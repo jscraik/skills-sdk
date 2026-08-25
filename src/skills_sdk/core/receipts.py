@@ -38,6 +38,7 @@ class Receipt:
     candidate: CandidateIdentity
     lane: str
     status: str
+    artifact_status: str | None
     evidence: tuple[str, ...]
     blocker: Blocker | None
     payload: Mapping[str, Any]
@@ -96,11 +97,17 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         source_revision=str(candidate_payload["source_revision"]),
         content_sha256=str(candidate_payload["content_sha256"]),
     )
+    artifact_status = str(payload["status"]) if schema_version == "package-receipt/v1" else None
+    generic_status = {
+        "built": "pass",
+        "blocked": "blocked",
+    }.get(artifact_status, str(payload["status"]))
     return Receipt(
         receipt_id=str(payload["receipt_id"]),
         candidate=candidate,
         lane=str(payload["lane"]),
-        status=str(payload["status"]),
+        status=generic_status,
+        artifact_status=artifact_status,
         evidence=evidence,
         blocker=_parse_blocker(blocker_payload),
         payload=_freeze_payload(payload),

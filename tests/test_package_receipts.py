@@ -46,7 +46,9 @@ def test_package_receipt_is_available_through_generic_parser() -> None:
     receipt = parse_receipt(payload)
     assert receipt.receipt_id == "synthetic-package-receipt-1"
     assert receipt.lane == "validation"
-    assert receipt.status == "built"
+    assert receipt.status == "pass"
+    assert receipt.artifact_status == "built"
+    assert receipt.payload["status"] == "built"
     assert receipt.candidate.package_id == "synthetic-skill"
 
 
