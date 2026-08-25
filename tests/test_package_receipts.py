@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from skills_sdk.core.errors import ContractError
+from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import PackageReceipt
 
@@ -53,3 +55,19 @@ def test_built_receipt_cannot_omit_manifest_files() -> None:
 def test_package_candidate_is_not_a_machine_path() -> None:
     candidate = _candidate()
     assert candidate.package_id == "synthetic-skill"
+
+
+def test_schema_registry_rejects_receipt_candidate_mismatch() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    payload["manifest"]["candidate"]["source_revision"] = "2" * 40
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-receipt.v1", payload)
+    assert any("same candidate" in detail for detail in error.value.details)
+
+
+def test_schema_registry_rejects_receipt_missing_manifest_path() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    payload["included_files"] = ["SKILL.md"]
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-receipt.v1", payload)
+    assert any("every manifest path" in detail for detail in error.value.details)
