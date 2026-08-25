@@ -1,0 +1,32 @@
+{
+  "schema_version": "package-receipt/v1",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "unsafe-skill",
+    "source_revision": "2222222222222222222222222222222222222222",
+    "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "status": "blocked",
+  "package_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "manifest": {
+    "schema_version": "package-manifest/v1",
+    "candidate": {
+      "schema_version": "package-candidate/v1",
+      "package_id": "unsafe-skill",
+      "source_revision": "2222222222222222222222222222222222222222",
+      "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "version": "0.1.0",
+    "files": [
+      {"path": "SKILL.md", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "size_bytes": 24, "role": "skill_md"}
+    ],
+    "provenance": {
+      "source": ["tests/fixtures/unsafe-skill"],
+      "builder": "skills-sdk/package-builder/v1"
+    }
+  },
+  "included_files": [],
+  "excluded_files": ["SKILL.md"],
+  "blocker_codes": ["unsafe_path"],
+  "mutation_performed": false
+}

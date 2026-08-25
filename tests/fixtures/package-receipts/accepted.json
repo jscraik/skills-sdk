@@ -1,0 +1,33 @@
+{
+  "schema_version": "package-receipt/v1",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "synthetic-skill",
+    "source_revision": "1111111111111111111111111111111111111111",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "status": "built",
+  "package_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "manifest": {
+    "schema_version": "package-manifest/v1",
+    "candidate": {
+      "schema_version": "package-candidate/v1",
+      "package_id": "synthetic-skill",
+      "source_revision": "1111111111111111111111111111111111111111",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "version": "0.1.0",
+    "files": [
+      {"path": "README.md", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size_bytes": 12, "role": "readme"},
+      {"path": "SKILL.md", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "size_bytes": 24, "role": "skill_md"}
+    ],
+    "provenance": {
+      "source": ["tests/fixtures/synthetic-skill"],
+      "builder": "skills-sdk/package-builder/v1"
+    }
+  },
+  "included_files": ["README.md", "SKILL.md"],
+  "excluded_files": ["references/internal.md"],
+  "blocker_codes": [],
+  "mutation_performed": false
+}

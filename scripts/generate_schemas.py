@@ -17,6 +17,7 @@ from skills_sdk.models.package import (
     PluginIdentity,
     SkillIdentity,
 )
+from skills_sdk.models.packaging import PackageManifest, PackageReceipt
 
 
 def _render_schema(model: type[object], filename: str) -> str:
@@ -42,6 +43,8 @@ def main() -> int:
         (PackageOwner, "package-owner.v1.schema.json"),
         (IntakeDecision, "intake-decision.v1.schema.json"),
         (NormalizedPackage, "normalized-package.v1.schema.json"),
+        (PackageManifest, "package-manifest.v1.schema.json"),
+        (PackageReceipt, "package-receipt.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
         target = schema_root / filename

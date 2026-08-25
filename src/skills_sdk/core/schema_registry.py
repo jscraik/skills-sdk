@@ -13,7 +13,15 @@ from referencing import Registry, Resource
 from skills_sdk.core.errors import ContractError
 
 SCHEMA_NAMES = frozenset(
-    {"blocker.v1", "package-identity.v1", "package-inventory-set.v1", "package-inventory.v1", "receipt-base.v1"}
+    {
+        "blocker.v1",
+        "package-identity.v1",
+        "package-inventory-set.v1",
+        "package-inventory.v1",
+        "package-manifest.v1",
+        "package-receipt.v1",
+        "receipt-base.v1",
+    }
 )
 
 

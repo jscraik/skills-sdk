@@ -30,6 +30,13 @@ from skills_sdk.models.package import (
     PluginIdentity,
     SkillIdentity,
 )
+from skills_sdk.models.packaging import (
+    PackageFileRole,
+    PackageManifest,
+    PackageManifestFile,
+    PackageManifestProvenance,
+    PackageReceipt,
+)
 
 __all__ = [
     "FormatChecks",
@@ -43,10 +50,15 @@ __all__ = [
     "OwnershipState",
     "PackageCandidateIdentity",
     "PackageDisposition",
+    "PackageFileRole",
     "PackageInventory",
     "PackageInventoryRecord",
     "PackageLifecycleState",
+    "PackageManifest",
+    "PackageManifestFile",
+    "PackageManifestProvenance",
     "PackageOwner",
+    "PackageReceipt",
     "PackageSource",
     "PackageSourceKind",
     "PackageType",
