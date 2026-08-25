@@ -1,0 +1,79 @@
+{
+  "$defs": {
+    "PackageSourceKind": {
+      "description": "How a package source was obtained before normalization.",
+      "enum": [
+        "git",
+        "archive",
+        "external",
+        "local"
+      ],
+      "title": "PackageSourceKind",
+      "type": "string"
+    },
+    "SourceProvenance": {
+      "additionalProperties": false,
+      "description": "Immutable source identity retained for an inventory candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "path",
+        "content_sha256"
+      ],
+      "title": "SourceProvenance",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/package-source.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Source identity preserved before a package is normalized.",
+  "properties": {
+    "package_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Package Id",
+      "type": "string"
+    },
+    "provenance": {
+      "$ref": "#/$defs/SourceProvenance"
+    },
+    "schema_version": {
+      "const": "package-source/v1",
+      "default": "package-source/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_kind": {
+      "$ref": "#/$defs/PackageSourceKind"
+    }
+  },
+  "required": [
+    "package_id",
+    "provenance",
+    "source_kind"
+  ],
+  "title": "PackageSource",
+  "type": "object"
+}

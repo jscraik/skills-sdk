@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "OwnershipState": {
+      "description": "Ownership posture at intake; it is not a runtime state.",
+      "enum": [
+        "canonical",
+        "transitional",
+        "external"
+      ],
+      "title": "OwnershipState",
+      "type": "string"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/package-owner.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Canonical ownership and rights evidence for one package candidate.",
+  "properties": {
+    "maintainer": {
+      "minLength": 1,
+      "title": "Maintainer",
+      "type": "string"
+    },
+    "owner": {
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "ownership_state": {
+      "$ref": "#/$defs/OwnershipState"
+    },
+    "rights": {
+      "$ref": "#/$defs/RightsStatus"
+    },
+    "schema_version": {
+      "const": "package-owner/v1",
+      "default": "package-owner/v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "owner",
+    "maintainer",
+    "ownership_state",
+    "rights"
+  ],
+  "title": "PackageOwner",
+  "type": "object"
+}

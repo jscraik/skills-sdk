@@ -1,0 +1,318 @@
+{
+  "$defs": {
+    "OwnershipState": {
+      "description": "Ownership posture at intake; it is not a runtime state.",
+      "enum": [
+        "canonical",
+        "transitional",
+        "external"
+      ],
+      "title": "OwnershipState",
+      "type": "string"
+    },
+    "PackageLifecycleState": {
+      "description": "Portable lifecycle state for a normalized package candidate.",
+      "enum": [
+        "discovered",
+        "normalized",
+        "admitted",
+        "blocked",
+        "retired"
+      ],
+      "title": "PackageLifecycleState",
+      "type": "string"
+    },
+    "PackageOwner": {
+      "additionalProperties": false,
+      "description": "Canonical ownership and rights evidence for one package candidate.",
+      "properties": {
+        "maintainer": {
+          "minLength": 1,
+          "title": "Maintainer",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ownership_state": {
+          "$ref": "#/$defs/OwnershipState"
+        },
+        "rights": {
+          "$ref": "#/$defs/RightsStatus"
+        },
+        "schema_version": {
+          "const": "package-owner/v1",
+          "default": "package-owner/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "maintainer",
+        "ownership_state",
+        "rights"
+      ],
+      "title": "PackageOwner",
+      "type": "object"
+    },
+    "PackageSource": {
+      "additionalProperties": false,
+      "description": "Source identity preserved before a package is normalized.",
+      "properties": {
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceProvenance"
+        },
+        "schema_version": {
+          "const": "package-source/v1",
+          "default": "package-source/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_kind": {
+          "$ref": "#/$defs/PackageSourceKind"
+        }
+      },
+      "required": [
+        "package_id",
+        "provenance",
+        "source_kind"
+      ],
+      "title": "PackageSource",
+      "type": "object"
+    },
+    "PackageSourceKind": {
+      "description": "How a package source was obtained before normalization.",
+      "enum": [
+        "git",
+        "archive",
+        "external",
+        "local"
+      ],
+      "title": "PackageSourceKind",
+      "type": "string"
+    },
+    "PackageType": {
+      "description": "Canonical package categories admitted by the Foundry.",
+      "enum": [
+        "skill",
+        "plugin"
+      ],
+      "title": "PackageType",
+      "type": "string"
+    },
+    "PluginIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Plugins identity, independent of a client adapter.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "plugin",
+          "default": "plugin",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "plugin-identity/v1",
+          "default": "plugin-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "PluginIdentity",
+      "type": "object"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    },
+    "SkillIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Skills identity, independent of runtime installation.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "skill",
+          "default": "skill",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "skill-identity/v1",
+          "default": "skill-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "SkillIdentity",
+      "type": "object"
+    },
+    "SourceProvenance": {
+      "additionalProperties": false,
+      "description": "Immutable source identity retained for an inventory candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "path",
+        "content_sha256"
+      ],
+      "title": "SourceProvenance",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/normalized-package.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Portable normalized package before provider or runtime projection.",
+  "properties": {
+    "dependencies": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "identity": {
+      "discriminator": {
+        "mapping": {
+          "plugin": "#/$defs/PluginIdentity",
+          "skill": "#/$defs/SkillIdentity"
+        },
+        "propertyName": "package_type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SkillIdentity"
+        },
+        {
+          "$ref": "#/$defs/PluginIdentity"
+        }
+      ],
+      "title": "Identity"
+    },
+    "lifecycle": {
+      "$ref": "#/$defs/PackageLifecycleState",
+      "default": "normalized"
+    },
+    "owner": {
+      "$ref": "#/$defs/PackageOwner"
+    },
+    "package_type": {
+      "$ref": "#/$defs/PackageType"
+    },
+    "schema_version": {
+      "const": "normalized-package/v1",
+      "default": "normalized-package/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/PackageSource"
+    }
+  },
+  "required": [
+    "package_type",
+    "identity",
+    "source",
+    "owner"
+  ],
+  "title": "NormalizedPackage",
+  "type": "object"
+}
