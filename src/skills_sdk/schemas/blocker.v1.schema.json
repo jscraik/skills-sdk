@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.skills-sdk.dev/blocker.v1.schema.json",
+  "title": "Typed blocker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message", "evidence_refs"],
+  "properties": {
+    "code": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+    "message": {"type": "string", "minLength": 1},
+    "evidence_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}

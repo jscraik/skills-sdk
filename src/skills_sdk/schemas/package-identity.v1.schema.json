@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.skills-sdk.dev/package-identity.v1.schema.json",
+  "title": "Package identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["package_id", "source_revision", "content_sha256"],
+  "properties": {
+    "package_id": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"},
+    "source_revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
