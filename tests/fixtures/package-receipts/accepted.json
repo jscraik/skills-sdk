@@ -1,12 +1,17 @@
 {
   "schema_version": "package-receipt/v1",
+  "receipt_id": "synthetic-package-receipt-1",
   "candidate": {
     "schema_version": "package-candidate/v1",
     "package_id": "synthetic-skill",
     "source_revision": "1111111111111111111111111111111111111111",
     "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
+  "lane": "validation",
   "status": "built",
+  "started_at": "2026-08-25T10:00:00Z",
+  "finished_at": "2026-08-25T10:00:01Z",
+  "evidence": ["tests/fixtures/synthetic-skill/SKILL.md"],
   "package_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
   "manifest": {
     "schema_version": "package-manifest/v1",
@@ -28,6 +33,5 @@
   },
   "included_files": ["README.md", "SKILL.md"],
   "excluded_files": ["references/internal.md"],
-  "blocker_codes": [],
   "mutation_performed": false
 }

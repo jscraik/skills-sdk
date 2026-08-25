@@ -50,7 +50,7 @@ class Receipt:
 def _parse_blocker(payload: Mapping[str, Any] | None) -> Blocker | None:
     if payload is None:
         return None
-    refs = tuple(str(ref) for ref in payload["evidence_refs"])
+    refs = tuple(str(ref) for ref in payload.get("evidence_refs", ()))
     for ref in refs:
         require_portable_relative_path(ref)
     return Blocker(code=str(payload["code"]), message=str(payload["message"]), evidence_refs=refs)
@@ -60,14 +60,22 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
     """Validate untrusted receipt data and return immutable public records."""
 
     active_registry = registry or SchemaRegistry()
-    active_registry.validate("receipt-base.v1", payload)
+    schema_version = payload.get("schema_version")
+    if schema_version == "package-receipt/v1":
+        # Package receipts are a concrete result contract layered on the
+        # generic receipt shape. Validate their richer invariants first, then
+        # expose the stable generic Receipt API to callers.
+        active_registry.validate("package-receipt.v1", payload)
+    else:
+        active_registry.validate("receipt-base.v1", payload)
     candidate_payload = payload["candidate"]
-    active_registry.validate("package-identity.v1", candidate_payload)
+    if schema_version != "package-receipt/v1":
+        active_registry.validate("package-identity.v1", candidate_payload)
     evidence = tuple(str(ref) for ref in payload["evidence"])
     for ref in evidence:
         require_portable_relative_path(ref)
     blocker_payload = payload.get("blocker")
-    if blocker_payload is not None:
+    if blocker_payload is not None and schema_version != "package-receipt/v1":
         active_registry.validate("blocker.v1", blocker_payload)
     candidate = CandidateIdentity(
         package_id=str(candidate_payload["package_id"]),

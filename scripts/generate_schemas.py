@@ -22,6 +22,33 @@ from skills_sdk.models.packaging import PackageManifest, PackageReceipt
 
 def _render_schema(model: type[object], filename: str) -> str:
     schema = model.model_json_schema()  # type: ignore[attr-defined]
+    if filename == "package-receipt.v1.schema.json":
+        # Pydantic emits field types but cannot express the status-dependent
+        # receipt invariants enforced by PackageReceipt.model_validator.
+        schema["allOf"] = [
+            {
+                "if": {"properties": {"status": {"const": "built"}}},
+                "then": {
+                    "required": ["package_digest", "manifest", "included_files"],
+                    "properties": {
+                        "blocker": {"not": {}},
+                        "package_digest": {"not": {"type": "null"}},
+                        "manifest": {"not": {"type": "null"}},
+                        "included_files": {"minItems": 1},
+                    },
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "blocked"}}},
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {
+                        "blocker": {"$ref": "#/$defs/PackageReceiptBlocker"},
+                        "package_digest": {"type": "null"},
+                    },
+                },
+            },
+        ]
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = f"https://schemas.skills-sdk.dev/{filename}"
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"

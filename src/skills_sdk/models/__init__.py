@@ -36,6 +36,7 @@ from skills_sdk.models.packaging import (
     PackageManifestFile,
     PackageManifestProvenance,
     PackageReceipt,
+    PackageReceiptBlocker,
 )
 
 __all__ = [
@@ -59,6 +60,7 @@ __all__ = [
     "PackageManifestProvenance",
     "PackageOwner",
     "PackageReceipt",
+    "PackageReceiptBlocker",
     "PackageSource",
     "PackageSourceKind",
     "PackageType",

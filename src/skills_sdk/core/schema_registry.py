@@ -63,12 +63,19 @@ class SchemaRegistry:
     def _validate_registered_model(name: str, payload: object) -> None:
         """Apply semantic invariants after structural schema validation."""
 
-        if name != "package-receipt.v1":
+        if name == "package-manifest.v1":
+            from skills_sdk.models.packaging import PackageManifest
+
+            model = PackageManifest
+        elif name == "package-receipt.v1":
+            from skills_sdk.models.packaging import PackageReceipt
+
+            model = PackageReceipt
+        else:
             return
-        from skills_sdk.models.packaging import PackageReceipt
 
         try:
-            PackageReceipt.model_validate(payload)
+            model.model_validate(payload)
         except ValidationError as error:
             details = tuple(item["msg"] for item in error.errors())
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details) from error
