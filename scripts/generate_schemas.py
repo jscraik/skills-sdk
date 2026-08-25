@@ -8,6 +8,15 @@ import json
 from pathlib import Path
 
 from skills_sdk.models.inventory import PackageInventory, PackageInventoryRecord
+from skills_sdk.models.package import (
+    IntakeDecision,
+    NormalizedPackage,
+    PackageCandidateIdentity,
+    PackageOwner,
+    PackageSource,
+    PluginIdentity,
+    SkillIdentity,
+)
 
 
 def _render_schema(model: type[object], filename: str) -> str:
@@ -26,6 +35,13 @@ def main() -> int:
     for model, filename in (
         (PackageInventoryRecord, "package-inventory.v1.schema.json"),
         (PackageInventory, "package-inventory-set.v1.schema.json"),
+        (PackageCandidateIdentity, "package-candidate.v1.schema.json"),
+        (SkillIdentity, "skill-identity.v1.schema.json"),
+        (PluginIdentity, "plugin-identity.v1.schema.json"),
+        (PackageSource, "package-source.v1.schema.json"),
+        (PackageOwner, "package-owner.v1.schema.json"),
+        (IntakeDecision, "intake-decision.v1.schema.json"),
+        (NormalizedPackage, "normalized-package.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
         target = schema_root / filename

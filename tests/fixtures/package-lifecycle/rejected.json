@@ -1,0 +1,35 @@
+{
+  "schema_version": "normalized-package/v1",
+  "package_type": "skill",
+  "identity": {
+    "schema_version": "skill-identity/v1",
+    "package_type": "skill",
+    "package_id": "unsafe-skill",
+    "name": "unsafe-skill",
+    "version": "0.1.0"
+  },
+  "source": {
+    "schema_version": "package-source/v1",
+    "package_id": "different-skill",
+    "provenance": {
+      "repository": "jscraik/agent-skills",
+      "revision": "1111111111111111111111111111111111111111",
+      "path": "tests/fixtures/synthetic-skill/SKILL.md",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "source_kind": "git"
+  },
+  "owner": {
+    "schema_version": "package-owner/v1",
+    "owner": "jscraik",
+    "maintainer": "jscraik",
+    "ownership_state": "canonical",
+    "rights": {
+      "basis": "authored",
+      "license": "Apache-2.0",
+      "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md"
+    }
+  },
+  "lifecycle": "normalized",
+  "dependencies": []
+}

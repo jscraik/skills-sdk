@@ -1,0 +1,42 @@
+{
+  "$id": "https://schemas.skills-sdk.dev/plugin-identity.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Agent Plugins identity, independent of a client adapter.",
+  "properties": {
+    "name": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "package_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Package Id",
+      "type": "string"
+    },
+    "package_type": {
+      "const": "plugin",
+      "default": "plugin",
+      "title": "Package Type",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "plugin-identity/v1",
+      "default": "plugin-identity/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "package_id",
+    "name",
+    "version"
+  ],
+  "title": "PluginIdentity",
+  "type": "object"
+}

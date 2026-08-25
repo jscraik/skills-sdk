@@ -1,0 +1,42 @@
+{
+  "$id": "https://schemas.skills-sdk.dev/skill-identity.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Agent Skills identity, independent of runtime installation.",
+  "properties": {
+    "name": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "package_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Package Id",
+      "type": "string"
+    },
+    "package_type": {
+      "const": "skill",
+      "default": "skill",
+      "title": "Package Type",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "skill-identity/v1",
+      "default": "skill-identity/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "package_id",
+    "name",
+    "version"
+  ],
+  "title": "SkillIdentity",
+  "type": "object"
+}
