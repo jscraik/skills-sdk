@@ -1,0 +1,38 @@
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12"]
+build-backend = "uv_build"
+
+[project]
+name = "skills-sdk"
+version = "0.1.0"
+description = "Portable lifecycle contracts and tooling for Agent Skills packages."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.scripts]
+skills-sdk = "skills_sdk.cli.main:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.3,<10",
+  "ruff>=0.15.5,<0.16",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.build-backend]
+module-name = "skills_sdk"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

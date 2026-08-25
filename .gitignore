@@ -1,0 +1,13 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+dist/
+build/
+*.egg-info/
+.DS_Store
+
+# SDK receipts and provider runs are runtime output, never public source.
+.harness/
+.tmp/
