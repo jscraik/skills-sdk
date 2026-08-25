@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "SecurityFinding": {
+      "additionalProperties": false,
+      "description": "Redacted finding metadata; raw secret values never enter the contract.",
+      "properties": {
+        "category": {
+          "enum": [
+            "secret",
+            "unsafe_path",
+            "external_service",
+            "license",
+            "mcp_auth",
+            "dependency"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "blocker"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "severity",
+        "message",
+        "evidence_refs"
+      ],
+      "title": "SecurityFinding",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/security-screening.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Candidate-bound secret and unsafe-package screening result.",
+  "properties": {
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "findings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SecurityFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "scanned_paths": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Scanned Paths",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "security-screening/v1",
+      "default": "security-screening/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "needs_review",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate",
+    "status",
+    "scanned_paths"
+  ],
+  "title": "SecurityScreeningResult",
+  "type": "object"
+}

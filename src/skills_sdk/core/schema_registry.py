@@ -22,6 +22,8 @@ SCHEMA_NAMES = frozenset(
         "package-manifest.v1",
         "package-receipt.v1",
         "receipt-base.v1",
+        "risk-classification.v1",
+        "security-screening.v1",
     }
 )
 

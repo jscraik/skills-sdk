@@ -1,0 +1,23 @@
+{
+  "schema_version": "risk-classification/v1",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "synthetic-skill",
+    "source_revision": "1111111111111111111111111111111111111111",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "source_kind": "scripted",
+  "risk_tier": "high",
+  "probability": "medium",
+  "impact": "high",
+  "detectability": "medium",
+  "cost": "medium",
+  "blocking_behavior": "block",
+  "receipt_required": true,
+  "sensor_ids": ["source-scan", "schema-check"],
+  "sensors": [
+    {"id": "source-scan", "placement": "static", "required": true, "cost": "low", "blocking_behavior": "block", "status": "selected", "receipt_required": true},
+    {"id": "schema-check", "placement": "schema", "required": true, "cost": "low", "blocking_behavior": "block", "status": "selected", "receipt_required": true}
+  ],
+  "acceptance_trace": ["risk-tier-selected", "required-sensors-bound"]
+}

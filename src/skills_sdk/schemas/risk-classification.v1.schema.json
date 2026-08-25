@@ -1,0 +1,241 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "RiskSensor": {
+      "additionalProperties": false,
+      "description": "One selected or available sensor in a candidate risk plan.",
+      "properties": {
+        "blocking_behavior": {
+          "enum": [
+            "block",
+            "warn",
+            "advisory",
+            "skip_optional"
+          ],
+          "title": "Blocking Behavior",
+          "type": "string"
+        },
+        "cost": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Cost",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "placement": {
+          "enum": [
+            "source",
+            "schema",
+            "static",
+            "runtime_adapter",
+            "external_adapter",
+            "preview"
+          ],
+          "title": "Placement",
+          "type": "string"
+        },
+        "receipt_required": {
+          "title": "Receipt Required",
+          "type": "boolean"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "selected",
+            "available_not_run",
+            "skipped_optional",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "placement",
+        "required",
+        "cost",
+        "blocking_behavior",
+        "status",
+        "receipt_required"
+      ],
+      "title": "RiskSensor",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/risk-classification.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Candidate-bound risk posture with explicit sensor coverage.",
+  "properties": {
+    "acceptance_trace": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Acceptance Trace",
+      "type": "array"
+    },
+    "blocking_behavior": {
+      "enum": [
+        "block",
+        "warn",
+        "advisory",
+        "skip_optional"
+      ],
+      "title": "Blocking Behavior",
+      "type": "string"
+    },
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "cost": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Cost",
+      "type": "string"
+    },
+    "detectability": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown"
+      ],
+      "title": "Detectability",
+      "type": "string"
+    },
+    "impact": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown"
+      ],
+      "title": "Impact",
+      "type": "string"
+    },
+    "probability": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown"
+      ],
+      "title": "Probability",
+      "type": "string"
+    },
+    "receipt_required": {
+      "title": "Receipt Required",
+      "type": "boolean"
+    },
+    "risk_tier": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "privileged",
+        "published"
+      ],
+      "title": "Risk Tier",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "risk-classification/v1",
+      "default": "risk-classification/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sensor_ids": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Sensor Ids",
+      "type": "array"
+    },
+    "sensors": {
+      "items": {
+        "$ref": "#/$defs/RiskSensor"
+      },
+      "minItems": 1,
+      "title": "Sensors",
+      "type": "array"
+    },
+    "source_kind": {
+      "enum": [
+        "docs_only",
+        "referenced",
+        "scripted",
+        "external",
+        "placeholder"
+      ],
+      "title": "Source Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate",
+    "source_kind",
+    "risk_tier",
+    "probability",
+    "impact",
+    "detectability",
+    "cost",
+    "blocking_behavior",
+    "receipt_required",
+    "sensor_ids",
+    "sensors",
+    "acceptance_trace"
+  ],
+  "title": "RiskClassification",
+  "type": "object"
+}
