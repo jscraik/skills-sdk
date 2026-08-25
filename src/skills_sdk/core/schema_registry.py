@@ -8,12 +8,21 @@ from importlib.resources import files
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
+from pydantic import ValidationError
 from referencing import Registry, Resource
 
 from skills_sdk.core.errors import ContractError
 
 SCHEMA_NAMES = frozenset(
-    {"blocker.v1", "package-identity.v1", "package-inventory-set.v1", "package-inventory.v1", "receipt-base.v1"}
+    {
+        "blocker.v1",
+        "package-identity.v1",
+        "package-inventory-set.v1",
+        "package-inventory.v1",
+        "package-manifest.v1",
+        "package-receipt.v1",
+        "receipt-base.v1",
+    }
 )
 
 
@@ -48,3 +57,25 @@ class SchemaRegistry:
         if errors:
             details = tuple(error.message for error in errors)
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details)
+        self._validate_registered_model(name, payload)
+
+    @staticmethod
+    def _validate_registered_model(name: str, payload: object) -> None:
+        """Apply semantic invariants after structural schema validation."""
+
+        if name == "package-manifest.v1":
+            from skills_sdk.models.packaging import PackageManifest
+
+            model = PackageManifest
+        elif name == "package-receipt.v1":
+            from skills_sdk.models.packaging import PackageReceipt
+
+            model = PackageReceipt
+        else:
+            return
+
+        try:
+            model.model_validate(payload)
+        except ValidationError as error:
+            details = tuple(item["msg"] for item in error.errors())
+            raise ContractError("contract_validation_failed", f"{name} rejected the payload", details) from error
