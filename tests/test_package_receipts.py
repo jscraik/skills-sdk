@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from skills_sdk.core.errors import ContractError
-from skills_sdk.core.receipts import parse_receipt
+from skills_sdk.core.receipts import CandidateIdentity, Receipt, parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import PackageReceipt
@@ -59,6 +59,16 @@ def test_package_receipt_payload_is_deeply_immutable() -> None:
     assert receipt.payload["manifest"]["candidate"]["source_revision"] == "1" * 40
     with pytest.raises(TypeError):
         receipt.payload["manifest"]["candidate"]["source_revision"] = "3" * 40
+
+
+def test_generic_receipt_constructor_keeps_artifact_status_optional() -> None:
+    candidate = CandidateIdentity(
+        package_id="synthetic-skill",
+        source_revision="1" * 40,
+        content_sha256="a" * 64,
+    )
+    receipt = Receipt("receipt-1", candidate, "validation", "pass", (), None, {})
+    assert receipt.artifact_status is None
 
 
 def test_blocked_package_receipt_allows_blocker_without_evidence_refs() -> None:

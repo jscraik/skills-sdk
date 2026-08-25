@@ -38,10 +38,10 @@ class Receipt:
     candidate: CandidateIdentity
     lane: str
     status: str
-    artifact_status: str | None
     evidence: tuple[str, ...]
     blocker: Blocker | None
     payload: Mapping[str, Any]
+    artifact_status: str | None = None
 
     def require_candidate(self, expected: CandidateIdentity) -> None:
         if self.candidate != expected:
