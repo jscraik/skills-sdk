@@ -12,7 +12,9 @@ from referencing import Registry, Resource
 
 from skills_sdk.core.errors import ContractError
 
-SCHEMA_NAMES = frozenset({"blocker.v1", "package-identity.v1", "receipt-base.v1"})
+SCHEMA_NAMES = frozenset(
+    {"blocker.v1", "package-identity.v1", "package-inventory-set.v1", "package-inventory.v1", "receipt-base.v1"}
+)
 
 
 @dataclass(frozen=True, slots=True)

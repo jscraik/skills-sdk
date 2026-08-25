@@ -1,0 +1,330 @@
+{
+  "$defs": {
+    "FormatChecks": {
+      "additionalProperties": false,
+      "description": "Format evidence recorded during read-only package inventory.",
+      "properties": {
+        "codex_adapter_manifest": {
+          "default": false,
+          "title": "Codex Adapter Manifest",
+          "type": "boolean"
+        },
+        "root_plugin_manifest": {
+          "default": false,
+          "title": "Root Plugin Manifest",
+          "type": "boolean"
+        }
+      },
+      "title": "FormatChecks",
+      "type": "object"
+    },
+    "PackageDisposition": {
+      "description": "Explicit inventory outcomes; none imply mutation.",
+      "enum": [
+        "admit_to_foundry",
+        "merge_with_existing",
+        "retain_external_source",
+        "runtime_only",
+        "sdk_fixture_only",
+        "archive_with_provenance",
+        "reject_duplicate",
+        "reject_unsafe",
+        "needs_owner_decision"
+      ],
+      "title": "PackageDisposition",
+      "type": "string"
+    },
+    "PackageInventoryRecord": {
+      "additionalProperties": false,
+      "description": "One read-only inventory record for a retained skill or plugin.",
+      "properties": {
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "current_path": {
+          "minLength": 1,
+          "title": "Current Path",
+          "type": "string"
+        },
+        "declared_version": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declared Version"
+        },
+        "direct_consumers": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Direct Consumers",
+          "type": "array"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "duplicate_of": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duplicate Of"
+        },
+        "external_dependencies": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "External Dependencies",
+          "type": "array"
+        },
+        "format_checks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FormatChecks"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "intended_disposition": {
+          "$ref": "#/$defs/PackageDisposition"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "$ref": "#/$defs/PackageType"
+        },
+        "rights": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RightsStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "risk": {
+          "$ref": "#/$defs/RiskClass",
+          "default": "none"
+        },
+        "runtime_visibility": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RuntimeVisibility"
+          },
+          "title": "Runtime Visibility",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "package-inventory/v1",
+          "default": "package-inventory/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceProvenance"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tessl_identity": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tessl Identity"
+        }
+      },
+      "required": [
+        "package_id",
+        "package_type",
+        "current_path",
+        "owner",
+        "intended_disposition"
+      ],
+      "title": "PackageInventoryRecord",
+      "type": "object"
+    },
+    "PackageType": {
+      "description": "Canonical package categories admitted by the Foundry.",
+      "enum": [
+        "skill",
+        "plugin"
+      ],
+      "title": "PackageType",
+      "type": "string"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    },
+    "RiskClass": {
+      "description": "Inventory risk classification before admission.",
+      "enum": [
+        "none",
+        "review",
+        "blocked"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    },
+    "RuntimeVisibility": {
+      "description": "Observed runtime surfaces, kept separate from canonical ownership.",
+      "enum": [
+        "user_agents",
+        "project_agents",
+        "codex_plugin_cache",
+        "none"
+      ],
+      "title": "RuntimeVisibility",
+      "type": "string"
+    },
+    "SourceProvenance": {
+      "additionalProperties": false,
+      "description": "Immutable source identity retained for an inventory candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "path",
+        "content_sha256"
+      ],
+      "title": "SourceProvenance",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/package-inventory-set.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A deterministic, read-only inventory snapshot.",
+  "properties": {
+    "records": {
+      "items": {
+        "$ref": "#/$defs/PackageInventoryRecord"
+      },
+      "title": "Records",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "package-inventory-set/v1",
+      "default": "package-inventory-set/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_revision": {
+      "pattern": "^[0-9a-f]{40}$",
+      "title": "Source Revision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_revision",
+    "records"
+  ],
+  "title": "PackageInventory",
+  "type": "object"
+}
