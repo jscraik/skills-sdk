@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -49,12 +50,31 @@ def test_package_receipt_is_available_through_generic_parser() -> None:
     assert receipt.candidate.package_id == "synthetic-skill"
 
 
+def test_package_receipt_payload_is_deeply_immutable() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    receipt = parse_receipt(payload)
+    payload["manifest"]["candidate"]["source_revision"] = "2" * 40
+    assert receipt.payload["manifest"]["candidate"]["source_revision"] == "1" * 40
+    with pytest.raises(TypeError):
+        receipt.payload["manifest"]["candidate"]["source_revision"] = "3" * 40
+
+
 def test_blocked_package_receipt_allows_blocker_without_evidence_refs() -> None:
     payload = json.loads((FIXTURE_ROOT / "blocked.json").read_text(encoding="utf-8"))
     payload["blocker"].pop("evidence_refs")
     receipt = parse_receipt(payload)
     assert receipt.blocker is not None
     assert receipt.blocker.evidence_refs == ()
+
+
+@pytest.mark.parametrize("field", ["schema_version", "lane"])
+def test_package_receipt_requires_routing_fields(field: str) -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    payload.pop(field)
+    with pytest.raises(ValidationError):
+        PackageReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-receipt.v1", payload)
 
 
 def test_manifest_and_receipt_must_bind_same_candidate() -> None:
@@ -98,6 +118,13 @@ def test_receipt_finished_at_must_not_precede_started_at() -> None:
         PackageReceipt.model_validate(payload)
 
 
+def test_receipt_timestamps_require_timezone() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    payload["started_at"] = datetime(2026, 8, 25, 10, 0, 0)
+    with pytest.raises(ValidationError):
+        PackageReceipt.model_validate(payload)
+
+
 def test_package_candidate_is_not_a_machine_path() -> None:
     candidate = _candidate()
     assert candidate.package_id == "synthetic-skill"
@@ -132,6 +159,14 @@ def test_schema_registry_rejects_null_built_artifacts() -> None:
     payload["manifest"] = None
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("package-receipt.v1", payload)
+
+
+def test_schema_registry_accepts_explicit_null_built_blocker() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    payload["blocker"] = None
+    receipt = PackageReceipt.model_validate(payload)
+    SchemaRegistry().validate("package-receipt.v1", payload)
+    assert receipt.blocker is None
 
 
 def test_schema_registry_rejects_duplicate_manifest_paths() -> None:

@@ -47,6 +47,20 @@ class Receipt:
             raise ContractError("candidate_mismatch", "receipt is bound to a different candidate")
 
 
+def _freeze_payload(value: Any) -> Any:
+    """Copy JSON-shaped receipt data into recursively immutable containers."""
+
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze_payload(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze_payload(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze_payload(item) for item in value)
+    if isinstance(value, set):
+        return frozenset(_freeze_payload(item) for item in value)
+    return value
+
+
 def _parse_blocker(payload: Mapping[str, Any] | None) -> Blocker | None:
     if payload is None:
         return None
@@ -89,5 +103,5 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         status=str(payload["status"]),
         evidence=evidence,
         blocker=_parse_blocker(blocker_payload),
-        payload=MappingProxyType(dict(payload)),
+        payload=_freeze_payload(payload),
     )

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints, field_validator, model_validator
+from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
 
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
@@ -91,13 +90,13 @@ class PackageReceiptBlocker(_ContractModel):
 class PackageReceipt(_ContractModel):
     """Candidate-bound package result with stable proof-receipt fields."""
 
-    schema_version: Literal["package-receipt/v1"] = "package-receipt/v1"
+    schema_version: Literal["package-receipt/v1"]
     receipt_id: ReceiptId
     candidate: PackageCandidateIdentity
-    lane: Literal["validation"] = "validation"
+    lane: Literal["validation"]
     status: Literal["built", "blocked"]
-    started_at: datetime
-    finished_at: datetime
+    started_at: AwareDatetime
+    finished_at: AwareDatetime
     evidence: tuple[PortablePath, ...] = Field(min_length=1)
     blocker: PackageReceiptBlocker | None = None
     package_digest: Sha256 | None = None

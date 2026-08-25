@@ -31,7 +31,7 @@ def _render_schema(model: type[object], filename: str) -> str:
                 "then": {
                     "required": ["package_digest", "manifest", "included_files"],
                     "properties": {
-                        "blocker": {"not": {}},
+                        "blocker": {"type": "null"},
                         "package_digest": {"not": {"type": "null"}},
                         "manifest": {"not": {"type": "null"}},
                         "included_files": {"minItems": 1},

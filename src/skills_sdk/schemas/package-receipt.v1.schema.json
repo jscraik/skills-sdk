@@ -191,7 +191,7 @@
       "then": {
         "properties": {
           "blocker": {
-            "not": {}
+            "type": "null"
           },
           "included_files": {
             "minItems": 1
@@ -287,7 +287,6 @@
     },
     "lane": {
       "const": "validation",
-      "default": "validation",
       "title": "Lane",
       "type": "string"
     },
@@ -328,7 +327,6 @@
     },
     "schema_version": {
       "const": "package-receipt/v1",
-      "default": "package-receipt/v1",
       "title": "Schema Version",
       "type": "string"
     },
@@ -347,8 +345,10 @@
     }
   },
   "required": [
+    "schema_version",
     "receipt_id",
     "candidate",
+    "lane",
     "status",
     "started_at",
     "finished_at",
