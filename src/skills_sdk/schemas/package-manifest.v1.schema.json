@@ -127,7 +127,6 @@
     },
     "schema_version": {
       "const": "package-manifest/v1",
-      "default": "package-manifest/v1",
       "title": "Schema Version",
       "type": "string"
     },
@@ -138,6 +137,7 @@
     }
   },
   "required": [
+    "schema_version",
     "candidate",
     "version",
     "files",

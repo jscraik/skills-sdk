@@ -58,7 +58,7 @@ class PackageManifestProvenance(_ContractModel):
 class PackageManifest(_ContractModel):
     """Candidate-bound package contents before distribution or installation."""
 
-    schema_version: Literal["package-manifest/v1"] = "package-manifest/v1"
+    schema_version: Literal["package-manifest/v1"]
     candidate: PackageCandidateIdentity
     version: NonEmptyText
     files: tuple[PackageManifestFile, ...] = Field(min_length=1)
@@ -138,6 +138,8 @@ class PackageReceipt(_ContractModel):
                 raise ValueError("blocked receipt paths require a manifest")
             if not included_paths <= manifest_paths:
                 raise ValueError("blocked package receipt included files must be manifested")
+            if set(self.excluded_files) & manifest_paths:
+                raise ValueError("blocked package receipt excluded files must not be manifested")
         if included_paths & set(self.excluded_files):
             raise ValueError("included and excluded package paths must be disjoint")
         return self

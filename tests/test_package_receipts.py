@@ -148,6 +148,26 @@ def test_schema_registry_rejects_receipt_missing_manifest_path() -> None:
     assert any("every manifest path" in detail for detail in error.value.details)
 
 
+def test_schema_registry_requires_manifest_schema_version() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))["manifest"]
+    payload.pop("schema_version")
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-manifest.v1", payload)
+
+
+def test_blocked_receipt_rejects_excluded_manifest_path() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    payload["status"] = "blocked"
+    payload["package_digest"] = None
+    payload["blocker"] = {"code": "unsafe_path", "message": "blocked", "evidence_refs": []}
+    payload["included_files"] = []
+    payload["excluded_files"] = ["SKILL.md"]
+    with pytest.raises(ValidationError, match="excluded files must not be manifested"):
+        PackageReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-receipt.v1", payload)
+
+
 def test_schema_registry_rejects_built_receipt_without_included_files() -> None:
     payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
     payload.pop("included_files")
