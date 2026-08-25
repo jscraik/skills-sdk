@@ -1,0 +1,49 @@
+{
+  "schema_version": "package-inventory/v1",
+  "package_id": "synthetic-skill",
+  "package_type": "skill",
+  "current_path": "skills/synthetic-skill",
+  "declared_version": "0.1.0",
+  "owner": "synthetic-owner",
+  "user_outcome": "make a source-bound package admission decision",
+  "distinctive_value": "keeps package identity and rights evidence together",
+  "maintenance_cost": "one catalog record and one SDK contract",
+  "context_cost": "loaded only during inventory or admission review",
+  "overlap_with_existing": [],
+  "recommended_mechanism": "standalone_skill",
+  "value_decision": "retain",
+  "mantra": {
+    "source_revision": "1111111111111111111111111111111111111111",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "taste": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "thin_surfaces": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "strong_guardrails": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "simplicity": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "progressive_disclosure": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "durable_memory": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "valuemaxxing": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "self_improvement": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "professional_output": {"status": "pass", "evidence": ["tests/fixtures/inventory/accepted.json"]},
+    "overall": "pass"
+  },
+  "source": {
+    "repository": "https://example.invalid/source.git",
+    "revision": "1111111111111111111111111111111111111111",
+    "path": "skills/synthetic-skill",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "rights": {
+    "basis": "authored",
+    "license": "Apache-2.0",
+    "evidence_ref": "evidence/rights.json"
+  },
+  "direct_consumers": ["tests/fixtures/synthetic-skill/SKILL.md"],
+  "runtime_visibility": [],
+  "duplicate_of": null,
+  "risk": "none",
+  "external_dependencies": [],
+  "tessl_identity": null,
+  "blocker_codes": [],
+  "format_checks": null,
+  "intended_disposition": "admit_to_foundry"
+}

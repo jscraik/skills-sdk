@@ -5,6 +5,8 @@ for Agent Skills packages: source shape, package identity, authoring contracts,
 security guardrails, behavioral evaluation, scorer quality, immutable receipts,
 provider handoff, and runtime verification boundaries.
 
+> Thin Surfaces. Strong Guardrails. Progressive Disclosure. Durable Memory. Professional Output.
+
 ## Current status
 
 This seed establishes only the public repository, packaging, review, and
@@ -28,3 +30,6 @@ uv sync --frozen
 bash scripts/validate-repository.sh
 uv run skills-sdk --help
 ```
+
+The cold-agent entrypoint and progressive-disclosure contract are documented in
+[`docs/agent-entrypoint.md`](docs/agent-entrypoint.md).

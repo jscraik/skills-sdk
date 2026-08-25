@@ -1,0 +1,493 @@
+{
+  "$defs": {
+    "FormatChecks": {
+      "additionalProperties": false,
+      "description": "Format evidence recorded during read-only package inventory.",
+      "properties": {
+        "codex_adapter_manifest": {
+          "default": false,
+          "title": "Codex Adapter Manifest",
+          "type": "boolean"
+        },
+        "root_plugin_manifest": {
+          "default": false,
+          "title": "Root Plugin Manifest",
+          "type": "boolean"
+        }
+      },
+      "title": "FormatChecks",
+      "type": "object"
+    },
+    "MantraAssessment": {
+      "additionalProperties": false,
+      "description": "The complete nine-part assessment bound to one exact candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "durable_memory": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "overall": {
+          "$ref": "#/$defs/MantraStatus"
+        },
+        "professional_output": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "progressive_disclosure": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "self_improvement": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "simplicity": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        },
+        "strong_guardrails": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "taste": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "thin_surfaces": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "valuemaxxing": {
+          "$ref": "#/$defs/MantraPrinciple"
+        }
+      },
+      "required": [
+        "source_revision",
+        "content_sha256",
+        "taste",
+        "thin_surfaces",
+        "strong_guardrails",
+        "simplicity",
+        "progressive_disclosure",
+        "durable_memory",
+        "valuemaxxing",
+        "self_improvement",
+        "professional_output",
+        "overall"
+      ],
+      "title": "MantraAssessment",
+      "type": "object"
+    },
+    "MantraPrinciple": {
+      "additionalProperties": false,
+      "description": "Candidate-bound evidence for one engineering-mantra principle.",
+      "properties": {
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/MantraStatus"
+        }
+      },
+      "required": [
+        "status",
+        "evidence"
+      ],
+      "title": "MantraPrinciple",
+      "type": "object"
+    },
+    "MantraStatus": {
+      "description": "Assessment status for one engineering-mantra principle.",
+      "enum": [
+        "pass",
+        "revise",
+        "reject"
+      ],
+      "title": "MantraStatus",
+      "type": "string"
+    },
+    "PackageDisposition": {
+      "description": "Explicit inventory outcomes; none imply mutation.",
+      "enum": [
+        "admit_to_foundry",
+        "merge_with_existing",
+        "retain_external_source",
+        "runtime_only",
+        "sdk_fixture_only",
+        "archive_with_provenance",
+        "reject_duplicate",
+        "reject_unsafe",
+        "needs_owner_decision"
+      ],
+      "title": "PackageDisposition",
+      "type": "string"
+    },
+    "PackageInventoryRecord": {
+      "additionalProperties": false,
+      "description": "One read-only inventory record for a retained skill or plugin.",
+      "properties": {
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "context_cost": {
+          "minLength": 1,
+          "title": "Context Cost",
+          "type": "string"
+        },
+        "current_path": {
+          "minLength": 1,
+          "title": "Current Path",
+          "type": "string"
+        },
+        "declared_version": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declared Version"
+        },
+        "direct_consumers": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Direct Consumers",
+          "type": "array"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "distinctive_value": {
+          "minLength": 1,
+          "title": "Distinctive Value",
+          "type": "string"
+        },
+        "duplicate_of": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duplicate Of"
+        },
+        "external_dependencies": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "External Dependencies",
+          "type": "array"
+        },
+        "format_checks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FormatChecks"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "intended_disposition": {
+          "$ref": "#/$defs/PackageDisposition"
+        },
+        "maintenance_cost": {
+          "minLength": 1,
+          "title": "Maintenance Cost",
+          "type": "string"
+        },
+        "mantra": {
+          "$ref": "#/$defs/MantraAssessment"
+        },
+        "overlap_with_existing": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Overlap With Existing",
+          "type": "array"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "$ref": "#/$defs/PackageType"
+        },
+        "recommended_mechanism": {
+          "$ref": "#/$defs/RecommendedMechanism"
+        },
+        "rights": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RightsStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "risk": {
+          "$ref": "#/$defs/RiskClass",
+          "default": "none"
+        },
+        "runtime_visibility": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RuntimeVisibility"
+          },
+          "title": "Runtime Visibility",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "package-inventory/v1",
+          "default": "package-inventory/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceProvenance"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tessl_identity": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tessl Identity"
+        },
+        "user_outcome": {
+          "minLength": 1,
+          "title": "User Outcome",
+          "type": "string"
+        },
+        "value_decision": {
+          "$ref": "#/$defs/ValueDecision"
+        }
+      },
+      "required": [
+        "package_id",
+        "package_type",
+        "current_path",
+        "owner",
+        "user_outcome",
+        "distinctive_value",
+        "maintenance_cost",
+        "context_cost",
+        "recommended_mechanism",
+        "value_decision",
+        "mantra",
+        "intended_disposition"
+      ],
+      "title": "PackageInventoryRecord",
+      "type": "object"
+    },
+    "PackageType": {
+      "description": "Canonical package categories admitted by the Foundry.",
+      "enum": [
+        "skill",
+        "plugin"
+      ],
+      "title": "PackageType",
+      "type": "string"
+    },
+    "RecommendedMechanism": {
+      "description": "The smallest useful packaging mechanism for a candidate.",
+      "enum": [
+        "standalone_skill",
+        "plugin_bundle",
+        "external_source",
+        "archive",
+        "reject"
+      ],
+      "title": "RecommendedMechanism",
+      "type": "string"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    },
+    "RiskClass": {
+      "description": "Inventory risk classification before admission.",
+      "enum": [
+        "none",
+        "review",
+        "blocked"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    },
+    "RuntimeVisibility": {
+      "description": "Observed runtime surfaces, kept separate from canonical ownership.",
+      "enum": [
+        "user_agents",
+        "project_agents",
+        "codex_plugin_cache",
+        "none"
+      ],
+      "title": "RuntimeVisibility",
+      "type": "string"
+    },
+    "SourceProvenance": {
+      "additionalProperties": false,
+      "description": "Immutable source identity retained for an inventory candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "path",
+        "content_sha256"
+      ],
+      "title": "SourceProvenance",
+      "type": "object"
+    },
+    "ValueDecision": {
+      "description": "The evidence-backed value decision for an inventory candidate.",
+      "enum": [
+        "retain",
+        "merge",
+        "replace",
+        "retire"
+      ],
+      "title": "ValueDecision",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/package-inventory-set.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A deterministic, read-only inventory snapshot.",
+  "properties": {
+    "records": {
+      "items": {
+        "$ref": "#/$defs/PackageInventoryRecord"
+      },
+      "title": "Records",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "package-inventory-set/v1",
+      "default": "package-inventory-set/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_revision": {
+      "pattern": "^[0-9a-f]{40}$",
+      "title": "Source Revision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_revision",
+    "records"
+  ],
+  "title": "PackageInventory",
+  "type": "object"
+}
