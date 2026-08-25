@@ -5,6 +5,17 @@ from collections.abc import Sequence
 
 from skills_sdk import __version__
 
+COMMAND_HELP = {
+    "inventory": "inspect a read-only source inventory",
+    "intake": "validate a copy-first package intake decision",
+    "validate": "run package contract validation",
+    "build": "build an immutable package candidate",
+    "eval": "run candidate-bound evaluation lanes",
+    "package": "prepare a distributable package",
+    "project": "project a candidate into a selected runtime surface",
+    "verify": "verify candidate-bound evidence",
+}
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the boundary-only command parser."""
@@ -13,6 +24,21 @@ def build_parser() -> argparse.ArgumentParser:
         description="Portable lifecycle contracts and tooling for Agent Skills packages.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    commands = parser.add_subparsers(dest="command", title="commands")
+    for name, help_text in COMMAND_HELP.items():
+        commands.add_parser(name, help=help_text, description=help_text)
+    tessl = commands.add_parser(
+        "tessl",
+        help="prepare or verify a Tessl candidate without publishing",
+        description="prepare or verify a Tessl candidate without publishing",
+    )
+    tessl_commands = tessl.add_subparsers(dest="tessl_command", title="tessl commands")
+    tessl_commands.add_parser(
+        "prepare", help="prepare a candidate-bound Tessl payload", description="prepare a candidate-bound Tessl payload"
+    )
+    tessl_commands.add_parser(
+        "verify", help="verify a prepared Tessl payload", description="verify a prepared Tessl payload"
+    )
     return parser
 
 

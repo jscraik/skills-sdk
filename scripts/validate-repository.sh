@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-uv run python scripts/generate_schemas.py
+uv run python scripts/generate_schemas.py --check
 uv run ruff check .
 uv run pytest
 uv build

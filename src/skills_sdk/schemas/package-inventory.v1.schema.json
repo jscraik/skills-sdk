@@ -18,6 +18,101 @@
       "title": "FormatChecks",
       "type": "object"
     },
+    "MantraAssessment": {
+      "additionalProperties": false,
+      "description": "The complete nine-part assessment bound to one exact candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "durable_memory": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "overall": {
+          "$ref": "#/$defs/MantraStatus"
+        },
+        "professional_output": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "progressive_disclosure": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "self_improvement": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "simplicity": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        },
+        "strong_guardrails": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "taste": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "thin_surfaces": {
+          "$ref": "#/$defs/MantraPrinciple"
+        },
+        "valuemaxxing": {
+          "$ref": "#/$defs/MantraPrinciple"
+        }
+      },
+      "required": [
+        "source_revision",
+        "content_sha256",
+        "taste",
+        "thin_surfaces",
+        "strong_guardrails",
+        "simplicity",
+        "progressive_disclosure",
+        "durable_memory",
+        "valuemaxxing",
+        "self_improvement",
+        "professional_output",
+        "overall"
+      ],
+      "title": "MantraAssessment",
+      "type": "object"
+    },
+    "MantraPrinciple": {
+      "additionalProperties": false,
+      "description": "Candidate-bound evidence for one engineering-mantra principle.",
+      "properties": {
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/MantraStatus"
+        }
+      },
+      "required": [
+        "status",
+        "evidence"
+      ],
+      "title": "MantraPrinciple",
+      "type": "object"
+    },
+    "MantraStatus": {
+      "description": "Assessment status for one engineering-mantra principle.",
+      "enum": [
+        "pass",
+        "revise",
+        "reject"
+      ],
+      "title": "MantraStatus",
+      "type": "string"
+    },
     "PackageDisposition": {
       "description": "Explicit inventory outcomes; none imply mutation.",
       "enum": [
@@ -41,6 +136,18 @@
         "plugin"
       ],
       "title": "PackageType",
+      "type": "string"
+    },
+    "RecommendedMechanism": {
+      "description": "The smallest useful packaging mechanism for a candidate.",
+      "enum": [
+        "standalone_skill",
+        "plugin_bundle",
+        "external_source",
+        "archive",
+        "reject"
+      ],
+      "title": "RecommendedMechanism",
       "type": "string"
     },
     "RightsStatus": {
@@ -129,6 +236,17 @@
       ],
       "title": "SourceProvenance",
       "type": "object"
+    },
+    "ValueDecision": {
+      "description": "The evidence-backed value decision for an inventory candidate.",
+      "enum": [
+        "retain",
+        "merge",
+        "replace",
+        "retire"
+      ],
+      "title": "ValueDecision",
+      "type": "string"
     }
   },
   "$id": "https://schemas.skills-sdk.dev/package-inventory.v1.schema.json",
@@ -144,6 +262,11 @@
       },
       "title": "Blocker Codes",
       "type": "array"
+    },
+    "context_cost": {
+      "minLength": 1,
+      "title": "Context Cost",
+      "type": "string"
     },
     "current_path": {
       "minLength": 1,
@@ -185,6 +308,11 @@
       "default": null,
       "title": "Display Name"
     },
+    "distinctive_value": {
+      "minLength": 1,
+      "title": "Distinctive Value",
+      "type": "string"
+    },
     "duplicate_of": {
       "anyOf": [
         {
@@ -221,6 +349,23 @@
     "intended_disposition": {
       "$ref": "#/$defs/PackageDisposition"
     },
+    "maintenance_cost": {
+      "minLength": 1,
+      "title": "Maintenance Cost",
+      "type": "string"
+    },
+    "mantra": {
+      "$ref": "#/$defs/MantraAssessment"
+    },
+    "overlap_with_existing": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Overlap With Existing",
+      "type": "array"
+    },
     "owner": {
       "minLength": 1,
       "title": "Owner",
@@ -233,6 +378,9 @@
     },
     "package_type": {
       "$ref": "#/$defs/PackageType"
+    },
+    "recommended_mechanism": {
+      "$ref": "#/$defs/RecommendedMechanism"
     },
     "rights": {
       "anyOf": [
@@ -286,6 +434,14 @@
       ],
       "default": null,
       "title": "Tessl Identity"
+    },
+    "user_outcome": {
+      "minLength": 1,
+      "title": "User Outcome",
+      "type": "string"
+    },
+    "value_decision": {
+      "$ref": "#/$defs/ValueDecision"
     }
   },
   "required": [
@@ -293,6 +449,13 @@
     "package_type",
     "current_path",
     "owner",
+    "user_outcome",
+    "distinctive_value",
+    "maintenance_cost",
+    "context_cost",
+    "recommended_mechanism",
+    "value_decision",
+    "mantra",
     "intended_disposition"
   ],
   "title": "PackageInventoryRecord",

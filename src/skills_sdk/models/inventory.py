@@ -58,6 +58,33 @@ class RiskClass(StrEnum):
     BLOCKED = "blocked"
 
 
+class RecommendedMechanism(StrEnum):
+    """The smallest useful packaging mechanism for a candidate."""
+
+    STANDALONE_SKILL = "standalone_skill"
+    PLUGIN_BUNDLE = "plugin_bundle"
+    EXTERNAL_SOURCE = "external_source"
+    ARCHIVE = "archive"
+    REJECT = "reject"
+
+
+class ValueDecision(StrEnum):
+    """The evidence-backed value decision for an inventory candidate."""
+
+    RETAIN = "retain"
+    MERGE = "merge"
+    REPLACE = "replace"
+    RETIRE = "retire"
+
+
+class MantraStatus(StrEnum):
+    """Assessment status for one engineering-mantra principle."""
+
+    PASS = "pass"
+    REVISE = "revise"
+    REJECT = "reject"
+
+
 class SourceProvenance(_ContractModel):
     """Immutable source identity retained for an inventory candidate."""
 
@@ -94,6 +121,61 @@ class FormatChecks(_ContractModel):
     codex_adapter_manifest: bool = False
 
 
+class MantraPrinciple(_ContractModel):
+    """Candidate-bound evidence for one engineering-mantra principle."""
+
+    status: MantraStatus
+    evidence: tuple[NonEmptyText, ...]
+
+    @field_validator("evidence")
+    @classmethod
+    def evidence_must_be_present(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        if not values:
+            raise ValueError("mantra evidence must contain at least one reference")
+        return values
+
+
+class MantraAssessment(_ContractModel):
+    """The complete nine-part assessment bound to one exact candidate."""
+
+    source_revision: GitRevision
+    content_sha256: Sha256
+    taste: MantraPrinciple
+    thin_surfaces: MantraPrinciple
+    strong_guardrails: MantraPrinciple
+    simplicity: MantraPrinciple
+    progressive_disclosure: MantraPrinciple
+    durable_memory: MantraPrinciple
+    valuemaxxing: MantraPrinciple
+    self_improvement: MantraPrinciple
+    professional_output: MantraPrinciple
+    overall: MantraStatus
+
+    @model_validator(mode="after")
+    def overall_matches_principles(self) -> MantraAssessment:
+        statuses = (
+            self.taste.status,
+            self.thin_surfaces.status,
+            self.strong_guardrails.status,
+            self.simplicity.status,
+            self.progressive_disclosure.status,
+            self.durable_memory.status,
+            self.valuemaxxing.status,
+            self.self_improvement.status,
+            self.professional_output.status,
+        )
+        expected = (
+            MantraStatus.REJECT
+            if MantraStatus.REJECT in statuses
+            else MantraStatus.REVISE
+            if MantraStatus.REVISE in statuses
+            else MantraStatus.PASS
+        )
+        if self.overall != expected:
+            raise ValueError(f"mantra overall must be {expected.value} for the principle statuses")
+        return self
+
+
 class PackageInventoryRecord(_ContractModel):
     """One read-only inventory record for a retained skill or plugin."""
 
@@ -104,6 +186,14 @@ class PackageInventoryRecord(_ContractModel):
     current_path: PortablePath
     declared_version: NonEmptyText | None = None
     owner: NonEmptyText
+    user_outcome: NonEmptyText
+    distinctive_value: NonEmptyText
+    maintenance_cost: NonEmptyText
+    context_cost: NonEmptyText
+    overlap_with_existing: tuple[NonEmptyText, ...] = ()
+    recommended_mechanism: RecommendedMechanism
+    value_decision: ValueDecision
+    mantra: MantraAssessment
     source: SourceProvenance | None = None
     rights: RightsStatus | None = None
     direct_consumers: tuple[PortablePath, ...] = ()
@@ -139,6 +229,29 @@ class PackageInventoryRecord(_ContractModel):
             self.source is None or self.rights is None
         ):
             raise ValueError("admit_to_foundry requires source and rights evidence")
+        if self.source is not None and (
+            self.mantra.source_revision != self.source.revision
+            or self.mantra.content_sha256 != self.source.content_sha256
+        ):
+            raise ValueError("mantra assessment must bind the exact source revision and content digest")
+        if self.package_type == PackageType.SKILL and self.recommended_mechanism == RecommendedMechanism.PLUGIN_BUNDLE:
+            raise ValueError("a skill cannot recommend plugin_bundle without a plugin package boundary")
+        if self.package_type == PackageType.PLUGIN and self.recommended_mechanism == (
+            RecommendedMechanism.STANDALONE_SKILL
+        ):
+            raise ValueError("a plugin cannot recommend standalone_skill")
+        if self.value_decision == ValueDecision.MERGE and not self.overlap_with_existing:
+            raise ValueError("merge value decision requires overlap_with_existing evidence")
+        if self.value_decision == ValueDecision.RETIRE and self.intended_disposition in (
+            PackageDisposition.ADMIT_TO_FOUNDRY,
+            PackageDisposition.MERGE_WITH_EXISTING,
+        ):
+            raise ValueError("retire value decision cannot admit or merge a package")
+        if self.intended_disposition in (
+            PackageDisposition.ADMIT_TO_FOUNDRY,
+            PackageDisposition.MERGE_WITH_EXISTING,
+        ) and self.mantra.overall != MantraStatus.PASS:
+            raise ValueError("admission and merge require a passing mantra assessment")
         return self
 
 

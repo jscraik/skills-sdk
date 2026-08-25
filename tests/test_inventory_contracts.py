@@ -3,7 +3,33 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from skills_sdk.models import PackageDisposition, PackageInventory, PackageInventoryRecord, PackageType
+from skills_sdk.models import (
+    MantraStatus,
+    PackageDisposition,
+    PackageInventory,
+    PackageInventoryRecord,
+    PackageType,
+    RecommendedMechanism,
+    ValueDecision,
+)
+
+
+def _mantra(status: str = "pass") -> dict[str, object]:
+    principle = {"status": status, "evidence": ["tests/test_inventory_contracts.py"]}
+    return {
+        "source_revision": "1" * 40,
+        "content_sha256": "a" * 64,
+        "taste": principle,
+        "thin_surfaces": principle,
+        "strong_guardrails": principle,
+        "simplicity": principle,
+        "progressive_disclosure": principle,
+        "durable_memory": principle,
+        "valuemaxxing": principle,
+        "self_improvement": principle,
+        "professional_output": principle,
+        "overall": status,
+    }
 
 
 def _record(package_id: str = "synthetic-skill") -> PackageInventoryRecord:
@@ -13,6 +39,14 @@ def _record(package_id: str = "synthetic-skill") -> PackageInventoryRecord:
         current_path="skills/synthetic-skill",
         declared_version="0.1.0",
         owner="synthetic-owner",
+        user_outcome="make a source-bound package admission decision",
+        distinctive_value="keeps package identity and rights evidence together",
+        maintenance_cost="one catalog record and one SDK contract",
+        context_cost="loaded only during inventory or admission review",
+        overlap_with_existing=(),
+        recommended_mechanism=RecommendedMechanism.STANDALONE_SKILL,
+        value_decision=ValueDecision.RETAIN,
+        mantra=_mantra(),
         source={
             "repository": "https://example.invalid/source.git",
             "revision": "1" * 40,
@@ -29,6 +63,7 @@ def _record(package_id: str = "synthetic-skill") -> PackageInventoryRecord:
 def test_inventory_record_is_frozen_and_versioned() -> None:
     record = _record()
     assert record.schema_version == "package-inventory/v1"
+    assert record.mantra.overall is MantraStatus.PASS
     with pytest.raises(ValidationError):
         record.current_path = "other/path"  # type: ignore[misc]
 
@@ -53,10 +88,31 @@ def test_unknown_provenance_is_a_typed_owner_decision() -> None:
         source=None,
         rights=None,
         blocker_codes=("provenance_unknown",),
+        mantra=_mantra("revise"),
         intended_disposition=PackageDisposition.NEEDS_OWNER_DECISION,
     )
     record = PackageInventoryRecord.model_validate(payload)
     assert record.blocker_codes == ("provenance_unknown",)
+
+
+def test_mantra_status_rollup_and_candidate_binding_are_enforced() -> None:
+    invalid_overall = _mantra()
+    invalid_overall["overall"] = "revise"
+    with pytest.raises(ValidationError, match="mantra overall must be pass"):
+        PackageInventoryRecord.model_validate(_record().model_dump() | {"mantra": invalid_overall})
+
+    mismatched = _record().model_dump()
+    mismatched["mantra"] = _mantra()
+    mismatched["mantra"]["content_sha256"] = "b" * 64  # type: ignore[index]
+    with pytest.raises(ValidationError, match="exact source revision and content digest"):
+        PackageInventoryRecord.model_validate(mismatched)
+
+
+def test_merge_value_decision_requires_overlap_evidence() -> None:
+    payload = _record().model_dump()
+    payload.update(value_decision=ValueDecision.MERGE, recommended_mechanism=RecommendedMechanism.STANDALONE_SKILL)
+    with pytest.raises(ValidationError, match="overlap_with_existing"):
+        PackageInventoryRecord.model_validate(payload)
 
 
 def test_inventory_rejects_duplicate_package_ids() -> None:
