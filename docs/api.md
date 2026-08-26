@@ -1,8 +1,10 @@
 # Python API
 
-The public API is the typed contract layer under `skills_sdk`. Import models
-from `skills_sdk` for the most common top-level contracts, or from
-`skills_sdk.models` when a family-specific name is clearer.
+The public API is the typed contract layer under `skills_sdk`. The top-level
+package exports the inventory, risk, and evaluation contracts listed in its
+`__all__`. Import family-specific contracts such as
+`PackageCandidateIdentity`, `PackageManifest`, and `PackageReceipt` from
+`skills_sdk.models` (or their submodules), as shown below.
 
 ## Contract families
 
@@ -46,9 +48,9 @@ normalized-package, and intake schemas are not registered with
 `SchemaRegistry`; when those families need structural validation, load their
 packaged JSON Schema resource with a Draft 2020-12 validator, then call the
 corresponding Pydantic model explicitly (for example,
-`PackageInventory.model_validate(payload)` for an inventory record). Validation
-is read-only: it does not write receipts, contact providers, install packages,
-or publish to a registry.
+`PackageInventoryRecord.model_validate(payload)` for an inventory record).
+Validation is read-only: it does not write receipts, contact providers, install
+packages, or publish to a registry.
 
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test

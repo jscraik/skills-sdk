@@ -69,6 +69,11 @@ def test_candidate_mismatch_is_typed() -> None:
         receipt.require_candidate(other)
 
 
+def test_unknown_schema_validation_is_typed() -> None:
+    with pytest.raises(ContractError, match="unknown_schema"):
+        SchemaRegistry().validate("unknown.v1", {})
+
+
 def test_blocked_receipt_requires_typed_blocker() -> None:
     payload = _receipt()
     payload["status"] = "blocked"

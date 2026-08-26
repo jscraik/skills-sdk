@@ -65,7 +65,8 @@ def test_public_docs_distinguish_wire_shapes_from_semantic_registry_checks() -> 
     api_compact = " ".join(api.split())
     assert 'exclude={"schema_version"}' in api
     assert "model-level semantic invariants" in api
-    assert "model_validate(payload)" in api
+    assert "PackageInventoryRecord.model_validate(payload)" in api
+    assert "family-specific contracts such as" in api
     assert "`package-identity.v1` and inventory schemas receive structural validation only" in api_compact
     assert "packaged source, owner, normalized-package, and intake schemas are not registered with" in api_compact
     assert "bare wire shape" in compatibility
