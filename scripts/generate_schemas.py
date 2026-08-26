@@ -288,6 +288,32 @@ def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> Non
         }
 
 
+def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> None:
+    """Require the typed blocker whenever a v2 value decision needs review."""
+
+    target = (
+        schema
+        if filename == "package-inventory.v2.schema.json"
+        else schema["$defs"]["PackageInventoryRecordV2"]
+    )
+    target["allOf"] = [
+        *target.get("allOf", []),
+        {
+            "if": {
+                "properties": {"value_decision": {"const": "needs_review"}},
+                "required": ["value_decision"],
+            },
+            "then": {
+                "properties": {
+                    "blocker_codes": {"contains": {"const": "value_review_required"}},
+                    "intended_disposition": {"const": "needs_owner_decision"},
+                },
+                "required": ["blocker_codes", "intended_disposition"],
+            },
+        },
+    ]
+
+
 def _render_schema(model: type[object], filename: str) -> str:
     schema = model.model_json_schema()  # type: ignore[attr-defined]
     _append_portable_path_constraints(schema)
@@ -324,6 +350,8 @@ def _render_schema(model: type[object], filename: str) -> str:
         _append_security_constraints(schema)
     elif filename in {"scenario-set.v1.schema.json", "scorer-profile.v1.schema.json"}:
         _append_evaluation_constraints(schema, filename)
+    elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
+        _append_inventory_v2_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = f"https://schemas.skills-sdk.dev/{filename}"
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"

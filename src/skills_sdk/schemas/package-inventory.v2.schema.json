@@ -255,6 +255,36 @@
   "$id": "https://schemas.skills-sdk.dev/package-inventory.v2.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "value_decision": {
+            "const": "needs_review"
+          }
+        },
+        "required": [
+          "value_decision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker_codes": {
+            "contains": {
+              "const": "value_review_required"
+            }
+          },
+          "intended_disposition": {
+            "const": "needs_owner_decision"
+          }
+        },
+        "required": [
+          "blocker_codes",
+          "intended_disposition"
+        ]
+      }
+    }
+  ],
   "description": "Version-two inventory record with typed pending value review.",
   "properties": {
     "blocker_codes": {
