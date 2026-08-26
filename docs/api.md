@@ -43,8 +43,9 @@ The registry accepts only known schema names and raises `ContractError` for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
 manifest, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
-they do not receive model-level semantic checks. The packaged source, owner,
-normalized-package, and intake schemas are not registered with
+they do not receive model-level semantic checks. The packaged candidate,
+skill-identity, plugin-identity, source, owner, normalized-package, and intake
+schemas are not registered with
 `SchemaRegistry`; when those families need structural validation, load their
 packaged JSON Schema resource with a Draft 2020-12 validator, then call the
 corresponding Pydantic model explicitly (for example,
