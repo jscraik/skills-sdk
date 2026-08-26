@@ -58,6 +58,7 @@
         "expected_signals": {
           "items": {
             "minLength": 1,
+            "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
             "type": "string"
           },
           "minItems": 1,
@@ -68,6 +69,7 @@
           "default": [],
           "items": {
             "minLength": 1,
+            "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
             "type": "string"
           },
           "title": "Forbidden Commands",
@@ -155,6 +157,7 @@
     },
     "scenario_set_id": {
       "minLength": 1,
+      "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
       "title": "Scenario Set Id",
       "type": "string"
     },

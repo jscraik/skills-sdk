@@ -208,8 +208,12 @@ def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> Non
     """Project evaluation policy invariants into the committed schemas."""
 
     if filename == "scenario-set.v1.schema.json":
-        schema["$defs"]["ScenarioCase"]["properties"]["case_id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
-        schema["$defs"]["ScenarioCase"]["properties"]["prompt"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        scenario_case_properties = schema["$defs"]["ScenarioCase"]["properties"]
+        scenario_case_properties["case_id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        scenario_case_properties["prompt"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        scenario_case_properties["expected_signals"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        scenario_case_properties["forbidden_commands"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        schema["properties"]["scenario_set_id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
         schema["properties"]["cases"]["items"]["$ref"] = "#/$defs/ScenarioCase"
         schema["allOf"] = [
             *schema.get("allOf", []),
@@ -238,6 +242,9 @@ def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> Non
         }
     elif filename == "scorer-profile.v1.schema.json":
         properties = schema["properties"]
+        properties["scorer_id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        properties["version_or_digest"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        properties["calibration_probe_ids"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
         properties["calibration_probe_ids"]["uniqueItems"] = True
         schema["allOf"] = [
             *schema.get("allOf", []),

@@ -94,6 +94,7 @@
       "default": [],
       "items": {
         "minLength": 1,
+        "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
         "type": "string"
       },
       "title": "Calibration Probe Ids",
@@ -125,6 +126,7 @@
     },
     "scorer_id": {
       "minLength": 1,
+      "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
       "title": "Scorer Id",
       "type": "string"
     },
@@ -140,6 +142,7 @@
     },
     "version_or_digest": {
       "minLength": 1,
+      "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
       "title": "Version Or Digest",
       "type": "string"
     }

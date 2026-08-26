@@ -75,3 +75,23 @@ def test_scorer_schema_rejects_duplicate_calibration_probes() -> None:
     payload["calibration_probe_ids"].append(payload["calibration_probe_ids"][0])
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("scorer-profile.v1", payload)
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "fixture_name", "field_path"),
+    [
+        ("scenario-set.v1", "scenario-accepted.json", ("scenario_set_id",)),
+        ("scenario-set.v1", "scenario-accepted.json", ("cases", 0, "prompt")),
+        ("scorer-profile.v1", "scorer-accepted.json", ("scorer_id",)),
+    ],
+)
+def test_evaluation_schemas_reject_whitespace_only_text(
+    schema_name: str, fixture_name: str, field_path: tuple[str | int, ...]
+) -> None:
+    payload = json.loads((FIXTURE_ROOT / fixture_name).read_text(encoding="utf-8"))
+    target: object = payload
+    for key in field_path[:-1]:
+        target = target[key]  # type: ignore[index]
+    target[field_path[-1]] = "   "  # type: ignore[index]
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate(schema_name, payload)
