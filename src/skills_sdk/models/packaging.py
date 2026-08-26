@@ -24,6 +24,7 @@ class PackageFileRole(StrEnum):
     SCRIPT = "script"
     ASSET = "asset"
     EVAL = "eval"
+    METADATA = "metadata"
 
 
 class PackageManifestFile(_ContractModel):

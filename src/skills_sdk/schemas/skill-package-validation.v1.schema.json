@@ -48,45 +48,6 @@
       "title": "PackageFileRole",
       "type": "string"
     },
-    "PackageManifest": {
-      "additionalProperties": false,
-      "description": "Candidate-bound package contents before distribution or installation.",
-      "properties": {
-        "candidate": {
-          "$ref": "#/$defs/PackageCandidateIdentity"
-        },
-        "files": {
-          "items": {
-            "$ref": "#/$defs/PackageManifestFile"
-          },
-          "minItems": 1,
-          "title": "Files",
-          "type": "array"
-        },
-        "provenance": {
-          "$ref": "#/$defs/PackageManifestProvenance"
-        },
-        "schema_version": {
-          "const": "package-manifest/v1",
-          "title": "Schema Version",
-          "type": "string"
-        },
-        "version": {
-          "minLength": 1,
-          "title": "Version",
-          "type": "string"
-        }
-      },
-      "required": [
-        "schema_version",
-        "candidate",
-        "version",
-        "files",
-        "provenance"
-      ],
-      "title": "PackageManifest",
-      "type": "object"
-    },
     "PackageManifestFile": {
       "additionalProperties": false,
       "description": "One immutable file entry in a package manifest.",
@@ -120,36 +81,49 @@
       "title": "PackageManifestFile",
       "type": "object"
     },
-    "PackageManifestProvenance": {
+    "SkillIdentity": {
       "additionalProperties": false,
-      "description": "Portable provenance references used to build a package manifest.",
+      "description": "Agent Skills identity, independent of runtime installation.",
       "properties": {
-        "builder": {
-          "minLength": 1,
-          "title": "Builder",
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
           "type": "string"
         },
-        "source": {
-          "items": {
-            "minLength": 1,
-            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
-            "type": "string"
-          },
-          "minItems": 1,
-          "title": "Source",
-          "type": "array"
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "skill",
+          "default": "skill",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "skill-identity/v1",
+          "default": "skill-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
         }
       },
       "required": [
-        "source",
-        "builder"
+        "package_id",
+        "name",
+        "version"
       ],
-      "title": "PackageManifestProvenance",
+      "title": "SkillIdentity",
       "type": "object"
     },
-    "PackageReceiptBlocker": {
+    "SkillPackageFinding": {
       "additionalProperties": false,
-      "description": "Stable typed blocker details for a package proof receipt.",
+      "description": "One stable, evidence-bound standalone-skill finding.",
       "properties": {
         "code": {
           "pattern": "^[a-z0-9_]+$",
@@ -170,17 +144,30 @@
           "minLength": 1,
           "title": "Message",
           "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
         }
       },
       "required": [
         "code",
+        "severity",
         "message"
       ],
-      "title": "PackageReceiptBlocker",
+      "title": "SkillPackageFinding",
       "type": "object"
+    },
+    "ValidationSeverity": {
+      "description": "Whether a finding blocks immutable candidate construction.",
+      "enum": [
+        "warning",
+        "blocker"
+      ],
+      "title": "ValidationSeverity",
+      "type": "string"
     }
   },
-  "$id": "https://schemas.skills-sdk.dev/package-receipt.v1.schema.json",
+  "$id": "https://schemas.skills-sdk.dev/skill-package-validation.v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "allOf": [
@@ -188,33 +175,41 @@
       "if": {
         "properties": {
           "status": {
-            "const": "built"
+            "const": "pass"
           }
-        }
+        },
+        "required": [
+          "status"
+        ]
       },
       "then": {
         "properties": {
-          "blocker": {
-            "type": "null"
-          },
-          "included_files": {
+          "files": {
             "minItems": 1
           },
-          "manifest": {
+          "findings": {
             "not": {
-              "type": "null"
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "const": "blocker"
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
             }
           },
-          "package_digest": {
+          "identity": {
             "not": {
               "type": "null"
             }
           }
         },
         "required": [
-          "package_digest",
-          "manifest",
-          "included_files"
+          "identity",
+          "files"
         ]
       }
     },
@@ -224,83 +219,57 @@
           "status": {
             "const": "blocked"
           }
-        }
+        },
+        "required": [
+          "status"
+        ]
       },
       "then": {
         "properties": {
-          "blocker": {
-            "$ref": "#/$defs/PackageReceiptBlocker"
-          },
-          "package_digest": {
-            "type": "null"
+          "findings": {
+            "contains": {
+              "properties": {
+                "severity": {
+                  "const": "blocker"
+                }
+              },
+              "required": [
+                "severity"
+              ]
+            }
           }
         },
         "required": [
-          "blocker"
+          "findings"
         ]
       }
     }
   ],
-  "description": "Candidate-bound package result with stable proof-receipt fields.",
+  "description": "Read-only structural result for one standalone skill candidate.",
   "properties": {
-    "blocker": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/PackageReceiptBlocker"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
-    },
     "candidate": {
       "$ref": "#/$defs/PackageCandidateIdentity"
     },
-    "evidence": {
-      "items": {
-        "minLength": 1,
-        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
-        "type": "string"
-      },
-      "minItems": 1,
-      "title": "Evidence",
-      "type": "array"
-    },
-    "excluded_files": {
+    "files": {
       "default": [],
       "items": {
-        "minLength": 1,
-        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
-        "type": "string"
+        "$ref": "#/$defs/PackageManifestFile"
       },
-      "title": "Excluded Files",
+      "title": "Files",
       "type": "array"
     },
-    "finished_at": {
-      "format": "date-time",
-      "title": "Finished At",
-      "type": "string"
-    },
-    "included_files": {
+    "findings": {
       "default": [],
       "items": {
-        "minLength": 1,
-        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
-        "type": "string"
+        "$ref": "#/$defs/SkillPackageFinding"
       },
-      "title": "Included Files",
+      "title": "Findings",
       "type": "array"
     },
-    "lane": {
-      "const": "validation",
-      "title": "Lane",
-      "type": "string"
-    },
-    "manifest": {
+    "identity": {
       "anyOf": [
         {
-          "$ref": "#/$defs/PackageManifest"
+          "$ref": "#/$defs/SkillIdentity"
         },
         {
           "type": "null"
@@ -314,37 +283,15 @@
       "title": "Mutation Performed",
       "type": "boolean"
     },
-    "package_digest": {
-      "anyOf": [
-        {
-          "pattern": "^[0-9a-f]{64}$",
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Package Digest"
-    },
-    "receipt_id": {
-      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
-      "title": "Receipt Id",
-      "type": "string"
-    },
     "schema_version": {
-      "const": "package-receipt/v1",
+      "const": "skill-package-validation/v1",
+      "default": "skill-package-validation/v1",
       "title": "Schema Version",
-      "type": "string"
-    },
-    "started_at": {
-      "format": "date-time",
-      "title": "Started At",
       "type": "string"
     },
     "status": {
       "enum": [
-        "built",
+        "pass",
         "blocked"
       ],
       "title": "Status",
@@ -352,15 +299,9 @@
     }
   },
   "required": [
-    "schema_version",
-    "receipt_id",
     "candidate",
-    "lane",
-    "status",
-    "started_at",
-    "finished_at",
-    "evidence"
+    "status"
   ],
-  "title": "PackageReceipt",
+  "title": "SkillPackageValidation",
   "type": "object"
 }

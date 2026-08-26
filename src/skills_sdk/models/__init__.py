@@ -43,6 +43,7 @@ from skills_sdk.models.packaging import (
     PackageReceiptBlocker,
 )
 from skills_sdk.models.risk import RiskClassification, RiskSensor, SecurityFinding, SecurityScreeningResult
+from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 __all__ = [
     "FormatChecks",
@@ -84,7 +85,10 @@ __all__ = [
     "SecurityFinding",
     "SecurityScreeningResult",
     "SkillIdentity",
+    "SkillPackageFinding",
+    "SkillPackageValidation",
     "SourceProvenance",
+    "ValidationSeverity",
     "ValueDecision",
     "ValueDecisionV2",
 ]

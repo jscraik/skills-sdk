@@ -26,6 +26,7 @@ from skills_sdk.models.package import (
 )
 from skills_sdk.models.packaging import PackageManifest, PackageReceipt
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
+from skills_sdk.models.validation import SkillPackageValidation
 
 _PORTABLE_PATH_PATTERN = (
     r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
@@ -344,6 +345,41 @@ def _render_schema(model: type[object], filename: str) -> str:
                 },
             },
         ]
+    elif filename == "skill-package-validation.v1.schema.json":
+        schema["allOf"] = [
+            {
+                "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
+                "then": {
+                    "required": ["identity", "files"],
+                    "properties": {
+                        "identity": {"not": {"type": "null"}},
+                        "files": {"minItems": 1},
+                        "findings": {
+                            "not": {
+                                "contains": {
+                                    "properties": {"severity": {"const": "blocker"}},
+                                    "required": ["severity"],
+                                }
+                            }
+                        },
+                    },
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+                "then": {
+                    "required": ["findings"],
+                    "properties": {
+                        "findings": {
+                            "contains": {
+                                "properties": {"severity": {"const": "blocker"}},
+                                "required": ["severity"],
+                            }
+                        }
+                    },
+                },
+            },
+        ]
     elif filename == "risk-classification.v1.schema.json":
         _append_risk_constraints(schema)
     elif filename == "security-screening.v1.schema.json":
@@ -381,6 +417,7 @@ def main() -> int:
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),
         (ScorerProfile, "scorer-profile.v1.schema.json"),
+        (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
         target = schema_root / filename

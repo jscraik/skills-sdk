@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 from collections.abc import Sequence
+from pathlib import Path
 
 from skills_sdk import __version__
+from skills_sdk.packaging import build_skill_package
+from skills_sdk.validation import SkillValidationPolicy, validate_skill_package
 
 COMMAND_HELP = {
     "inventory": "inspect a read-only source inventory",
@@ -26,7 +30,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
     for name, help_text in COMMAND_HELP.items():
+        if name in {"validate", "build"}:
+            continue
         commands.add_parser(name, help=help_text, description=help_text)
+    for name in ("validate", "build"):
+        command = commands.add_parser(name, help=COMMAND_HELP[name], description=COMMAND_HELP[name])
+        command.add_argument("package_root", type=Path)
+        command.add_argument("--source-revision", required=True)
+        command.add_argument("--max-entrypoint-lines", type=int)
+        command.add_argument("--max-reference-depth", type=int)
+        command.add_argument("--json", action="store_true", dest="json_output")
+        command.add_argument("--robot", action="store_true", help="emit automation-safe output without prompts")
     tessl = commands.add_parser(
         "tessl",
         help="prepare or verify a Tessl candidate without publishing",
@@ -43,9 +57,33 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Parse the currently supported boundary-only command surface."""
-    build_parser().parse_args(argv)
-    return 0
+    """Run implemented commands and preserve parse-only future boundaries."""
+    arguments = build_parser().parse_args(argv)
+    if arguments.command not in {"validate", "build"}:
+        return 0
+    policy = SkillValidationPolicy(
+        max_entrypoint_lines=arguments.max_entrypoint_lines,
+        max_reference_depth=arguments.max_reference_depth,
+    )
+    if arguments.command == "validate":
+        result = validate_skill_package(
+            arguments.package_root,
+            source_revision=arguments.source_revision,
+            policy=policy,
+        )
+        successful = result.status == "pass"
+    else:
+        result = build_skill_package(
+            arguments.package_root,
+            source_revision=arguments.source_revision,
+            policy=policy,
+        )
+        successful = result.status == "built"
+    if arguments.json_output:
+        print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+    else:
+        print(f"{arguments.command}: {result.status} ({result.candidate.package_id})")
+    return 0 if successful else 2
 
 
 if __name__ == "__main__":

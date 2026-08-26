@@ -42,7 +42,8 @@
         "reference",
         "script",
         "asset",
-        "eval"
+        "eval",
+        "metadata"
       ],
       "title": "PackageFileRole",
       "type": "string"
