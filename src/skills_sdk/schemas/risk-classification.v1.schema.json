@@ -165,7 +165,10 @@
                       {
                         "properties": {
                           "status": {
-                            "const": "skipped_optional"
+                            "enum": [
+                              "available_not_run",
+                              "skipped_optional"
+                            ]
                           }
                         },
                         "required": [

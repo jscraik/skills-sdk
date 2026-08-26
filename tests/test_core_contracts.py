@@ -5,6 +5,7 @@ import json
 from importlib.resources import files
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
@@ -17,6 +18,7 @@ EXPECTED_PORTABLE_PATH_PATTERN = (
 )
 
 PORTABLE_PATH_SCHEMA_NAMES = (
+    "blocker.v1",
     "normalized-package.v1",
     "package-inventory-set.v1",
     "package-inventory.v1",
@@ -24,6 +26,7 @@ PORTABLE_PATH_SCHEMA_NAMES = (
     "package-owner.v1",
     "package-receipt.v1",
     "package-source.v1",
+    "receipt-base.v1",
     "security-screening.v1",
 )
 
@@ -116,3 +119,27 @@ def _contains_pattern(node: object, pattern: str) -> bool:
 def test_packaged_schemas_project_portable_path_constraints(name: str) -> None:
     schema = json.loads(files("skills_sdk.schemas").joinpath(f"{name}.schema.json").read_text(encoding="utf-8"))
     assert _contains_pattern(schema, EXPECTED_PORTABLE_PATH_PATTERN)
+
+
+@pytest.mark.parametrize(
+    "schema_name, path",
+    [("receipt-base.v1", ("evidence",)), ("blocker.v1", ("evidence_refs",))],
+)
+@pytest.mark.parametrize("value", ["   ", "path/\n", "../outside", "path/"])
+def test_generic_receipt_schemas_reject_non_portable_paths(
+    schema_name: str, path: tuple[str, ...], value: str
+) -> None:
+    schema = SchemaRegistry().load(schema_name)
+    if schema_name == "receipt-base.v1":
+        payload = _receipt()
+    else:
+        payload = {"code": "unsafe_path", "message": "blocked", "evidence_refs": ["valid/path"]}
+    target: object = payload
+    for key in path[:-1]:
+        target = target[key]  # type: ignore[index]
+    target[path[-1]] = [value]  # type: ignore[index]
+    if schema_name == "receipt-base.v1":
+        with pytest.raises(ContractError, match="contract_validation_failed"):
+            SchemaRegistry().validate(schema_name, payload)
+    else:
+        assert list(Draft202012Validator(schema).iter_errors(payload))

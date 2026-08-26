@@ -74,7 +74,9 @@ def _append_risk_constraints(schema: dict[str, Any]) -> None:
                                     {
                                         "anyOf": [
                                             {
-                                                "properties": {"status": {"const": "skipped_optional"}},
+                                                "properties": {
+                                                    "status": {"enum": ["available_not_run", "skipped_optional"]}
+                                                },
                                                 "required": ["status"],
                                             },
                                             {
