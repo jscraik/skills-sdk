@@ -236,7 +236,7 @@
     "acceptance_trace": {
       "items": {
         "minLength": 1,
-        "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+        "pattern": "^[\\s\\S]*\\S[\\s\\S]*$",
         "type": "string"
       },
       "minItems": 1,

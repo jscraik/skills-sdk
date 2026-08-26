@@ -25,7 +25,21 @@ _PORTABLE_PATH_PATTERN = (
     r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
     r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
 )
-_NON_WHITESPACE_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
+_NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"
+_NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
+
+
+def _append_portable_path_constraints(schema: Any) -> None:
+    """Project the shared PortablePath contract into every generated schema node."""
+
+    if isinstance(schema, dict):
+        if schema.pop("x-skills-sdk-portable-path", False):
+            schema["pattern"] = _PORTABLE_PATH_PATTERN
+        for value in schema.values():
+            _append_portable_path_constraints(value)
+    elif isinstance(schema, list):
+        for value in schema:
+            _append_portable_path_constraints(value)
 
 
 def _append_risk_constraints(schema: dict[str, Any]) -> None:
@@ -33,8 +47,8 @@ def _append_risk_constraints(schema: dict[str, Any]) -> None:
 
     schema["properties"]["sensor_ids"]["uniqueItems"] = True
     schema["properties"]["sensors"]["uniqueItems"] = True
-    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
-    schema["$defs"]["RiskSensor"]["properties"]["id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NORMALIZED_TEXT_PATTERN
+    schema["$defs"]["RiskSensor"]["properties"]["id"]["pattern"] = _NORMALIZED_TEXT_PATTERN
     schema["properties"]["acceptance_trace"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
     schema["allOf"] = [
         *schema.get("allOf", []),
@@ -108,7 +122,7 @@ def _append_security_constraints(schema: dict[str, Any]) -> None:
     """Add JSON-Schema-expressible security invariants to the generated contract."""
 
     schema["properties"]["scanned_paths"]["items"]["pattern"] = _PORTABLE_PATH_PATTERN
-    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NORMALIZED_TEXT_PATTERN
     schema["properties"]["sensor_ids"]["uniqueItems"] = True
     schema["$defs"]["SecurityFinding"]["properties"]["evidence_refs"]["items"]["pattern"] = _PORTABLE_PATH_PATTERN
     schema["$defs"]["SecurityFinding"]["properties"]["code"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
@@ -189,6 +203,7 @@ def _append_security_constraints(schema: dict[str, Any]) -> None:
 
 def _render_schema(model: type[object], filename: str) -> str:
     schema = model.model_json_schema()  # type: ignore[attr-defined]
+    _append_portable_path_constraints(schema)
     if filename == "package-receipt.v1.schema.json":
         # Pydantic emits field types but cannot express the status-dependent
         # receipt invariants enforced by PackageReceipt.model_validator.

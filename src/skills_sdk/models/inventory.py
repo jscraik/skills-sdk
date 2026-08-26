@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, StringConstraints, WithJsonSchema, field_validator, model_validator
 
 from skills_sdk.core.paths import require_portable_relative_path
 
@@ -13,7 +13,17 @@ PackageId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9
 GitRevision = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
 Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-PortablePath = Annotated[str, StringConstraints(strip_whitespace=False, min_length=1)]
+PortablePath = Annotated[
+    str,
+    StringConstraints(strip_whitespace=False, min_length=1),
+    WithJsonSchema(
+        {
+            "type": "string",
+            "minLength": 1,
+            "x-skills-sdk-portable-path": True,
+        }
+    ),
+]
 
 
 class _ContractModel(BaseModel):

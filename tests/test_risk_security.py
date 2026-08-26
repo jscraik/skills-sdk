@@ -192,10 +192,34 @@ def test_security_schema_rejects_whitespace_only_finding_text(field: str) -> Non
     assert _schema_errors("security-screening.v1", payload)
 
 
+@pytest.mark.parametrize("field", ["code", "message"])
+def test_security_model_and_schema_match_nonempty_text_normalization(field: str) -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["findings"][0][field] = f" {field} reviewed "
+    result = SecurityScreeningResult.model_validate(payload)
+    assert getattr(result.findings[0], field) == f"{field} reviewed"
+    assert not _schema_errors("security-screening.v1", payload)
+
+
 def test_security_schema_rejects_whitespace_only_scanned_path() -> None:
     payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
     payload["scanned_paths"] = [" "]
     assert _schema_errors("security-screening.v1", payload)
+
+
+def test_security_model_rejects_whitespace_only_scanned_path() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["scanned_paths"] = ["   "]
+    with pytest.raises(ValidationError, match="invalid_portable_path"):
+        SecurityScreeningResult.model_validate(payload)
+
+
+def test_risk_model_and_schema_match_nonempty_text_normalization() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["acceptance_trace"] = [" risk-tier-selected "]
+    result = RiskClassification.model_validate(payload)
+    assert result.acceptance_trace == ("risk-tier-selected",)
+    assert not _schema_errors("risk-classification.v1", payload)
 
 
 @pytest.mark.parametrize("field", ["scanned_paths", "evidence_refs"])
