@@ -63,7 +63,8 @@ def test_public_docs_distinguish_wire_shapes_from_semantic_registry_checks() -> 
     api = (REPO_ROOT / "docs/api.md").read_text(encoding="utf-8")
     compatibility = (REPO_ROOT / "docs/compatibility.md").read_text(encoding="utf-8")
     assert 'exclude={"schema_version"}' in api
-    assert "Pydantic semantic checks" in api
+    assert "model-level semantic invariants" in api
+    assert "model_validate(payload)" in api
     assert "bare wire shape" in compatibility
 
 

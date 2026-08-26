@@ -21,8 +21,8 @@ from `skills_sdk` for the most common top-level contracts, or from
 
 ## Schema validation
 
-Use `SchemaRegistry` for packaged JSON Schema plus the model-level semantic
-invariants:
+Use `SchemaRegistry` for packaged JSON Schema structural validation. It also
+applies model-level semantic invariants for the supported contract families:
 
 ```python
 from skills_sdk.core import SchemaRegistry
@@ -41,9 +41,10 @@ The registry accepts only known schema names and raises `ContractError` for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
 manifest, receipt, risk, security, scenario, and scorer schemas. For inventory,
 identity, source, owner, normalized-package, and intake records, validate the
-corresponding Pydantic model explicitly after the structural schema check.
-Validation is read-only: it does not write receipts, contact providers, install
-packages, or publish to a registry.
+corresponding Pydantic model explicitly after the structural schema check (for
+example, `PackageInventory.model_validate(payload)`). Validation is read-only:
+it does not write receipts, contact providers, install packages, or publish to
+a registry.
 
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test
