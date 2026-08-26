@@ -79,6 +79,27 @@ def test_blocked_package_receipt_allows_blocker_without_evidence_refs() -> None:
     assert receipt.blocker.evidence_refs == ()
 
 
+@pytest.mark.parametrize("candidate_value", [None, "missing"])
+def test_generic_parser_preserves_unresolved_blocked_candidate(candidate_value: object) -> None:
+    payload = json.loads((FIXTURE_ROOT / "blocked.json").read_text(encoding="utf-8"))
+    if candidate_value == "missing":
+        payload.pop("candidate")
+    else:
+        payload["candidate"] = candidate_value
+
+    receipt = parse_receipt(payload)
+
+    assert receipt.candidate is None
+    with pytest.raises(ContractError, match="candidate_unavailable"):
+        receipt.require_candidate(
+            CandidateIdentity(
+                package_id="synthetic-skill",
+                source_revision="1" * 40,
+                content_sha256="a" * 64,
+            )
+        )
+
+
 @pytest.mark.parametrize("field", ["schema_version", "lane"])
 def test_package_receipt_requires_routing_fields(field: str) -> None:
     payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))

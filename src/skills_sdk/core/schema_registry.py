@@ -28,6 +28,7 @@ SCHEMA_NAMES = frozenset(
         "security-screening.v1",
         "scenario-set.v1",
         "scorer-profile.v1",
+        "skill-package-validation.v1",
     }
 )
 
@@ -103,6 +104,10 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation import ScorerProfile
 
             model = ScorerProfile
+        elif name == "skill-package-validation.v1":
+            from skills_sdk.models.validation import SkillPackageValidation
+
+            model = SkillPackageValidation
         else:
             return
 

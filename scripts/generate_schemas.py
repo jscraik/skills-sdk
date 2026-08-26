@@ -26,6 +26,7 @@ from skills_sdk.models.package import (
 )
 from skills_sdk.models.packaging import PackageManifest, PackageReceipt
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
+from skills_sdk.models.validation import SkillPackageValidation
 
 _PORTABLE_PATH_PATTERN = (
     r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
@@ -324,8 +325,9 @@ def _render_schema(model: type[object], filename: str) -> str:
             {
                 "if": {"properties": {"status": {"const": "built"}}},
                 "then": {
-                    "required": ["package_digest", "manifest", "included_files"],
+                    "required": ["candidate", "package_digest", "manifest", "included_files"],
                     "properties": {
+                        "candidate": {"not": {"type": "null"}},
                         "blocker": {"type": "null"},
                         "package_digest": {"not": {"type": "null"}},
                         "manifest": {"not": {"type": "null"}},
@@ -344,6 +346,53 @@ def _render_schema(model: type[object], filename: str) -> str:
                 },
             },
         ]
+    elif filename == "skill-package-validation.v1.schema.json":
+        schema["allOf"] = [
+            {
+                "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
+                "then": {
+                    "required": ["candidate", "identity", "files"],
+                    "properties": {
+                        "candidate": {"not": {"type": "null"}},
+                        "identity": {"not": {"type": "null"}},
+                        "files": {"minItems": 1},
+                        "findings": {
+                            "not": {
+                                "contains": {
+                                    "properties": {"severity": {"const": "blocker"}},
+                                    "required": ["severity"],
+                                }
+                            }
+                        },
+                    },
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+                "then": {
+                    "required": ["findings"],
+                    "properties": {
+                        "findings": {
+                            "contains": {
+                                "properties": {"severity": {"const": "blocker"}},
+                                "required": ["severity"],
+                            }
+                        }
+                    },
+                },
+            },
+        ]
+        schema["$comment"] = (
+            "Validate candidate/identity package_id binding and file-path uniqueness with "
+            "skills_sdk.core.schema_registry.SchemaRegistry.validate; JSON Schema cannot compare arbitrary fields."
+        )
+        schema["x-skills-sdk-semantic-validator"] = {
+            "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+            "required_for": [
+                "passing identity package_id must match the candidate package_id",
+                "skill validation file paths must be unique",
+            ],
+        }
     elif filename == "risk-classification.v1.schema.json":
         _append_risk_constraints(schema)
     elif filename == "security-screening.v1.schema.json":
@@ -381,6 +430,7 @@ def main() -> int:
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),
         (ScorerProfile, "scorer-profile.v1.schema.json"),
+        (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
         target = schema_root / filename

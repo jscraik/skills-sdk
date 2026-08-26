@@ -11,6 +11,16 @@ implicit dependencies of the core package.
 - Pydantic `>=2.11,<3` for typed contract models.
 - JSON Schema Draft 2020-12 for packaged schemas.
 - The repository's pinned `uv.lock` is the reproducible development toolchain.
+- Filesystem package validation requires descriptor-relative, no-follow
+  traversal support. Unsupported platforms return a typed blocker instead of
+  weakening the symlink and special-file boundary.
+
+Filesystem validation hashes one descriptor-captured view and rejects observed
+file or directory changes during traversal. This is a best-effort quiescence
+check for locally controlled source, not a transactional snapshot against a
+privileged concurrent writer. Promotion callers must validate an immutable
+source revision or prepared snapshot when adversarial concurrent mutation is
+in scope.
 
 ## Contract policy
 

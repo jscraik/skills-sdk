@@ -9,9 +9,8 @@ uv run skills-sdk --help
 uv run skills-sdk --version
 ```
 
-The current CLI is intentionally boundary-only. It parses these explicit
-routes and returns successfully without provider, runtime, or distribution
-side effects:
+The CLI exposes these explicit routes without provider, runtime, or
+distribution side effects:
 
 ```text
 inventory   intake   validate   build   eval   package   project   verify
@@ -19,12 +18,24 @@ tessl prepare   tessl verify
 ```
 
 Use `uv run skills-sdk <route> --help` for a short route description. The
-routes are stable discovery boundaries while their deeper implementations are
-built in separate, candidate-bound lanes. In particular:
+`validate` and `build` routes are implemented local commands:
+
+```bash
+uv run skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
+uv run skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
+```
+
+Both commands are non-interactive and non-mutating. Exit `0` means validation
+passed or a receipt was built; exit `2` means a structured blocker was
+returned. `validate` returns `skill-package-validation/v1`; `build` returns a
+candidate-bound `package-receipt/v1` without writing into the package.
+`--json` emits the versioned contract. `--robot` is an accepted no-op that
+reserves the prompt-free automation contract. The remaining routes are stable
+discovery boundaries while their deeper implementations are built in separate,
+candidate-bound lanes:
 
 - `inventory` is read-only source-inventory intent.
-- `validate`, `build`, `eval`, and `package` name local contract lanes; the
-  current command parser does not execute them yet.
+- `eval` and `package` name reserved local contract lanes and do not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.
 - `tessl prepare` and `tessl verify` name preparation and verification only;

@@ -11,11 +11,11 @@ provider handoff, and runtime verification boundaries.
 
 The `0.1.0` release establishes the public repository boundary and the first
 portable contracts for inventory, intake, package identity, packaging,
-evaluation, risk, security, and candidate-bound receipts. The CLI currently
-exposes a deliberately small boundary-only command surface: it parses help,
-version, and lifecycle route names without running provider, runtime, or
-distribution side effects. Provider execution, handoff, runtime installation,
-and publication remain separate implementation and evidence lanes.
+evaluation, risk, security, and candidate-bound receipts. The CLI executes the
+portable, read-only `validate` lane and the non-mutating `build` receipt lane;
+the remaining route names are discovery boundaries only. Provider execution,
+handoff, runtime installation, and publication remain separate implementation
+and evidence lanes.
 
 ## Ownership boundaries
 
@@ -41,8 +41,8 @@ The cold-agent entrypoint and progressive-disclosure contract are documented in
 
 - [`docs/api.md`](docs/api.md) — public Python contract families and schema
   validation.
-- [`docs/cli.md`](docs/cli.md) — the boundary-only command surface and its
-  current guarantees.
+- [`docs/cli.md`](docs/cli.md) — implemented local commands, reserved route
+  boundaries, and exit-code guarantees.
 - [`docs/compatibility.md`](docs/compatibility.md) — Python, schema, and
   compatibility policy.
 - [`SUPPORT.md`](SUPPORT.md) — support requests and safe reproduction details.
