@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from skills_sdk.models.evaluation import ScenarioSet, ScorerProfile
+
+FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "evaluation"
+
+
+def test_release_scenario_fixture_requires_regression_coverage() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scenario-accepted.json").read_text(encoding="utf-8"))
+    scenario_set = ScenarioSet.model_validate(payload)
+    assert scenario_set.release is True
+    assert {case.category for case in scenario_set.cases} == {"happy", "boundary", "regression"}
+
+
+def test_release_scenario_without_regression_is_rejected() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scenario-accepted.json").read_text(encoding="utf-8"))
+    payload["cases"] = [case for case in payload["cases"] if case["category"] != "regression"]
+    with pytest.raises(ValidationError, match="regression case"):
+        ScenarioSet.model_validate(payload)
+
+
+def test_scorer_fixture_requires_deterministic_first() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scorer-accepted.json").read_text(encoding="utf-8"))
+    scorer = ScorerProfile.model_validate(payload)
+    assert scorer.calibration_required is True
+    assert scorer.deterministic_checks_first is True
+
+
+def test_external_scorer_without_calibration_is_rejected() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scorer-accepted.json").read_text(encoding="utf-8"))
+    payload["calibration_probe_ids"] = []
+    with pytest.raises(ValidationError, match="calibration probes"):
+        ScorerProfile.model_validate(payload)
+
+
+def test_duplicate_scenario_ids_are_rejected() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scenario-accepted.json").read_text(encoding="utf-8"))
+    payload["cases"][1]["case_id"] = payload["cases"][0]["case_id"]
+    with pytest.raises(ValidationError, match="case ids"):
+        ScenarioSet.model_validate(payload)

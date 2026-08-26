@@ -1,0 +1,16 @@
+{
+  "schema_version": "scenario-set/v1",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "synthetic-skill",
+    "source_revision": "1111111111111111111111111111111111111111",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "scenario_set_id": "release-1",
+  "release": true,
+  "cases": [
+    {"case_id": "happy-path", "category": "happy", "prompt": "Use the skill for the supported task.", "expected_signals": ["selected", "validated"], "forbidden_commands": ["rm -rf"], "oracle": "expected_signal"},
+    {"case_id": "boundary-path", "category": "boundary", "prompt": "The required evidence is missing.", "expected_signals": ["blocked", "evidence"], "forbidden_commands": [], "oracle": "expected_signal"},
+    {"case_id": "regression-path", "category": "regression", "prompt": "Repeat the previously failing task.", "expected_signals": ["preserved"], "forbidden_commands": [], "oracle": "structured"}
+  ]
+}

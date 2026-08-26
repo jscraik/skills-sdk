@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "ScenarioCase": {
+      "additionalProperties": false,
+      "description": "One candidate-bound behavioral scenario.",
+      "properties": {
+        "case_id": {
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "happy",
+            "pressure",
+            "boundary",
+            "regression"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "expected_signals": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Expected Signals",
+          "type": "array"
+        },
+        "forbidden_commands": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Forbidden Commands",
+          "type": "array"
+        },
+        "oracle": {
+          "enum": [
+            "exact_match",
+            "expected_signal",
+            "structured"
+          ],
+          "title": "Oracle",
+          "type": "string"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id",
+        "category",
+        "prompt",
+        "expected_signals",
+        "oracle"
+      ],
+      "title": "ScenarioCase",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/scenario-set.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Immutable scenario universe selected for one package candidate.",
+  "properties": {
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/ScenarioCase"
+      },
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "release": {
+      "title": "Release",
+      "type": "boolean"
+    },
+    "scenario_set_id": {
+      "minLength": 1,
+      "title": "Scenario Set Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "scenario-set/v1",
+      "default": "scenario-set/v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate",
+    "scenario_set_id",
+    "release",
+    "cases"
+  ],
+  "title": "ScenarioSet",
+  "type": "object"
+}

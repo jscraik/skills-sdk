@@ -24,6 +24,8 @@ SCHEMA_NAMES = frozenset(
         "receipt-base.v1",
         "risk-classification.v1",
         "security-screening.v1",
+        "scenario-set.v1",
+        "scorer-profile.v1",
     }
 )
 

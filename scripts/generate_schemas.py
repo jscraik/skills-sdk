@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from skills_sdk.models.evaluation import ScenarioSet, ScorerProfile
 from skills_sdk.models.inventory import PackageInventory, PackageInventoryRecord
 from skills_sdk.models.package import (
     IntakeDecision,
@@ -262,6 +263,8 @@ def main() -> int:
         (PackageReceipt, "package-receipt.v1.schema.json"),
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
+        (ScenarioSet, "scenario-set.v1.schema.json"),
+        (ScorerProfile, "scorer-profile.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
         target = schema_root / filename

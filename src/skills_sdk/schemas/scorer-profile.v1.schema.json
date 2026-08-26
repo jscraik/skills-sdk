@@ -1,0 +1,107 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/scorer-profile.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Versioned scorer identity and calibration requirements.",
+  "properties": {
+    "calibration_probe_ids": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Calibration Probe Ids",
+      "type": "array"
+    },
+    "calibration_required": {
+      "title": "Calibration Required",
+      "type": "boolean"
+    },
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "deterministic_checks_first": {
+      "title": "Deterministic Checks First",
+      "type": "boolean"
+    },
+    "pass_threshold": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Pass Threshold",
+      "type": "number"
+    },
+    "schema_version": {
+      "const": "scorer-profile/v1",
+      "default": "scorer-profile/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scorer_id": {
+      "minLength": 1,
+      "title": "Scorer Id",
+      "type": "string"
+    },
+    "scorer_type": {
+      "enum": [
+        "deterministic",
+        "llm_judge",
+        "hybrid",
+        "external"
+      ],
+      "title": "Scorer Type",
+      "type": "string"
+    },
+    "version_or_digest": {
+      "minLength": 1,
+      "title": "Version Or Digest",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate",
+    "scorer_id",
+    "scorer_type",
+    "version_or_digest",
+    "pass_threshold",
+    "deterministic_checks_first",
+    "calibration_required"
+  ],
+  "title": "ScorerProfile",
+  "type": "object"
+}
