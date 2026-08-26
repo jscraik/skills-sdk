@@ -83,6 +83,14 @@ class SchemaRegistry:
             from skills_sdk.models.risk import SecurityScreeningResult
 
             model = SecurityScreeningResult
+        elif name == "scenario-set.v1":
+            from skills_sdk.models.evaluation import ScenarioSet
+
+            model = ScenarioSet
+        elif name == "scorer-profile.v1":
+            from skills_sdk.models.evaluation import ScorerProfile
+
+            model = ScorerProfile
         else:
             return
 

@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from skills_sdk.core.errors import ContractError
+from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.evaluation import ScenarioSet, ScorerProfile
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "evaluation"
@@ -44,3 +46,32 @@ def test_duplicate_scenario_ids_are_rejected() -> None:
     payload["cases"][1]["case_id"] = payload["cases"][0]["case_id"]
     with pytest.raises(ValidationError, match="case ids"):
         ScenarioSet.model_validate(payload)
+
+
+def test_scenario_schema_requires_regression_for_release() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scenario-accepted.json").read_text(encoding="utf-8"))
+    payload["cases"] = [case for case in payload["cases"] if case["category"] != "regression"]
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("scenario-set.v1", payload)
+
+
+def test_scenario_registry_rejects_duplicate_nested_case_ids() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scenario-accepted.json").read_text(encoding="utf-8"))
+    payload["cases"][1]["case_id"] = payload["cases"][0]["case_id"]
+    with pytest.raises(ContractError, match="contract_validation_failed") as error:
+        SchemaRegistry().validate("scenario-set.v1", payload)
+    assert any("case ids" in detail for detail in error.value.details)
+
+
+def test_scorer_schema_requires_calibration_probes() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scorer-accepted.json").read_text(encoding="utf-8"))
+    payload["calibration_probe_ids"] = []
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("scorer-profile.v1", payload)
+
+
+def test_scorer_schema_rejects_duplicate_calibration_probes() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scorer-accepted.json").read_text(encoding="utf-8"))
+    payload["calibration_probe_ids"].append(payload["calibration_probe_ids"][0])
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("scorer-profile.v1", payload)

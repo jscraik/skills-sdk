@@ -204,6 +204,74 @@ def _append_security_constraints(schema: dict[str, Any]) -> None:
     }
 
 
+def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> None:
+    """Project evaluation policy invariants into the committed schemas."""
+
+    if filename == "scenario-set.v1.schema.json":
+        schema["$defs"]["ScenarioCase"]["properties"]["case_id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        schema["$defs"]["ScenarioCase"]["properties"]["prompt"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+        schema["properties"]["cases"]["items"]["$ref"] = "#/$defs/ScenarioCase"
+        schema["allOf"] = [
+            *schema.get("allOf", []),
+            {
+                "if": {"properties": {"release": {"const": True}}, "required": ["release"]},
+                "then": {
+                    "required": ["cases"],
+                    "properties": {
+                        "cases": {
+                            "contains": {
+                                "properties": {"category": {"const": "regression"}},
+                                "required": ["category"],
+                            }
+                        }
+                    },
+                },
+            },
+        ]
+        schema["$comment"] = (
+            "Validate scenario-case identifier uniqueness and release regression coverage with "
+            "skills_sdk.core.schema_registry.SchemaRegistry.validate."
+        )
+        schema["x-skills-sdk-semantic-validator"] = {
+            "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+            "required_for": ["scenario case ids must be unique"],
+        }
+    elif filename == "scorer-profile.v1.schema.json":
+        properties = schema["properties"]
+        properties["calibration_probe_ids"]["uniqueItems"] = True
+        schema["allOf"] = [
+            *schema.get("allOf", []),
+            {
+                "if": {
+                    "properties": {"calibration_required": {"const": True}},
+                    "required": ["calibration_required"],
+                },
+                "then": {
+                    "required": ["calibration_probe_ids"],
+                    "properties": {"calibration_probe_ids": {"minItems": 1}},
+                },
+            },
+            {
+                "if": {
+                    "properties": {"scorer_type": {"enum": ["llm_judge", "external"]}},
+                    "required": ["scorer_type"],
+                },
+                "then": {
+                    "required": ["deterministic_checks_first"],
+                    "properties": {"deterministic_checks_first": {"const": True}},
+                },
+            },
+        ]
+        schema["$comment"] = (
+            "Validate calibration and deterministic-first policy with "
+            "skills_sdk.core.schema_registry.SchemaRegistry.validate."
+        )
+        schema["x-skills-sdk-semantic-validator"] = {
+            "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+            "required_for": ["calibration probes and deterministic checks must match scorer policy"],
+        }
+
+
 def _render_schema(model: type[object], filename: str) -> str:
     schema = model.model_json_schema()  # type: ignore[attr-defined]
     _append_portable_path_constraints(schema)
@@ -238,6 +306,8 @@ def _render_schema(model: type[object], filename: str) -> str:
         _append_risk_constraints(schema)
     elif filename == "security-screening.v1.schema.json":
         _append_security_constraints(schema)
+    elif filename in {"scenario-set.v1.schema.json", "scorer-profile.v1.schema.json"}:
+        _append_evaluation_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = f"https://schemas.skills-sdk.dev/{filename}"
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"
