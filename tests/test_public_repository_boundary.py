@@ -65,7 +65,9 @@ def test_public_docs_distinguish_wire_shapes_from_semantic_registry_checks() -> 
     assert 'exclude={"schema_version"}' in api
     assert "model-level semantic invariants" in api
     assert "model_validate(payload)" in api
+    assert "not registered with `SchemaRegistry`" in api
     assert "bare wire shape" in compatibility
+    assert "`receipt-base.v1` requires `schema_version`" in compatibility
 
 
 def test_seed_has_no_machine_paths_keys_or_provider_secrets() -> None:
