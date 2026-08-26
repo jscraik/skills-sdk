@@ -32,10 +32,10 @@ class Blocker:
 
 @dataclass(frozen=True, slots=True)
 class Receipt:
-    """One validated proof-lane result bound to an immutable candidate."""
+    """One validated proof-lane result, candidate-bound when identity resolved."""
 
     receipt_id: str
-    candidate: CandidateIdentity
+    candidate: CandidateIdentity | None
     lane: str
     status: str
     evidence: tuple[str, ...]
@@ -44,6 +44,8 @@ class Receipt:
     artifact_status: str | None = None
 
     def require_candidate(self, expected: CandidateIdentity) -> None:
+        if self.candidate is None:
+            raise ContractError("candidate_unavailable", "receipt has no resolved candidate identity")
         if self.candidate != expected:
             raise ContractError("candidate_mismatch", "receipt is bound to a different candidate")
 
@@ -83,7 +85,7 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         active_registry.validate("package-receipt.v1", payload)
     else:
         active_registry.validate("receipt-base.v1", payload)
-    candidate_payload = payload["candidate"]
+    candidate_payload = payload.get("candidate")
     if schema_version != "package-receipt/v1":
         active_registry.validate("package-identity.v1", candidate_payload)
     evidence = tuple(str(ref) for ref in payload["evidence"])
@@ -92,10 +94,14 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
     blocker_payload = payload.get("blocker")
     if blocker_payload is not None and schema_version != "package-receipt/v1":
         active_registry.validate("blocker.v1", blocker_payload)
-    candidate = CandidateIdentity(
-        package_id=str(candidate_payload["package_id"]),
-        source_revision=str(candidate_payload["source_revision"]),
-        content_sha256=str(candidate_payload["content_sha256"]),
+    candidate = (
+        CandidateIdentity(
+            package_id=str(candidate_payload["package_id"]),
+            source_revision=str(candidate_payload["source_revision"]),
+            content_sha256=str(candidate_payload["content_sha256"]),
+        )
+        if isinstance(candidate_payload, Mapping)
+        else None
     )
     artifact_status = str(payload["status"]) if schema_version == "package-receipt/v1" else None
     generic_status = {
