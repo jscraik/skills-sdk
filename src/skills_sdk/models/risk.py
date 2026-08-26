@@ -67,10 +67,13 @@ class RiskClassification(_ContractModel):
             raise ValueError("sensor_ids must match the declared sensors")
         if any(
             sensor.required
-            and (sensor.status == "skipped_optional" or sensor.blocking_behavior == "skip_optional")
+            and (
+                sensor.status in {"available_not_run", "skipped_optional"}
+                or sensor.blocking_behavior == "skip_optional"
+            )
             for sensor in self.sensors
         ):
-            raise ValueError("required sensors cannot use optional skip states")
+            raise ValueError("required sensors cannot be skipped or left unrun")
         if not self.receipt_required and any(
             sensor.status == "selected" and sensor.receipt_required for sensor in self.sensors
         ):

@@ -74,8 +74,11 @@ def test_duplicate_sensor_id_entries_are_rejected() -> None:
         RiskClassification.model_validate(payload)
 
 
-@pytest.mark.parametrize("field, value", [("status", "skipped_optional"), ("blocking_behavior", "skip_optional")])
-def test_required_sensors_cannot_use_optional_skip_states(field: str, value: str) -> None:
+@pytest.mark.parametrize(
+    "field, value",
+    [("status", "available_not_run"), ("status", "skipped_optional"), ("blocking_behavior", "skip_optional")],
+)
+def test_required_sensors_cannot_be_skipped_or_left_unrun(field: str, value: str) -> None:
     payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
     payload["sensors"][0][field] = value
     with pytest.raises(ValidationError, match="required sensors"):
@@ -144,8 +147,11 @@ def test_risk_schema_rejects_whitespace_only_acceptance_trace() -> None:
     assert _schema_errors("risk-classification.v1", payload)
 
 
-@pytest.mark.parametrize("field, value", [("status", "skipped_optional"), ("blocking_behavior", "skip_optional")])
-def test_risk_schema_rejects_optional_skip_for_required_sensor(field: str, value: str) -> None:
+@pytest.mark.parametrize(
+    "field, value",
+    [("status", "available_not_run"), ("status", "skipped_optional"), ("blocking_behavior", "skip_optional")],
+)
+def test_risk_schema_rejects_unrun_or_optional_skip_for_required_sensor(field: str, value: str) -> None:
     payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
     payload["sensors"][0][field] = value
     assert _schema_errors("risk-classification.v1", payload)
