@@ -5,12 +5,15 @@ from skills_sdk.models import (
     MantraStatus,
     PackageInventory,
     PackageInventoryRecord,
+    PackageInventoryRecordV2,
+    PackageInventoryV2,
     RecommendedMechanism,
     RiskClassification,
     ScenarioSet,
     ScorerProfile,
     SecurityScreeningResult,
     ValueDecision,
+    ValueDecisionV2,
 )
 
 __version__ = "0.1.0"
@@ -20,11 +23,14 @@ __all__ = [
     "MantraStatus",
     "PackageInventory",
     "PackageInventoryRecord",
+    "PackageInventoryRecordV2",
+    "PackageInventoryV2",
     "RecommendedMechanism",
     "RiskClassification",
     "ScenarioSet",
     "ScorerProfile",
     "SecurityScreeningResult",
     "ValueDecision",
+    "ValueDecisionV2",
     "__version__",
 ]

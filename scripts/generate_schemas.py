@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from skills_sdk.models.evaluation import ScenarioSet, ScorerProfile
-from skills_sdk.models.inventory import PackageInventory, PackageInventoryRecord
+from skills_sdk.models.inventory import (
+    PackageInventory,
+    PackageInventoryRecord,
+    PackageInventoryRecordV2,
+    PackageInventoryV2,
+)
 from skills_sdk.models.package import (
     IntakeDecision,
     NormalizedPackage,
@@ -333,6 +338,8 @@ def main() -> int:
     for model, filename in (
         (PackageInventoryRecord, "package-inventory.v1.schema.json"),
         (PackageInventory, "package-inventory-set.v1.schema.json"),
+        (PackageInventoryRecordV2, "package-inventory.v2.schema.json"),
+        (PackageInventoryV2, "package-inventory-set.v2.schema.json"),
         (PackageCandidateIdentity, "package-candidate.v1.schema.json"),
         (SkillIdentity, "skill-identity.v1.schema.json"),
         (PluginIdentity, "plugin-identity.v1.schema.json"),

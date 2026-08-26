@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models import PackageInventoryRecord
+from skills_sdk.models import PackageInventoryRecord, PackageInventoryRecordV2
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures/inventory"
@@ -37,6 +37,19 @@ def test_boundary_inventory_fixture_preserves_typed_blockers() -> None:
     assert record.intended_disposition.value == "needs_owner_decision"
     assert set(record.blocker_codes) == {"canonical_source_unknown", "runtime_copy_not_source"}
     assert record.mantra.overall.value == "revise"
+
+
+def test_v2_pending_value_fixture_preserves_typed_blocker() -> None:
+    payload = _load("pending-value-review-v2.json")
+    record = PackageInventoryRecordV2.model_validate(payload)
+    SchemaRegistry().validate("package-inventory.v2", record.model_dump(mode="json"))
+    assert record.value_decision.value == "needs_review"
+    assert record.blocker_codes == ("value_review_required",)
+
+
+def test_v1_model_rejects_the_v2_pending_value_fixture() -> None:
+    with pytest.raises(ValidationError):
+        PackageInventoryRecord.model_validate(_load("pending-value-review-v2.json"))
 
 
 def test_generated_inventory_schemas_have_no_drift() -> None:

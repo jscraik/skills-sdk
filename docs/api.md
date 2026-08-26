@@ -8,7 +8,8 @@ package exports the inventory, risk, and evaluation contracts listed in its
 
 ## Contract families
 
-- **Inventory:** `PackageInventory`, `PackageInventoryRecord`, source
+- **Inventory:** `PackageInventory`, `PackageInventoryRecord`, their `V2`
+  counterparts, source
   provenance, rights, ownership, disposition, and mantra assessment.
 - **Intake and package identity:** `PackageCandidateIdentity`, `SkillIdentity`,
   `PluginIdentity`, `PackageSource`, `PackageOwner`, `IntakeDecision`, and

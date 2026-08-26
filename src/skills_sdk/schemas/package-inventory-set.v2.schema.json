@@ -129,9 +129,9 @@
       "title": "PackageDisposition",
       "type": "string"
     },
-    "PackageInventoryRecord": {
+    "PackageInventoryRecordV2": {
       "additionalProperties": false,
-      "description": "One read-only inventory record for a retained skill or plugin.",
+      "description": "Version-two inventory record with typed pending value review.",
       "properties": {
         "blocker_codes": {
           "default": [],
@@ -287,8 +287,8 @@
           "type": "array"
         },
         "schema_version": {
-          "const": "package-inventory/v1",
-          "default": "package-inventory/v1",
+          "const": "package-inventory/v2",
+          "default": "package-inventory/v2",
           "title": "Schema Version",
           "type": "string"
         },
@@ -322,7 +322,7 @@
           "type": "string"
         },
         "value_decision": {
-          "$ref": "#/$defs/ValueDecision"
+          "$ref": "#/$defs/ValueDecisionV2"
         }
       },
       "required": [
@@ -339,7 +339,7 @@
         "mantra",
         "intended_disposition"
       ],
-      "title": "PackageInventoryRecord",
+      "title": "PackageInventoryRecordV2",
       "type": "object"
     },
     "PackageType": {
@@ -452,33 +452,34 @@
       "title": "SourceProvenance",
       "type": "object"
     },
-    "ValueDecision": {
-      "description": "The evidence-backed value decision for an inventory candidate.",
+    "ValueDecisionV2": {
+      "description": "Value decision including an explicit unresolved review state.",
       "enum": [
+        "needs_review",
         "retain",
         "merge",
         "replace",
         "retire"
       ],
-      "title": "ValueDecision",
+      "title": "ValueDecisionV2",
       "type": "string"
     }
   },
-  "$id": "https://schemas.skills-sdk.dev/package-inventory-set.v1.schema.json",
+  "$id": "https://schemas.skills-sdk.dev/package-inventory-set.v2.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "A deterministic, read-only inventory snapshot.",
+  "description": "Version-two deterministic, read-only inventory snapshot.",
   "properties": {
     "records": {
       "items": {
-        "$ref": "#/$defs/PackageInventoryRecord"
+        "$ref": "#/$defs/PackageInventoryRecordV2"
       },
       "title": "Records",
       "type": "array"
     },
     "schema_version": {
-      "const": "package-inventory-set/v1",
-      "default": "package-inventory-set/v1",
+      "const": "package-inventory-set/v2",
+      "default": "package-inventory-set/v2",
       "title": "Schema Version",
       "type": "string"
     },
@@ -492,6 +493,6 @@
     "source_revision",
     "records"
   ],
-  "title": "PackageInventory",
+  "title": "PackageInventoryV2",
   "type": "object"
 }

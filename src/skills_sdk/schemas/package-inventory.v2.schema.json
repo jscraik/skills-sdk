@@ -129,219 +129,6 @@
       "title": "PackageDisposition",
       "type": "string"
     },
-    "PackageInventoryRecord": {
-      "additionalProperties": false,
-      "description": "One read-only inventory record for a retained skill or plugin.",
-      "properties": {
-        "blocker_codes": {
-          "default": [],
-          "items": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "title": "Blocker Codes",
-          "type": "array"
-        },
-        "context_cost": {
-          "minLength": 1,
-          "title": "Context Cost",
-          "type": "string"
-        },
-        "current_path": {
-          "minLength": 1,
-          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
-          "title": "Current Path",
-          "type": "string"
-        },
-        "declared_version": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Declared Version"
-        },
-        "direct_consumers": {
-          "default": [],
-          "items": {
-            "minLength": 1,
-            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
-            "type": "string"
-          },
-          "title": "Direct Consumers",
-          "type": "array"
-        },
-        "display_name": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Display Name"
-        },
-        "distinctive_value": {
-          "minLength": 1,
-          "title": "Distinctive Value",
-          "type": "string"
-        },
-        "duplicate_of": {
-          "anyOf": [
-            {
-              "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Duplicate Of"
-        },
-        "external_dependencies": {
-          "default": [],
-          "items": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "title": "External Dependencies",
-          "type": "array"
-        },
-        "format_checks": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FormatChecks"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "intended_disposition": {
-          "$ref": "#/$defs/PackageDisposition"
-        },
-        "maintenance_cost": {
-          "minLength": 1,
-          "title": "Maintenance Cost",
-          "type": "string"
-        },
-        "mantra": {
-          "$ref": "#/$defs/MantraAssessment"
-        },
-        "overlap_with_existing": {
-          "default": [],
-          "items": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "title": "Overlap With Existing",
-          "type": "array"
-        },
-        "owner": {
-          "minLength": 1,
-          "title": "Owner",
-          "type": "string"
-        },
-        "package_id": {
-          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
-          "title": "Package Id",
-          "type": "string"
-        },
-        "package_type": {
-          "$ref": "#/$defs/PackageType"
-        },
-        "recommended_mechanism": {
-          "$ref": "#/$defs/RecommendedMechanism"
-        },
-        "rights": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/RightsStatus"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "risk": {
-          "$ref": "#/$defs/RiskClass",
-          "default": "none"
-        },
-        "runtime_visibility": {
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/RuntimeVisibility"
-          },
-          "title": "Runtime Visibility",
-          "type": "array"
-        },
-        "schema_version": {
-          "const": "package-inventory/v1",
-          "default": "package-inventory/v1",
-          "title": "Schema Version",
-          "type": "string"
-        },
-        "source": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SourceProvenance"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "tessl_identity": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Tessl Identity"
-        },
-        "user_outcome": {
-          "minLength": 1,
-          "title": "User Outcome",
-          "type": "string"
-        },
-        "value_decision": {
-          "$ref": "#/$defs/ValueDecision"
-        }
-      },
-      "required": [
-        "package_id",
-        "package_type",
-        "current_path",
-        "owner",
-        "user_outcome",
-        "distinctive_value",
-        "maintenance_cost",
-        "context_cost",
-        "recommended_mechanism",
-        "value_decision",
-        "mantra",
-        "intended_disposition"
-      ],
-      "title": "PackageInventoryRecord",
-      "type": "object"
-    },
     "PackageType": {
       "description": "Canonical package categories admitted by the Foundry.",
       "enum": [
@@ -452,46 +239,230 @@
       "title": "SourceProvenance",
       "type": "object"
     },
-    "ValueDecision": {
-      "description": "The evidence-backed value decision for an inventory candidate.",
+    "ValueDecisionV2": {
+      "description": "Value decision including an explicit unresolved review state.",
       "enum": [
+        "needs_review",
         "retain",
         "merge",
         "replace",
         "retire"
       ],
-      "title": "ValueDecision",
+      "title": "ValueDecisionV2",
       "type": "string"
     }
   },
-  "$id": "https://schemas.skills-sdk.dev/package-inventory-set.v1.schema.json",
+  "$id": "https://schemas.skills-sdk.dev/package-inventory.v2.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "A deterministic, read-only inventory snapshot.",
+  "description": "Version-two inventory record with typed pending value review.",
   "properties": {
-    "records": {
+    "blocker_codes": {
+      "default": [],
       "items": {
-        "$ref": "#/$defs/PackageInventoryRecord"
+        "minLength": 1,
+        "type": "string"
       },
-      "title": "Records",
+      "title": "Blocker Codes",
+      "type": "array"
+    },
+    "context_cost": {
+      "minLength": 1,
+      "title": "Context Cost",
+      "type": "string"
+    },
+    "current_path": {
+      "minLength": 1,
+      "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+      "title": "Current Path",
+      "type": "string"
+    },
+    "declared_version": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Declared Version"
+    },
+    "direct_consumers": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+        "type": "string"
+      },
+      "title": "Direct Consumers",
+      "type": "array"
+    },
+    "display_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Display Name"
+    },
+    "distinctive_value": {
+      "minLength": 1,
+      "title": "Distinctive Value",
+      "type": "string"
+    },
+    "duplicate_of": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duplicate Of"
+    },
+    "external_dependencies": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "External Dependencies",
+      "type": "array"
+    },
+    "format_checks": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FormatChecks"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "intended_disposition": {
+      "$ref": "#/$defs/PackageDisposition"
+    },
+    "maintenance_cost": {
+      "minLength": 1,
+      "title": "Maintenance Cost",
+      "type": "string"
+    },
+    "mantra": {
+      "$ref": "#/$defs/MantraAssessment"
+    },
+    "overlap_with_existing": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Overlap With Existing",
+      "type": "array"
+    },
+    "owner": {
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "package_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Package Id",
+      "type": "string"
+    },
+    "package_type": {
+      "$ref": "#/$defs/PackageType"
+    },
+    "recommended_mechanism": {
+      "$ref": "#/$defs/RecommendedMechanism"
+    },
+    "rights": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RightsStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "risk": {
+      "$ref": "#/$defs/RiskClass",
+      "default": "none"
+    },
+    "runtime_visibility": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RuntimeVisibility"
+      },
+      "title": "Runtime Visibility",
       "type": "array"
     },
     "schema_version": {
-      "const": "package-inventory-set/v1",
-      "default": "package-inventory-set/v1",
+      "const": "package-inventory/v2",
+      "default": "package-inventory/v2",
       "title": "Schema Version",
       "type": "string"
     },
-    "source_revision": {
-      "pattern": "^[0-9a-f]{40}$",
-      "title": "Source Revision",
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "tessl_identity": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tessl Identity"
+    },
+    "user_outcome": {
+      "minLength": 1,
+      "title": "User Outcome",
       "type": "string"
+    },
+    "value_decision": {
+      "$ref": "#/$defs/ValueDecisionV2"
     }
   },
   "required": [
-    "source_revision",
-    "records"
+    "package_id",
+    "package_type",
+    "current_path",
+    "owner",
+    "user_outcome",
+    "distinctive_value",
+    "maintenance_cost",
+    "context_cost",
+    "recommended_mechanism",
+    "value_decision",
+    "mantra",
+    "intended_disposition"
   ],
-  "title": "PackageInventory",
+  "title": "PackageInventoryRecordV2",
   "type": "object"
 }
