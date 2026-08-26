@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models import PackageInventoryRecord
+from skills_sdk.models import PackageInventoryRecord, PackageInventoryRecordV2
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures/inventory"
@@ -37,6 +38,55 @@ def test_boundary_inventory_fixture_preserves_typed_blockers() -> None:
     assert record.intended_disposition.value == "needs_owner_decision"
     assert set(record.blocker_codes) == {"canonical_source_unknown", "runtime_copy_not_source"}
     assert record.mantra.overall.value == "revise"
+
+
+def test_v2_pending_value_fixture_preserves_typed_blocker() -> None:
+    payload = _load("pending-value-review-v2.json")
+    record = PackageInventoryRecordV2.model_validate(payload)
+    SchemaRegistry().validate("package-inventory.v2", record.model_dump(mode="json"))
+    assert record.value_decision.value == "needs_review"
+    assert record.blocker_codes == ("value_review_required",)
+
+
+def test_v1_model_rejects_the_v2_pending_value_fixture() -> None:
+    with pytest.raises(ValidationError):
+        PackageInventoryRecord.model_validate(_load("pending-value-review-v2.json"))
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"blocker_codes": []},
+        {"intended_disposition": "admit_to_foundry"},
+    ],
+)
+def test_v2_schema_rejects_unblocked_pending_value_review(changes: dict[str, object]) -> None:
+    payload = _load("pending-value-review-v2.json")
+    payload.update(changes)
+    with pytest.raises(ContractError, match=r"package-inventory\.v2 rejected"):
+        SchemaRegistry().validate("package-inventory.v2", payload)
+
+
+def test_v2_registry_applies_record_semantics_after_schema_validation() -> None:
+    payload = _load("pending-value-review-v2.json")
+    payload["duplicate_of"] = payload["package_id"]
+    with pytest.raises(ContractError) as captured:
+        SchemaRegistry().validate("package-inventory.v2", payload)
+    assert captured.value.code == "contract_validation_failed"
+    assert any("duplicate_of must identify a different package" in detail for detail in captured.value.details)
+
+
+def test_v2_registry_applies_set_semantics_after_schema_validation() -> None:
+    record = _load("pending-value-review-v2.json")
+    payload = {
+        "schema_version": "package-inventory-set/v2",
+        "source_revision": "2" * 40,
+        "records": [record, record],
+    }
+    with pytest.raises(ContractError) as captured:
+        SchemaRegistry().validate("package-inventory-set.v2", payload)
+    assert captured.value.code == "contract_validation_failed"
+    assert any("package_id values must be unique" in detail for detail in captured.value.details)
 
 
 def test_generated_inventory_schemas_have_no_drift() -> None:

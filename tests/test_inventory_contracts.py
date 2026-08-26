@@ -8,9 +8,12 @@ from skills_sdk.models import (
     PackageDisposition,
     PackageInventory,
     PackageInventoryRecord,
+    PackageInventoryRecordV2,
+    PackageInventoryV2,
     PackageType,
     RecommendedMechanism,
     ValueDecision,
+    ValueDecisionV2,
 )
 
 
@@ -113,6 +116,79 @@ def test_merge_value_decision_requires_overlap_evidence() -> None:
     payload.update(value_decision=ValueDecision.MERGE, recommended_mechanism=RecommendedMechanism.STANDALONE_SKILL)
     with pytest.raises(ValidationError, match="overlap_with_existing"):
         PackageInventoryRecord.model_validate(payload)
+
+
+def test_pending_value_review_is_a_typed_blocker() -> None:
+    payload = _record().model_dump()
+    payload.update(
+        schema_version="package-inventory/v2",
+        value_decision=ValueDecisionV2.NEEDS_REVIEW,
+        blocker_codes=("value_review_required",),
+        mantra=_mantra("revise"),
+        intended_disposition=PackageDisposition.NEEDS_OWNER_DECISION,
+    )
+    record = PackageInventoryRecordV2.model_validate(payload)
+    assert record.value_decision is ValueDecisionV2.NEEDS_REVIEW
+
+
+@pytest.mark.parametrize(
+    ("disposition", "blocker_codes"),
+    [
+        (PackageDisposition.ADMIT_TO_FOUNDRY, ("value_review_required",)),
+        (PackageDisposition.NEEDS_OWNER_DECISION, ()),
+    ],
+)
+def test_pending_value_review_rejects_unblocked_or_admitted_candidates(
+    disposition: PackageDisposition,
+    blocker_codes: tuple[str, ...],
+) -> None:
+    payload = _record().model_dump()
+    payload.update(
+        schema_version="package-inventory/v2",
+        value_decision=ValueDecisionV2.NEEDS_REVIEW,
+        blocker_codes=blocker_codes,
+        mantra=_mantra("pass" if disposition == PackageDisposition.ADMIT_TO_FOUNDRY else "revise"),
+        intended_disposition=disposition,
+    )
+    with pytest.raises(ValidationError, match="needs_review value decision"):
+        PackageInventoryRecordV2.model_validate(payload)
+
+
+def test_v1_inventory_rejects_the_v2_pending_review_value() -> None:
+    payload = _record().model_dump()
+    payload["value_decision"] = "needs_review"
+    with pytest.raises(ValidationError, match=r"retain.*merge.*replace.*retire"):
+        PackageInventoryRecord.model_validate(payload)
+
+
+def test_v2_inventory_set_requires_v2_records() -> None:
+    record = PackageInventoryRecordV2.model_validate(
+        _record().model_dump()
+        | {
+            "schema_version": "package-inventory/v2",
+            "value_decision": "needs_review",
+            "blocker_codes": ("value_review_required",),
+            "mantra": _mantra("revise"),
+            "intended_disposition": "needs_owner_decision",
+        }
+    )
+    inventory = PackageInventoryV2(source_revision="1" * 40, records=(record,))
+    assert inventory.schema_version == "package-inventory-set/v2"
+
+
+def test_v1_inventory_set_rejects_a_constructed_v2_record() -> None:
+    record = PackageInventoryRecordV2.model_validate(
+        _record().model_dump()
+        | {
+            "schema_version": "package-inventory/v2",
+            "value_decision": "needs_review",
+            "blocker_codes": ("value_review_required",),
+            "mantra": _mantra("revise"),
+            "intended_disposition": "needs_owner_decision",
+        }
+    )
+    with pytest.raises(ValidationError, match=r"set/v1 requires package-inventory/v1"):
+        PackageInventory(source_revision="1" * 40, records=(record,))
 
 
 def test_inventory_rejects_duplicate_package_ids() -> None:

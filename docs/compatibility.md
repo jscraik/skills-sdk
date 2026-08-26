@@ -31,6 +31,12 @@ values, semantic invariants, or schema meaning requires a new schema version,
 updated fixtures, and a compatibility note. Tests and the generated schemas
 are the executable compatibility proof.
 
+`package-inventory/v2` and `package-inventory-set/v2` add the explicit
+`needs_review` value decision for candidates whose value evidence is still
+blocked. The corresponding `v1` models and schemas remain unchanged and reject
+that value. Consumers may continue reading `v1`; producers that need the
+pending-review state must emit the matching `v2` record or set envelope.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

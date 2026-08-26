@@ -274,6 +274,53 @@ class PackageInventory(_ContractModel):
 
     @model_validator(mode="after")
     def package_ids_are_unique(self) -> PackageInventory:
+        if any(record.schema_version != "package-inventory/v1" for record in self.records):
+            raise ValueError("package-inventory-set/v1 requires package-inventory/v1 records")
+        package_ids = [record.package_id for record in self.records]
+        if len(package_ids) != len(set(package_ids)):
+            raise ValueError("inventory package_id values must be unique")
+        return self
+
+
+class ValueDecisionV2(StrEnum):
+    """Value decision including an explicit unresolved review state."""
+
+    NEEDS_REVIEW = "needs_review"
+    RETAIN = "retain"
+    MERGE = "merge"
+    REPLACE = "replace"
+    RETIRE = "retire"
+
+
+class PackageInventoryRecordV2(PackageInventoryRecord):
+    """Version-two inventory record with typed pending value review."""
+
+    schema_version: Literal["package-inventory/v2"] = "package-inventory/v2"
+    value_decision: ValueDecisionV2
+
+    @model_validator(mode="after")
+    def pending_value_review_is_blocked(self) -> PackageInventoryRecordV2:
+        if self.value_decision == ValueDecisionV2.NEEDS_REVIEW and (
+            self.intended_disposition != PackageDisposition.NEEDS_OWNER_DECISION
+            or "value_review_required" not in self.blocker_codes
+        ):
+            raise ValueError(
+                "needs_review value decision requires needs_owner_decision and value_review_required"
+            )
+        return self
+
+
+class PackageInventoryV2(_ContractModel):
+    """Version-two deterministic, read-only inventory snapshot."""
+
+    schema_version: Literal["package-inventory-set/v2"] = "package-inventory-set/v2"
+    source_revision: GitRevision
+    records: tuple[PackageInventoryRecordV2, ...]
+
+    @model_validator(mode="after")
+    def package_ids_are_unique(self) -> PackageInventoryV2:
+        if any(record.schema_version != "package-inventory/v2" for record in self.records):
+            raise ValueError("package-inventory-set/v2 requires package-inventory/v2 records")
         package_ids = [record.package_id for record in self.records]
         if len(package_ids) != len(set(package_ids)):
             raise ValueError("inventory package_id values must be unique")

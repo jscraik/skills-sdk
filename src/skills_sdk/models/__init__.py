@@ -9,6 +9,8 @@ from skills_sdk.models.inventory import (
     PackageDisposition,
     PackageInventory,
     PackageInventoryRecord,
+    PackageInventoryRecordV2,
+    PackageInventoryV2,
     PackageType,
     RecommendedMechanism,
     RightsStatus,
@@ -16,6 +18,7 @@ from skills_sdk.models.inventory import (
     RuntimeVisibility,
     SourceProvenance,
     ValueDecision,
+    ValueDecisionV2,
 )
 from skills_sdk.models.package import (
     IntakeChecks,
@@ -56,6 +59,8 @@ __all__ = [
     "PackageFileRole",
     "PackageInventory",
     "PackageInventoryRecord",
+    "PackageInventoryRecordV2",
+    "PackageInventoryV2",
     "PackageLifecycleState",
     "PackageManifest",
     "PackageManifestFile",
@@ -81,4 +86,5 @@ __all__ = [
     "SkillIdentity",
     "SourceProvenance",
     "ValueDecision",
+    "ValueDecisionV2",
 ]
