@@ -264,8 +264,12 @@ def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> Non
                     "required": ["scorer_type"],
                 },
                 "then": {
-                    "required": ["deterministic_checks_first"],
-                    "properties": {"deterministic_checks_first": {"const": True}},
+                    "required": ["calibration_required", "calibration_probe_ids", "deterministic_checks_first"],
+                    "properties": {
+                        "calibration_required": {"const": True},
+                        "calibration_probe_ids": {"minItems": 1},
+                        "deterministic_checks_first": {"const": True},
+                    },
                 },
             },
         ]

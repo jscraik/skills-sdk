@@ -78,11 +78,19 @@
       },
       "then": {
         "properties": {
+          "calibration_probe_ids": {
+            "minItems": 1
+          },
+          "calibration_required": {
+            "const": true
+          },
           "deterministic_checks_first": {
             "const": true
           }
         },
         "required": [
+          "calibration_required",
+          "calibration_probe_ids",
           "deterministic_checks_first"
         ]
       }

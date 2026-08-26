@@ -41,6 +41,13 @@ def test_external_scorer_without_calibration_is_rejected() -> None:
         ScorerProfile.model_validate(payload)
 
 
+def test_opaque_scorer_cannot_opt_out_of_calibration() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scorer-accepted.json").read_text(encoding="utf-8"))
+    payload["calibration_required"] = False
+    with pytest.raises(ValidationError, match="require calibration"):
+        ScorerProfile.model_validate(payload)
+
+
 def test_duplicate_scenario_ids_are_rejected() -> None:
     payload = json.loads((FIXTURE_ROOT / "scenario-accepted.json").read_text(encoding="utf-8"))
     payload["cases"][1]["case_id"] = payload["cases"][0]["case_id"]
@@ -73,6 +80,13 @@ def test_scorer_schema_requires_calibration_probes() -> None:
 def test_scorer_schema_rejects_duplicate_calibration_probes() -> None:
     payload = json.loads((FIXTURE_ROOT / "scorer-accepted.json").read_text(encoding="utf-8"))
     payload["calibration_probe_ids"].append(payload["calibration_probe_ids"][0])
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("scorer-profile.v1", payload)
+
+
+def test_scorer_schema_rejects_opaque_calibration_opt_out() -> None:
+    payload = json.loads((FIXTURE_ROOT / "scorer-accepted.json").read_text(encoding="utf-8"))
+    payload["calibration_required"] = False
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("scorer-profile.v1", payload)
 

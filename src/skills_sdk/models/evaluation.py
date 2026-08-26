@@ -57,6 +57,8 @@ class ScorerProfile(_ContractModel):
     def calibration_matches_policy(self) -> ScorerProfile:
         if self.calibration_required and not self.calibration_probe_ids:
             raise ValueError("calibration_required scorers must declare calibration probes")
+        if self.scorer_type in {"llm_judge", "external"} and not self.calibration_required:
+            raise ValueError("judge and external scorers must require calibration")
         if self.scorer_type in {"llm_judge", "external"} and not self.deterministic_checks_first:
             raise ValueError("judge and external scorers must run deterministic checks first")
         if len(self.calibration_probe_ids) != len(set(self.calibration_probe_ids)):
