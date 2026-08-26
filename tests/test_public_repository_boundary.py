@@ -12,6 +12,16 @@ BANNED_TEXT = (
     "tessl" + "_api_key",
 )
 
+PUBLIC_SURFACES = (
+    "CHANGELOG.md",
+    "SUPPORT.md",
+    "docs/api.md",
+    "docs/cli.md",
+    "docs/compatibility.md",
+    "docs/agent-entrypoint.md",
+    "examples/inventory_contract.py",
+)
+
 
 def _source_files() -> list[Path]:
     result = subprocess.run(
@@ -31,6 +41,43 @@ def test_seed_has_no_private_package_or_runtime_roots() -> None:
         if BANNED_PATH_PARTS.intersection(path.relative_to(REPO_ROOT).parts)
     ]
     assert offending == []
+
+
+def test_public_repository_surfaces_are_present_and_linked() -> None:
+    missing = [path for path in PUBLIC_SURFACES if not (REPO_ROOT / path).is_file()]
+    assert missing == []
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    for path in PUBLIC_SURFACES:
+        assert f"{path}]" in readme or f"{path})" in readme
+
+
+def test_public_docs_preserve_portable_and_no_waiver_boundaries() -> None:
+    docs = "\n".join((REPO_ROOT / path).read_text(encoding="utf-8") for path in PUBLIC_SURFACES)
+    assert "portable" in docs.casefold()
+    assert "waiver" in docs.casefold()
+    assert "provider" in docs.casefold()
+
+
+def test_public_docs_distinguish_wire_shapes_from_semantic_registry_checks() -> None:
+    api = (REPO_ROOT / "docs/api.md").read_text(encoding="utf-8")
+    compatibility = (REPO_ROOT / "docs/compatibility.md").read_text(encoding="utf-8")
+    api_compact = " ".join(api.split())
+    assert 'exclude={"schema_version"}' in api
+    assert "model-level semantic invariants" in api
+    assert "PackageInventoryRecord.model_validate(payload)" in api
+    assert "family-specific contracts such as" in api
+    assert "`package-identity.v1` and inventory schemas receive structural validation only" in api_compact
+    assert (
+        "packaged candidate, skill-identity, plugin-identity, source, owner, "
+        "normalized-package, and intake schemas are not registered with"
+    ) in api_compact
+    assert (
+        "`package-identity.v1`, `package-source.v1`, and\n"
+        "`package-owner.v1` JSON schemas intentionally accept"
+    ) in compatibility
+    assert "bare wire shape" in compatibility
+    assert "`receipt-base.v1` requires `schema_version`" in compatibility
 
 
 def test_seed_has_no_machine_paths_keys_or_provider_secrets() -> None:

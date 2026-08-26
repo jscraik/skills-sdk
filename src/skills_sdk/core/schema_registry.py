@@ -48,6 +48,8 @@ class SchemaRegistry:
         return payload
 
     def validate(self, name: str, payload: object) -> None:
+        if name not in SCHEMA_NAMES:
+            raise ContractError("unknown_schema", f"unsupported schema: {name}")
         schemas = {schema_name: self.load(schema_name) for schema_name in SCHEMA_NAMES}
         registry = Registry().with_resources(
             (schema["$id"], Resource.from_contents(schema)) for schema in schemas.values()
