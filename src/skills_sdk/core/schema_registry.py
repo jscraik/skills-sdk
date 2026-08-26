@@ -73,6 +73,14 @@ class SchemaRegistry:
             from skills_sdk.models.packaging import PackageReceipt
 
             model = PackageReceipt
+        elif name == "risk-classification.v1":
+            from skills_sdk.models.risk import RiskClassification
+
+            model = RiskClassification
+        elif name == "security-screening.v1":
+            from skills_sdk.models.risk import SecurityScreeningResult
+
+            model = SecurityScreeningResult
         else:
             return
 

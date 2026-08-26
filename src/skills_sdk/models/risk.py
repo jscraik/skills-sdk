@@ -45,8 +45,16 @@ class RiskClassification(_ContractModel):
         ids = tuple(sensor.id for sensor in self.sensors)
         if len(ids) != len(set(ids)):
             raise ValueError("risk sensor ids must be unique")
+        if len(self.sensor_ids) != len(set(self.sensor_ids)):
+            raise ValueError("sensor_ids must be unique")
         if set(self.sensor_ids) != set(ids):
             raise ValueError("sensor_ids must match the declared sensors")
+        if any(
+            sensor.required
+            and (sensor.status == "skipped_optional" or sensor.blocking_behavior == "skip_optional")
+            for sensor in self.sensors
+        ):
+            raise ValueError("required sensors cannot use optional skip states")
         if self.risk_tier in {"high", "privileged", "published"} and not self.receipt_required:
             raise ValueError("elevated risk tiers require a receipt")
         return self
@@ -91,8 +99,11 @@ class SecurityScreeningResult(_ContractModel):
         severities = {finding.severity for finding in self.findings}
         if self.status == "pass" and severities - {"info"}:
             raise ValueError("pass screening cannot contain warning or blocker findings")
-        if self.status == "needs_review" and not severities & {"warning", "blocker"}:
-            raise ValueError("needs_review screening requires a warning or blocker finding")
+        if self.status == "needs_review":
+            if "blocker" in severities:
+                raise ValueError("needs_review screening cannot contain a blocker finding")
+            if "warning" not in severities:
+                raise ValueError("needs_review screening requires a warning finding")
         if self.status == "blocked" and "blocker" not in severities:
             raise ValueError("blocked screening requires a blocker finding")
         codes = [finding.code for finding in self.findings]
