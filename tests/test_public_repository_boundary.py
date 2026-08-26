@@ -59,6 +59,14 @@ def test_public_docs_preserve_portable_and_no_waiver_boundaries() -> None:
     assert "provider" in docs.casefold()
 
 
+def test_public_docs_distinguish_wire_shapes_from_semantic_registry_checks() -> None:
+    api = (REPO_ROOT / "docs/api.md").read_text(encoding="utf-8")
+    compatibility = (REPO_ROOT / "docs/compatibility.md").read_text(encoding="utf-8")
+    assert 'exclude={"schema_version"}' in api
+    assert "Pydantic semantic checks" in api
+    assert "bare wire shape" in compatibility
+
+
 def test_seed_has_no_machine_paths_keys_or_provider_secrets() -> None:
     offending: list[str] = []
     for path in _source_files():

@@ -14,11 +14,14 @@ implicit dependencies of the core package.
 
 ## Contract policy
 
-Every versioned payload carries a `schema_version` where the contract defines
-one. Unknown model fields are rejected, portable paths are validated at the
-boundary, and candidate-bound evidence keeps source revision and content
-digest together. A validation failure is an explicit blocker; there is no
-waiver or suppression path.
+Every versioned Pydantic model carries a `schema_version` where the contract
+defines one. Some low-level identity, source, owner, and receipt-base JSON
+schemas intentionally accept the bare wire shape without that envelope field;
+use the corresponding model dump when a versioned payload is required. Unknown
+model fields are rejected, portable paths are validated at the boundary, and
+candidate-bound evidence keeps source revision and content digest together. A
+validation failure is an explicit blocker; there is no waiver or suppression
+path.
 
 Within the `0.1.x` line, compatible additions may add optional data without
 changing the meaning of existing fields. Changing required fields, enum

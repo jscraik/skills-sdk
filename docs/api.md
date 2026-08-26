@@ -33,12 +33,17 @@ candidate = PackageCandidateIdentity(
     source_revision="0" * 40,
     content_sha256="0" * 64,
 )
-SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json"))
+# package-identity.v1 is the wire identity shape and has no schema_version key.
+SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json", exclude={"schema_version"}))
 ```
 
 The registry accepts only known schema names and raises `ContractError` for an
-unknown schema or invalid payload. Validation is read-only: it does not write
-receipts, contact providers, install packages, or publish to a registry.
+unknown schema or invalid payload. It adds Pydantic semantic checks for
+manifest, receipt, risk, security, scenario, and scorer schemas. For inventory,
+identity, source, owner, normalized-package, and intake records, validate the
+corresponding Pydantic model explicitly after the structural schema check.
+Validation is read-only: it does not write receipts, contact providers, install
+packages, or publish to a registry.
 
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test
