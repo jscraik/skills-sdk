@@ -63,7 +63,10 @@ def test_non_blocked_receipt_rejects_blocker() -> None:
         parse_receipt(payload)
 
 
-@pytest.mark.parametrize("value", ["/tmp/receipt.json", "../receipt.json", "C:/receipt.json", "a\\b.json"])
+@pytest.mark.parametrize(
+    "value",
+    ["/tmp/receipt.json", "../receipt.json", "C:/receipt.json", "a\\b.json", "receipt.json\n", "receipt.json\r"],
+)
 def test_non_portable_paths_are_rejected(value: str) -> None:
     with pytest.raises(ContractError, match="invalid_portable_path"):
         require_portable_relative_path(value)

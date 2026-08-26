@@ -13,7 +13,7 @@ PackageId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9
 GitRevision = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
 Sha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-PortablePath = Annotated[str, StringConstraints(min_length=1)]
+PortablePath = Annotated[str, StringConstraints(strip_whitespace=False, min_length=1)]
 
 
 class _ContractModel(BaseModel):

@@ -22,8 +22,8 @@ from skills_sdk.models.packaging import PackageManifest, PackageReceipt
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 
 _PORTABLE_PATH_PATTERN = (
-    r"^(?=.*\S)(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
-    r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$).+$"
+    r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
+    r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
 )
 _NON_WHITESPACE_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
 

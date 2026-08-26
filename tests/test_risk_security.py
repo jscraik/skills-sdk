@@ -198,6 +198,20 @@ def test_security_schema_rejects_whitespace_only_scanned_path() -> None:
     assert _schema_errors("security-screening.v1", payload)
 
 
+@pytest.mark.parametrize("field", ["scanned_paths", "evidence_refs"])
+@pytest.mark.parametrize("value", ["SKILL.md\n", "SKILL.md\r", "SKILL\n.md"])
+def test_security_paths_reject_line_terminators(field: str, value: str) -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    if field == "evidence_refs":
+        payload["findings"][0][field] = [value]
+    else:
+        payload[field] = [value]
+
+    with pytest.raises(ValidationError):
+        SecurityScreeningResult.model_validate(payload)
+    assert _schema_errors("security-screening.v1", payload)
+
+
 def test_security_schema_accepts_multiline_finding_message() -> None:
     payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
     payload["findings"][0]["message"] = "line one\nline two"
