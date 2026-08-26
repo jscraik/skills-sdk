@@ -6,8 +6,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from skills_sdk import __version__
-from skills_sdk.packaging import build_skill_package
-from skills_sdk.validation import SkillValidationPolicy, validate_skill_package
 
 COMMAND_HELP = {
     "inventory": "inspect a read-only source inventory",
@@ -36,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("validate", "build"):
         command = commands.add_parser(name, help=COMMAND_HELP[name], description=COMMAND_HELP[name])
         command.add_argument("package_root", type=Path)
-        command.add_argument("--source-revision", required=True)
+        command.add_argument("--source-revision")
         command.add_argument("--max-entrypoint-lines", type=int)
         command.add_argument("--max-reference-depth", type=int)
         command.add_argument("--json", action="store_true", dest="json_output")
@@ -61,21 +59,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     if arguments.command not in {"validate", "build"}:
         return 0
+    from skills_sdk.validation import SkillValidationPolicy
+
     policy = SkillValidationPolicy(
         max_entrypoint_lines=arguments.max_entrypoint_lines,
         max_reference_depth=arguments.max_reference_depth,
     )
     if arguments.command == "validate":
+        from skills_sdk.validation import validate_skill_package
+
         result = validate_skill_package(
             arguments.package_root,
-            source_revision=arguments.source_revision,
+            source_revision=arguments.source_revision or "",
             policy=policy,
         )
         successful = result.status == "pass"
     else:
+        from skills_sdk.packaging import build_skill_package
+
         result = build_skill_package(
             arguments.package_root,
-            source_revision=arguments.source_revision,
+            source_revision=arguments.source_revision or "",
             policy=policy,
         )
         successful = result.status == "built"

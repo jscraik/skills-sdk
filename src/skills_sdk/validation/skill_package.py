@@ -23,7 +23,22 @@ _ALLOWED_FRONTMATTER: Final[frozenset[str]] = frozenset(
     {"name", "description", "version", "license", "compatibility", "allowed-tools", "metadata", "triggers"}
 )
 _UNSAFE_DIRECTORIES: Final[frozenset[str]] = frozenset(
-    {".git", ".codex", ".agents", ".gnupg", ".ssh", "__pycache__"}
+    {
+        ".agents",
+        ".cache",
+        ".codex",
+        ".git",
+        ".gnupg",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".ssh",
+        ".tox",
+        ".venv",
+        "__pycache__",
+        "node_modules",
+        "venv",
+    }
 )
 _UNSAFE_NAMES: Final[frozenset[str]] = frozenset(
     {".env", "credentials.json", "id_rsa", "id_ed25519", "secrets.json"}
@@ -106,6 +121,11 @@ def _finding(code: str, message: str, *refs: str) -> SkillPackageFinding:
     )
 
 
+def _source_changed_finding(relative_directory: Path) -> SkillPackageFinding:
+    references = (relative_directory.as_posix(),) if relative_directory.parts else ()
+    return _finding("source_changed", "package directory changed during validation", *references)
+
+
 def _candidate(package_root: Path, source_revision: str, files: list[PackageManifestFile]) -> PackageCandidateIdentity:
     content_sha256 = _content_digest(files) if files else hashlib.sha256(b"").hexdigest()
     package_id = package_root.name
@@ -129,7 +149,11 @@ def _file_role(relative: Path) -> PackageFileRole:
         "scripts": PackageFileRole.SCRIPT,
         "assets": PackageFileRole.ASSET,
         "evals": PackageFileRole.EVAL,
-    }.get(relative.parts[0], PackageFileRole.METADATA)
+    }.get(relative.parts[0], PackageFileRole.ASSET)
+
+
+def _is_generated_receipt(name: str) -> bool:
+    return name == "skill-package-validation.json" or name.endswith("-receipt.json")
 
 
 def _regular_file(
@@ -145,6 +169,7 @@ def _regular_file(
     if (
         name in _UNSAFE_NAMES
         or name.startswith(".env.")
+        or _is_generated_receipt(name)
         or relative.suffix.lower() in {".key", ".pem", ".p12", ".pfx", ".token"}
     ):
         return (
@@ -267,8 +292,7 @@ def _scan_files(
                 findings.append(finding)
         after = os.fstat(directory_fd)
         if (before.st_mtime_ns, before.st_ino) != (after.st_mtime_ns, after.st_ino):
-            reference = relative_directory.as_posix() if relative_directory.parts else "."
-            findings.append(_finding("source_changed", "package directory changed during validation", reference))
+            findings.append(_source_changed_finding(relative_directory))
 
     try:
         visit(root_fd, Path())

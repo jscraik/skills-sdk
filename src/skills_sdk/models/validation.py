@@ -55,6 +55,8 @@ class SkillPackageValidation(_ContractModel):
                 raise ValueError("passing skill validation cannot contain blockers")
             if self.identity is None or not self.files:
                 raise ValueError("passing skill validation requires identity and files")
+            if self.identity.package_id != self.candidate.package_id:
+                raise ValueError("skill validation identity must bind the same candidate package")
         elif not blockers:
             raise ValueError("blocked skill validation requires at least one blocker")
         paths = tuple(item.path for item in self.files)

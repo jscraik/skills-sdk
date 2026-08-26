@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REVISION = "1" * 40
 
@@ -83,3 +86,38 @@ def test_invalid_source_revision_returns_structured_blocker(tmp_path: Path) -> N
     assert completed.returncode == 2
     payload = json.loads(completed.stdout)
     assert payload["findings"][0]["code"] == "invalid_source_revision"
+
+
+@pytest.mark.parametrize("command", ["validate", "build"])
+def test_missing_source_revision_returns_structured_blocker(tmp_path: Path, command: str) -> None:
+    root = _skill(tmp_path / "fixture-skill", name="fixture-skill")
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "skills_sdk.cli.main", command, str(root), "--json", "--robot"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    payload = json.loads(completed.stdout)
+    code = payload["findings"][0]["code"] if command == "validate" else payload["blocker"]["code"]
+    assert code == "invalid_source_revision"
+
+
+@pytest.mark.parametrize("arguments", [["--help"], ["inventory"]])
+def test_reserved_routes_do_not_import_validation_dependencies(tmp_path: Path, arguments: list[str]) -> None:
+    (tmp_path / "yaml.py").write_text("raise RuntimeError('validation dependency imported')\n", encoding="utf-8")
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join((str(tmp_path), environment.get("PYTHONPATH", "")))
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "skills_sdk.cli.main", *arguments],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "validation dependency imported" not in completed.stderr

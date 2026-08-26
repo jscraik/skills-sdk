@@ -263,6 +263,40 @@ def test_candidate_digest_binds_all_safe_package_files(tmp_path: Path) -> None:
     assert first.candidate.content_sha256 != second.candidate.content_sha256
 
 
+def test_unrecognised_package_files_use_a_v1_compatible_role(tmp_path: Path) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    (root / "LICENSE").write_text("Apache-2.0\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    license_file = next(item for item in result.files if item.path == "LICENSE")
+    assert license_file.role == "asset"
+
+
+@pytest.mark.parametrize("directory_name", [".venv", "venv", ".pytest_cache", "node_modules"])
+def test_generated_environment_directories_are_blocked(tmp_path: Path, directory_name: str) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    generated = root / directory_name
+    generated.mkdir()
+    (generated / "state.txt").write_text("generated\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    assert "unsafe_package_directory" in {item.code for item in result.findings}
+    assert all(not item.path.startswith(directory_name) for item in result.files)
+
+
+@pytest.mark.parametrize("filename", ["package-receipt.json", "skill-package-validation.json"])
+def test_generated_validation_receipts_are_blocked(tmp_path: Path, filename: str) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    (root / filename).write_text("{}\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    assert "unsafe_package_file" in {item.code for item in result.findings}
+    assert filename not in {item.path for item in result.files}
+
+
 def test_unsafe_nested_file_and_runtime_directory_are_blocked(tmp_path: Path) -> None:
     root = _write_skill(tmp_path / "fixture-skill")
     nested = root / "assets" / "private"
@@ -350,6 +384,13 @@ def test_observed_file_change_returns_source_changed(tmp_path: Path, monkeypatch
     assert "source_changed" in {item.code for item in result.findings}
 
 
+def test_root_source_change_finding_has_portable_evidence() -> None:
+    finding = skill_package_module._source_changed_finding(Path())
+
+    assert finding.code == "source_changed"
+    assert finding.evidence_refs == ()
+
+
 def test_generated_schema_enforces_raw_status_invariants(tmp_path: Path) -> None:
     root = _write_skill(tmp_path / "fixture-skill")
     valid = validate_skill_package(root, source_revision=REVISION).model_dump(mode="json")
@@ -364,3 +405,9 @@ def test_generated_schema_enforces_raw_status_invariants(tmp_path: Path) -> None
     invalid_blocked["status"] = "blocked"
     with pytest.raises(ContractError):
         registry.validate("skill-package-validation.v1", invalid_blocked)
+
+    mismatched_identity = copy.deepcopy(valid)
+    mismatched_identity["identity"]["package_id"] = "different-skill"
+    mismatched_identity["identity"]["name"] = "different-skill"
+    with pytest.raises(ContractError):
+        registry.validate("skill-package-validation.v1", mismatched_identity)
