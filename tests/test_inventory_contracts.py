@@ -115,6 +115,40 @@ def test_merge_value_decision_requires_overlap_evidence() -> None:
         PackageInventoryRecord.model_validate(payload)
 
 
+def test_pending_value_review_is_a_typed_blocker() -> None:
+    payload = _record().model_dump()
+    payload.update(
+        value_decision=ValueDecision.NEEDS_REVIEW,
+        blocker_codes=("value_review_required",),
+        mantra=_mantra("revise"),
+        intended_disposition=PackageDisposition.NEEDS_OWNER_DECISION,
+    )
+    record = PackageInventoryRecord.model_validate(payload)
+    assert record.value_decision is ValueDecision.NEEDS_REVIEW
+
+
+@pytest.mark.parametrize(
+    ("disposition", "blocker_codes"),
+    [
+        (PackageDisposition.ADMIT_TO_FOUNDRY, ("value_review_required",)),
+        (PackageDisposition.NEEDS_OWNER_DECISION, ()),
+    ],
+)
+def test_pending_value_review_rejects_unblocked_or_admitted_candidates(
+    disposition: PackageDisposition,
+    blocker_codes: tuple[str, ...],
+) -> None:
+    payload = _record().model_dump()
+    payload.update(
+        value_decision=ValueDecision.NEEDS_REVIEW,
+        blocker_codes=blocker_codes,
+        mantra=_mantra("revise"),
+        intended_disposition=disposition,
+    )
+    with pytest.raises(ValidationError, match="needs_review value decision"):
+        PackageInventoryRecord.model_validate(payload)
+
+
 def test_inventory_rejects_duplicate_package_ids() -> None:
     with pytest.raises(ValidationError, match="package_id values must be unique"):
         PackageInventory(source_revision="1" * 40, records=(_record(), _record()))

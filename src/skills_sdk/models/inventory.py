@@ -81,6 +81,7 @@ class RecommendedMechanism(StrEnum):
 class ValueDecision(StrEnum):
     """The evidence-backed value decision for an inventory candidate."""
 
+    NEEDS_REVIEW = "needs_review"
     RETAIN = "retain"
     MERGE = "merge"
     REPLACE = "replace"
@@ -252,6 +253,13 @@ class PackageInventoryRecord(_ContractModel):
             raise ValueError("a plugin cannot recommend standalone_skill")
         if self.value_decision == ValueDecision.MERGE and not self.overlap_with_existing:
             raise ValueError("merge value decision requires overlap_with_existing evidence")
+        if self.value_decision == ValueDecision.NEEDS_REVIEW and (
+            self.intended_disposition != PackageDisposition.NEEDS_OWNER_DECISION
+            or "value_review_required" not in self.blocker_codes
+        ):
+            raise ValueError(
+                "needs_review value decision requires needs_owner_decision and value_review_required"
+            )
         if self.value_decision == ValueDecision.RETIRE and self.intended_disposition in (
             PackageDisposition.ADMIT_TO_FOUNDRY,
             PackageDisposition.MERGE_WITH_EXISTING,

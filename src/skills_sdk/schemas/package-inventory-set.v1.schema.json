@@ -455,6 +455,7 @@
     "ValueDecision": {
       "description": "The evidence-backed value decision for an inventory candidate.",
       "enum": [
+        "needs_review",
         "retain",
         "merge",
         "replace",
