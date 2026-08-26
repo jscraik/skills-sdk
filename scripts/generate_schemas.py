@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from skills_sdk.models.inventory import PackageInventory, PackageInventoryRecord
 from skills_sdk.models.package import (
@@ -18,10 +19,191 @@ from skills_sdk.models.package import (
     SkillIdentity,
 )
 from skills_sdk.models.packaging import PackageManifest, PackageReceipt
+from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
+
+_PORTABLE_PATH_PATTERN = (
+    r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
+    r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
+)
+_NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"
+_NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
+
+
+def _append_portable_path_constraints(schema: Any) -> None:
+    """Project the shared PortablePath contract into every generated schema node."""
+
+    if isinstance(schema, dict):
+        if schema.pop("x-skills-sdk-portable-path", False):
+            schema["pattern"] = _PORTABLE_PATH_PATTERN
+        for value in schema.values():
+            _append_portable_path_constraints(value)
+    elif isinstance(schema, list):
+        for value in schema:
+            _append_portable_path_constraints(value)
+
+
+def _append_risk_constraints(schema: dict[str, Any]) -> None:
+    """Add JSON-Schema-expressible risk invariants to the generated contract."""
+
+    schema["properties"]["sensor_ids"]["uniqueItems"] = True
+    schema["properties"]["sensors"]["uniqueItems"] = True
+    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NORMALIZED_TEXT_PATTERN
+    schema["$defs"]["RiskSensor"]["properties"]["id"]["pattern"] = _NORMALIZED_TEXT_PATTERN
+    schema["properties"]["acceptance_trace"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["allOf"] = [
+        *schema.get("allOf", []),
+        {
+            "if": {
+                "properties": {"risk_tier": {"enum": ["high", "privileged", "published"]}},
+                "required": ["risk_tier"],
+            },
+            "then": {
+                "properties": {"receipt_required": {"const": True}},
+                "required": ["receipt_required"],
+            },
+        },
+        {
+            "if": {"required": ["sensors"]},
+            "then": {
+                "not": {
+                    "properties": {
+                        "sensors": {
+                            "contains": {
+                                "allOf": [
+                                    {"properties": {"required": {"const": True}}, "required": ["required"]},
+                                    {
+                                        "anyOf": [
+                                            {
+                                                "properties": {"status": {"const": "skipped_optional"}},
+                                                "required": ["status"],
+                                            },
+                                            {
+                                                "properties": {"blocking_behavior": {"const": "skip_optional"}},
+                                                "required": ["blocking_behavior"],
+                                            },
+                                        ]
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "not": {
+                "properties": {
+                    "receipt_required": {"const": False},
+                    "sensors": {
+                        "contains": {
+                            "allOf": [
+                                {"properties": {"status": {"const": "selected"}}, "required": ["status"]},
+                                {"properties": {"receipt_required": {"const": True}}, "required": ["receipt_required"]},
+                            ]
+                        }
+                    },
+                },
+                "required": ["receipt_required", "sensors"],
+            }
+        },
+    ]
+    schema["$comment"] = (
+        "Validate risk sensor-id coverage with "
+        "skills_sdk.core.schema_registry.SchemaRegistry.validate; standard JSON Schema "
+        "cannot compare the two arbitrary identifier arrays."
+    )
+    schema["x-skills-sdk-semantic-validator"] = {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": ["sensor_ids must match declared sensor ids", "risk sensor ids must be unique"],
+    }
+
+
+def _append_security_constraints(schema: dict[str, Any]) -> None:
+    """Add JSON-Schema-expressible security invariants to the generated contract."""
+
+    schema["properties"]["scanned_paths"]["items"]["pattern"] = _PORTABLE_PATH_PATTERN
+    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NORMALIZED_TEXT_PATTERN
+    schema["properties"]["sensor_ids"]["uniqueItems"] = True
+    schema["$defs"]["SecurityFinding"]["properties"]["evidence_refs"]["items"]["pattern"] = _PORTABLE_PATH_PATTERN
+    schema["$defs"]["SecurityFinding"]["properties"]["code"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["$defs"]["SecurityFinding"]["properties"]["message"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["allOf"] = [
+        *schema.get("allOf", []),
+        {
+            "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
+            "then": {
+                "not": {
+                    "required": ["findings"],
+                    "properties": {
+                        "findings": {
+                            "contains": {
+                                "properties": {"severity": {"enum": ["warning", "blocker"]}},
+                                "required": ["severity"],
+                            }
+                        }
+                    }
+                }
+            },
+        },
+        {
+            "if": {"properties": {"status": {"const": "needs_review"}}, "required": ["status"]},
+            "then": {
+                "allOf": [
+                    {
+                        "required": ["findings"],
+                        "properties": {
+                            "findings": {
+                                "contains": {
+                                    "properties": {"severity": {"const": "warning"}},
+                                    "required": ["severity"],
+                                }
+                            }
+                        },
+                    },
+                    {
+                        "not": {
+                            "properties": {
+                                "findings": {
+                                    "contains": {
+                                        "properties": {"severity": {"const": "blocker"}},
+                                        "required": ["severity"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                ]
+            },
+        },
+        {
+            "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+            "then": {
+                "required": ["findings"],
+                "properties": {
+                    "findings": {
+                        "contains": {
+                            "properties": {"severity": {"const": "blocker"}},
+                            "required": ["severity"],
+                        }
+                    }
+                },
+            },
+        },
+    ]
+    schema["$comment"] = (
+        "Validate finding-code uniqueness with "
+        "skills_sdk.core.schema_registry.SchemaRegistry.validate; standard JSON Schema "
+        "cannot compare arbitrary object fields."
+    )
+    schema["x-skills-sdk-semantic-validator"] = {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": ["security finding codes must be unique"],
+    }
 
 
 def _render_schema(model: type[object], filename: str) -> str:
     schema = model.model_json_schema()  # type: ignore[attr-defined]
+    _append_portable_path_constraints(schema)
     if filename == "package-receipt.v1.schema.json":
         # Pydantic emits field types but cannot express the status-dependent
         # receipt invariants enforced by PackageReceipt.model_validator.
@@ -49,6 +231,10 @@ def _render_schema(model: type[object], filename: str) -> str:
                 },
             },
         ]
+    elif filename == "risk-classification.v1.schema.json":
+        _append_risk_constraints(schema)
+    elif filename == "security-screening.v1.schema.json":
+        _append_security_constraints(schema)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = f"https://schemas.skills-sdk.dev/{filename}"
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"
@@ -72,6 +258,8 @@ def main() -> int:
         (NormalizedPackage, "normalized-package.v1.schema.json"),
         (PackageManifest, "package-manifest.v1.schema.json"),
         (PackageReceipt, "package-receipt.v1.schema.json"),
+        (RiskClassification, "risk-classification.v1.schema.json"),
+        (SecurityScreeningResult, "security-screening.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
         target = schema_root / filename

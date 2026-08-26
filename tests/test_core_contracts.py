@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from importlib.resources import files
 
 import pytest
@@ -9,6 +10,22 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.receipts import CandidateIdentity, parse_receipt
 from skills_sdk.core.schema_registry import SCHEMA_NAMES, SchemaRegistry
+
+EXPECTED_PORTABLE_PATH_PATTERN = (
+    r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)"
+    r"(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
+)
+
+PORTABLE_PATH_SCHEMA_NAMES = (
+    "normalized-package.v1",
+    "package-inventory-set.v1",
+    "package-inventory.v1",
+    "package-manifest.v1",
+    "package-owner.v1",
+    "package-receipt.v1",
+    "package-source.v1",
+    "security-screening.v1",
+)
 
 
 def _receipt() -> dict[str, object]:
@@ -63,7 +80,18 @@ def test_non_blocked_receipt_rejects_blocker() -> None:
         parse_receipt(payload)
 
 
-@pytest.mark.parametrize("value", ["/tmp/receipt.json", "../receipt.json", "C:/receipt.json", "a\\b.json"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "/tmp/receipt.json",
+        "../receipt.json",
+        "C:/receipt.json",
+        "a\\b.json",
+        "receipt.json\n",
+        "receipt.json\r",
+        "   ",
+    ],
+)
 def test_non_portable_paths_are_rejected(value: str) -> None:
     with pytest.raises(ContractError, match="invalid_portable_path"):
         require_portable_relative_path(value)
@@ -74,3 +102,17 @@ def test_receipt_schema_rejects_candidate_shape_drift() -> None:
     payload["candidate"]["runtime_path"] = "/tmp/synthetic"
     with pytest.raises(ContractError, match="contract_validation_failed"):
         parse_receipt(payload)
+
+
+def _contains_pattern(node: object, pattern: str) -> bool:
+    if isinstance(node, dict):
+        return node.get("pattern") == pattern or any(_contains_pattern(value, pattern) for value in node.values())
+    if isinstance(node, list):
+        return any(_contains_pattern(value, pattern) for value in node)
+    return False
+
+
+@pytest.mark.parametrize("name", PORTABLE_PATH_SCHEMA_NAMES)
+def test_packaged_schemas_project_portable_path_constraints(name: str) -> None:
+    schema = json.loads(files("skills_sdk.schemas").joinpath(f"{name}.schema.json").read_text(encoding="utf-8"))
+    assert _contains_pattern(schema, EXPECTED_PORTABLE_PATH_PATTERN)

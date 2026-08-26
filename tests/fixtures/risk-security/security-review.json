@@ -1,0 +1,16 @@
+{
+  "schema_version": "security-screening/v1",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "synthetic-skill",
+    "source_revision": "1111111111111111111111111111111111111111",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "status": "needs_review",
+  "sensor_ids": ["external-service-scan"],
+  "scanned_paths": ["SKILL.md"],
+  "findings": [
+    {"code": "external_service", "category": "external_service", "severity": "warning", "message": "external service ownership evidence is incomplete", "evidence_refs": ["evidence/ownership.json"]}
+  ],
+  "mutation_performed": false
+}

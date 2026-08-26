@@ -1,0 +1,16 @@
+{
+  "schema_version": "security-screening/v1",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "synthetic-skill",
+    "source_revision": "1111111111111111111111111111111111111111",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "status": "pass",
+  "sensor_ids": ["dependency-scan"],
+  "scanned_paths": ["SKILL.md", "references/contract.yaml"],
+  "findings": [
+    {"code": "scan_complete", "category": "dependency", "severity": "info", "message": "screening completed", "evidence_refs": ["evidence/security-scan.json"]}
+  ],
+  "mutation_performed": false
+}

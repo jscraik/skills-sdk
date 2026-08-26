@@ -1,0 +1,16 @@
+{
+  "schema_version": "security-screening/v1",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "unsafe-skill",
+    "source_revision": "2222222222222222222222222222222222222222",
+    "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "status": "blocked",
+  "sensor_ids": ["secret-scan"],
+  "scanned_paths": ["SKILL.md"],
+  "findings": [
+    {"code": "secret_like_value", "category": "secret", "severity": "blocker", "message": "secret-like material detected; value redacted", "evidence_refs": ["evidence/security-scan.json"]}
+  ],
+  "mutation_performed": false
+}
