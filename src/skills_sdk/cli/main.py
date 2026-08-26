@@ -21,7 +21,7 @@ COMMAND_HELP = {
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the boundary-only command parser."""
+    """Build the CLI parser."""
     parser = argparse.ArgumentParser(
         prog="skills-sdk",
         description="Portable lifecycle contracts and tooling for Agent Skills packages.",
