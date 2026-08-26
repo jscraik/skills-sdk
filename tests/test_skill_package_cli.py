@@ -101,6 +101,7 @@ def test_invalid_source_revision_returns_structured_blocker(tmp_path: Path) -> N
     assert completed.returncode == 2
     payload = json.loads(completed.stdout)
     assert payload["findings"][0]["code"] == "invalid_source_revision"
+    assert payload["candidate"] is None
 
 
 @pytest.mark.parametrize("command", ["validate", "build"])
@@ -118,6 +119,7 @@ def test_missing_source_revision_returns_structured_blocker(tmp_path: Path, comm
     payload = json.loads(completed.stdout)
     code = payload["findings"][0]["code"] if command == "validate" else payload["blocker"]["code"]
     assert code == "invalid_source_revision"
+    assert payload["candidate"] is None
 
 
 @pytest.mark.parametrize("arguments", [["--help"], ["inventory"]])

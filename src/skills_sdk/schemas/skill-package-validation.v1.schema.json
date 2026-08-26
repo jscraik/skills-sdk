@@ -184,6 +184,11 @@
       },
       "then": {
         "properties": {
+          "candidate": {
+            "not": {
+              "type": "null"
+            }
+          },
           "files": {
             "minItems": 1
           },
@@ -208,6 +213,7 @@
           }
         },
         "required": [
+          "candidate",
           "identity",
           "files"
         ]
@@ -248,7 +254,15 @@
   "description": "Read-only structural result for one standalone skill candidate.",
   "properties": {
     "candidate": {
-      "$ref": "#/$defs/PackageCandidateIdentity"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "files": {
       "default": [],
@@ -299,7 +313,6 @@
     }
   },
   "required": [
-    "candidate",
     "status"
   ],
   "title": "SkillPackageValidation",

@@ -40,7 +40,7 @@ class SkillPackageValidation(_ContractModel):
     """Read-only structural result for one standalone skill candidate."""
 
     schema_version: Literal["skill-package-validation/v1"] = "skill-package-validation/v1"
-    candidate: PackageCandidateIdentity
+    candidate: PackageCandidateIdentity | None = None
     status: Literal["pass", "blocked"]
     identity: SkillIdentity | None = None
     files: tuple[PackageManifestFile, ...] = ()
@@ -53,8 +53,8 @@ class SkillPackageValidation(_ContractModel):
         if self.status == "pass":
             if blockers:
                 raise ValueError("passing skill validation cannot contain blockers")
-            if self.identity is None or not self.files:
-                raise ValueError("passing skill validation requires identity and files")
+            if self.candidate is None or self.identity is None or not self.files:
+                raise ValueError("passing skill validation requires candidate, identity, and files")
             if self.identity.package_id != self.candidate.package_id:
                 raise ValueError("skill validation identity must bind the same candidate package")
         elif not blockers:

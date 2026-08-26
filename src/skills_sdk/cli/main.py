@@ -65,7 +65,8 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
     if json_output:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
         return
-    print(f"{command}: {result.status} ({result.candidate.package_id})")
+    package_id = result.candidate.package_id if result.candidate is not None else "unresolved-candidate"
+    print(f"{command}: {result.status} ({package_id})")
     for finding in _human_findings(command, result):
         references = ", ".join(finding.evidence_refs)
         suffix = f" [{references}]" if references else ""

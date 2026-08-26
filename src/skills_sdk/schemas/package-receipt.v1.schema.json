@@ -196,6 +196,11 @@
           "blocker": {
             "type": "null"
           },
+          "candidate": {
+            "not": {
+              "type": "null"
+            }
+          },
           "included_files": {
             "minItems": 1
           },
@@ -211,6 +216,7 @@
           }
         },
         "required": [
+          "candidate",
           "package_digest",
           "manifest",
           "included_files"
@@ -254,7 +260,15 @@
       "default": null
     },
     "candidate": {
-      "$ref": "#/$defs/PackageCandidateIdentity"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "evidence": {
       "items": {
@@ -353,7 +367,6 @@
   "required": [
     "schema_version",
     "receipt_id",
-    "candidate",
     "lane",
     "status",
     "started_at",

@@ -92,7 +92,7 @@ class PackageReceipt(_ContractModel):
 
     schema_version: Literal["package-receipt/v1"]
     receipt_id: ReceiptId
-    candidate: PackageCandidateIdentity
+    candidate: PackageCandidateIdentity | None = None
     lane: Literal["validation"]
     status: Literal["built", "blocked"]
     started_at: AwareDatetime
@@ -123,8 +123,8 @@ class PackageReceipt(_ContractModel):
         manifest_paths = {item.path for item in self.manifest.files} if self.manifest is not None else set()
         included_paths = set(self.included_files)
         if self.status == "built":
-            if self.package_digest is None or self.manifest is None:
-                raise ValueError("built package receipt requires package_digest and manifest")
+            if self.candidate is None or self.package_digest is None or self.manifest is None:
+                raise ValueError("built package receipt requires candidate, package_digest, and manifest")
             if not included_paths or included_paths != manifest_paths:
                 raise ValueError("built package receipt must include every manifest path")
             if self.blocker is not None:

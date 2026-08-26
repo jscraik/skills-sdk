@@ -362,12 +362,11 @@ def validate_skill_package(
     findings: list[SkillPackageFinding] = []
     files: list[PackageManifestFile] = []
     identity: SkillIdentity | None = None
-    candidate_revision = source_revision
-    if not _SOURCE_REVISION_RE.fullmatch(source_revision):
+    revision_is_valid = bool(_SOURCE_REVISION_RE.fullmatch(source_revision))
+    if not revision_is_valid:
         findings.append(
             _finding("invalid_source_revision", "source revision must be a 40-character lowercase hexadecimal digest")
         )
-        candidate_revision = "0" * 40
     if not package_root.exists() or not package_root.is_dir() or package_root.is_symlink():
         findings.append(_finding("invalid_package_root", "package root must be a regular directory"))
     else:
@@ -405,7 +404,7 @@ def validate_skill_package(
                 )
             except (ValueError, yaml.YAMLError):
                 findings.append(_finding("invalid_frontmatter", "SKILL.md frontmatter must be valid YAML", "SKILL.md"))
-    candidate = _candidate(root, candidate_revision, files)
+    candidate = _candidate(root, source_revision, files) if revision_is_valid else None
     status = "blocked" if any(item.severity is ValidationSeverity.BLOCKER for item in findings) else "pass"
     return SkillPackageValidation(
         candidate=candidate,

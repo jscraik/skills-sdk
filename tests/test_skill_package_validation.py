@@ -428,3 +428,8 @@ def test_generated_schema_enforces_raw_status_invariants(tmp_path: Path) -> None
 
     schema = registry.load("skill-package-validation.v1")
     assert schema["x-skills-sdk-semantic-validator"]["entrypoint"].endswith("SchemaRegistry.validate")
+
+    missing_candidate = copy.deepcopy(valid)
+    missing_candidate["candidate"] = None
+    with pytest.raises(ContractError):
+        registry.validate("skill-package-validation.v1", missing_candidate)

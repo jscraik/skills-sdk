@@ -28,6 +28,10 @@ def _receipt_id(package_id: str, content_sha256: str) -> str:
     return f"{package_id}-{content_sha256[:16]}"
 
 
+def _blocked_receipt_id(validation: object) -> str:
+    return f"blocked-{_canonical_sha256(validation)[:16]}"
+
+
 def build_skill_package(
     package_root: Path,
     *,
@@ -43,10 +47,15 @@ def build_skill_package(
     evidence = tuple(item.path for item in validation.files) or ("SKILL.md",)
     if validation.status == "blocked":
         first = validation.findings[0]
+        candidate = validation.candidate
         return PackageReceipt(
             schema_version="package-receipt/v1",
-            receipt_id=_receipt_id(validation.candidate.package_id, validation.candidate.content_sha256),
-            candidate=validation.candidate,
+            receipt_id=(
+                _receipt_id(candidate.package_id, candidate.content_sha256)
+                if candidate is not None
+                else _blocked_receipt_id(validation.model_dump(mode="json"))
+            ),
+            candidate=candidate,
             lane="validation",
             status="blocked",
             started_at=started_at,
@@ -59,6 +68,7 @@ def build_skill_package(
             ),
             mutation_performed=False,
         )
+    assert validation.candidate is not None
     assert validation.identity is not None
     manifest = PackageManifest(
         schema_version="package-manifest/v1",

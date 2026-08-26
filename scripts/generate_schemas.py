@@ -325,8 +325,9 @@ def _render_schema(model: type[object], filename: str) -> str:
             {
                 "if": {"properties": {"status": {"const": "built"}}},
                 "then": {
-                    "required": ["package_digest", "manifest", "included_files"],
+                    "required": ["candidate", "package_digest", "manifest", "included_files"],
                     "properties": {
+                        "candidate": {"not": {"type": "null"}},
                         "blocker": {"type": "null"},
                         "package_digest": {"not": {"type": "null"}},
                         "manifest": {"not": {"type": "null"}},
@@ -350,8 +351,9 @@ def _render_schema(model: type[object], filename: str) -> str:
             {
                 "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
                 "then": {
-                    "required": ["identity", "files"],
+                    "required": ["candidate", "identity", "files"],
                     "properties": {
+                        "candidate": {"not": {"type": "null"}},
                         "identity": {"not": {"type": "null"}},
                         "files": {"minItems": 1},
                         "findings": {
