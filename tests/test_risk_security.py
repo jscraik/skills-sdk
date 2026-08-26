@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from skills_sdk.core.errors import ContractError
@@ -11,6 +12,11 @@ from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "risk-security"
+
+
+def _schema_errors(name: str, payload: object) -> list[object]:
+    schema = SchemaRegistry().load(name)
+    return list(Draft202012Validator(schema).iter_errors(payload))
 
 
 def test_risk_fixture_requires_receipt_for_elevated_tier() -> None:
@@ -75,6 +81,78 @@ def test_required_sensors_cannot_use_optional_skip_states(field: str, value: str
         RiskClassification.model_validate(payload)
 
 
+def test_selected_sensor_receipt_requirement_propagates_to_low_risk() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["risk_tier"] = "low"
+    payload["receipt_required"] = False
+    with pytest.raises(ValidationError, match="classification receipt"):
+        RiskClassification.model_validate(payload)
+
+
+def test_needs_review_screening_requires_a_warning() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-review.json").read_text(encoding="utf-8"))
+    payload["findings"][0]["severity"] = "info"
+    with pytest.raises(ValidationError, match="requires a warning"):
+        SecurityScreeningResult.model_validate(payload)
+
+
+def test_duplicate_security_finding_codes_are_rejected() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["findings"].append(dict(payload["findings"][0]))
+    with pytest.raises(ValidationError, match="finding codes must be unique"):
+        SecurityScreeningResult.model_validate(payload)
+
+
+def test_risk_schema_requires_receipt_for_elevated_tier() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["receipt_required"] = False
+    assert _schema_errors("risk-classification.v1", payload)
+
+
+def test_risk_schema_rejects_duplicate_sensor_id_entries() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["sensor_ids"].append(payload["sensor_ids"][0])
+    assert _schema_errors("risk-classification.v1", payload)
+
+
+@pytest.mark.parametrize("field, value", [("status", "skipped_optional"), ("blocking_behavior", "skip_optional")])
+def test_risk_schema_rejects_optional_skip_for_required_sensor(field: str, value: str) -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["sensors"][0][field] = value
+    assert _schema_errors("risk-classification.v1", payload)
+
+
+def test_risk_schema_propagates_selected_sensor_receipt_requirement() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["risk_tier"] = "low"
+    payload["receipt_required"] = False
+    assert _schema_errors("risk-classification.v1", payload)
+
+
+@pytest.mark.parametrize(
+    "filename, mutation",
+    [
+        ("security-pass.json", lambda payload: payload["findings"][0].update(severity="warning")),
+        ("security-review.json", lambda payload: payload["findings"][0].update(severity="info")),
+        ("security-blocked.json", lambda payload: payload["findings"][0].update(severity="warning")),
+    ],
+)
+def test_security_schema_enforces_status_and_finding_severity(filename: str, mutation: object) -> None:
+    payload = json.loads((FIXTURE_ROOT / filename).read_text(encoding="utf-8"))
+    mutation(payload)  # type: ignore[operator]
+    assert _schema_errors("security-screening.v1", payload)
+
+
+@pytest.mark.parametrize("field, value", [("scanned_paths", ["/absolute/path"]), ("evidence_refs", ["../outside"])])
+def test_security_schema_enforces_portable_paths(field: str, value: list[str]) -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    if field == "evidence_refs":
+        payload["findings"][0][field] = value
+    else:
+        payload[field] = value
+    assert _schema_errors("security-screening.v1", payload)
+
+
 def test_schema_registry_applies_risk_semantic_invariants() -> None:
     payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
     payload["sensor_ids"] = ["source-scan"]
@@ -83,9 +161,34 @@ def test_schema_registry_applies_risk_semantic_invariants() -> None:
     assert any("sensor_ids must match" in detail for detail in error.value.details)
 
 
+def test_schema_registry_rejects_selected_sensor_receipt_mismatch() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["risk_tier"] = "low"
+    payload["receipt_required"] = False
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("risk-classification.v1", payload)
+    assert error.value.code == "contract_validation_failed"
+
+
 def test_schema_registry_applies_security_semantic_invariants() -> None:
     payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
     payload["findings"][0]["severity"] = "warning"
     with pytest.raises(ContractError) as error:
         SchemaRegistry().validate("security-screening.v1", payload)
-    assert any("pass screening" in detail for detail in error.value.details)
+    assert error.value.code == "contract_validation_failed"
+
+
+def test_schema_registry_rejects_needs_review_without_warning() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-review.json").read_text(encoding="utf-8"))
+    payload["findings"][0]["severity"] = "info"
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("security-screening.v1", payload)
+    assert error.value.code == "contract_validation_failed"
+
+
+def test_schema_registry_rejects_duplicate_finding_codes() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["findings"].append(dict(payload["findings"][0]))
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("security-screening.v1", payload)
+    assert any("finding codes must be unique" in detail for detail in error.value.details)

@@ -55,6 +55,10 @@ class RiskClassification(_ContractModel):
             for sensor in self.sensors
         ):
             raise ValueError("required sensors cannot use optional skip states")
+        if not self.receipt_required and any(
+            sensor.status == "selected" and sensor.receipt_required for sensor in self.sensors
+        ):
+            raise ValueError("selected sensors requiring receipts need a classification receipt")
         if self.risk_tier in {"high", "privileged", "published"} and not self.receipt_required:
             raise ValueError("elevated risk tiers require a receipt")
         return self

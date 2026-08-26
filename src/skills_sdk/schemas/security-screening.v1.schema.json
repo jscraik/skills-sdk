@@ -1,4 +1,5 @@
 {
+  "$comment": "Validate finding-code uniqueness with skills_sdk.core.schema_registry.SchemaRegistry.validate; standard JSON Schema cannot compare arbitrary object fields.",
   "$defs": {
     "PackageCandidateIdentity": {
       "additionalProperties": false,
@@ -58,6 +59,7 @@
         "evidence_refs": {
           "items": {
             "minLength": 1,
+            "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./).+$",
             "type": "string"
           },
           "minItems": 1,
@@ -93,6 +95,125 @@
   "$id": "https://schemas.skills-sdk.dev/security-screening.v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "pass"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "properties": {
+            "findings": {
+              "contains": {
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "warning",
+                      "blocker"
+                    ]
+                  }
+                },
+                "required": [
+                  "severity"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "needs_review"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "findings": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "warning"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "findings"
+            ]
+          },
+          {
+            "not": {
+              "properties": {
+                "findings": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "const": "blocker"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "findings": {
+            "contains": {
+              "properties": {
+                "severity": {
+                  "const": "blocker"
+                }
+              },
+              "required": [
+                "severity"
+              ]
+            }
+          }
+        },
+        "required": [
+          "findings"
+        ]
+      }
+    }
+  ],
   "description": "Candidate-bound secret and unsafe-package screening result.",
   "properties": {
     "candidate": {
@@ -115,6 +236,7 @@
     "scanned_paths": {
       "items": {
         "minLength": 1,
+        "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./).+$",
         "type": "string"
       },
       "minItems": 1,
@@ -143,5 +265,11 @@
     "scanned_paths"
   ],
   "title": "SecurityScreeningResult",
-  "type": "object"
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "security finding codes must be unique"
+    ]
+  }
 }

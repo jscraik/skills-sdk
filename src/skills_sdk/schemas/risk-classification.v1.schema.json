@@ -1,4 +1,5 @@
 {
+  "$comment": "Validate risk sensor-id coverage with skills_sdk.core.schema_registry.SchemaRegistry.validate; standard JSON Schema cannot compare the two arbitrary identifier arrays.",
   "$defs": {
     "PackageCandidateIdentity": {
       "additionalProperties": false,
@@ -109,6 +110,126 @@
   "$id": "https://schemas.skills-sdk.dev/risk-classification.v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "risk_tier": {
+            "enum": [
+              "high",
+              "privileged",
+              "published"
+            ]
+          }
+        },
+        "required": [
+          "risk_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "receipt_required": {
+            "const": true
+          }
+        },
+        "required": [
+          "receipt_required"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "sensors"
+        ]
+      },
+      "then": {
+        "not": {
+          "properties": {
+            "sensors": {
+              "contains": {
+                "allOf": [
+                  {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "required"
+                    ]
+                  },
+                  {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "status": {
+                            "const": "skipped_optional"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "blocking_behavior": {
+                            "const": "skip_optional"
+                          }
+                        },
+                        "required": [
+                          "blocking_behavior"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "receipt_required": {
+            "const": false
+          },
+          "sensors": {
+            "contains": {
+              "allOf": [
+                {
+                  "properties": {
+                    "status": {
+                      "const": "selected"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                {
+                  "properties": {
+                    "receipt_required": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "receipt_required"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "receipt_required",
+          "sensors"
+        ]
+      }
+    }
+  ],
   "description": "Candidate-bound risk posture with explicit sensor coverage.",
   "properties": {
     "acceptance_trace": {
@@ -200,7 +321,8 @@
       },
       "minItems": 1,
       "title": "Sensor Ids",
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "sensors": {
       "items": {
@@ -237,5 +359,11 @@
     "acceptance_trace"
   ],
   "title": "RiskClassification",
-  "type": "object"
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "sensor_ids must match declared sensor ids"
+    ]
+  }
 }
