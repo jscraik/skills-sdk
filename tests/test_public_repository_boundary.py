@@ -12,6 +12,16 @@ BANNED_TEXT = (
     "tessl" + "_api_key",
 )
 
+PUBLIC_SURFACES = (
+    "CHANGELOG.md",
+    "SUPPORT.md",
+    "docs/api.md",
+    "docs/cli.md",
+    "docs/compatibility.md",
+    "docs/agent-entrypoint.md",
+    "examples/inventory_contract.py",
+)
+
 
 def _source_files() -> list[Path]:
     result = subprocess.run(
@@ -31,6 +41,22 @@ def test_seed_has_no_private_package_or_runtime_roots() -> None:
         if BANNED_PATH_PARTS.intersection(path.relative_to(REPO_ROOT).parts)
     ]
     assert offending == []
+
+
+def test_public_repository_surfaces_are_present_and_linked() -> None:
+    missing = [path for path in PUBLIC_SURFACES if not (REPO_ROOT / path).is_file()]
+    assert missing == []
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    for path in PUBLIC_SURFACES:
+        assert f"{path}]" in readme or f"{path})" in readme
+
+
+def test_public_docs_preserve_portable_and_no_waiver_boundaries() -> None:
+    docs = "\n".join((REPO_ROOT / path).read_text(encoding="utf-8") for path in PUBLIC_SURFACES)
+    assert "portable" in docs.casefold()
+    assert "waiver" in docs.casefold()
+    assert "provider" in docs.casefold()
 
 
 def test_seed_has_no_machine_paths_keys_or_provider_secrets() -> None:
