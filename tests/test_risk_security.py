@@ -34,6 +34,7 @@ def test_security_screening_fixtures_are_explicit(filename: str, expected: str) 
     payload = json.loads((FIXTURE_ROOT / filename).read_text(encoding="utf-8"))
     result = SecurityScreeningResult.model_validate(payload)
     assert result.status == expected
+    assert result.sensor_ids
     assert result.mutation_performed is False
 
 
@@ -103,6 +104,22 @@ def test_duplicate_security_finding_codes_are_rejected() -> None:
         SecurityScreeningResult.model_validate(payload)
 
 
+def test_pass_screening_without_findings_is_valid() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload.pop("findings")
+    result = SecurityScreeningResult.model_validate(payload)
+    assert result.findings == ()
+    assert not _schema_errors("security-screening.v1", payload)
+
+
+def test_security_screening_requires_unique_sensor_identity() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["sensor_ids"].append(payload["sensor_ids"][0])
+    with pytest.raises(ValidationError, match="screening sensor ids must be unique"):
+        SecurityScreeningResult.model_validate(payload)
+    assert _schema_errors("security-screening.v1", payload)
+
+
 def test_risk_schema_requires_receipt_for_elevated_tier() -> None:
     payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
     payload["receipt_required"] = False
@@ -143,13 +160,29 @@ def test_security_schema_enforces_status_and_finding_severity(filename: str, mut
     assert _schema_errors("security-screening.v1", payload)
 
 
-@pytest.mark.parametrize("field, value", [("scanned_paths", ["/absolute/path"]), ("evidence_refs", ["../outside"])])
+@pytest.mark.parametrize(
+    "field, value",
+    [("scanned_paths", ["/absolute/path"]), ("evidence_refs", ["../outside"]), ("scanned_paths", ["scans/"])],
+)
 def test_security_schema_enforces_portable_paths(field: str, value: list[str]) -> None:
     payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
     if field == "evidence_refs":
         payload["findings"][0][field] = value
     else:
         payload[field] = value
+    assert _schema_errors("security-screening.v1", payload)
+
+
+@pytest.mark.parametrize("field", ["code", "message"])
+def test_security_schema_rejects_whitespace_only_finding_text(field: str) -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["findings"][0][field] = "   "
+    assert _schema_errors("security-screening.v1", payload)
+
+
+def test_security_schema_requires_sensor_identity() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload.pop("sensor_ids")
     assert _schema_errors("security-screening.v1", payload)
 
 
@@ -168,6 +201,19 @@ def test_schema_registry_rejects_selected_sensor_receipt_mismatch() -> None:
     with pytest.raises(ContractError) as error:
         SchemaRegistry().validate("risk-classification.v1", payload)
     assert error.value.code == "contract_validation_failed"
+
+
+def test_risk_model_rejects_untrimmed_sensor_identity() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["sensors"][0]["id"] = " source-scan "
+    with pytest.raises(ValidationError, match="sensor ids must already be normalized"):
+        RiskClassification.model_validate(payload)
+
+
+def test_risk_schema_rejects_untrimmed_sensor_identity() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["sensors"][0]["id"] = " source-scan "
+    assert _schema_errors("risk-classification.v1", payload)
 
 
 def test_schema_registry_applies_security_semantic_invariants() -> None:

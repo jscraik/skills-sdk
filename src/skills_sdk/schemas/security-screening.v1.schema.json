@@ -53,13 +53,14 @@
         },
         "code": {
           "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$",
           "title": "Code",
           "type": "string"
         },
         "evidence_refs": {
           "items": {
             "minLength": 1,
-            "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./).+$",
+            "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$).+$",
             "type": "string"
           },
           "minItems": 1,
@@ -68,6 +69,7 @@
         },
         "message": {
           "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$",
           "title": "Message",
           "type": "string"
         },
@@ -125,7 +127,10 @@
                 ]
               }
             }
-          }
+          },
+          "required": [
+            "findings"
+          ]
         }
       }
     },
@@ -236,7 +241,7 @@
     "scanned_paths": {
       "items": {
         "minLength": 1,
-        "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./).+$",
+        "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$).+$",
         "type": "string"
       },
       "minItems": 1,
@@ -248,6 +253,17 @@
       "default": "security-screening/v1",
       "title": "Schema Version",
       "type": "string"
+    },
+    "sensor_ids": {
+      "items": {
+        "minLength": 1,
+        "pattern": "^\\S(?:.*\\S)?$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Sensor Ids",
+      "type": "array",
+      "uniqueItems": true
     },
     "status": {
       "enum": [
@@ -261,6 +277,7 @@
   },
   "required": [
     "candidate",
+    "sensor_ids",
     "status",
     "scanned_paths"
   ],

@@ -21,13 +21,16 @@ from skills_sdk.models.package import (
 from skills_sdk.models.packaging import PackageManifest, PackageReceipt
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 
-_PORTABLE_PATH_PATTERN = r"^(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\./).+$"
+_PORTABLE_PATH_PATTERN = r"^(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$).+$"
+_NON_WHITESPACE_TEXT_PATTERN = r"^\S(?:.*\S)?$"
 
 
 def _append_risk_constraints(schema: dict[str, Any]) -> None:
     """Add JSON-Schema-expressible risk invariants to the generated contract."""
 
     schema["properties"]["sensor_ids"]["uniqueItems"] = True
+    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["$defs"]["RiskSensor"]["properties"]["id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
     schema["allOf"] = [
         *schema.get("allOf", []),
         {
@@ -100,13 +103,18 @@ def _append_security_constraints(schema: dict[str, Any]) -> None:
     """Add JSON-Schema-expressible security invariants to the generated contract."""
 
     schema["properties"]["scanned_paths"]["items"]["pattern"] = _PORTABLE_PATH_PATTERN
+    schema["properties"]["sensor_ids"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["properties"]["sensor_ids"]["uniqueItems"] = True
     schema["$defs"]["SecurityFinding"]["properties"]["evidence_refs"]["items"]["pattern"] = _PORTABLE_PATH_PATTERN
+    schema["$defs"]["SecurityFinding"]["properties"]["code"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["$defs"]["SecurityFinding"]["properties"]["message"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
     schema["allOf"] = [
         *schema.get("allOf", []),
         {
             "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
             "then": {
                 "not": {
+                    "required": ["findings"],
                     "properties": {
                         "findings": {
                             "contains": {

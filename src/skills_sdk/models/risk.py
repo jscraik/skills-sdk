@@ -22,6 +22,13 @@ class RiskSensor(_ContractModel):
     status: Literal["selected", "available_not_run", "skipped_optional", "blocked"]
     receipt_required: bool
 
+    @field_validator("id", mode="before")
+    @classmethod
+    def id_must_be_normalized(cls, value: object) -> object:
+        if isinstance(value, str) and value != value.strip():
+            raise ValueError("sensor ids must already be normalized")
+        return value
+
 
 class RiskClassification(_ContractModel):
     """Candidate-bound risk posture with explicit sensor coverage."""
@@ -39,6 +46,15 @@ class RiskClassification(_ContractModel):
     sensor_ids: tuple[NonEmptyText, ...] = Field(min_length=1)
     sensors: tuple[RiskSensor, ...] = Field(min_length=1)
     acceptance_trace: tuple[NonEmptyText, ...] = Field(min_length=1)
+
+    @field_validator("sensor_ids", mode="before")
+    @classmethod
+    def sensor_ids_must_be_normalized(cls, values: object) -> object:
+        if isinstance(values, (list, tuple)) and any(
+            isinstance(value, str) and value != value.strip() for value in values
+        ):
+            raise ValueError("sensor ids must already be normalized")
+        return values
 
     @model_validator(mode="after")
     def sensors_cover_classification(self) -> RiskClassification:
@@ -86,10 +102,20 @@ class SecurityScreeningResult(_ContractModel):
 
     schema_version: Literal["security-screening/v1"] = "security-screening/v1"
     candidate: PackageCandidateIdentity
+    sensor_ids: tuple[NonEmptyText, ...] = Field(min_length=1)
     status: Literal["pass", "needs_review", "blocked"]
     scanned_paths: tuple[PortablePath, ...] = Field(min_length=1)
     findings: tuple[SecurityFinding, ...] = ()
     mutation_performed: Literal[False] = False
+
+    @field_validator("sensor_ids", mode="before")
+    @classmethod
+    def sensor_ids_must_be_normalized(cls, values: object) -> object:
+        if isinstance(values, (list, tuple)) and any(
+            isinstance(value, str) and value != value.strip() for value in values
+        ):
+            raise ValueError("sensor ids must already be normalized")
+        return values
 
     @field_validator("scanned_paths")
     @classmethod
@@ -100,6 +126,8 @@ class SecurityScreeningResult(_ContractModel):
 
     @model_validator(mode="after")
     def status_matches_findings(self) -> SecurityScreeningResult:
+        if len(self.sensor_ids) != len(set(self.sensor_ids)):
+            raise ValueError("screening sensor ids must be unique")
         severities = {finding.severity for finding in self.findings}
         if self.status == "pass" and severities - {"info"}:
             raise ValueError("pass screening cannot contain warning or blocker findings")

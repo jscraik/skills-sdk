@@ -60,6 +60,7 @@
         },
         "id": {
           "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$",
           "title": "Id",
           "type": "string"
         },
@@ -317,6 +318,7 @@
     "sensor_ids": {
       "items": {
         "minLength": 1,
+        "pattern": "^\\S(?:.*\\S)?$",
         "type": "string"
       },
       "minItems": 1,
