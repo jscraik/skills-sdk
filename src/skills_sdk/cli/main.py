@@ -87,6 +87,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
     else:
         print(f"{arguments.command}: {result.status} ({result.candidate.package_id})")
+        if not successful:
+            blockers = (
+                result.findings
+                if arguments.command == "validate"
+                else ((result.blocker,) if result.blocker is not None else ())
+            )
+            for item in blockers:
+                references = " ".join(item.evidence_refs)
+                print(f"  {item.code}: {item.message}{f' [{references}]' if references else ''}")
     return 0 if successful else 2
 
 
