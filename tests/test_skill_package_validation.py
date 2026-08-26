@@ -286,6 +286,20 @@ def test_generated_environment_directories_are_blocked(tmp_path: Path, directory
     assert all(not item.path.startswith(directory_name) for item in result.files)
 
 
+def test_package_directory_depth_is_bounded(tmp_path: Path) -> None:
+    root = _write_skill(tmp_path / "deep-skill", name="deep-skill")
+    nested = root
+    for index in range(65):
+        nested /= f"d{index}"
+    nested.mkdir(parents=True)
+    (nested / "detail.md").write_text("deep\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    finding = next(item for item in result.findings if item.code == "package_depth_exceeded")
+    assert finding.evidence_refs
+
+
 @pytest.mark.parametrize("filename", ["package-receipt.json", "skill-package-validation.json"])
 def test_generated_validation_receipts_are_blocked(tmp_path: Path, filename: str) -> None:
     root = _write_skill(tmp_path / "fixture-skill")
@@ -411,3 +425,6 @@ def test_generated_schema_enforces_raw_status_invariants(tmp_path: Path) -> None
     mismatched_identity["identity"]["name"] = "different-skill"
     with pytest.raises(ContractError):
         registry.validate("skill-package-validation.v1", mismatched_identity)
+
+    schema = registry.load("skill-package-validation.v1")
+    assert schema["x-skills-sdk-semantic-validator"]["entrypoint"].endswith("SchemaRegistry.validate")

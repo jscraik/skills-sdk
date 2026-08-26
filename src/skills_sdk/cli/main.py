@@ -4,6 +4,7 @@ import argparse
 import json
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from skills_sdk import __version__
 
@@ -38,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--max-entrypoint-lines", type=int)
         command.add_argument("--max-reference-depth", type=int)
         command.add_argument("--json", action="store_true", dest="json_output")
-        command.add_argument("--robot", action="store_true", help="emit automation-safe output without prompts")
+        command.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     tessl = commands.add_parser(
         "tessl",
         help="prepare or verify a Tessl candidate without publishing",
@@ -52,6 +53,23 @@ def build_parser() -> argparse.ArgumentParser:
         "verify", help="verify a prepared Tessl payload", description="verify a prepared Tessl payload"
     )
     return parser
+
+
+def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
+    if command == "validate":
+        return tuple(result.findings)
+    return (result.blocker,) if result.blocker is not None else ()
+
+
+def _print_result(command: str, result: Any, *, json_output: bool) -> None:
+    if json_output:
+        print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+        return
+    print(f"{command}: {result.status} ({result.candidate.package_id})")
+    for finding in _human_findings(command, result):
+        references = ", ".join(finding.evidence_refs)
+        suffix = f" [{references}]" if references else ""
+        print(f"  {finding.code}: {finding.message}{suffix}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -83,10 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             policy=policy,
         )
         successful = result.status == "built"
-    if arguments.json_output:
-        print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
-    else:
-        print(f"{arguments.command}: {result.status} ({result.candidate.package_id})")
+    _print_result(arguments.command, result, json_output=arguments.json_output)
     return 0 if successful else 2
 
 

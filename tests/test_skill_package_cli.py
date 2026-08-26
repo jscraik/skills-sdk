@@ -63,6 +63,21 @@ def test_validate_and_build_commands_return_typed_blocker_exit(tmp_path: Path) -
     assert json.loads(build.stdout)["blocker"]["code"] == "name_mismatch"
 
 
+@pytest.mark.parametrize("command", ["validate", "build"])
+def test_human_output_includes_blocker_details(tmp_path: Path, command: str) -> None:
+    root = _skill(tmp_path / "fixture-skill", name="wrong-name")
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "skills_sdk.cli.main", command, str(root), "--source-revision", REVISION],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert "name_mismatch: skill name must match the package directory [SKILL.md]" in completed.stdout
+
+
 def test_invalid_source_revision_returns_structured_blocker(tmp_path: Path) -> None:
     root = _skill(tmp_path / "fixture-skill", name="fixture-skill")
 
@@ -121,3 +136,15 @@ def test_reserved_routes_do_not_import_validation_dependencies(tmp_path: Path, a
 
     assert completed.returncode == 0, completed.stderr
     assert "validation dependency imported" not in completed.stderr
+
+
+def test_robot_help_describes_the_reserved_no_op_contract() -> None:
+    completed = subprocess.run(
+        [sys.executable, "-m", "skills_sdk.cli.main", "validate", "--help"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0
+    assert "reserve the prompt-free automation contract" in completed.stdout

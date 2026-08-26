@@ -380,6 +380,17 @@ def _render_schema(model: type[object], filename: str) -> str:
                 },
             },
         ]
+        schema["$comment"] = (
+            "Validate candidate/identity package_id binding and file-path uniqueness with "
+            "skills_sdk.core.schema_registry.SchemaRegistry.validate; JSON Schema cannot compare arbitrary fields."
+        )
+        schema["x-skills-sdk-semantic-validator"] = {
+            "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+            "required_for": [
+                "passing identity package_id must match the candidate package_id",
+                "skill validation file paths must be unique",
+            ],
+        }
     elif filename == "risk-classification.v1.schema.json":
         _append_risk_constraints(schema)
     elif filename == "security-screening.v1.schema.json":

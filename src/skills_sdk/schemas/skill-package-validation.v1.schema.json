@@ -1,4 +1,5 @@
 {
+  "$comment": "Validate candidate/identity package_id binding and file-path uniqueness with skills_sdk.core.schema_registry.SchemaRegistry.validate; JSON Schema cannot compare arbitrary fields.",
   "$defs": {
     "PackageCandidateIdentity": {
       "additionalProperties": false,
@@ -302,5 +303,12 @@
     "status"
   ],
   "title": "SkillPackageValidation",
-  "type": "object"
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "passing identity package_id must match the candidate package_id",
+      "skill validation file paths must be unique"
+    ]
+  }
 }
