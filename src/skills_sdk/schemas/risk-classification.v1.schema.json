@@ -60,7 +60,7 @@
         },
         "id": {
           "minLength": 1,
-          "pattern": "^\\S(?:.*\\S)?$",
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
           "title": "Id",
           "type": "string"
         },
@@ -236,6 +236,7 @@
     "acceptance_trace": {
       "items": {
         "minLength": 1,
+        "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
         "type": "string"
       },
       "minItems": 1,
@@ -318,7 +319,7 @@
     "sensor_ids": {
       "items": {
         "minLength": 1,
-        "pattern": "^\\S(?:.*\\S)?$",
+        "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
         "type": "string"
       },
       "minItems": 1,
@@ -332,7 +333,8 @@
       },
       "minItems": 1,
       "title": "Sensors",
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "source_kind": {
       "enum": [
@@ -365,7 +367,8 @@
   "x-skills-sdk-semantic-validator": {
     "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
     "required_for": [
-      "sensor_ids must match declared sensor ids"
+      "sensor_ids must match declared sensor ids",
+      "risk sensor ids must be unique"
     ]
   }
 }

@@ -21,16 +21,21 @@ from skills_sdk.models.package import (
 from skills_sdk.models.packaging import PackageManifest, PackageReceipt
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 
-_PORTABLE_PATH_PATTERN = r"^(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$).+$"
-_NON_WHITESPACE_TEXT_PATTERN = r"^\S(?:.*\S)?$"
+_PORTABLE_PATH_PATTERN = (
+    r"^(?=.*\S)(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
+    r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$).+$"
+)
+_NON_WHITESPACE_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
 
 
 def _append_risk_constraints(schema: dict[str, Any]) -> None:
     """Add JSON-Schema-expressible risk invariants to the generated contract."""
 
     schema["properties"]["sensor_ids"]["uniqueItems"] = True
+    schema["properties"]["sensors"]["uniqueItems"] = True
     schema["properties"]["sensor_ids"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
     schema["$defs"]["RiskSensor"]["properties"]["id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
+    schema["properties"]["acceptance_trace"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
     schema["allOf"] = [
         *schema.get("allOf", []),
         {
@@ -95,7 +100,7 @@ def _append_risk_constraints(schema: dict[str, Any]) -> None:
     )
     schema["x-skills-sdk-semantic-validator"] = {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
-        "required_for": ["sensor_ids must match declared sensor ids"],
+        "required_for": ["sensor_ids must match declared sensor ids", "risk sensor ids must be unique"],
     }
 
 

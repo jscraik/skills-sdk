@@ -132,6 +132,18 @@ def test_risk_schema_rejects_duplicate_sensor_id_entries() -> None:
     assert _schema_errors("risk-classification.v1", payload)
 
 
+def test_risk_schema_rejects_duplicate_sensor_objects() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["sensors"].append(dict(payload["sensors"][0]))
+    assert _schema_errors("risk-classification.v1", payload)
+
+
+def test_risk_schema_rejects_whitespace_only_acceptance_trace() -> None:
+    payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
+    payload["acceptance_trace"] = [" "]
+    assert _schema_errors("risk-classification.v1", payload)
+
+
 @pytest.mark.parametrize("field, value", [("status", "skipped_optional"), ("blocking_behavior", "skip_optional")])
 def test_risk_schema_rejects_optional_skip_for_required_sensor(field: str, value: str) -> None:
     payload = json.loads((FIXTURE_ROOT / "risk.json").read_text(encoding="utf-8"))
@@ -178,6 +190,18 @@ def test_security_schema_rejects_whitespace_only_finding_text(field: str) -> Non
     payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
     payload["findings"][0][field] = "   "
     assert _schema_errors("security-screening.v1", payload)
+
+
+def test_security_schema_rejects_whitespace_only_scanned_path() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["scanned_paths"] = [" "]
+    assert _schema_errors("security-screening.v1", payload)
+
+
+def test_security_schema_accepts_multiline_finding_message() -> None:
+    payload = json.loads((FIXTURE_ROOT / "security-pass.json").read_text(encoding="utf-8"))
+    payload["findings"][0]["message"] = "line one\nline two"
+    assert not _schema_errors("security-screening.v1", payload)
 
 
 def test_security_schema_requires_sensor_identity() -> None:
