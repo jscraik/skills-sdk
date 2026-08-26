@@ -72,8 +72,11 @@ def test_public_docs_distinguish_wire_shapes_from_semantic_registry_checks() -> 
         "packaged candidate, skill-identity, plugin-identity, source, owner, "
         "normalized-package, and intake schemas are not registered with"
     ) in api_compact
-    assert "`package-identity.v1` JSON schema intentionally accepts" in compatibility
-    assert "source and owner JSON schemas\nrequire `schema_version`" in compatibility
+    assert (
+        "`package-identity.v1`, `package-source.v1`, and\n"
+        "`package-owner.v1` JSON schemas intentionally accept"
+    ) in compatibility
+    assert "bare wire shape" in compatibility
     assert "`receipt-base.v1` requires `schema_version`" in compatibility
 
 
