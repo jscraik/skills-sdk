@@ -45,6 +45,7 @@ _UNSAFE_NAMES: Final[frozenset[str]] = frozenset(
 )
 _PACKAGE_ID_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _SOURCE_REVISION_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{40}$")
+_MAX_PACKAGE_DIRECTORY_DEPTH: Final[int] = 64
 
 
 class _UnsupportedSafeTraversal(OSError):
@@ -220,7 +221,7 @@ def _scan_files(
             captured,
         )
 
-    def visit(directory_fd: int, relative_directory: Path) -> None:
+    def visit(directory_fd: int, relative_directory: Path, directory_depth: int) -> None:
         before = os.fstat(directory_fd)
         try:
             entries = sorted(os.scandir(directory_fd), key=lambda entry: entry.name)
@@ -255,6 +256,15 @@ def _scan_files(
                 findings.append(_finding("symlink_not_allowed", "package paths must not be symbolic links", relative))
                 continue
             if entry.is_dir(follow_symlinks=False):
+                if directory_depth >= _MAX_PACKAGE_DIRECTORY_DEPTH:
+                    findings.append(
+                        _finding(
+                            "package_depth_exceeded",
+                            f"package directory depth exceeds hard limit {_MAX_PACKAGE_DIRECTORY_DEPTH}",
+                            relative,
+                        )
+                    )
+                    continue
                 try:
                     child_fd = os.open(
                         entry.name,
@@ -267,7 +277,7 @@ def _scan_files(
                     )
                     continue
                 try:
-                    visit(child_fd, relative_path)
+                    visit(child_fd, relative_path, directory_depth + 1)
                 finally:
                     os.close(child_fd)
                 continue
@@ -295,7 +305,7 @@ def _scan_files(
             findings.append(_source_changed_finding(relative_directory))
 
     try:
-        visit(root_fd, Path())
+        visit(root_fd, Path(), 0)
     finally:
         os.close(root_fd)
     files.sort(key=lambda item: item.path)

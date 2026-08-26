@@ -189,6 +189,26 @@ def test_injected_authoring_budgets_block_without_becoming_core_defaults(tmp_pat
     }
 
 
+def test_package_directory_depth_is_hard_limited(tmp_path: Path) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    nested = root
+    for index in range(skill_package_module._MAX_PACKAGE_DIRECTORY_DEPTH):
+        nested /= f"level-{index}"
+        nested.mkdir()
+    (nested / "included.txt").write_text("included\n", encoding="utf-8")
+    too_deep = nested / "too-deep"
+    too_deep.mkdir()
+    (too_deep / "excluded.txt").write_text("excluded\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    expected_prefix = "/".join(f"level-{index}" for index in range(skill_package_module._MAX_PACKAGE_DIRECTORY_DEPTH))
+    assert result.status == "blocked"
+    assert "package_depth_exceeded" in {item.code for item in result.findings}
+    assert f"{expected_prefix}/included.txt" in {item.path for item in result.files}
+    assert f"{expected_prefix}/too-deep/excluded.txt" not in {item.path for item in result.files}
+
+
 def test_build_returns_typed_blocked_receipt_without_mutation(tmp_path: Path) -> None:
     root = _write_skill(tmp_path / "fixture-skill", name="different-skill")
     before = {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
