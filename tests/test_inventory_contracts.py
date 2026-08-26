@@ -176,6 +176,21 @@ def test_v2_inventory_set_requires_v2_records() -> None:
     assert inventory.schema_version == "package-inventory-set/v2"
 
 
+def test_v1_inventory_set_rejects_a_constructed_v2_record() -> None:
+    record = PackageInventoryRecordV2.model_validate(
+        _record().model_dump()
+        | {
+            "schema_version": "package-inventory/v2",
+            "value_decision": "needs_review",
+            "blocker_codes": ("value_review_required",),
+            "mantra": _mantra("revise"),
+            "intended_disposition": "needs_owner_decision",
+        }
+    )
+    with pytest.raises(ValidationError, match=r"set/v1 requires package-inventory/v1"):
+        PackageInventory(source_revision="1" * 40, records=(record,))
+
+
 def test_inventory_rejects_duplicate_package_ids() -> None:
     with pytest.raises(ValidationError, match="package_id values must be unique"):
         PackageInventory(source_revision="1" * 40, records=(_record(), _record()))

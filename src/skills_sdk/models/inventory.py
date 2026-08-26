@@ -274,6 +274,8 @@ class PackageInventory(_ContractModel):
 
     @model_validator(mode="after")
     def package_ids_are_unique(self) -> PackageInventory:
+        if any(record.schema_version != "package-inventory/v1" for record in self.records):
+            raise ValueError("package-inventory-set/v1 requires package-inventory/v1 records")
         package_ids = [record.package_id for record in self.records]
         if len(package_ids) != len(set(package_ids)):
             raise ValueError("inventory package_id values must be unique")
@@ -317,6 +319,8 @@ class PackageInventoryV2(_ContractModel):
 
     @model_validator(mode="after")
     def package_ids_are_unique(self) -> PackageInventoryV2:
+        if any(record.schema_version != "package-inventory/v2" for record in self.records):
+            raise ValueError("package-inventory-set/v2 requires package-inventory/v2 records")
         package_ids = [record.package_id for record in self.records]
         if len(package_ids) != len(set(package_ids)):
             raise ValueError("inventory package_id values must be unique")

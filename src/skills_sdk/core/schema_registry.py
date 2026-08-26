@@ -71,7 +71,15 @@ class SchemaRegistry:
     def _validate_registered_model(name: str, payload: object) -> None:
         """Apply semantic invariants after structural schema validation."""
 
-        if name == "package-manifest.v1":
+        if name == "package-inventory.v2":
+            from skills_sdk.models.inventory import PackageInventoryRecordV2
+
+            model = PackageInventoryRecordV2
+        elif name == "package-inventory-set.v2":
+            from skills_sdk.models.inventory import PackageInventoryV2
+
+            model = PackageInventoryV2
+        elif name == "package-manifest.v1":
             from skills_sdk.models.packaging import PackageManifest
 
             model = PackageManifest
