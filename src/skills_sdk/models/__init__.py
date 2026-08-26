@@ -1,5 +1,6 @@
 """Typed package and plugin inventory contracts."""
 
+from skills_sdk.models.evaluation import ScenarioCase, ScenarioSet, ScorerProfile
 from skills_sdk.models.inventory import (
     FormatChecks,
     MantraAssessment,
@@ -72,6 +73,9 @@ __all__ = [
     "RiskClassification",
     "RiskSensor",
     "RuntimeVisibility",
+    "ScenarioCase",
+    "ScenarioSet",
+    "ScorerProfile",
     "SecurityFinding",
     "SecurityScreeningResult",
     "SkillIdentity",

@@ -7,6 +7,8 @@ from skills_sdk.models import (
     PackageInventoryRecord,
     RecommendedMechanism,
     RiskClassification,
+    ScenarioSet,
+    ScorerProfile,
     SecurityScreeningResult,
     ValueDecision,
 )
@@ -20,6 +22,8 @@ __all__ = [
     "PackageInventoryRecord",
     "RecommendedMechanism",
     "RiskClassification",
+    "ScenarioSet",
+    "ScorerProfile",
     "SecurityScreeningResult",
     "ValueDecision",
     "__version__",
