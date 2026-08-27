@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.packaging import (
     PackageFileRole,
@@ -45,6 +45,10 @@ def _receipt_with_extra_file(
     assert payload["manifest"] is not None
     payload["manifest"]["files"].append(extra_file.model_dump(mode="json"))
     payload["included_files"].append(extra_file.path)
+    files = tuple(PackageManifestFile.model_validate(item) for item in payload["manifest"]["files"])
+    content_digest = candidate_content_sha256(files)
+    payload["candidate"]["content_sha256"] = content_digest
+    payload["manifest"]["candidate"]["content_sha256"] = content_digest
     payload["package_digest"] = canonical_json_sha256(payload["manifest"])
     return PackageReceiptV2.model_validate(payload)
 

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import CandidateIdentity, Receipt, parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -162,6 +163,18 @@ def test_v2_built_receipt_rejects_manifest_digest_mismatch() -> None:
     with pytest.raises(ContractError) as error:
         SchemaRegistry().validate("package-receipt.v2", payload)
     assert any("digest must match" in detail for detail in error.value.details)
+
+
+def test_v2_built_receipt_rejects_recomputed_digest_for_wrong_candidate_content() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
+    payload["manifest"]["files"][0]["sha256"] = "f" * 64
+    payload["package_digest"] = canonical_json_sha256(payload["manifest"])
+
+    with pytest.raises(ValidationError, match="candidate digest must match manifest files"):
+        PackageReceiptV2.model_validate(payload)
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-receipt.v2", payload)
+    assert any("candidate digest must match manifest files" in detail for detail in error.value.details)
 
 
 def test_v1_built_receipt_keeps_historical_digest_semantics() -> None:

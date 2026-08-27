@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
 
-from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
@@ -155,6 +155,10 @@ class PackageReceiptV2(PackageReceipt):
     def package_digest_matches_manifest(self) -> PackageReceiptV2:
         if self.status == "built":
             assert self.manifest is not None
+            assert self.candidate is not None
+            expected_content_digest = candidate_content_sha256(self.manifest.files)
+            if self.candidate.content_sha256 != expected_content_digest:
+                raise ValueError("built package receipt candidate digest must match manifest files")
             expected_digest = canonical_json_sha256(self.manifest.model_dump(mode="json"))
             if self.package_digest != expected_digest:
                 raise ValueError("built package receipt digest must match the canonical manifest")

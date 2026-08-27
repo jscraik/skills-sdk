@@ -5,21 +5,21 @@
     "schema_version": "package-candidate/v1",
     "package_id": "synthetic-skill",
     "source_revision": "1111111111111111111111111111111111111111",
-    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "content_sha256": "e731dc0e9ae63974d0b110b5fcd7fccd96a73eb04d21b78313f3adb7d37697f4"
   },
   "lane": "validation",
   "status": "built",
   "started_at": "2026-08-25T10:00:00Z",
   "finished_at": "2026-08-25T10:00:01Z",
   "evidence": ["tests/fixtures/synthetic-skill/SKILL.md"],
-  "package_digest": "1e1d021c86c0b39c858a439fcecae5d07dde2615276ba14b4d1e7dcaacd2829c",
+  "package_digest": "ad411f55622e7b25d26dd4a5e44690679d8f02100e82fe117a7b03f28b5a1b3f",
   "manifest": {
     "schema_version": "package-manifest/v1",
     "candidate": {
       "schema_version": "package-candidate/v1",
       "package_id": "synthetic-skill",
       "source_revision": "1111111111111111111111111111111111111111",
-      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "content_sha256": "e731dc0e9ae63974d0b110b5fcd7fccd96a73eb04d21b78313f3adb7d37697f4"
     },
     "version": "0.1.0",
     "files": [
