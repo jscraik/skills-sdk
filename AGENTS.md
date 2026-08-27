@@ -6,22 +6,52 @@ schema_version: 1
 
 Skills SDK is the public, portable implementation of package authoring,
 validation, security, evaluation, receipt, and handoff contracts for Agent
-Skills. It is not a package Foundry, runtime installation, or distribution
-registry.
+Skills. It is a contract library and local tooling surface, not a package
+Foundry, runtime installer, provider client, distribution registry, or
+publication service.
 
-## Boundaries
+## Scope and boundaries
 
 - Keep the core independent of Agent-Skills, Tessl, Codex, and local runtime
-  filesystem layouts. Integrations implement explicit provider interfaces.
-- Never commit private skill source, credentials, opaque secret values,
-  machine-specific paths, generated receipts, or provider run histories.
+  filesystem layouts; integrations own explicit provider or host adapters.
 - Keep source, validation, runtime, provider, distribution, and publication
-  evidence separate.
-- Preserve stable receipt fields and schema versions. Test compatibility before
-  changing a public contract.
+  evidence in separate lanes. Local contract proof does not establish hosted,
+  installed, or published behavior.
+- Treat `PackageCandidateIdentity` (`package_id`, `source_revision`, and
+  `content_sha256`) as the binding identity for downstream manifests and
+  receipts. Preserve stable receipt fields and schema versions.
+- `validate_skill_package` and `build_skill_package` are read-only. Validation
+  returns a `skill-package-validation/v1` result; build returns a
+  candidate-bound `package-receipt/v1` and does not write into the package.
+- Validate untrusted data at the boundary. Never commit private skill source,
+  credentials, opaque secret values, machine-specific paths, generated
+  receipts, provider histories, or local runtime state.
 - Never waive or suppress a failed contract. Repair the implementation or emit
-  a typed blocker.
+  a typed blocker. Public contract changes require schema, behavior, and
+  compatibility proof.
 
-## Validation
+## Working language and discovery
 
-Run `bash scripts/validate-repository.sh` before a commit or pull request.
+- Use [`UBIQUITOUS.md`](UBIQUITOUS.md) as the canonical project vocabulary.
+  Map overloaded phrases such as “build”, “publish”, “install”, “candidate”,
+  and “receipt” through it before changing code or documentation.
+- Read [`CODESTYLE.md`](CODESTYLE.md) before technical edits and
+  [`CONTRIBUTING.md`](CONTRIBUTING.md) before commit or pull-request work.
+- Use [`docs/agent-entrypoint.md`](docs/agent-entrypoint.md) for the short
+  first-run route, [`docs/cli.md`](docs/cli.md) for command behavior,
+  [`docs/api.md`](docs/api.md) for contract families, and
+  [`docs/compatibility.md`](docs/compatibility.md) for versioning rules.
+- Keep this file limited to rules every task needs. Put reader-facing detail
+  and examples in the linked documentation surfaces.
+
+## Development and validation
+
+- Use Python `3.12` and the pinned `uv` environment: `uv sync --frozen`.
+- Run the narrowest relevant check first. Schema changes also require
+  `uv run python scripts/generate_schemas.py --check`; public contract changes
+  need focused schema, behavior, and compatibility tests.
+- Before a commit or pull request, run
+  `bash scripts/validate-repository.sh`. The wrapper runs the generated-schema
+  check, Ruff, the full pytest suite, `uv build`, and `git diff --check`.
+- Report exact validation commands as `pass`, `fail`, or `blocked`, including
+  the blocker when the exact production or provider path cannot run.
