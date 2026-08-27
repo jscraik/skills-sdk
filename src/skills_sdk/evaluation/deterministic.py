@@ -78,6 +78,8 @@ def _evaluate_case(case: ScenarioCase, observation: ScenarioObservation) -> Scen
             case_id=case.case_id,
             status="blocked",
             evidence_refs=observation.evidence_refs,
+            runner_id=observation.runner_id,
+            runner_version_or_digest=observation.runner_version_or_digest,
             blocker=observation.blocker,
         )
     if case.oracle != "expected_signal":
@@ -87,6 +89,8 @@ def _evaluate_case(case: ScenarioCase, observation: ScenarioObservation) -> Scen
             case_id=case.case_id,
             status="blocked",
             evidence_refs=observation.evidence_refs,
+            runner_id=observation.runner_id,
+            runner_version_or_digest=observation.runner_version_or_digest,
             blocker=_blocker(
                 "unsupported_oracle",
                 f"scenario-set/v1 does not define deterministic {case.oracle} expectations",
@@ -109,6 +113,8 @@ def _evaluate_case(case: ScenarioCase, observation: ScenarioObservation) -> Scen
         forbidden_commands_observed=forbidden_observed,
         evidence_refs=observation.evidence_refs,
         observation_sha256=observation.output_sha256,
+        runner_id=observation.runner_id,
+        runner_version_or_digest=observation.runner_version_or_digest,
     )
 
 
@@ -205,7 +211,13 @@ def evaluate_scenario_set(
     score = passed / len(results)
     status = "pass" if score >= scorer.pass_threshold else "fail"
     return EvaluationReceipt(
-        receipt_id=_receipt_id(scenario_set, scorer, results, status),
+        receipt_id=_receipt_id(
+            scenario_set,
+            scorer,
+            results,
+            status,
+            completed_calibration_probe_ids=completed_probes,
+        ),
         candidate=scenario_set.candidate,
         scenario_set_id=scenario_set.scenario_set_id,
         scorer=scorer,

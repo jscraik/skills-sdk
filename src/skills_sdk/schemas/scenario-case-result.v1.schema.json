@@ -138,6 +138,16 @@
       "default": null,
       "title": "Observation Sha256"
     },
+    "runner_id": {
+      "minLength": 1,
+      "title": "Runner Id",
+      "type": "string"
+    },
+    "runner_version_or_digest": {
+      "minLength": 1,
+      "title": "Runner Version Or Digest",
+      "type": "string"
+    },
     "scenario_set_id": {
       "minLength": 1,
       "title": "Scenario Set Id",
@@ -163,7 +173,9 @@
     "candidate",
     "scenario_set_id",
     "case_id",
-    "status"
+    "status",
+    "runner_id",
+    "runner_version_or_digest"
   ],
   "title": "ScenarioCaseResult",
   "type": "object"

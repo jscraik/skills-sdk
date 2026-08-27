@@ -284,6 +284,27 @@ def test_receipt_identity_includes_blocker_and_calibration_evidence() -> None:
     assert calibration.receipt_id != missing_observation.receipt_id
 
 
+def test_completed_receipt_identity_includes_optional_calibration_evidence() -> None:
+    scenario_set = _scenario_set()
+    scorer = _scorer().model_copy(update={"calibration_required": False})
+
+    without_probe = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=scorer,
+    )
+    with_probe = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=scorer,
+        completed_calibration_probe_ids=("positive",),
+    )
+
+    assert without_probe.status == "pass"
+    assert with_probe.status == "pass"
+    assert without_probe.receipt_id != with_probe.receipt_id
+
+
 def test_non_deterministic_scorer_requires_an_adapter() -> None:
     scenario_set = _scenario_set()
     scorer = _scorer().model_copy(update={"scorer_type": "hybrid"})
@@ -320,3 +341,52 @@ def test_observation_digest_is_bound_into_result_and_receipt_identity() -> None:
 
     assert first.case_results[0].observation_sha256 == "b" * 64
     assert first.receipt_id != second.receipt_id
+
+
+def test_runner_identity_is_bound_into_result_and_receipt_identity() -> None:
+    scenario_set = _scenario_set()
+    original = _observations(scenario_set)
+    changed = list(original)
+    changed[0] = original[0].model_copy(
+        update={"runner_id": "replacement-runner", "runner_version_or_digest": "v2"}
+    )
+
+    first = evaluate_scenario_set(
+        scenario_set,
+        original,
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+    second = evaluate_scenario_set(
+        scenario_set,
+        changed,
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+
+    assert first.case_results[0].runner_id == "local-runner"
+    assert first.case_results[0].runner_version_or_digest == "v1"
+    assert first.receipt_id != second.receipt_id
+
+
+@pytest.mark.parametrize(
+    "probe_ids",
+    [
+        ("positive", "fabricated"),
+        ("negative", "positive"),
+        ("positive",),
+    ],
+)
+def test_receipt_rejects_noncanonical_calibration_evidence(probe_ids: tuple[str, ...]) -> None:
+    scenario_set = _scenario_set()
+    receipt = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+    payload = receipt.model_dump()
+    payload["completed_calibration_probe_ids"] = probe_ids
+
+    with pytest.raises(ValidationError, match="completed calibration probes"):
+        EvaluationReceipt.model_validate(payload)

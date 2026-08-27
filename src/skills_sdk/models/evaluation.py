@@ -121,6 +121,8 @@ class ScenarioCaseResult(_ContractModel):
     forbidden_commands_observed: tuple[NonEmptyText, ...] = ()
     evidence_refs: tuple[PortablePath, ...] = ()
     observation_sha256: Sha256 | None = None
+    runner_id: NonEmptyText
+    runner_version_or_digest: NonEmptyText
     blocker: PackageReceiptBlocker | None = None
     mutation_performed: Literal[False] = False
 
@@ -184,6 +186,21 @@ class EvaluationReceipt(_ContractModel):
             raise ValueError("evaluation receipt results must bind the same candidate and scenario set")
         if len(self.completed_calibration_probe_ids) != len(set(self.completed_calibration_probe_ids)):
             raise ValueError("completed calibration probe ids must be unique")
+        completed_probe_set = set(self.completed_calibration_probe_ids)
+        declared_probe_set = set(self.scorer.calibration_probe_ids)
+        if completed_probe_set - declared_probe_set:
+            raise ValueError("completed calibration probes must be declared by the scorer profile")
+        canonical_completed_probes = tuple(
+            probe for probe in self.scorer.calibration_probe_ids if probe in completed_probe_set
+        )
+        if self.completed_calibration_probe_ids != canonical_completed_probes:
+            raise ValueError("completed calibration probes must follow scorer profile order")
+        if (
+            self.status != "blocked"
+            and self.scorer.calibration_required
+            and completed_probe_set != declared_probe_set
+        ):
+            raise ValueError("completed calibration probes must match the scorer profile")
         blocked_results = tuple(result for result in self.case_results if result.status == "blocked")
         if self.status == "blocked":
             if self.blocker is None and not blocked_results:
