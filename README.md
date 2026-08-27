@@ -38,8 +38,11 @@ anything, mutate a runtime, or publish to a registry.
 ## What the SDK guarantees
 
 - Typed Pydantic contracts for package identity, source and ownership, intake,
-  inventory, evaluation scenarios and scorers, risk and security, validation,
-  manifests, and receipts.
+  inventory, evaluation scenarios, observations, case results and receipts,
+  risk and security, validation, manifests, and packaging receipts.
+- Deterministic, non-executing evaluation of externally produced observations,
+  with explicit blockers for unsupported oracles, incomplete calibration, and
+  candidate or scenario-set identity drift.
 - Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
   names. The registry applies structural validation to those names and
   semantic invariants only for registered model families; other packaged

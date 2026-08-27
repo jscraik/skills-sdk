@@ -82,6 +82,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/models/` | Frozen Pydantic contract families for identity, inventory, intake, evaluation, risk, security, validation, manifests, and receipts. | `PackageCandidateIdentity`, `SkillPackageValidation`, `PackageManifest`, `PackageReceipt` |
 | `src/skills_sdk/validation/` | Read-only standalone-skill capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. | `SkillIR`, `read_frontmatter`, `validate_skill_package` |
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
+| `src/skills_sdk/evaluation/` | Pure deterministic scoring over externally produced, candidate-bound observations; no prompt, provider, package, or runtime execution. | `evaluate_scenario_set` in `deterministic.py` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
@@ -107,7 +108,7 @@ docstrings and the linked API or CLI guides.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The repository's dependency direction is `CLI -> validation/packaging -> models/core`; provider, runtime, distribution, and publication adapters remain external boundaries.
+- The repository's dependency direction is `CLI -> validation/packaging/evaluation -> models/core`; provider, runtime, distribution, and publication adapters remain external boundaries.
 
 ## Architectural invariants
 

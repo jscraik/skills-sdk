@@ -8,7 +8,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from skills_sdk.models.evaluation import ScenarioSet, ScorerProfile
+from skills_sdk.models.evaluation import (
+    EvaluationReceipt,
+    ScenarioCaseResult,
+    ScenarioObservation,
+    ScenarioSet,
+    ScorerProfile,
+)
 from skills_sdk.models.inventory import (
     PackageInventory,
     PackageInventoryRecord,
@@ -437,6 +443,9 @@ def main() -> int:
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),
         (ScorerProfile, "scorer-profile.v1.schema.json"),
+        (ScenarioObservation, "scenario-observation.v1.schema.json"),
+        (ScenarioCaseResult, "scenario-case-result.v1.schema.json"),
+        (EvaluationReceipt, "evaluation-receipt.v1.schema.json"),
         (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
