@@ -107,10 +107,7 @@ docstrings and the linked API or CLI guides.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The repository's conceptual direction is `core -> services -> providers ->
-  CLI`. This checkout currently implements the core, model, validation,
-  packaging, and CLI portions; provider, runtime, distribution, and
-  publication adapters remain explicit external boundaries.
+- The repository's dependency direction is `CLI -> validation/packaging -> models/core`; provider, runtime, distribution, and publication adapters remain external boundaries.
 
 ## Architectural invariants
 
