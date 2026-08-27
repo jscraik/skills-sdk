@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.packaging import (
     PackageFileRole,
@@ -13,6 +14,7 @@ from skills_sdk.models.packaging import (
     PackageHardeningPolicy,
     PackageHardeningReceipt,
     PackageManifestFile,
+    PackageReceipt,
 )
 from skills_sdk.packaging import build_skill_package, harden_skill_package
 
@@ -32,6 +34,19 @@ def _skill(root: Path, *, readme: bool = True) -> Path:
     if readme:
         (root / "README.md").write_text("# Fixture\n", encoding="utf-8")
     return root
+
+
+def _receipt_with_extra_file(
+    package_receipt: PackageReceipt, extra_file: PackageManifestFile
+) -> PackageReceipt:
+    """Return a validated receipt whose digest covers the added manifest file."""
+
+    payload = package_receipt.model_dump(mode="json")
+    assert payload["manifest"] is not None
+    payload["manifest"]["files"].append(extra_file.model_dump(mode="json"))
+    payload["included_files"].append(extra_file.path)
+    payload["package_digest"] = canonical_json_sha256(payload["manifest"])
+    return PackageReceipt.model_validate(payload)
 
 
 def test_hardening_passes_and_binds_exact_build_candidate(tmp_path: Path) -> None:
@@ -91,20 +106,12 @@ def test_hardening_blocks_forbidden_manifest_paths_without_mutation(tmp_path: Pa
         size_bytes=0,
         role=PackageFileRole.REFERENCE,
     )
-    manifest = package_receipt.manifest.model_copy(
-        update={"files": (*package_receipt.manifest.files, unsafe_file)}
-    )
-    unsafe_receipt = package_receipt.model_copy(
-        update={
-            "manifest": manifest,
-            "included_files": (*package_receipt.included_files, unsafe_file.path),
-        }
-    )
+    unsafe_receipt = _receipt_with_extra_file(package_receipt, unsafe_file)
 
     receipt = harden_skill_package(unsafe_receipt)
 
     assert receipt.status == "blocked"
-    assert receipt.package_digest == package_receipt.package_digest
+    assert receipt.package_digest == unsafe_receipt.package_digest
     assert {item.id for item in receipt.blockers} == {"forbidden_package_paths"}
     assert receipt.mutation_performed is False
 
@@ -138,14 +145,7 @@ def test_hardening_uses_canonical_validator_path_safety_policy(
         size_bytes=0,
         role=PackageFileRole.REFERENCE,
     )
-    unsafe_receipt = package_receipt.model_copy(
-        update={
-            "manifest": package_receipt.manifest.model_copy(
-                update={"files": (*package_receipt.manifest.files, unsafe_file)}
-            ),
-            "included_files": (*package_receipt.included_files, unsafe_path),
-        }
-    )
+    unsafe_receipt = _receipt_with_extra_file(package_receipt, unsafe_file)
 
     receipt = harden_skill_package(unsafe_receipt)
 

@@ -117,6 +117,17 @@ def test_manifest_and_receipt_must_bind_same_candidate() -> None:
         PackageReceipt.model_validate(payload)
 
 
+def test_built_receipt_rejects_manifest_digest_mismatch() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    payload["manifest"]["version"] = "9.9.9"
+
+    with pytest.raises(ValidationError, match="digest must match"):
+        PackageReceipt.model_validate(payload)
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-receipt.v1", payload)
+    assert any("digest must match" in detail for detail in error.value.details)
+
+
 def test_built_receipt_cannot_omit_manifest_files() -> None:
     payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
     payload["included_files"] = ["SKILL.md"]

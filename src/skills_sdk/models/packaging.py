@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
@@ -125,6 +126,9 @@ class PackageReceipt(_ContractModel):
         if self.status == "built":
             if self.candidate is None or self.package_digest is None or self.manifest is None:
                 raise ValueError("built package receipt requires candidate, package_digest, and manifest")
+            expected_digest = canonical_json_sha256(self.manifest.model_dump(mode="json"))
+            if self.package_digest != expected_digest:
+                raise ValueError("built package receipt digest must match the canonical manifest")
             if not included_paths or included_paths != manifest_paths:
                 raise ValueError("built package receipt must include every manifest path")
             if self.blocker is not None:

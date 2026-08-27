@@ -12,7 +12,7 @@
   "started_at": "2026-08-25T10:00:00Z",
   "finished_at": "2026-08-25T10:00:01Z",
   "evidence": ["tests/fixtures/synthetic-skill/SKILL.md"],
-  "package_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "package_digest": "3a23cee7c174607f454bdd2a8a7245e5ae1c9c08ff74cff248a2ec3a4eb72996",
   "manifest": {
     "schema_version": "package-manifest/v1",
     "candidate": {
