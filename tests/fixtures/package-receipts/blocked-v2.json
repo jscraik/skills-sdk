@@ -1,0 +1,23 @@
+{
+  "schema_version": "package-receipt/v2",
+  "receipt_id": "unsafe-package-receipt-2",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "unsafe-skill",
+    "source_revision": "2222222222222222222222222222222222222222",
+    "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "lane": "validation",
+  "status": "blocked",
+  "started_at": "2026-08-25T11:00:00Z",
+  "finished_at": "2026-08-25T11:00:01Z",
+  "evidence": ["tests/fixtures/unsafe-skill"],
+  "blocker": {
+    "code": "unsafe_path",
+    "message": "candidate contains a path outside the package root",
+    "evidence_refs": ["tests/fixtures/unsafe-skill"]
+  },
+  "included_files": [],
+  "excluded_files": [],
+  "mutation_performed": false
+}

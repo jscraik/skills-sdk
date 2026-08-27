@@ -66,7 +66,7 @@ def test_validation_builds_portable_identity_and_deterministic_manifest(tmp_path
     assert first.candidate == second.candidate
     assert first.manifest == second.manifest
     SchemaRegistry().validate("skill-package-validation.v1", validation.model_dump(mode="json"))
-    SchemaRegistry().validate("package-receipt.v1", first.model_dump(mode="json"))
+    SchemaRegistry().validate("package-receipt.v2", first.model_dump(mode="json"))
 
 
 @pytest.mark.parametrize(

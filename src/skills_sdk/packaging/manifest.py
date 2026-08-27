@@ -10,8 +10,8 @@ from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.packaging import (
     PackageManifest,
     PackageManifestProvenance,
-    PackageReceipt,
     PackageReceiptBlocker,
+    PackageReceiptV2,
 )
 from skills_sdk.validation.skill_package import SkillValidationPolicy, validate_skill_package
 
@@ -32,7 +32,7 @@ def build_skill_package(
     source_revision: str,
     policy: SkillValidationPolicy | None = None,
     clock: Clock | None = None,
-) -> PackageReceipt:
+) -> PackageReceiptV2:
     """Validate and build a candidate-bound, non-mutating package receipt."""
 
     active_clock = clock or (lambda: datetime.now(UTC))
@@ -42,8 +42,8 @@ def build_skill_package(
     if validation.status == "blocked":
         first = validation.findings[0]
         candidate = validation.candidate
-        return PackageReceipt(
-            schema_version="package-receipt/v1",
+        return PackageReceiptV2(
+            schema_version="package-receipt/v2",
             receipt_id=(
                 _receipt_id(candidate.package_id, candidate.content_sha256)
                 if candidate is not None
@@ -72,8 +72,8 @@ def build_skill_package(
         provenance=PackageManifestProvenance(source=("SKILL.md",), builder="skills-sdk.packaging.manifest/v1"),
     )
     package_digest = canonical_json_sha256(manifest.model_dump(mode="json"))
-    return PackageReceipt(
-        schema_version="package-receipt/v1",
+    return PackageReceiptV2(
+        schema_version="package-receipt/v2",
         receipt_id=_receipt_id(validation.candidate.package_id, validation.candidate.content_sha256),
         candidate=validation.candidate,
         lane="validation",

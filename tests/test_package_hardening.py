@@ -14,7 +14,7 @@ from skills_sdk.models.packaging import (
     PackageHardeningPolicy,
     PackageHardeningReceipt,
     PackageManifestFile,
-    PackageReceipt,
+    PackageReceiptV2,
 )
 from skills_sdk.packaging import build_skill_package, harden_skill_package
 
@@ -37,8 +37,8 @@ def _skill(root: Path, *, readme: bool = True) -> Path:
 
 
 def _receipt_with_extra_file(
-    package_receipt: PackageReceipt, extra_file: PackageManifestFile
-) -> PackageReceipt:
+    package_receipt: PackageReceiptV2, extra_file: PackageManifestFile
+) -> PackageReceiptV2:
     """Return a validated receipt whose digest covers the added manifest file."""
 
     payload = package_receipt.model_dump(mode="json")
@@ -46,11 +46,13 @@ def _receipt_with_extra_file(
     payload["manifest"]["files"].append(extra_file.model_dump(mode="json"))
     payload["included_files"].append(extra_file.path)
     payload["package_digest"] = canonical_json_sha256(payload["manifest"])
-    return PackageReceipt.model_validate(payload)
+    return PackageReceiptV2.model_validate(payload)
 
 
 def test_hardening_passes_and_binds_exact_build_candidate(tmp_path: Path) -> None:
     package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
+
+    assert package_receipt.schema_version == "package-receipt/v2"
 
     receipt = harden_skill_package(package_receipt)
 
@@ -204,7 +206,7 @@ def test_hardening_returns_typed_blocker_for_partial_blocked_manifest(tmp_path: 
         },
         included_files=("SKILL.md",),
     )
-    blocked = PackageReceipt.model_validate(payload)
+    blocked = PackageReceiptV2.model_validate(payload)
 
     receipt = harden_skill_package(blocked)
 

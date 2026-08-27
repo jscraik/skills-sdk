@@ -22,7 +22,8 @@ publication service.
   receipts. Preserve stable receipt fields and schema versions.
 - `validate_skill_package` and `build_skill_package` are read-only. Validation
   returns a `skill-package-validation/v1` result; a successful build returns a
-  candidate-bound `package-receipt/v1`. A blocked build may have
+  candidate-bound `package-receipt/v2`. The historical
+  `package-receipt/v1` contract remains accepted for compatibility. A blocked build may have
   `candidate: null` when identity cannot be resolved, and neither path writes
   into the package.
 - Validate untrusted data at the boundary. Never commit private skill source,

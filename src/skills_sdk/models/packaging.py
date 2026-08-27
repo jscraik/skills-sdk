@@ -126,9 +126,6 @@ class PackageReceipt(_ContractModel):
         if self.status == "built":
             if self.candidate is None or self.package_digest is None or self.manifest is None:
                 raise ValueError("built package receipt requires candidate, package_digest, and manifest")
-            expected_digest = canonical_json_sha256(self.manifest.model_dump(mode="json"))
-            if self.package_digest != expected_digest:
-                raise ValueError("built package receipt digest must match the canonical manifest")
             if not included_paths or included_paths != manifest_paths:
                 raise ValueError("built package receipt must include every manifest path")
             if self.blocker is not None:
@@ -146,6 +143,21 @@ class PackageReceipt(_ContractModel):
                 raise ValueError("blocked package receipt excluded files must not be manifested")
         if included_paths & set(self.excluded_files):
             raise ValueError("included and excluded package paths must be disjoint")
+        return self
+
+
+class PackageReceiptV2(PackageReceipt):
+    """Digest-bound package result that preserves the v1 receipt shape."""
+
+    schema_version: Literal["package-receipt/v2"]
+
+    @model_validator(mode="after")
+    def package_digest_matches_manifest(self) -> PackageReceiptV2:
+        if self.status == "built":
+            assert self.manifest is not None
+            expected_digest = canonical_json_sha256(self.manifest.model_dump(mode="json"))
+            if self.package_digest != expected_digest:
+                raise ValueError("built package receipt digest must match the canonical manifest")
         return self
 
 
@@ -230,4 +242,5 @@ __all__ = [
     "PackageManifestProvenance",
     "PackageReceipt",
     "PackageReceiptBlocker",
+    "PackageReceiptV2",
 ]

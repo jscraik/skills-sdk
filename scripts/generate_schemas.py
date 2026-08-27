@@ -24,7 +24,12 @@ from skills_sdk.models.package import (
     PluginIdentity,
     SkillIdentity,
 )
-from skills_sdk.models.packaging import PackageHardeningReceipt, PackageManifest, PackageReceipt
+from skills_sdk.models.packaging import (
+    PackageHardeningReceipt,
+    PackageManifest,
+    PackageReceipt,
+    PackageReceiptV2,
+)
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 from skills_sdk.models.validation import SkillPackageValidation
 
@@ -318,7 +323,7 @@ def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> N
 def _render_schema(model: type[object], filename: str) -> str:
     schema = model.model_json_schema()  # type: ignore[attr-defined]
     _append_portable_path_constraints(schema)
-    if filename == "package-receipt.v1.schema.json":
+    if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:
         # Pydantic emits field types but cannot express the status-dependent
         # receipt invariants enforced by PackageReceipt.model_validator.
         schema["allOf"] = [
@@ -426,6 +431,7 @@ def main() -> int:
         (NormalizedPackage, "normalized-package.v1.schema.json"),
         (PackageManifest, "package-manifest.v1.schema.json"),
         (PackageReceipt, "package-receipt.v1.schema.json"),
+        (PackageReceiptV2, "package-receipt.v2.schema.json"),
         (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
