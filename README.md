@@ -150,13 +150,13 @@ runtime installation, or generated receipt.
 The same candidate identity should travel through each local proof artifact,
 while the artifact type states which lane actually ran:
 
-| Surface | What the SDK represents | What it does not establish |
-| --- | --- | --- |
-| Inventory and intake | Source, ownership, rights, value, and admission decisions | Canonical ownership when the evidence is missing |
-| Validation | Package shape, safe traversal, frontmatter, file manifest, and typed findings | Skill execution or runtime behavior |
-| Evaluation | Candidate-bound scenarios and scorer calibration requirements | A passing score from a scorer that did not run |
-| Risk and security | Sensor coverage, redacted findings, and explicit pass/review/block states | Provider or runtime security beyond the declared sensors |
-| Manifest and receipt | Immutable candidate, files, digest, timestamps, and blockers | Distribution, installation, publication, or hosted readiness |
+| Surface              | What the SDK represents                                                       | What it does not establish                                   |
+| -------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Inventory and intake | Source, ownership, rights, value, and admission decisions                     | Canonical ownership when the evidence is missing             |
+| Validation           | Package shape, safe traversal, frontmatter, file manifest, and typed findings | Skill execution or runtime behavior                          |
+| Evaluation           | Candidate-bound scenarios and scorer calibration requirements                 | A passing score from a scorer that did not run               |
+| Risk and security    | Sensor coverage, redacted findings, and explicit pass/review/block states     | Provider or runtime security beyond the declared sensors     |
+| Manifest and receipt | Immutable candidate, files, digest, timestamps, and blockers                  | Distribution, installation, publication, or hosted readiness |
 
 This separation is deliberate: local contract proof, hosted CI and review,
 provider or registry state, and installed behavior are different claims.
