@@ -167,10 +167,24 @@ contribution workflow remain in `CODESTYLE.md` and `CONTRIBUTING.md`.
 from the public models and applies the JSON-Schema-expressible constraints. It
 does not regenerate the hand-maintained `receipt-base.v1.schema.json`,
 `blocker.v1.schema.json`, or `package-identity.v1.schema.json` resources. Run
-its `--check` mode for the generated subset, and use the direct Draft 2020-12
-schema tests and `SchemaRegistry.load` checks for the hand-maintained subset.
-All of these resources are part of the compatibility surface; pair public
-changes with schema, behavior, and compatibility tests.
+its `--check` mode for the generated subset. The canonical focused route for
+the hand-maintained subset is:
+
+```bash
+uv run pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
+```
+
+That route loads all three resources through `SchemaRegistry.load`, which
+performs the Draft 2020-12 schema check, and exercises their candidate
+identity, generic receipt, and typed-blocker contracts. The aggregate
+`bash scripts/validate-repository.sh` command includes these modules through
+its full pytest run, but does not execute a separate hand-maintained-schema
+command. Record `pass` only when the focused command exits `0` with all tests
+passing, `fail` when it exits non-zero with a schema or contract assertion, or
+`blocked` when it cannot run or complete; a blocked result must include the
+concrete reason and nearest meaningful fallback. All of these resources are
+part of the compatibility surface; pair public changes with schema, behavior,
+and compatibility tests.
 
 ### Errors, statuses, and evidence
 

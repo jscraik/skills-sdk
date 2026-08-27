@@ -54,10 +54,18 @@ publication service.
 - Use Python `3.12` and the pinned `uv` environment: `uv sync --frozen`.
 - Run the narrowest relevant check first. Schema changes require
   `uv run python scripts/generate_schemas.py --check` for the
-  generator-managed subset plus direct Draft 2020-12/schema contract checks
-  for the hand-maintained `receipt-base.v1`, `blocker.v1`, and
-  `package-identity.v1` resources; public contract changes need focused schema,
-  behavior, and compatibility tests.
+  generator-managed subset and this canonical focused route for the
+  hand-maintained resources:
+  `uv run pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py`.
+  That route checks the `receipt-base.v1`, `blocker.v1`, and
+  `package-identity.v1` resources with Draft 2020-12 through
+  `SchemaRegistry.load` and exercises their candidate, receipt, and blocker
+  contracts. The repository wrapper's full pytest run includes these tests but
+  does not run a separate hand-maintained-schema command. Record `pass` only
+  for exit `0` with all tests passing, `fail` for a non-zero schema or contract
+  assertion, and `blocked` when the command cannot run or complete; include a
+  concrete blocker reason and nearest fallback for `blocked`. Public contract
+  changes need focused schema, behavior, and compatibility tests.
 - Before a commit or pull request, run
   `bash scripts/validate-repository.sh`. The wrapper runs the generated-schema
   check, Ruff, the full pytest suite, `uv build`, and `git diff --check`.
