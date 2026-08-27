@@ -1,10 +1,12 @@
 # Skills SDK
 
 Skills SDK is a portable Python contract layer and local tooling surface for
-Agent Skills packages. It turns package source into explicit, versioned
-inventory, intake, validation, evaluation, risk, security, manifest, and
-candidate-bound receipt data without coupling the core package to a host
-repository, provider account, runtime installation, or registry.
+Agent Skills packages. It defines explicit, versioned contracts for inventory,
+intake, evaluation, risk, security, manifests, and receipts. Its local
+source-consuming services validate standalone packages and build
+candidate-bound manifest and receipt data; inventory, intake, evaluation, risk,
+and security are caller-populated contract lanes. The core remains independent
+of a host repository, provider account, runtime installation, or registry.
 
 > Thin Surfaces. Strong Guardrails. Progressive Disclosure. Durable Memory.
 > Professional Output.
@@ -28,7 +30,8 @@ The repository is version `0.1.0` and is in the contract-building `0.x`
 series. The implemented local commands are `validate` and `build`. The other
 lifecycle names, including `inventory`, `intake`, `eval`, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
-boundaries: they parse and show help, but do not execute provider work, install
+boundaries: they parse arguments and provide route-specific help when
+explicitly requested with `--help`, but do not execute provider work, install
 anything, mutate a runtime, or publish to a registry.
 
 ## What the SDK guarantees
@@ -94,20 +97,47 @@ uv run skills-sdk validate ./path/to/skill \
   --json --robot
 ```
 
-Exit status `0` means `status: "pass"`. Exit status `2` means the result is
+For a valid invocation that reaches the validation service, exit status `0`
+means `status: "pass"`. Exit status `2` means the service returned
 `status: "blocked"` and contains one or more typed findings. `--json` emits
 the versioned result; `--robot` is an accepted no-op that reserves the
 prompt-free automation contract. Human output includes finding codes and
-portable evidence references. The full command contract is in
+portable evidence references when a finding has them. Argparse also uses exit
+status `2` for malformed invocations such as a missing `package_root`; that
+usage error occurs before a versioned validation result is produced. The full
+command contract is in
 [`docs/cli.md`](docs/cli.md).
+
+The committed `tests/fixtures/synthetic-skill` fixture makes the validation
+contract runnable from the repository root. A passing validation is:
+
+```bash
+uv run skills-sdk validate tests/fixtures/synthetic-skill \
+  --source-revision 0000000000000000000000000000000000000000 \
+  --json --robot
+```
+
+Expected evidence is exit `0`, `status: "pass"`, and a candidate with
+`package_id: "synthetic-skill"`. A blocked validation is:
+
+```bash
+uv run skills-sdk validate tests/fixtures/synthetic-skill \
+  --source-revision not-a-revision \
+  --json --robot
+```
+
+Expected evidence is exit `2`, `status: "blocked"`, and a finding with code
+`invalid_source_revision`; the candidate is `null` because the supplied
+revision is not a valid 40-character lowercase hexadecimal value.
 
 ## Build a candidate-bound receipt
 
 `build` runs the same read-only validation and, when it passes, returns a
 `package-receipt/v1` with a deterministic manifest, package digest, included
 files, and the resolved candidate identity. It does not create an archive or
-write a receipt into the package. A blocked result contains a typed blocker,
-does not claim a package digest, and exits `2`.
+write a receipt into the package. For a valid invocation that reaches the build
+service, a blocked result contains a typed blocker, does not claim a package
+digest, and exits `2`.
 
 ```bash
 uv run skills-sdk build ./path/to/skill \
@@ -115,9 +145,31 @@ uv run skills-sdk build ./path/to/skill \
   --json --robot
 ```
 
-The receipt is evidence for the local validation lane only. It does not prove
-that a provider accepted the package, that a runtime installed it, or that a
-registry published it.
+The committed fixture also makes both build outcomes concrete. A successful
+build is:
+
+```bash
+uv run skills-sdk build tests/fixtures/synthetic-skill \
+  --source-revision 0000000000000000000000000000000000000000 \
+  --json --robot
+```
+
+Expected evidence is exit `0`, `status: "built"`, and populated `manifest` and
+`package_digest` fields with `mutation_performed: false`. A blocked build is:
+
+```bash
+uv run skills-sdk build tests/fixtures/synthetic-skill \
+  --source-revision not-a-revision \
+  --json --robot
+```
+
+Expected evidence is exit `2`, `status: "blocked"`, and a typed blocker with
+code `invalid_source_revision`; `manifest` and `package_digest` are `null`.
+For a valid invocation that reaches the build service, exit `2` is the blocked
+receipt outcome; malformed invocations are rejected by argparse before a
+versioned receipt exists. The receipt is evidence for the local validation lane
+only. It does not prove that a provider accepted the package, that a runtime
+installed it, or that a registry published it.
 
 ## Python API
 
@@ -142,7 +194,7 @@ if validation.status == "pass":
 For contract families, schema loading, model-level invariants, and the bare
 wire-shape exceptions, see [`docs/api.md`](docs/api.md). The small
 [`examples/inventory_contract.py`](examples/inventory_contract.py) example
-shows a portable inventory identity without requiring a provider, credential,
+shows a portable candidate identity without requiring a provider, credential,
 runtime installation, or generated receipt.
 
 ## Contract and evidence boundaries

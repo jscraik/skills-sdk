@@ -55,9 +55,10 @@ and file content needed to produce a `skill-package-validation/v1` result.
 _Avoid_: execution, installation, runtime verification
 
 **Typed blocker**:
-A machine-readable code, message, and portable evidence reference explaining
-why a contract or proof lane cannot complete. A blocker is an explicit result,
-not a waiver or a silent omission.
+A machine-readable code and message explaining why a contract or proof lane
+cannot complete, with portable evidence references when they are available. A
+blocker is an explicit result, not a waiver or a silent omission; callers must
+not invent an evidence path when the failure has no package-local reference.
 _Avoid_: warning-only failure, best-effort success, suppressed error
 
 **Package manifest**:
@@ -105,7 +106,8 @@ _Avoid_: installed package, provider artifact
 **Boundary route**:
 A named CLI route that makes a lifecycle intent discoverable while its deeper
 implementation is not available in this SDK. The current boundary routes parse
-and show help without executing side effects.
+arguments and expose route-specific help when `--help` is requested, without
+executing side effects.
 _Avoid_: implemented command, successful operation
 
 **Skill identity**:
@@ -141,11 +143,11 @@ _Avoid_: build, runtime projection, source admission
 
 - One **Agent Skills package** produces one **Candidate identity** for a given
   source revision and captured content digest.
-- One **Candidate identity** can bind one **Package manifest** and zero or more
-  lane-specific **Receipts**; each receipt must state which lane ran.
+- One **Candidate identity** can bind zero or more **Package manifests** and zero
+  or more lane-specific **Receipts**; each receipt must state which lane ran.
 - A **Validation lane** can emit a passing result or one or more **Typed
   blockers** without executing the package.
-- An **Inventory snapshot** contains one or more inventory records; an
+- An **Inventory snapshot** contains zero or more inventory records; an
   **Intake decision** resolves whether a candidate may enter its canonical
   ownership path.
 - **Structural schema validation** checks payload shape before registered
@@ -157,7 +159,9 @@ _Avoid_: build, runtime projection, source admission
 
 - “Build” can mean constructing an archive or returning a proof artifact.
   In this repository, use **build a candidate-bound receipt**: `build` validates
-  read-only, computes a manifest and package digest, and writes nothing.
+  read-only; after validation passes, it computes a manifest and package digest.
+  A blocked validation returns a typed blocker without a manifest or package
+  digest, and the command writes nothing.
 - “Validate” and “verify” are not interchangeable. Use **validation lane** for
   the implemented local package check; reserve **verify** for a future or
   external evidence-checking lane unless the owning contract says otherwise.
@@ -173,8 +177,8 @@ _Avoid_: build, runtime projection, source admission
 
 | User phrase | Canonical action |
 | --- | --- |
-| “Validate this skill” | Run `uv run skills-sdk validate <package-root> --source-revision <40-lowercase-hex> --json --robot`; treat exit `0` as a passing validation result and exit `2` as a typed blocker. |
-| “Build this package” | Run `uv run skills-sdk build <package-root> --source-revision <40-lowercase-hex> --json --robot`; call the result a candidate-bound receipt, not an archive or publication. |
+| “Validate this skill” | Run `uv run skills-sdk validate <package-root> --source-revision <40-lowercase-hex> --json --robot`; for an invocation that reaches the validator, treat exit `0` as a passing result and exit `2` as a typed blocker. Argparse also uses exit `2` for malformed invocations before a versioned result exists. |
+| “Build this package” | Run `uv run skills-sdk build <package-root> --source-revision <40-lowercase-hex> --json --robot`; for an invocation that reaches the builder, call the result a candidate-bound receipt, not an archive or publication. Argparse rejects malformed invocations before a versioned receipt exists. |
 | “Make it available” | First name the target lane. Use `validate` or `build` for local contract proof; hand installation, provider execution, and publication to their owning adapter or registry workflow. |
 | “Check the schemas” | Run `uv run python scripts/generate_schemas.py --check` for generated-schema drift, then use `SchemaRegistry` or the documented Draft 2020-12 validator for the payload family. |
 | “Is it verified?” | Identify the evidence lane and candidate identity, then inspect that lane's result; a local receipt alone does not prove runtime, provider, registry, or hosted state. |
@@ -189,8 +193,9 @@ _Avoid_: build, runtime projection, source admission
 >
 > **Developer:** “What should I call a failure that stops the candidate?”
 >
-> **Domain expert:** “Use **Typed blocker** and include its code, message, and
-> portable evidence reference. Do not turn it into a warning or a waiver.”
+> **Domain expert:** “Use **Typed blocker** and include its code and message;
+> add portable evidence references when they are available. Do not invent a
+> path, turn it into a warning, or use a waiver.”
 
 ## Agent Integration
 

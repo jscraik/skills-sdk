@@ -1,9 +1,11 @@
 # Architecture
 
 Skills SDK is a portable Python contract layer and local tooling surface for
-Agent Skills packages. It turns untrusted package source and contract-shaped
-payloads into explicit, versioned records while keeping provider execution,
-runtime projection, distribution, and publication outside the core package.
+Agent Skills packages. It defines versioned contract models for caller-provided
+inventory, intake, evaluation, risk, and security data, and consumes package
+source only through read-only validation and build services that produce
+candidate-bound manifest and receipt records. Provider execution, runtime
+projection, distribution, and publication remain outside the core package.
 
 This is a map of the stable seams that help a contributor decide where a
 change belongs. It is intentionally shorter than the implementation
