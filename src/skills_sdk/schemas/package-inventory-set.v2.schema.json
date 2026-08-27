@@ -498,7 +498,7 @@
   "$id": "https://schemas.skills-sdk.dev/package-inventory-set.v2.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Version-two deterministic, read-only inventory snapshot.",
+  "description": "Version-two read-only inventory snapshot preserving caller-supplied record order.",
   "properties": {
     "records": {
       "items": {

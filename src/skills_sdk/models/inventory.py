@@ -266,7 +266,7 @@ class PackageInventoryRecord(_ContractModel):
 
 
 class PackageInventory(_ContractModel):
-    """A deterministic, read-only inventory snapshot."""
+    """A read-only inventory snapshot preserving caller-supplied record order."""
 
     schema_version: Literal["package-inventory-set/v1"] = "package-inventory-set/v1"
     source_revision: GitRevision
@@ -311,7 +311,7 @@ class PackageInventoryRecordV2(PackageInventoryRecord):
 
 
 class PackageInventoryV2(_ContractModel):
-    """Version-two deterministic, read-only inventory snapshot."""
+    """Version-two read-only inventory snapshot preserving caller-supplied record order."""
 
     schema_version: Literal["package-inventory-set/v2"] = "package-inventory-set/v2"
     source_revision: GitRevision
