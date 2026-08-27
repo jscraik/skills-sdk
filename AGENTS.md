@@ -21,8 +21,10 @@ publication service.
   `content_sha256`) as the binding identity for downstream manifests and
   receipts. Preserve stable receipt fields and schema versions.
 - `validate_skill_package` and `build_skill_package` are read-only. Validation
-  returns a `skill-package-validation/v1` result; build returns a
-  candidate-bound `package-receipt/v1` and does not write into the package.
+  returns a `skill-package-validation/v1` result; a successful build returns a
+  candidate-bound `package-receipt/v1`. A blocked build may have
+  `candidate: null` when identity cannot be resolved, and neither path writes
+  into the package.
 - Validate untrusted data at the boundary. Never commit private skill source,
   credentials, opaque secret values, machine-specific paths, generated
   receipts, provider histories, or local runtime state.

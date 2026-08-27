@@ -3,10 +3,11 @@
 Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines explicit, versioned contracts for inventory,
 intake, evaluation, risk, security, manifests, and receipts. Its local
-source-consuming services validate standalone packages and build
-candidate-bound manifest and receipt data; inventory, intake, evaluation, risk,
-and security are caller-populated contract lanes. The core remains independent
-of a host repository, provider account, runtime installation, or registry.
+source-consuming services validate standalone packages and, after a candidate
+identity is resolved and validation passes, build candidate-bound manifest and
+receipt data; inventory, intake, evaluation, risk, and security are
+caller-populated contract lanes. The core remains independent of a host
+repository, provider account, runtime installation, or registry.
 
 > Thin Surfaces. Strong Guardrails. Progressive Disclosure. Durable Memory.
 > Professional Output.
@@ -39,12 +40,16 @@ anything, mutate a runtime, or publish to a registry.
 - Typed Pydantic contracts for package identity, source and ownership, intake,
   inventory, evaluation scenarios and scorers, risk and security, validation,
   manifests, and receipts.
-- Packaged JSON Schemas with a `SchemaRegistry` for structural validation and
-  the semantic invariants registered for supported contract families.
+- Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
+  names. The registry applies structural validation to those names and
+  semantic invariants only for registered model families; other packaged
+  resources can be loaded directly with a Draft 2020-12 validator as described
+  in [`docs/api.md`](docs/api.md).
 - Filesystem-safe, read-only standalone-skill validation with portable paths,
   closed YAML frontmatter, deterministic file manifests, and typed blockers.
-- Candidate-bound receipts that keep `package_id`, a 40-character source
-  revision, and a SHA-256 content digest together across proof lanes.
+- Receipts that bind a resolved candidate keep `package_id`, a 40-character
+  source revision, and a SHA-256 content digest together across proof lanes;
+  blocked receipts may omit the candidate when its identity cannot be resolved.
 - A prompt-free CLI contract with JSON output and stable exit behavior for the
   implemented commands.
 
@@ -82,11 +87,14 @@ The first-run route and its boundaries are also documented in
 it never executes the skill and never mutates the source tree. A package must
 contain a regular `SKILL.md` with closed YAML frontmatter, a non-empty
 `name` matching its directory name, and a non-empty `description`. Files and
-directories must use portable relative paths; symlinks, credential-like files,
+directories must use portable relative paths; symlinks, screened credential
+filenames (`.env`, `.env.*`, `credentials.json`, `secrets.json`, `id_rsa`,
+`id_ed25519`, and `.key`/`.pem`/`.p12`/`.pfx`/`.token` suffixes),
 runtime/source-control directories, unreadable files, and an unstable source
-are typed blockers. The validator also rejects unsupported frontmatter keys
-and requires the supplied source revision to be 40 lowercase hexadecimal
-characters.
+are typed blockers. This is a filename policy, not a content secret scan, so
+credential-bearing content in an otherwise permitted filename is not detected
+by this validator. It also rejects unsupported frontmatter keys and requires
+the supplied source revision to be 40 lowercase hexadecimal characters.
 
 Replace `<40-lowercase-hex>` with the revision that identifies the source you
 are validating:

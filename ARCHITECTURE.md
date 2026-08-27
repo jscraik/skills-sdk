@@ -3,9 +3,10 @@
 Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines versioned contract models for caller-provided
 inventory, intake, evaluation, risk, and security data, and consumes package
-source only through read-only validation and build services that produce
-candidate-bound manifest and receipt records. Provider execution, runtime
-projection, distribution, and publication remain outside the core package.
+source only through read-only validation and, after a resolved identity and a
+passing validation, build candidate-bound manifest and receipt records.
+Provider execution, runtime projection, distribution, and publication remain
+outside the core package.
 
 This is a map of the stable seams that help a contributor decide where a
 change belongs. It is intentionally shorter than the implementation
@@ -34,10 +35,10 @@ operational contracts.
 ## Bird's-eye view
 
 There are two related local paths. A package path captures a filesystem view,
-validates its entrypoint and files, and then (only after a pass) composes a
-candidate-bound manifest and receipt. A contract path validates JSON-shaped
-payloads against packaged schemas and, for registered families, applies the
-corresponding Pydantic invariants.
+validates its entrypoint and files, and then (only after a resolved identity and
+a pass) composes a candidate-bound manifest and receipt. A contract path
+validates JSON-shaped payloads against packaged schemas and, for registered
+families, applies the corresponding Pydantic invariants.
 
 ```text
 Package source
@@ -120,22 +121,29 @@ single module:
   `build_skill_package` do not execute package code, write receipts into the
   package, create archives, install anything, or publish anything. Successful
   and blocked results carry `mutation_performed: false`.
-- **Every downstream local artifact is candidate-bound.** The tuple of
-  `package_id`, `source_revision`, and `content_sha256` identifies the captured
-  source state. A package digest describes the manifest artifact and does not
-  replace candidate identity.
+- **Resolved downstream local artifacts are candidate-bound.** Once candidate
+  identity is resolved, manifests and successful receipts carry the tuple of
+  `package_id`, `source_revision`, and `content_sha256` that identifies the
+  captured source state. A blocked receipt may have `candidate: null` when an
+  identity cannot be resolved, such as for an invalid source revision; callers
+  must not invent one. A package digest describes the manifest artifact and
+  does not replace candidate identity.
 - **The filesystem boundary is conservative.** Validation uses descriptor-
   relative, no-follow traversal; rejects symlinks, unsafe directories,
-  credential-like files, unreadable or unstable content, and non-portable
-  paths; and records a deterministic sorted file manifest.
-- **Failures are explicit.** Invalid input produces a typed `ContractError` or
-  a versioned result containing typed blockers. There is no waiver or silent
-  success path for a failed contract.
-- **Shape and meaning are separate checks.** Packaged Draft 2020-12 schemas
-  establish structural shape. Only the contract families registered with
-  `SchemaRegistry` receive their additional Pydantic semantic checks through
-  that registry; the compatibility docs describe the bare wire-shape
-  exceptions.
+  screened credential filenames, unreadable or unstable content, and
+  non-portable paths; the filename policy does not scan arbitrary file contents
+  for secrets. It records a deterministic sorted file manifest.
+- **Failures are explicit at each public entry point.** `SchemaRegistry.validate`
+  translates unknown schemas and schema/model failures into `ContractError`,
+  while direct Pydantic model construction may raise `pydantic.ValidationError`.
+  Package `validate` and `build` paths return versioned results; blocked results
+  carry typed findings or blockers. There is no waiver or silent success path
+  for a failed contract.
+- **Shape and meaning are separate checks.** Packaged Draft 2020-12 resources
+  establish structural shape, but `SchemaRegistry` loads only its registered
+  schema names. It applies additional Pydantic semantic checks only for
+  registered families; other packaged resources are loaded directly with a
+  Draft 2020-12 validator, as described in the [API guide](docs/api.md).
 - **Core ownership stays portable.** The package contains no implicit import
   of Agent-Skills, Tessl, Codex, a provider account, a host runtime, or a
   machine-specific filesystem layout. External adapters must supply their own
