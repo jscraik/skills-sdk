@@ -84,6 +84,31 @@
       ],
       "title": "PackageHardeningCheck",
       "type": "object"
+    },
+    "PackageHardeningPolicy": {
+      "additionalProperties": false,
+      "description": "Portable, explicit package-hardening limits.",
+      "properties": {
+        "max_file_count": {
+          "default": 250,
+          "minimum": 1,
+          "title": "Max File Count",
+          "type": "integer"
+        },
+        "max_total_bytes": {
+          "default": 5242880,
+          "minimum": 1,
+          "title": "Max Total Bytes",
+          "type": "integer"
+        },
+        "require_readme": {
+          "default": true,
+          "title": "Require Readme",
+          "type": "boolean"
+        }
+      },
+      "title": "PackageHardeningPolicy",
+      "type": "object"
     }
   },
   "$id": "https://schemas.skills-sdk.dev/package-hardening.v1.schema.json",
@@ -108,6 +133,14 @@
       "title": "Blockers",
       "type": "array"
     },
+    "build_status": {
+      "enum": [
+        "built",
+        "blocked"
+      ],
+      "title": "Build Status",
+      "type": "string"
+    },
     "candidate": {
       "anyOf": [
         {
@@ -118,6 +151,9 @@
         }
       ],
       "default": null
+    },
+    "effective_policy": {
+      "$ref": "#/$defs/PackageHardeningPolicy"
     },
     "file_count": {
       "minimum": 0,
@@ -190,7 +226,9 @@
     }
   },
   "required": [
+    "build_status",
     "status",
+    "effective_policy",
     "file_count",
     "total_size_bytes",
     "hardening_checks",

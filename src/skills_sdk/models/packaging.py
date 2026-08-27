@@ -168,8 +168,10 @@ class PackageHardeningReceipt(_ContractModel):
 
     schema_version: Literal["package-hardening/v1"] = "package-hardening/v1"
     candidate: PackageCandidateIdentity | None = None
+    build_status: Literal["built", "blocked"]
     status: Literal["pass", "blocked"]
     package_digest: Sha256 | None = None
+    effective_policy: PackageHardeningPolicy
     included_files: tuple[PortablePath, ...] = ()
     file_count: int = Field(ge=0)
     total_size_bytes: int = Field(ge=0)
@@ -202,13 +204,16 @@ class PackageHardeningReceipt(_ContractModel):
         if self.status == "pass":
             if expected_blockers:
                 raise ValueError("passing hardening receipt cannot contain blockers")
-            if self.candidate is None or self.package_digest is None:
-                raise ValueError("passing hardening receipt requires candidate and package_digest")
+            if self.build_status != "built" or self.candidate is None or self.package_digest is None:
+                raise ValueError("passing hardening receipt requires a built candidate and package_digest")
         else:
             if not expected_blockers:
                 raise ValueError("blocked hardening receipt requires a blocker")
-            if self.package_digest is not None:
-                raise ValueError("blocked hardening receipt cannot claim a package digest")
+            if self.build_status == "built":
+                if self.candidate is None or self.package_digest is None:
+                    raise ValueError("hardening-blocked built package must preserve candidate and package_digest")
+            elif self.package_digest is not None:
+                raise ValueError("build-blocked hardening receipt cannot claim a package digest")
         return self
 
 

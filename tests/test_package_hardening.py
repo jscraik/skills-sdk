@@ -41,6 +41,7 @@ def test_hardening_passes_and_binds_exact_build_candidate(tmp_path: Path) -> Non
     assert receipt.status == "pass"
     assert receipt.candidate == package_receipt.candidate
     assert receipt.package_digest == package_receipt.package_digest
+    assert receipt.effective_policy == PackageHardeningPolicy()
     assert receipt.blockers == ()
     assert receipt.mutation_performed is False
     SchemaRegistry().validate("package-hardening.v1", receipt.model_dump(mode="json"))
@@ -54,7 +55,8 @@ def test_hardening_blocks_missing_required_readme(tmp_path: Path) -> None:
     receipt = harden_skill_package(package_receipt)
 
     assert receipt.status == "blocked"
-    assert receipt.package_digest is None
+    assert receipt.build_status == "built"
+    assert receipt.package_digest == package_receipt.package_digest
     assert {item.id for item in receipt.blockers} == {"required_package_roles"}
 
 
@@ -66,6 +68,7 @@ def test_hardening_policy_can_explicitly_make_readme_optional(tmp_path: Path) ->
     receipt = harden_skill_package(package_receipt, policy=PackageHardeningPolicy(require_readme=False))
 
     assert receipt.status == "pass"
+    assert receipt.effective_policy.require_readme is False
 
 
 def test_hardening_exposes_budget_warning_without_hiding_it(tmp_path: Path) -> None:
@@ -100,6 +103,7 @@ def test_hardening_blocks_forbidden_manifest_paths_without_mutation(tmp_path: Pa
     receipt = harden_skill_package(unsafe_receipt)
 
     assert receipt.status == "blocked"
+    assert receipt.package_digest == package_receipt.package_digest
     assert {item.id for item in receipt.blockers} == {"forbidden_package_paths"}
     assert receipt.mutation_performed is False
 
@@ -114,6 +118,7 @@ def test_hardening_propagates_blocked_build_without_claiming_digest(tmp_path: Pa
     receipt = harden_skill_package(package_receipt)
 
     assert receipt.status == "blocked"
+    assert receipt.build_status == "blocked"
     assert receipt.package_digest is None
     assert "package_receipt_built" in {item.id for item in receipt.blockers}
 
@@ -125,3 +130,28 @@ def test_hardening_receipt_rejects_warning_projection_drift(tmp_path: Path) -> N
 
     with pytest.raises(ValidationError, match="projections"):
         PackageHardeningReceipt.model_validate(payload)
+
+
+def test_hardening_returns_typed_blocker_for_partial_blocked_manifest(tmp_path: Path) -> None:
+    package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
+    assert package_receipt.manifest is not None
+    blocked = package_receipt.model_copy(
+        update={
+            "status": "blocked",
+            "package_digest": None,
+            "blocker": {
+                "code": "synthetic_blocker",
+                "message": "Synthetic blocked build.",
+                "evidence_refs": (),
+            },
+            "included_files": ("SKILL.md",),
+        }
+    )
+
+    receipt = harden_skill_package(blocked)
+
+    assert receipt.status == "blocked"
+    assert receipt.build_status == "blocked"
+    assert receipt.package_digest is None
+    assert receipt.file_count == 1
+    assert "package_receipt_built" in {item.id for item in receipt.blockers}

@@ -154,11 +154,15 @@ def harden_skill_package(
     )
     blockers = tuple(item for item in checks if item.status == "blocker")
     warnings = tuple(item for item in checks if item.status == "warning")
-    files = package_receipt.manifest.files if package_receipt.manifest is not None else ()
+    manifest_files = package_receipt.manifest.files if package_receipt.manifest is not None else ()
+    included_paths = set(package_receipt.included_files)
+    files = tuple(item for item in manifest_files if item.path in included_paths)
     return PackageHardeningReceipt(
         candidate=package_receipt.candidate,
+        build_status=package_receipt.status,
         status="blocked" if blockers else "pass",
-        package_digest=None if blockers else package_receipt.package_digest,
+        package_digest=package_receipt.package_digest,
+        effective_policy=active_policy,
         included_files=package_receipt.included_files,
         file_count=len(files),
         total_size_bytes=sum(item.size_bytes for item in files),
