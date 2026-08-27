@@ -158,7 +158,6 @@ class PackageHardeningCheck(_ContractModel):
 
     id: BlockerCode
     status: Literal["pass", "warning", "blocker"]
-    severity: Literal["info", "warning", "blocker"]
     message: NonEmptyText
     evidence: tuple[NonEmptyText, ...] = ()
 

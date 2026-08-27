@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import PurePosixPath
 from typing import Literal
 
+from skills_sdk.core.package_safety import unsafe_package_path_reason
 from skills_sdk.models.packaging import (
     PackageHardeningCheck,
     PackageHardeningPolicy,
@@ -14,62 +14,25 @@ from skills_sdk.models.packaging import (
 )
 
 _ACCEPTANCE_TRACE = ("portable-package", "immutable-candidate", "non-mutating-hardening")
-_FORBIDDEN_PATH_PARTS = frozenset(
-    {
-        ".agents",
-        ".cache",
-        ".codex",
-        ".git",
-        ".harness",
-        ".plugin-appserver",
-        "__pycache__",
-        "artifacts",
-        "dist",
-        "node_modules",
-    }
-)
-_FORBIDDEN_FILENAMES = frozenset(
-    {".env", ".env.local", ".envrc", ".netrc", ".npmrc", "id_rsa", "id_ed25519"}
-)
-_FORBIDDEN_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
-
-
 def _check(
     check_id: str,
     *,
     status: Literal["pass", "warning", "blocker"],
-    severity: Literal["info", "warning", "blocker"],
     message: str,
     evidence: tuple[str, ...] = (),
 ) -> PackageHardeningCheck:
     return PackageHardeningCheck(
         id=check_id,
         status=status,
-        severity=severity,
         message=message,
         evidence=evidence,
     )
-
-
-def _forbidden_reason(path: str) -> str | None:
-    parts = tuple(part.lower() for part in PurePosixPath(path).parts)
-    name = parts[-1]
-    if any(part in _FORBIDDEN_PATH_PARTS for part in parts):
-        return "forbidden_path_part"
-    if name in _FORBIDDEN_FILENAMES:
-        return "forbidden_filename"
-    if name.startswith(".env."):
-        return "forbidden_env_family"
-    if name.endswith(_FORBIDDEN_SUFFIXES):
-        return "forbidden_secret_suffix"
-    return None
 
 
 def _package_receipt_check(receipt: PackageReceipt) -> PackageHardeningCheck:
     return _check(
         "package_receipt_built",
         status="pass" if receipt.status == "built" else "blocker",
-        severity="blocker",
         message="Package hardening requires a successful immutable package receipt.",
         evidence=(f"package_receipt_status:{receipt.status}",),
     )
@@ -79,12 +42,11 @@ def _forbidden_paths_check(receipt: PackageReceipt) -> PackageHardeningCheck:
     forbidden = tuple(
         f"{path}:{reason}"
         for path in receipt.included_files
-        if (reason := _forbidden_reason(path)) is not None
+        if (reason := unsafe_package_path_reason(path)) is not None
     )
     return _check(
         "forbidden_package_paths",
         status="blocker" if forbidden else "pass",
-        severity="blocker",
         message="Package contents must exclude runtime, generated, dependency, and secret-bearing paths.",
         evidence=forbidden,
     )
@@ -98,7 +60,6 @@ def _size_budget_check(
     return _check(
         "package_size_budget",
         status="pass" if within_budget else "warning",
-        severity="warning",
         message="Package contents should remain within the explicit hardening budget.",
         evidence=(
             f"files:{len(files)}/{policy.max_file_count}",
@@ -118,7 +79,6 @@ def _provenance_check(receipt: PackageReceipt) -> PackageHardeningCheck:
     return _check(
         "provenance_trace",
         status="pass" if valid else "blocker",
-        severity="blocker",
         message="Package hardening requires the Skills SDK manifest builder and SKILL.md source provenance.",
         evidence=evidence,
     )
@@ -134,7 +94,6 @@ def _required_role_check(
     return _check(
         "required_package_roles",
         status="pass" if valid else "blocker",
-        severity="blocker",
         message="Package manifest must include SKILL.md and, when required, root README.md roles.",
         evidence=roles,
     )

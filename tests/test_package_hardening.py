@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.packaging import (
     PackageFileRole,
+    PackageHardeningCheck,
     PackageHardeningPolicy,
     PackageHardeningReceipt,
     PackageManifestFile,
@@ -106,6 +107,63 @@ def test_hardening_blocks_forbidden_manifest_paths_without_mutation(tmp_path: Pa
     assert receipt.package_digest == package_receipt.package_digest
     assert {item.id for item in receipt.blockers} == {"forbidden_package_paths"}
     assert receipt.mutation_performed is False
+
+
+@pytest.mark.parametrize(
+    "unsafe_path",
+    (
+        "credentials.json",
+        "secrets.json",
+        "references/access.token",
+        ".ssh/config",
+        ".gnupg/pubring.kbx",
+        ".mypy_cache/state.json",
+        ".pytest_cache/state.json",
+        ".ruff_cache/state.json",
+        ".venv/pyvenv.cfg",
+        "venv/pyvenv.cfg",
+        ".tox/config",
+        "references/skill-package-validation.json",
+        "references/build-receipt.json",
+    ),
+)
+def test_hardening_uses_canonical_validator_path_safety_policy(
+    tmp_path: Path, unsafe_path: str
+) -> None:
+    package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
+    assert package_receipt.manifest is not None
+    unsafe_file = PackageManifestFile(
+        path=unsafe_path,
+        sha256="0" * 64,
+        size_bytes=0,
+        role=PackageFileRole.REFERENCE,
+    )
+    unsafe_receipt = package_receipt.model_copy(
+        update={
+            "manifest": package_receipt.manifest.model_copy(
+                update={"files": (*package_receipt.manifest.files, unsafe_file)}
+            ),
+            "included_files": (*package_receipt.included_files, unsafe_path),
+        }
+    )
+
+    receipt = harden_skill_package(unsafe_receipt)
+
+    assert receipt.status == "blocked"
+    assert {item.id for item in receipt.blockers} == {"forbidden_package_paths"}
+
+
+def test_hardening_check_has_one_status_axis() -> None:
+    check = PackageHardeningCheck(
+        id="single_status_axis",
+        status="warning",
+        message="One status field carries the decision.",
+    )
+    payload = check.model_dump(mode="json")
+    payload["severity"] = "blocker"
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        PackageHardeningCheck.model_validate(payload)
 
 
 def test_hardening_propagates_blocked_build_without_claiming_digest(tmp_path: Path) -> None:

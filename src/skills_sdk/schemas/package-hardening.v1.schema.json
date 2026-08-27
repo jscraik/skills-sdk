@@ -57,15 +57,6 @@
           "title": "Message",
           "type": "string"
         },
-        "severity": {
-          "enum": [
-            "info",
-            "warning",
-            "blocker"
-          ],
-          "title": "Severity",
-          "type": "string"
-        },
         "status": {
           "enum": [
             "pass",
@@ -79,7 +70,6 @@
       "required": [
         "id",
         "status",
-        "severity",
         "message"
       ],
       "title": "PackageHardeningCheck",

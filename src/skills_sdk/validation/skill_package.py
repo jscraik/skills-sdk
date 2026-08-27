@@ -13,6 +13,7 @@ from typing import Final
 import yaml
 
 from skills_sdk.core.errors import ContractError
+from skills_sdk.core.package_safety import UNSAFE_PACKAGE_DIRECTORIES, unsafe_package_file_reason
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity
 from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile
@@ -21,27 +22,6 @@ from skills_sdk.validation.skill_ir import SkillIR, build_skill_ir, read_frontma
 
 _ALLOWED_FRONTMATTER: Final[frozenset[str]] = frozenset(
     {"name", "description", "version", "license", "compatibility", "allowed-tools", "metadata", "triggers"}
-)
-_UNSAFE_DIRECTORIES: Final[frozenset[str]] = frozenset(
-    {
-        ".agents",
-        ".cache",
-        ".codex",
-        ".git",
-        ".gnupg",
-        ".mypy_cache",
-        ".pytest_cache",
-        ".ruff_cache",
-        ".ssh",
-        ".tox",
-        ".venv",
-        "__pycache__",
-        "node_modules",
-        "venv",
-    }
-)
-_UNSAFE_NAMES: Final[frozenset[str]] = frozenset(
-    {".env", "credentials.json", "id_rsa", "id_ed25519", "secrets.json"}
 )
 _PACKAGE_ID_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _SOURCE_REVISION_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{40}$")
@@ -153,10 +133,6 @@ def _file_role(relative: Path) -> PackageFileRole:
     }.get(relative.parts[0], PackageFileRole.ASSET)
 
 
-def _is_generated_receipt(name: str) -> bool:
-    return name == "skill-package-validation.json" or name.endswith("-receipt.json")
-
-
 def _regular_file(
     parent_fd: int, relative: Path, role: PackageFileRole
 ) -> tuple[PackageManifestFile | None, SkillPackageFinding | None, bytes | None]:
@@ -167,12 +143,7 @@ def _regular_file(
     except (ContractError, UnicodeError):
         return None, _finding("invalid_package_path", "package filenames must be portable POSIX paths"), None
     name = relative.name
-    if (
-        name in _UNSAFE_NAMES
-        or name.startswith(".env.")
-        or _is_generated_receipt(name)
-        or relative.suffix.lower() in {".key", ".pem", ".p12", ".pfx", ".token"}
-    ):
+    if unsafe_package_file_reason(name) is not None:
         return (
             None,
             _finding("unsafe_package_file", "credential-like files cannot enter a package", relative_text),
@@ -243,7 +214,7 @@ def _scan_files(
             except (ContractError, UnicodeError):
                 findings.append(_finding("invalid_package_path", "package filenames must be portable POSIX paths"))
                 continue
-            if entry.name in _UNSAFE_DIRECTORIES:
+            if entry.name.lower() in UNSAFE_PACKAGE_DIRECTORIES:
                 findings.append(
                     _finding(
                         "unsafe_package_directory",
