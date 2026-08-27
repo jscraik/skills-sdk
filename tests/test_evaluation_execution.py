@@ -4,11 +4,13 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
+from skills_sdk.core.receipts import parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import evaluate_scenario_set
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
     ScenarioCase,
+    ScenarioCaseResult,
     ScenarioObservation,
     ScenarioSet,
     ScorerProfile,
@@ -114,6 +116,11 @@ def test_evaluator_emits_deterministic_candidate_bound_receipt() -> None:
     assert [result.case_id for result in receipt.case_results] == ["happy", "regression"]
     assert repeated.receipt_id == receipt.receipt_id
     SchemaRegistry().validate("evaluation-receipt.v1", receipt.model_dump(mode="json"))
+
+    generic_receipt = parse_receipt(receipt.model_dump(mode="json"))
+    assert generic_receipt.lane == "evaluation"
+    assert generic_receipt.status == "pass"
+    assert generic_receipt.evidence == ("evidence/happy.json", "evidence/regression.json")
 
 
 def test_missing_signal_and_forbidden_command_fail_without_mutation() -> None:
@@ -323,6 +330,51 @@ def test_non_deterministic_scorer_requires_an_adapter() -> None:
     assert receipt.status == "blocked"
     assert receipt.blocker is not None
     assert receipt.blocker.code == "provider_adapter_required"
+
+
+def test_completed_receipt_rejects_non_deterministic_scorer() -> None:
+    scenario_set = _scenario_set()
+    receipt = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+    payload = receipt.model_dump()
+    payload["scorer"]["scorer_type"] = "hybrid"
+
+    with pytest.raises(ValidationError, match="requires a deterministic scorer"):
+        EvaluationReceipt.model_validate(payload)
+
+
+def test_completed_receipt_rejects_score_that_disagrees_with_case_results() -> None:
+    scenario_set = _scenario_set()
+    receipt = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+    payload = receipt.model_dump()
+    payload["score"] = 0.5
+    payload["status"] = "fail"
+
+    with pytest.raises(ValidationError, match="pass ratio"):
+        EvaluationReceipt.model_validate(payload)
+
+
+def test_blocked_case_result_rejects_deterministic_failure_evidence() -> None:
+    with pytest.raises(ValidationError, match="cannot contain deterministic failure evidence"):
+        ScenarioCaseResult(
+            candidate=_candidate(),
+            scenario_set_id="release-1",
+            case_id="happy",
+            status="blocked",
+            missing_signals=("validated",),
+            runner_id="local-runner",
+            runner_version_or_digest="v1",
+            blocker=PackageReceiptBlocker(code="runner_unavailable", message="runner unavailable"),
+        )
 
 
 def test_observation_digest_is_bound_into_result_and_receipt_identity() -> None:

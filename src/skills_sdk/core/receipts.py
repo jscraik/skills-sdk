@@ -83,21 +83,32 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         "package-receipt/v2": "package-receipt.v2",
     }
     package_receipt_schema = package_receipt_schemas.get(schema_version) if isinstance(schema_version, str) else None
+    evaluation_receipt = schema_version == "evaluation-receipt/v1"
     if package_receipt_schema is not None:
         # Package receipts are a concrete result contract layered on the
         # generic receipt shape. Validate their richer invariants first, then
         # expose the stable generic Receipt API to callers.
         active_registry.validate(package_receipt_schema, payload)
+    elif evaluation_receipt:
+        active_registry.validate("evaluation-receipt.v1", payload)
     else:
         active_registry.validate("receipt-base.v1", payload)
     candidate_payload = payload.get("candidate")
-    if package_receipt_schema is None:
+    if package_receipt_schema is None and not evaluation_receipt:
         active_registry.validate("package-identity.v1", candidate_payload)
-    evidence = tuple(str(ref) for ref in payload["evidence"])
+    raw_evidence = payload.get("evidence", ())
+    if evaluation_receipt:
+        raw_evidence = tuple(
+            ref
+            for result in payload.get("case_results", ())
+            if isinstance(result, Mapping)
+            for ref in result.get("evidence_refs", ())
+        )
+    evidence = tuple(str(ref) for ref in raw_evidence)
     for ref in evidence:
         require_portable_relative_path(ref)
     blocker_payload = payload.get("blocker")
-    if blocker_payload is not None and package_receipt_schema is None:
+    if blocker_payload is not None and package_receipt_schema is None and not evaluation_receipt:
         active_registry.validate("blocker.v1", blocker_payload)
     candidate = (
         CandidateIdentity(

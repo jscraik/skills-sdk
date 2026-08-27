@@ -144,6 +144,8 @@ class ScenarioCaseResult(_ContractModel):
             raise ValueError("failed scenario result requires deterministic failure evidence")
         if self.status == "blocked" and self.blocker is None:
             raise ValueError("blocked scenario result requires a blocker")
+        if self.status == "blocked" and has_failure:
+            raise ValueError("blocked scenario result cannot contain deterministic failure evidence")
         if self.status != "blocked" and self.observation_sha256 is None:
             raise ValueError("completed scenario result requires observation_sha256")
         if self.status == "blocked" and self.observation_sha256 is not None:
@@ -212,6 +214,13 @@ class EvaluationReceipt(_ContractModel):
                 raise ValueError("completed evaluation receipt cannot contain blockers")
             if self.score is None or not self.case_results:
                 raise ValueError("completed evaluation receipt requires score and case results")
+            if self.scorer.scorer_type != "deterministic":
+                raise ValueError("completed evaluation receipt requires a deterministic scorer")
+            expected_score = sum(result.status == "pass" for result in self.case_results) / len(
+                self.case_results
+            )
+            if self.score != expected_score:
+                raise ValueError("evaluation receipt score must match the case-result pass ratio")
             expected_status = "pass" if self.score >= self.scorer.pass_threshold else "fail"
             if self.status != expected_status:
                 raise ValueError("evaluation receipt status must match the scorer threshold")
