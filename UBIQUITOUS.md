@@ -195,6 +195,8 @@ _Avoid_: build, runtime projection, source admission
 ## Agent Integration
 
 [`AGENTS.md`](AGENTS.md) is the active instruction surface and points here.
+[`ARCHITECTURE.md`](ARCHITECTURE.md) maps the code boundaries and invariants
+that give these terms their repository-specific meaning.
 Keep executable identifiers such as `build`, `validate`, `SchemaRegistry`, and
 schema names unchanged; use this glossary to clarify their meaning in prose
 and prompts.
@@ -202,6 +204,7 @@ and prompts.
 ## Sources
 
 - [`AGENTS.md`](AGENTS.md)
+- [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - [`README.md`](README.md)
 - [`docs/agent-entrypoint.md`](docs/agent-entrypoint.md)
 - [`docs/api.md`](docs/api.md)

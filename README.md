@@ -192,8 +192,10 @@ same change. Read [`CODESTYLE.md`](CODESTYLE.md) for implementation style and
 
 Use the canonical vocabulary in [`UBIQUITOUS.md`](UBIQUITOUS.md) when “build”,
 “publish”, “install”, “candidate”, “receipt”, or “verification” could mean more
-than one lane. The remaining public trust surfaces are:
+than one lane. For a coarse-grained map of the code and its invariants, see
+[`ARCHITECTURE.md`](ARCHITECTURE.md). The remaining public trust surfaces are:
 
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — bird's-eye code map, boundaries, and invariants.
 - [`docs/cli.md`](docs/cli.md) — implemented commands, reserved routes, output, and exit codes.
 - [`docs/api.md`](docs/api.md) — public Python contract families and schema validation.
 - [`docs/compatibility.md`](docs/compatibility.md) — runtime floor, schema evolution, and evidence separation.

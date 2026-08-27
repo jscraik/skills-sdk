@@ -35,6 +35,9 @@ publication service.
 - Use [`UBIQUITOUS.md`](UBIQUITOUS.md) as the canonical project vocabulary.
   Map overloaded phrases such as “build”, “publish”, “install”, “candidate”,
   and “receipt” through it before changing code or documentation.
+- Use [`ARCHITECTURE.md`](ARCHITECTURE.md) for the bird's-eye code map,
+  dependency boundaries, and architectural invariants before changing a
+  module or public workflow.
 - Read [`CODESTYLE.md`](CODESTYLE.md) before technical edits and
   [`CONTRIBUTING.md`](CONTRIBUTING.md) before commit or pull-request work.
 - Use [`docs/agent-entrypoint.md`](docs/agent-entrypoint.md) for the short
