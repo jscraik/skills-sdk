@@ -81,7 +81,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/core/` | Shared typed errors, portable paths, generic receipt parsing, and packaged schema lookup/validation. | `ContractError`, `require_portable_relative_path`, `Receipt`, `SchemaRegistry` |
 | `src/skills_sdk/models/` | Frozen Pydantic contract families for identity, inventory, intake, evaluation, risk, security, validation, manifests, and receipts. | `PackageCandidateIdentity`, `SkillPackageValidation`, `PackageManifest`, `PackageReceipt` |
 | `src/skills_sdk/validation/` | Read-only standalone-skill capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. | `SkillIR`, `read_frontmatter`, `validate_skill_package` |
-| `src/skills_sdk/packaging/` | Composition of a successful validation into a deterministic manifest and candidate-bound receipt; no archive or source mutation. | `build_skill_package` in `manifest.py` |
+| `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
@@ -98,9 +98,9 @@ docstrings and the linked API or CLI guides.
   filesystem, provider, runtime, or publication work.
 - `validation` depends on core and models. It does not depend on the packaging
   service, which keeps the read-only inspection path independently loadable.
-- `packaging` composes validation and packaging models. Its public wrapper
-  loads the manifest implementation lazily so the validation and packaging
-  imports remain acyclic.
+- `packaging` composes validation and packaging models. Hardening consumes the
+  build receipt and never rescans source state. Its public wrapper loads service
+  implementations lazily so validation and packaging imports remain acyclic.
 - `cli` is the outermost process adapter. It imports the implemented services
   lazily, prints their versioned results, and maps a blocked result to the
   documented exit status.

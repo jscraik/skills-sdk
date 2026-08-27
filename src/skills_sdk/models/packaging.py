@@ -145,8 +145,78 @@ class PackageReceipt(_ContractModel):
         return self
 
 
+class PackageHardeningPolicy(_ContractModel):
+    """Portable, explicit package-hardening limits."""
+
+    max_file_count: int = Field(default=250, ge=1)
+    max_total_bytes: int = Field(default=5 * 1024 * 1024, ge=1)
+    require_readme: bool = True
+
+
+class PackageHardeningCheck(_ContractModel):
+    """One deterministic hardening decision and its evidence."""
+
+    id: BlockerCode
+    status: Literal["pass", "warning", "blocker"]
+    severity: Literal["info", "warning", "blocker"]
+    message: NonEmptyText
+    evidence: tuple[NonEmptyText, ...] = ()
+
+
+class PackageHardeningReceipt(_ContractModel):
+    """Candidate-bound, non-mutating package hardening result."""
+
+    schema_version: Literal["package-hardening/v1"] = "package-hardening/v1"
+    candidate: PackageCandidateIdentity | None = None
+    status: Literal["pass", "blocked"]
+    package_digest: Sha256 | None = None
+    included_files: tuple[PortablePath, ...] = ()
+    file_count: int = Field(ge=0)
+    total_size_bytes: int = Field(ge=0)
+    hardening_checks: tuple[PackageHardeningCheck, ...] = Field(min_length=1)
+    blockers: tuple[PackageHardeningCheck, ...] = ()
+    warnings: tuple[PackageHardeningCheck, ...] = ()
+    mutation_performed: Literal[False] = False
+    acceptance_trace: tuple[NonEmptyText, ...] = Field(min_length=1)
+
+    @field_validator("included_files")
+    @classmethod
+    def included_paths_must_be_portable(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        if len(values) != len(set(values)):
+            raise ValueError("hardening receipt paths must be unique")
+        for value in values:
+            require_portable_relative_path(value)
+        return values
+
+    @model_validator(mode="after")
+    def status_matches_checks(self) -> PackageHardeningReceipt:
+        check_ids = tuple(item.id for item in self.hardening_checks)
+        if len(check_ids) != len(set(check_ids)):
+            raise ValueError("hardening check ids must be unique")
+        expected_blockers = tuple(item for item in self.hardening_checks if item.status == "blocker")
+        expected_warnings = tuple(item for item in self.hardening_checks if item.status == "warning")
+        if self.blockers != expected_blockers or self.warnings != expected_warnings:
+            raise ValueError("hardening blocker and warning projections must match checks")
+        if self.file_count != len(self.included_files):
+            raise ValueError("hardening file_count must match included_files")
+        if self.status == "pass":
+            if expected_blockers:
+                raise ValueError("passing hardening receipt cannot contain blockers")
+            if self.candidate is None or self.package_digest is None:
+                raise ValueError("passing hardening receipt requires candidate and package_digest")
+        else:
+            if not expected_blockers:
+                raise ValueError("blocked hardening receipt requires a blocker")
+            if self.package_digest is not None:
+                raise ValueError("blocked hardening receipt cannot claim a package digest")
+        return self
+
+
 __all__ = [
     "PackageFileRole",
+    "PackageHardeningCheck",
+    "PackageHardeningPolicy",
+    "PackageHardeningReceipt",
     "PackageManifest",
     "PackageManifestFile",
     "PackageManifestProvenance",

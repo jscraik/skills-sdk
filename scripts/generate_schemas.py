@@ -24,7 +24,7 @@ from skills_sdk.models.package import (
     PluginIdentity,
     SkillIdentity,
 )
-from skills_sdk.models.packaging import PackageManifest, PackageReceipt
+from skills_sdk.models.packaging import PackageHardeningReceipt, PackageManifest, PackageReceipt
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 from skills_sdk.models.validation import SkillPackageValidation
 
@@ -426,6 +426,7 @@ def main() -> int:
         (NormalizedPackage, "normalized-package.v1.schema.json"),
         (PackageManifest, "package-manifest.v1.schema.json"),
         (PackageReceipt, "package-receipt.v1.schema.json"),
+        (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),
