@@ -28,6 +28,9 @@ SCHEMA_NAMES = frozenset(
         "receipt-base.v1",
         "risk-classification.v1",
         "security-screening.v1",
+        "evaluation-receipt.v1",
+        "scenario-case-result.v1",
+        "scenario-observation.v1",
         "scenario-set.v1",
         "scorer-profile.v1",
         "skill-package-validation.v1",
@@ -114,6 +117,18 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation import ScorerProfile
 
             model = ScorerProfile
+        elif name == "scenario-observation.v1":
+            from skills_sdk.models.evaluation import ScenarioObservation
+
+            model = ScenarioObservation
+        elif name == "scenario-case-result.v1":
+            from skills_sdk.models.evaluation import ScenarioCaseResult
+
+            model = ScenarioCaseResult
+        elif name == "evaluation-receipt.v1":
+            from skills_sdk.models.evaluation import EvaluationReceipt
+
+            model = EvaluationReceipt
         elif name == "skill-package-validation.v1":
             from skills_sdk.models.validation import SkillPackageValidation
 

@@ -8,7 +8,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from skills_sdk.models.evaluation import ScenarioSet, ScorerProfile
+from skills_sdk.models.evaluation import (
+    EvaluationReceipt,
+    ScenarioCaseResult,
+    ScenarioObservation,
+    ScenarioSet,
+    ScorerProfile,
+)
 from skills_sdk.models.inventory import (
     PackageInventory,
     PackageInventoryRecord,
@@ -294,6 +300,148 @@ def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> Non
         }
 
 
+def _append_evaluation_result_constraints(schema: dict[str, Any], filename: str) -> None:
+    """Project result status invariants while marking model-only comparisons."""
+
+    properties = schema["properties"]
+    properties["evidence_refs"]["uniqueItems"] = True
+    if filename == "scenario-observation.v1.schema.json":
+        schema["allOf"] = [
+            {
+                "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]},
+                "then": {
+                    "required": ["output_sha256"],
+                    "properties": {"blocker": {"type": "null"}, "output_sha256": {"type": "string"}},
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {
+                        "blocker": {"$ref": "#/$defs/PackageReceiptBlocker"},
+                        "observed_commands": {"maxItems": 0},
+                        "observed_signals": {"maxItems": 0},
+                        "output_sha256": {"type": "null"},
+                    },
+                },
+            },
+        ]
+        required_for = ["scenario observation evidence refs must be unique"]
+    else:
+        schema["allOf"] = [
+            {
+                "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
+                "then": {
+                    "required": ["observation_sha256"],
+                    "properties": {
+                        "blocker": {"type": "null"},
+                        "forbidden_commands_observed": {"maxItems": 0},
+                        "missing_signals": {"maxItems": 0},
+                        "observation_sha256": {"type": "string"},
+                    },
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "fail"}}, "required": ["status"]},
+                "then": {
+                    "required": ["observation_sha256"],
+                    "properties": {
+                        "blocker": {"type": "null"},
+                        "observation_sha256": {"type": "string"},
+                    },
+                    "anyOf": [
+                        {"properties": {"missing_signals": {"minItems": 1}}, "required": ["missing_signals"]},
+                        {
+                            "properties": {"forbidden_commands_observed": {"minItems": 1}},
+                            "required": ["forbidden_commands_observed"],
+                        },
+                    ],
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {
+                        "blocker": {"$ref": "#/$defs/PackageReceiptBlocker"},
+                        "observation_sha256": {"type": "null"},
+                    },
+                },
+            },
+        ]
+        required_for = ["scenario result evidence refs and case ids must be unique"]
+    schema["$comment"] = (
+        "Validate candidate, scenario-set, and identifier binding with "
+        "skills_sdk.core.schema_registry.SchemaRegistry.validate."
+    )
+    schema["x-skills-sdk-semantic-validator"] = {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": required_for,
+    }
+
+
+def _append_evaluation_receipt_constraints(schema: dict[str, Any]) -> None:
+    """Project receipt status invariants and mark cross-object model checks."""
+
+    properties = schema["properties"]
+    properties["case_results"]["uniqueItems"] = True
+    properties["completed_calibration_probe_ids"]["uniqueItems"] = True
+    completed = {
+        "required": ["score", "case_results"],
+        "properties": {
+            "blocker": {"type": "null"},
+            "case_results": {"minItems": 1},
+            "score": {"type": "number"},
+        },
+    }
+    schema["allOf"] = [
+        {
+            "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
+            "then": completed,
+        },
+        {
+            "if": {"properties": {"status": {"const": "fail"}}, "required": ["status"]},
+            "then": completed,
+        },
+        {
+            "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+            "then": {
+                "properties": {"score": {"type": "null"}},
+                "anyOf": [
+                    {
+                        "properties": {"blocker": {"$ref": "#/$defs/PackageReceiptBlocker"}},
+                        "required": ["blocker"],
+                    },
+                    {
+                        "properties": {
+                            "case_results": {
+                                "contains": {
+                                    "properties": {"status": {"const": "blocked"}},
+                                    "required": ["status"],
+                                }
+                            }
+                        },
+                        "required": ["case_results"],
+                    },
+                ],
+            },
+        },
+    ]
+    schema["$comment"] = (
+        "Validate candidate, scorer, case-result, calibration, threshold, and identifier binding with "
+        "skills_sdk.core.schema_registry.SchemaRegistry.validate."
+    )
+    schema["x-skills-sdk-semantic-validator"] = {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": [
+            "evaluation case ids must be unique",
+            "completed calibration probes must match scorer policy",
+            "receipt status must match the scorer threshold",
+        ],
+    }
+
+
 def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> None:
     """Require the typed blocker whenever a v2 value decision needs review."""
 
@@ -404,6 +552,10 @@ def _render_schema(model: type[object], filename: str) -> str:
         _append_security_constraints(schema)
     elif filename in {"scenario-set.v1.schema.json", "scorer-profile.v1.schema.json"}:
         _append_evaluation_constraints(schema, filename)
+    elif filename in {"scenario-observation.v1.schema.json", "scenario-case-result.v1.schema.json"}:
+        _append_evaluation_result_constraints(schema, filename)
+    elif filename == "evaluation-receipt.v1.schema.json":
+        _append_evaluation_receipt_constraints(schema)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
@@ -437,6 +589,9 @@ def main() -> int:
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),
         (ScorerProfile, "scorer-profile.v1.schema.json"),
+        (ScenarioObservation, "scenario-observation.v1.schema.json"),
+        (ScenarioCaseResult, "scenario-case-result.v1.schema.json"),
+        (EvaluationReceipt, "evaluation-receipt.v1.schema.json"),
         (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)

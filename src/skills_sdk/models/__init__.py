@@ -1,6 +1,13 @@
 """Typed package and plugin inventory contracts."""
 
-from skills_sdk.models.evaluation import ScenarioCase, ScenarioSet, ScorerProfile
+from skills_sdk.models.evaluation import (
+    EvaluationReceipt,
+    ScenarioCase,
+    ScenarioCaseResult,
+    ScenarioObservation,
+    ScenarioSet,
+    ScorerProfile,
+)
 from skills_sdk.models.inventory import (
     FormatChecks,
     MantraAssessment,
@@ -50,6 +57,7 @@ from skills_sdk.models.risk import RiskClassification, RiskSensor, SecurityFindi
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 __all__ = [
+    "EvaluationReceipt",
     "FormatChecks",
     "IntakeChecks",
     "IntakeDecision",
@@ -88,6 +96,8 @@ __all__ = [
     "RiskSensor",
     "RuntimeVisibility",
     "ScenarioCase",
+    "ScenarioCaseResult",
+    "ScenarioObservation",
     "ScenarioSet",
     "ScorerProfile",
     "SecurityFinding",

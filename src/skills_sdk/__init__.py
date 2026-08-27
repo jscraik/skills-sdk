@@ -1,6 +1,8 @@
 """Portable lifecycle contracts and tooling for Agent Skills packages."""
 
+from skills_sdk.evaluation import evaluate_scenario_set
 from skills_sdk.models import (
+    EvaluationReceipt,
     MantraAssessment,
     MantraStatus,
     PackageInventory,
@@ -9,6 +11,8 @@ from skills_sdk.models import (
     PackageInventoryV2,
     RecommendedMechanism,
     RiskClassification,
+    ScenarioCaseResult,
+    ScenarioObservation,
     ScenarioSet,
     ScorerProfile,
     SecurityScreeningResult,
@@ -19,6 +23,7 @@ from skills_sdk.models import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "EvaluationReceipt",
     "MantraAssessment",
     "MantraStatus",
     "PackageInventory",
@@ -27,10 +32,13 @@ __all__ = [
     "PackageInventoryV2",
     "RecommendedMechanism",
     "RiskClassification",
+    "ScenarioCaseResult",
+    "ScenarioObservation",
     "ScenarioSet",
     "ScorerProfile",
     "SecurityScreeningResult",
     "ValueDecision",
     "ValueDecisionV2",
     "__version__",
+    "evaluate_scenario_set",
 ]

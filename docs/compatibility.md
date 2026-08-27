@@ -56,6 +56,13 @@ The generic receipt parser accepts both versions. Producers that require
 manifest binding must emit v2; consumers may continue reading v1 while they
 migrate without changing v1 semantics.
 
+`scenario-observation/v1`, `scenario-case-result/v1`, and
+`evaluation-receipt/v1` add a deterministic local evaluation boundary without
+changing `scenario-set/v1` or `scorer-profile/v1`. The evaluator accepts only
+deterministic scorer profiles and currently decides only `expected_signal`
+oracles. Other scorer and oracle types remain valid declarations but require a
+separate adapter and produce a typed blocker in the local service.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

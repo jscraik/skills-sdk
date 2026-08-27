@@ -26,9 +26,12 @@ package exports the inventory, risk, and evaluation contracts listed in its
   `PackageReceiptV2`, which binds `package_digest` to the canonical manifest;
   `PackageReceipt` preserves the historical `package-receipt/v1` contract for
   compatible readers.
-- **Evaluation:** `ScenarioSet`, `ScenarioCase`, and `ScorerProfile`. Judge and
-  external scorers must declare calibration probes and deterministic checks
-  first.
+- **Evaluation:** `ScenarioSet`, `ScenarioCase`, `ScorerProfile`,
+  `ScenarioObservation`, `ScenarioCaseResult`, and `EvaluationReceipt`. Use
+  `evaluate_scenario_set` to score externally produced observations with a
+  deterministic scorer. The service never executes a prompt, provider, or
+  package. Unsupported oracles, incomplete calibration, and mismatched
+  candidate identities return typed blockers rather than guessed outcomes.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
 
