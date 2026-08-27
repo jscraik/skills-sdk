@@ -57,7 +57,7 @@ JSON-shaped contract payload
     v
 core/schema_registry.py + models/*
     |
-    +--> structural schema result, semantic model result, or ContractError
+    --> successful validation (`None`) after structural and applicable semantic checks, or ContractError
 
 Local candidate-bound proof
     |
