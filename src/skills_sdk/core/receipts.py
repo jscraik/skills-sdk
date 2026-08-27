@@ -83,21 +83,27 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         "package-receipt/v2": "package-receipt.v2",
     }
     package_receipt_schema = package_receipt_schemas.get(schema_version) if isinstance(schema_version, str) else None
-    evaluation_receipt = schema_version == "evaluation-receipt/v1"
+    evaluation_receipt_schemas = {
+        "evaluation-receipt/v1": "evaluation-receipt.v1",
+        "evaluation-receipt/v2": "evaluation-receipt.v2",
+    }
+    evaluation_receipt_schema = (
+        evaluation_receipt_schemas.get(schema_version) if isinstance(schema_version, str) else None
+    )
     if package_receipt_schema is not None:
         # Package receipts are a concrete result contract layered on the
         # generic receipt shape. Validate their richer invariants first, then
         # expose the stable generic Receipt API to callers.
         active_registry.validate(package_receipt_schema, payload)
-    elif evaluation_receipt:
-        active_registry.validate("evaluation-receipt.v1", payload)
+    elif evaluation_receipt_schema is not None:
+        active_registry.validate(evaluation_receipt_schema, payload)
     else:
         active_registry.validate("receipt-base.v1", payload)
     candidate_payload = payload.get("candidate")
-    if package_receipt_schema is None and not evaluation_receipt:
+    if package_receipt_schema is None and evaluation_receipt_schema is None:
         active_registry.validate("package-identity.v1", candidate_payload)
     raw_evidence = payload.get("evidence", ())
-    if evaluation_receipt:
+    if evaluation_receipt_schema is not None:
         raw_evidence = tuple(
             ref
             for result in payload.get("case_results", ())
@@ -108,7 +114,7 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
     for ref in evidence:
         require_portable_relative_path(ref)
     blocker_payload = payload.get("blocker")
-    if blocker_payload is not None and package_receipt_schema is None and not evaluation_receipt:
+    if blocker_payload is not None and package_receipt_schema is None and evaluation_receipt_schema is None:
         active_registry.validate("blocker.v1", blocker_payload)
     candidate = (
         CandidateIdentity(

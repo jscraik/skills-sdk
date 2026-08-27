@@ -63,6 +63,21 @@ deterministic scorer profiles and currently decides only `expected_signal`
 oracles. Other scorer and oracle types remain valid declarations but require a
 separate adapter and produce a typed blocker in the local service.
 
+The explicit v2 evaluation family adds `scenario-set/v2`,
+`scenario-observation/v2`, `scenario-case-result/v2`, and
+`evaluation-receipt/v2`. V2 observations require a redaction-safe
+`provider-identity/v1`; completed receipts bind one provider across every case
+result. V2 exact-match cases compare only `expected_output_sha256` with the
+observation's `output_sha256`. A missing expected digest returns the typed
+`exact_match_digest_required` blocker, structured oracles remain blocked, and
+no raw output is accepted or retained. Generic receipt parsing dispatches both
+evaluation receipt versions without changing their payload meaning.
+
+The v1 models, schemas, fixtures, registry names, parser dispatch, and
+`evaluate_scenario_set` semantics remain unchanged. In particular, v1
+`exact_match` remains an `unsupported_oracle` outcome; callers must opt into
+the v2 types and evaluator rather than placing v2 fields in a v1 payload.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

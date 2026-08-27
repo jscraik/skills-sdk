@@ -1,0 +1,579 @@
+{
+  "$comment": "Validate candidate, scorer, case-result, calibration, threshold, and identifier binding with skills_sdk.core.schema_registry.SchemaRegistry.validate.",
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageReceiptBlocker": {
+      "additionalProperties": false,
+      "description": "Stable typed blocker details for a package proof receipt.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageReceiptBlocker",
+      "type": "object"
+    },
+    "ProviderIdentity": {
+      "additionalProperties": false,
+      "description": "Secret-free identity for the external producer of an observation.",
+      "properties": {
+        "adapter_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "adapter_version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Adapter Version Or Digest",
+          "type": "string"
+        },
+        "model_id": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "provider_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_kind": {
+          "enum": [
+            "llm",
+            "agent",
+            "external"
+          ],
+          "title": "Provider Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "provider-identity/v1",
+          "default": "provider-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Version Or Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "provider_kind",
+        "model_id",
+        "version_or_digest",
+        "adapter_id",
+        "adapter_version_or_digest"
+      ],
+      "title": "ProviderIdentity",
+      "type": "object"
+    },
+    "ScenarioCaseResultV2": {
+      "additionalProperties": false,
+      "properties": {
+        "blocker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageReceiptBlocker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "case_id": {
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expected_output_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Output Sha256"
+        },
+        "forbidden_commands_observed": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Forbidden Commands Observed",
+          "type": "array"
+        },
+        "missing_signals": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Missing Signals",
+          "type": "array"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "observation_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observation Sha256"
+        },
+        "output_digest_mismatch": {
+          "default": false,
+          "title": "Output Digest Mismatch",
+          "type": "boolean"
+        },
+        "provider": {
+          "$ref": "#/$defs/ProviderIdentity"
+        },
+        "runner_id": {
+          "minLength": 1,
+          "title": "Runner Id",
+          "type": "string"
+        },
+        "runner_version_or_digest": {
+          "minLength": 1,
+          "title": "Runner Version Or Digest",
+          "type": "string"
+        },
+        "scenario_set_id": {
+          "minLength": 1,
+          "title": "Scenario Set Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "scenario-case-result/v2",
+          "default": "scenario-case-result/v2",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "scenario_set_id",
+        "case_id",
+        "provider",
+        "status",
+        "runner_id",
+        "runner_version_or_digest"
+      ],
+      "title": "ScenarioCaseResultV2",
+      "type": "object"
+    },
+    "ScorerProfile": {
+      "additionalProperties": false,
+      "description": "Versioned scorer identity and calibration requirements.",
+      "properties": {
+        "calibration_probe_ids": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Calibration Probe Ids",
+          "type": "array"
+        },
+        "calibration_required": {
+          "title": "Calibration Required",
+          "type": "boolean"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "deterministic_checks_first": {
+          "title": "Deterministic Checks First",
+          "type": "boolean"
+        },
+        "pass_threshold": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Pass Threshold",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "scorer-profile/v1",
+          "default": "scorer-profile/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scorer_id": {
+          "minLength": 1,
+          "title": "Scorer Id",
+          "type": "string"
+        },
+        "scorer_type": {
+          "enum": [
+            "deterministic",
+            "llm_judge",
+            "hybrid",
+            "external"
+          ],
+          "title": "Scorer Type",
+          "type": "string"
+        },
+        "version_or_digest": {
+          "minLength": 1,
+          "title": "Version Or Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "scorer_id",
+        "scorer_type",
+        "version_or_digest",
+        "pass_threshold",
+        "deterministic_checks_first",
+        "calibration_required"
+      ],
+      "title": "ScorerProfile",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/evaluation-receipt.v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "pass"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "case_results": {
+            "minItems": 1
+          },
+          "score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "score",
+          "case_results"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "fail"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "case_results": {
+            "minItems": 1
+          },
+          "score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "score",
+          "case_results"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "blocker": {
+                "$ref": "#/$defs/PackageReceiptBlocker"
+              }
+            },
+            "required": [
+              "blocker"
+            ]
+          },
+          {
+            "properties": {
+              "case_results": {
+                "contains": {
+                  "properties": {
+                    "status": {
+                      "const": "blocked"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "case_results"
+            ]
+          }
+        ],
+        "properties": {
+          "score": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageReceiptBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "case_results": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ScenarioCaseResultV2"
+      },
+      "title": "Case Results",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "completed_calibration_probe_ids": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Completed Calibration Probe Ids",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "lane": {
+      "const": "evaluation",
+      "default": "evaluation",
+      "title": "Lane",
+      "type": "string"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "receipt_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "scenario_set_id": {
+      "minLength": 1,
+      "title": "Scenario Set Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "evaluation-receipt/v2",
+      "default": "evaluation-receipt/v2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "score": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Score"
+    },
+    "scorer": {
+      "$ref": "#/$defs/ScorerProfile"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "candidate",
+    "scenario_set_id",
+    "scorer",
+    "status"
+  ],
+  "title": "EvaluationReceiptV2",
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "evaluation case ids must be unique",
+      "completed calibration probes must match scorer policy",
+      "receipt status must match the scorer threshold"
+    ]
+  }
+}

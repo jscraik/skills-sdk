@@ -1,0 +1,22 @@
+{
+  "schema_version": "scenario-set/v2",
+  "candidate": {
+    "schema_version": "package-candidate/v1",
+    "package_id": "synthetic-skill",
+    "source_revision": "1111111111111111111111111111111111111111",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "scenario_set_id": "compatibility-v2",
+  "release": false,
+  "cases": [
+    {
+      "case_id": "exact",
+      "category": "boundary",
+      "prompt": "Compare only the output digest.",
+      "expected_signals": ["digest supplied"],
+      "forbidden_commands": [],
+      "oracle": "exact_match",
+      "expected_output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}

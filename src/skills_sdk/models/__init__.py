@@ -8,6 +8,13 @@ from skills_sdk.models.evaluation import (
     ScenarioSet,
     ScorerProfile,
 )
+from skills_sdk.models.evaluation_v2 import (
+    EvaluationReceiptV2,
+    ScenarioCaseResultV2,
+    ScenarioCaseV2,
+    ScenarioObservationV2,
+    ScenarioSetV2,
+)
 from skills_sdk.models.inventory import (
     FormatChecks,
     MantraAssessment,
@@ -53,11 +60,13 @@ from skills_sdk.models.packaging import (
     PackageReceiptBlocker,
     PackageReceiptV2,
 )
+from skills_sdk.models.provider import ProviderIdentity
 from skills_sdk.models.risk import RiskClassification, RiskSensor, SecurityFinding, SecurityScreeningResult
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 __all__ = [
     "EvaluationReceipt",
+    "EvaluationReceiptV2",
     "FormatChecks",
     "IntakeChecks",
     "IntakeDecision",
@@ -89,6 +98,7 @@ __all__ = [
     "PackageSourceKind",
     "PackageType",
     "PluginIdentity",
+    "ProviderIdentity",
     "RecommendedMechanism",
     "RightsStatus",
     "RiskClass",
@@ -97,8 +107,12 @@ __all__ = [
     "RuntimeVisibility",
     "ScenarioCase",
     "ScenarioCaseResult",
+    "ScenarioCaseResultV2",
+    "ScenarioCaseV2",
     "ScenarioObservation",
+    "ScenarioObservationV2",
     "ScenarioSet",
+    "ScenarioSetV2",
     "ScorerProfile",
     "SecurityFinding",
     "SecurityScreeningResult",

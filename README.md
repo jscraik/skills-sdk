@@ -44,6 +44,10 @@ anything, mutate a runtime, or publish to a registry.
 - Deterministic, non-executing evaluation of externally produced observations,
   with explicit blockers for unsupported oracles, incomplete calibration, and
   candidate or scenario-set identity drift.
+- An opt-in v2 evaluation family with secret-free provider identity binding,
+  digest-only exact-match decisions, deterministic receipt identity, and
+  generic receipt parsing. Existing v1 payloads and evaluator semantics remain
+  unchanged.
 - Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
   names. The registry applies structural validation to those names and
   semantic invariants only for registered model families; other packaged

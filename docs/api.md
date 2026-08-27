@@ -32,6 +32,12 @@ package exports the inventory, risk, and evaluation contracts listed in its
   deterministic scorer. The service never executes a prompt, provider, or
   package. Unsupported oracles, incomplete calibration, and mismatched
   candidate identities return typed blockers rather than guessed outcomes.
+  The additive v2 family (`ScenarioSetV2`, `ScenarioCaseV2`,
+  `ScenarioObservationV2`, `ScenarioCaseResultV2`, and `EvaluationReceiptV2`)
+  binds observations and receipts to a secret-free `ProviderIdentity` and lets
+  `evaluate_scenario_set_v2` decide `exact_match` from expected and observed
+  SHA-256 digests only. The v1 symbols and `evaluate_scenario_set` retain their
+  historical behavior.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
 
@@ -55,7 +61,7 @@ SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json
 
 The registry accepts only known schema names and raises `ContractError` for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
-manifest, receipt, risk, security, scenario, and scorer schemas. The registered
+manifest, provider identity, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake
