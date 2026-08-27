@@ -52,9 +52,12 @@ publication service.
 ## Development and validation
 
 - Use Python `3.12` and the pinned `uv` environment: `uv sync --frozen`.
-- Run the narrowest relevant check first. Schema changes also require
-  `uv run python scripts/generate_schemas.py --check`; public contract changes
-  need focused schema, behavior, and compatibility tests.
+- Run the narrowest relevant check first. Schema changes require
+  `uv run python scripts/generate_schemas.py --check` for the
+  generator-managed subset plus direct Draft 2020-12/schema contract checks
+  for the hand-maintained `receipt-base.v1`, `blocker.v1`, and
+  `package-identity.v1` resources; public contract changes need focused schema,
+  behavior, and compatibility tests.
 - Before a commit or pull request, run
   `bash scripts/validate-repository.sh`. The wrapper runs the generated-schema
   check, Ruff, the full pytest suite, `uv build`, and `git diff --check`.

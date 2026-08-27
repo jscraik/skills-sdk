@@ -42,9 +42,12 @@ identity.
 _Avoid_: content digest, source revision
 
 **Portable path**:
-A normalized, relative POSIX path that stays inside the package root. Absolute
-paths, parent traversal, backslashes, line terminators, and unnormalized forms
-are invalid at the contract boundary.
+A normalized, relative POSIX path that stays within the owning field's
+declared context. Package manifest and receipt paths are package-root-relative;
+inventory fields such as `current_path`, `SourceProvenance.path`, and
+`direct_consumers` may be workspace- or source-root-relative. The type does not
+choose that base. Absolute paths, parent traversal, backslashes, line
+terminators, and unnormalized forms are invalid at the contract boundary.
 _Avoid_: machine path, absolute path, host path
 
 ### Lifecycle and evidence
@@ -86,8 +89,10 @@ extra check through the registry.
 _Avoid_: schema loading, runtime test
 
 **Inventory snapshot**:
-A deterministic, read-only set of package records describing source,
-ownership, rights, value, risk, intended disposition, and runtime visibility.
+A read-only set of package records that preserves the caller-supplied record
+order and describes source, ownership, rights, value, risk, intended
+disposition, and runtime visibility. It is not canonically ordered or
+deterministic unless the caller supplies and documents an ordering.
 _Avoid_: live runtime inventory, installation list
 
 **Intake decision**:

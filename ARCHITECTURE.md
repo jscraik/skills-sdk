@@ -83,7 +83,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/validation/` | Read-only standalone-skill capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. | `SkillIR`, `read_frontmatter`, `validate_skill_package` |
 | `src/skills_sdk/packaging/` | Composition of a successful validation into a deterministic manifest and candidate-bound receipt; no archive or source mutation. | `build_skill_package` in `manifest.py` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
-| `src/skills_sdk/schemas/` | Committed JSON Schema resources generated from public Pydantic contracts and checked for drift. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
+| `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
 | `docs/` | Reader-facing API, CLI, compatibility, and first-run detail. | `docs/agent-entrypoint.md`, `docs/api.md`, `docs/cli.md`, `docs/compatibility.md` |
 | `scripts/` | Repository-owned schema generation and aggregate validation commands. | `generate_schemas.py`, `validate-repository.sh` |
@@ -131,8 +131,11 @@ single module:
 - **The filesystem boundary is conservative.** Validation uses descriptor-
   relative, no-follow traversal; rejects symlinks, unsafe directories,
   screened credential filenames, unreadable or unstable content, and
-  non-portable paths; the filename policy does not scan arbitrary file contents
-  for secrets. It records a deterministic sorted file manifest.
+  non-portable paths; the filename and directory policies are fixed denylists,
+  and the filename policy does not scan arbitrary file contents for secrets.
+  Observed source changes are typed blockers, but the before/after stat check is
+  best-effort rather than a transactional snapshot. It records a deterministic
+  sorted file manifest.
 - **Failures are explicit at each public entry point.** `SchemaRegistry.validate`
   translates unknown schemas and schema/model failures into `ContractError`,
   while direct Pydantic model construction may raise `pydantic.ValidationError`.
@@ -163,11 +166,14 @@ contribution workflow remain in `CODESTYLE.md` and `CONTRIBUTING.md`.
 
 ### Schema generation and compatibility
 
-`scripts/generate_schemas.py` derives committed resources from the public
-models and applies the JSON-Schema-expressible constraints. The generated
-files are part of the compatibility surface. Run its `--check` mode whenever
-contract models or schema behavior changes, and pair public changes with
-schema, behavior, and compatibility tests.
+`scripts/generate_schemas.py` derives the generator-managed committed resources
+from the public models and applies the JSON-Schema-expressible constraints. It
+does not regenerate the hand-maintained `receipt-base.v1.schema.json`,
+`blocker.v1.schema.json`, or `package-identity.v1.schema.json` resources. Run
+its `--check` mode for the generated subset, and use the direct Draft 2020-12
+schema tests and `SchemaRegistry.load` checks for the hand-maintained subset.
+All of these resources are part of the compatibility surface; pair public
+changes with schema, behavior, and compatibility tests.
 
 ### Errors, statuses, and evidence
 
