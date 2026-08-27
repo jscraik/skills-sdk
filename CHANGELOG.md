@@ -9,6 +9,8 @@ breaking contract change cannot remain compatible.
 - Establish the public, portable Python package boundary.
 - Add typed inventory, intake, package, packaging, evaluation, risk, security,
   and candidate-bound receipt contracts.
+- Add `package-receipt/v2` with canonical manifest/digest binding while
+  preserving `package-receipt/v1` acceptance semantics.
 - Package versioned JSON Schemas and a semantic `SchemaRegistry` validator.
 - Expose a boundary-only `skills-sdk` CLI with explicit lifecycle and Tessl
   preparation route names; no route publishes, installs, or mutates a runtime.

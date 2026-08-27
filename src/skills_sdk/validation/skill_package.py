@@ -12,6 +12,7 @@ from typing import Final
 
 import yaml
 
+from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.package_safety import UNSAFE_PACKAGE_DIRECTORIES, unsafe_package_file_reason
 from skills_sdk.core.paths import require_portable_relative_path
@@ -83,16 +84,6 @@ def _open_directory_tree(path: Path) -> int:
         raise
 
 
-def _content_digest(files: list[PackageManifestFile]) -> str:
-    digest = hashlib.sha256()
-    for item in files:
-        digest.update(item.path.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(item.sha256.encode("ascii"))
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
 def _finding(code: str, message: str, *refs: str) -> SkillPackageFinding:
     return SkillPackageFinding(
         code=code,
@@ -108,7 +99,7 @@ def _source_changed_finding(relative_directory: Path) -> SkillPackageFinding:
 
 
 def _candidate(package_root: Path, source_revision: str, files: list[PackageManifestFile]) -> PackageCandidateIdentity:
-    content_sha256 = _content_digest(files) if files else hashlib.sha256(b"").hexdigest()
+    content_sha256 = candidate_content_sha256(files)
     package_id = package_root.name
     if not _PACKAGE_ID_RE.fullmatch(package_id):
         root_digest = hashlib.sha256(package_root.name.encode("utf-8", errors="surrogateescape")).hexdigest()[:6]

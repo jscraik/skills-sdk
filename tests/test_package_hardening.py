@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.packaging import (
     PackageFileRole,
@@ -13,6 +14,7 @@ from skills_sdk.models.packaging import (
     PackageHardeningPolicy,
     PackageHardeningReceipt,
     PackageManifestFile,
+    PackageReceiptV2,
 )
 from skills_sdk.packaging import build_skill_package, harden_skill_package
 
@@ -34,8 +36,27 @@ def _skill(root: Path, *, readme: bool = True) -> Path:
     return root
 
 
+def _receipt_with_extra_file(
+    package_receipt: PackageReceiptV2, extra_file: PackageManifestFile
+) -> PackageReceiptV2:
+    """Return a validated receipt whose digest covers the added manifest file."""
+
+    payload = package_receipt.model_dump(mode="json")
+    assert payload["manifest"] is not None
+    payload["manifest"]["files"].append(extra_file.model_dump(mode="json"))
+    payload["included_files"].append(extra_file.path)
+    files = tuple(PackageManifestFile.model_validate(item) for item in payload["manifest"]["files"])
+    content_digest = candidate_content_sha256(files)
+    payload["candidate"]["content_sha256"] = content_digest
+    payload["manifest"]["candidate"]["content_sha256"] = content_digest
+    payload["package_digest"] = canonical_json_sha256(payload["manifest"])
+    return PackageReceiptV2.model_validate(payload)
+
+
 def test_hardening_passes_and_binds_exact_build_candidate(tmp_path: Path) -> None:
     package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
+
+    assert package_receipt.schema_version == "package-receipt/v2"
 
     receipt = harden_skill_package(package_receipt)
 
@@ -91,20 +112,12 @@ def test_hardening_blocks_forbidden_manifest_paths_without_mutation(tmp_path: Pa
         size_bytes=0,
         role=PackageFileRole.REFERENCE,
     )
-    manifest = package_receipt.manifest.model_copy(
-        update={"files": (*package_receipt.manifest.files, unsafe_file)}
-    )
-    unsafe_receipt = package_receipt.model_copy(
-        update={
-            "manifest": manifest,
-            "included_files": (*package_receipt.included_files, unsafe_file.path),
-        }
-    )
+    unsafe_receipt = _receipt_with_extra_file(package_receipt, unsafe_file)
 
     receipt = harden_skill_package(unsafe_receipt)
 
     assert receipt.status == "blocked"
-    assert receipt.package_digest == package_receipt.package_digest
+    assert receipt.package_digest == unsafe_receipt.package_digest
     assert {item.id for item in receipt.blockers} == {"forbidden_package_paths"}
     assert receipt.mutation_performed is False
 
@@ -138,14 +151,7 @@ def test_hardening_uses_canonical_validator_path_safety_policy(
         size_bytes=0,
         role=PackageFileRole.REFERENCE,
     )
-    unsafe_receipt = package_receipt.model_copy(
-        update={
-            "manifest": package_receipt.manifest.model_copy(
-                update={"files": (*package_receipt.manifest.files, unsafe_file)}
-            ),
-            "included_files": (*package_receipt.included_files, unsafe_path),
-        }
-    )
+    unsafe_receipt = _receipt_with_extra_file(package_receipt, unsafe_file)
 
     receipt = harden_skill_package(unsafe_receipt)
 
@@ -193,18 +199,18 @@ def test_hardening_receipt_rejects_warning_projection_drift(tmp_path: Path) -> N
 def test_hardening_returns_typed_blocker_for_partial_blocked_manifest(tmp_path: Path) -> None:
     package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
     assert package_receipt.manifest is not None
-    blocked = package_receipt.model_copy(
-        update={
-            "status": "blocked",
-            "package_digest": None,
-            "blocker": {
-                "code": "synthetic_blocker",
-                "message": "Synthetic blocked build.",
-                "evidence_refs": (),
-            },
-            "included_files": ("SKILL.md",),
-        }
+    payload = package_receipt.model_dump(mode="json")
+    payload.update(
+        status="blocked",
+        package_digest=None,
+        blocker={
+            "code": "synthetic_blocker",
+            "message": "Synthetic blocked build.",
+            "evidence_refs": (),
+        },
+        included_files=("SKILL.md",),
     )
+    blocked = PackageReceiptV2.model_validate(payload)
 
     receipt = harden_skill_package(blocked)
 
@@ -215,3 +221,13 @@ def test_hardening_returns_typed_blocker_for_partial_blocked_manifest(tmp_path: 
     assert "package_receipt_built" in {item.id for item in receipt.blockers}
     budget = next(item for item in receipt.hardening_checks if item.id == "package_size_budget")
     assert budget.evidence[0] == "files:1/250"
+
+
+def test_hardening_revalidates_copied_receipt_before_use(tmp_path: Path) -> None:
+    package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
+    assert package_receipt.manifest is not None
+    altered_manifest = package_receipt.manifest.model_copy(update={"version": "9.9.9"})
+    stale_receipt = package_receipt.model_copy(update={"manifest": altered_manifest})
+
+    with pytest.raises(ValidationError, match="digest must match"):
+        harden_skill_package(stale_receipt)

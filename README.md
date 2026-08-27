@@ -152,11 +152,13 @@ revision is not a valid 40-character lowercase hexadecimal value.
 ## Build a candidate-bound receipt
 
 `build` runs the same read-only validation and, when it passes, returns a
-`package-receipt/v1` with a deterministic manifest, package digest, included
-files, and the resolved candidate identity. It does not create an archive or
-write a receipt into the package. For a valid invocation that reaches the build
-service, a blocked result contains a typed blocker, does not claim a package
-digest, and exits `2`.
+`package-receipt/v2` with a deterministic manifest, a package digest bound to
+the canonical manifest bytes, included files, and the resolved candidate
+identity. The SDK continues to parse `package-receipt/v1` with its historical
+opaque-digest semantics. Build does not create an archive or write a receipt
+into the package. For a valid invocation that reaches the build service, a
+blocked result contains a typed blocker, does not claim a package digest, and
+exits `2`.
 
 ```bash
 uv run skills-sdk build ./path/to/skill \

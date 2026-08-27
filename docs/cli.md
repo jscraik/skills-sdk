@@ -30,9 +30,10 @@ reaches a service, exit `0` means validation passed or a receipt was built;
 exit `2` means a structured blocker was returned. Malformed invocations are
 rejected by `argparse` with exit `2` before a versioned result exists.
 `validate` returns `skill-package-validation/v1`; a successful `build` returns
-a candidate-bound `package-receipt/v1` without writing into the package. A
-blocked build may have `candidate: null` when the source identity cannot be
-resolved.
+a candidate-bound `package-receipt/v2` whose digest covers the canonical
+manifest, without writing into the package. The generic parser continues to
+accept `package-receipt/v1` for compatibility. A blocked build may have
+`candidate: null` when the source identity cannot be resolved.
 `--json` emits the versioned contract. `--robot` is an accepted no-op that
 reserves the prompt-free automation contract. The remaining routes are stable
 discovery boundaries while their deeper implementations are built in separate,

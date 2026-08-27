@@ -25,6 +25,7 @@ PORTABLE_PATH_SCHEMA_NAMES = (
     "package-manifest.v1",
     "package-owner.v1",
     "package-receipt.v1",
+    "package-receipt.v2",
     "package-source.v1",
     "receipt-base.v1",
     "security-screening.v1",

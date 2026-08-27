@@ -47,6 +47,15 @@ blocked. The corresponding `v1` models and schemas remain unchanged and reject
 that value. Consumers may continue reading `v1`; producers that need the
 pending-review state must emit the matching `v2` record or set envelope.
 
+`package-receipt/v1` remains valid with its historical opaque
+`package_digest`: consumers may validate its shape and receipt invariants, but
+must not infer that the digest covers the embedded manifest. Builders now emit
+`package-receipt/v2`, which preserves the v1 fields and additionally requires
+`package_digest` to equal the SHA-256 digest of the canonical JSON manifest.
+The generic receipt parser accepts both versions. Producers that require
+manifest binding must emit v2; consumers may continue reading v1 while they
+migrate without changing v1 semantics.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

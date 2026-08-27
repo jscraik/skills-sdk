@@ -78,21 +78,26 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
 
     active_registry = registry or SchemaRegistry()
     schema_version = payload.get("schema_version")
-    if schema_version == "package-receipt/v1":
+    package_receipt_schemas = {
+        "package-receipt/v1": "package-receipt.v1",
+        "package-receipt/v2": "package-receipt.v2",
+    }
+    package_receipt_schema = package_receipt_schemas.get(schema_version) if isinstance(schema_version, str) else None
+    if package_receipt_schema is not None:
         # Package receipts are a concrete result contract layered on the
         # generic receipt shape. Validate their richer invariants first, then
         # expose the stable generic Receipt API to callers.
-        active_registry.validate("package-receipt.v1", payload)
+        active_registry.validate(package_receipt_schema, payload)
     else:
         active_registry.validate("receipt-base.v1", payload)
     candidate_payload = payload.get("candidate")
-    if schema_version != "package-receipt/v1":
+    if package_receipt_schema is None:
         active_registry.validate("package-identity.v1", candidate_payload)
     evidence = tuple(str(ref) for ref in payload["evidence"])
     for ref in evidence:
         require_portable_relative_path(ref)
     blocker_payload = payload.get("blocker")
-    if blocker_payload is not None and schema_version != "package-receipt/v1":
+    if blocker_payload is not None and package_receipt_schema is None:
         active_registry.validate("blocker.v1", blocker_payload)
     candidate = (
         CandidateIdentity(
@@ -103,7 +108,7 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         if isinstance(candidate_payload, Mapping)
         else None
     )
-    artifact_status = str(payload["status"]) if schema_version == "package-receipt/v1" else None
+    artifact_status = str(payload["status"]) if package_receipt_schema is not None else None
     generic_status = {
         "built": "pass",
         "blocked": "blocked",

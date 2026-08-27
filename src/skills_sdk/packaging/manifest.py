@@ -2,26 +2,20 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.packaging import (
     PackageManifest,
     PackageManifestProvenance,
-    PackageReceipt,
     PackageReceiptBlocker,
+    PackageReceiptV2,
 )
 from skills_sdk.validation.skill_package import SkillValidationPolicy, validate_skill_package
 
 Clock = Callable[[], datetime]
-
-
-def _canonical_sha256(value: object) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
 
 
 def _receipt_id(package_id: str, content_sha256: str) -> str:
@@ -29,7 +23,7 @@ def _receipt_id(package_id: str, content_sha256: str) -> str:
 
 
 def _blocked_receipt_id(validation: object) -> str:
-    return f"blocked-{_canonical_sha256(validation)[:16]}"
+    return f"blocked-{canonical_json_sha256(validation)[:16]}"
 
 
 def build_skill_package(
@@ -38,7 +32,7 @@ def build_skill_package(
     source_revision: str,
     policy: SkillValidationPolicy | None = None,
     clock: Clock | None = None,
-) -> PackageReceipt:
+) -> PackageReceiptV2:
     """Validate and build a candidate-bound, non-mutating package receipt."""
 
     active_clock = clock or (lambda: datetime.now(UTC))
@@ -48,8 +42,8 @@ def build_skill_package(
     if validation.status == "blocked":
         first = validation.findings[0]
         candidate = validation.candidate
-        return PackageReceipt(
-            schema_version="package-receipt/v1",
+        return PackageReceiptV2(
+            schema_version="package-receipt/v2",
             receipt_id=(
                 _receipt_id(candidate.package_id, candidate.content_sha256)
                 if candidate is not None
@@ -77,9 +71,9 @@ def build_skill_package(
         files=validation.files,
         provenance=PackageManifestProvenance(source=("SKILL.md",), builder="skills-sdk.packaging.manifest/v1"),
     )
-    package_digest = _canonical_sha256(manifest.model_dump(mode="json"))
-    return PackageReceipt(
-        schema_version="package-receipt/v1",
+    package_digest = canonical_json_sha256(manifest.model_dump(mode="json"))
+    return PackageReceiptV2(
+        schema_version="package-receipt/v2",
         receipt_id=_receipt_id(validation.candidate.package_id, validation.candidate.content_sha256),
         candidate=validation.candidate,
         lane="validation",
