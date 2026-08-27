@@ -106,6 +106,7 @@ def harden_skill_package(
 ) -> PackageHardeningReceipt:
     """Return a typed, read-only hardening decision for one build receipt."""
 
+    package_receipt = PackageReceipt.model_validate(package_receipt.model_dump(mode="json"))
     active_policy = policy or PackageHardeningPolicy()
     manifest_files = package_receipt.manifest.files if package_receipt.manifest is not None else ()
     included_paths = set(package_receipt.included_files)

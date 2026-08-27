@@ -193,18 +193,18 @@ def test_hardening_receipt_rejects_warning_projection_drift(tmp_path: Path) -> N
 def test_hardening_returns_typed_blocker_for_partial_blocked_manifest(tmp_path: Path) -> None:
     package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
     assert package_receipt.manifest is not None
-    blocked = package_receipt.model_copy(
-        update={
-            "status": "blocked",
-            "package_digest": None,
-            "blocker": {
-                "code": "synthetic_blocker",
-                "message": "Synthetic blocked build.",
-                "evidence_refs": (),
-            },
-            "included_files": ("SKILL.md",),
-        }
+    payload = package_receipt.model_dump(mode="json")
+    payload.update(
+        status="blocked",
+        package_digest=None,
+        blocker={
+            "code": "synthetic_blocker",
+            "message": "Synthetic blocked build.",
+            "evidence_refs": (),
+        },
+        included_files=("SKILL.md",),
     )
+    blocked = PackageReceipt.model_validate(payload)
 
     receipt = harden_skill_package(blocked)
 
@@ -215,3 +215,13 @@ def test_hardening_returns_typed_blocker_for_partial_blocked_manifest(tmp_path: 
     assert "package_receipt_built" in {item.id for item in receipt.blockers}
     budget = next(item for item in receipt.hardening_checks if item.id == "package_size_budget")
     assert budget.evidence[0] == "files:1/250"
+
+
+def test_hardening_revalidates_copied_receipt_before_use(tmp_path: Path) -> None:
+    package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
+    assert package_receipt.manifest is not None
+    altered_manifest = package_receipt.manifest.model_copy(update={"version": "9.9.9"})
+    stale_receipt = package_receipt.model_copy(update={"manifest": altered_manifest})
+
+    with pytest.raises(ValidationError, match="digest must match"):
+        harden_skill_package(stale_receipt)
