@@ -16,7 +16,11 @@ def test_validation_public_import_does_not_depend_on_packaging_import_order() ->
 
 def test_packaging_public_import_does_not_depend_on_validation_import_order() -> None:
     completed = subprocess.run(
-        [sys.executable, "-c", "from skills_sdk.packaging import build_skill_package"],
+        [
+            sys.executable,
+            "-c",
+            "from skills_sdk.packaging import build_skill_package, harden_skill_package",
+        ],
         check=False,
         capture_output=True,
         text=True,

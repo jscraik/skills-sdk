@@ -190,6 +190,27 @@ versioned receipt exists. The receipt is evidence for the local validation lane
 only. It does not prove that a provider accepted the package, that a runtime
 installed it, or that a registry published it.
 
+## Harden an immutable package receipt
+
+Package hardening consumes the typed build receipt rather than rescanning the
+filesystem. It checks the immutable manifest for forbidden runtime, generated,
+dependency, and secret-bearing paths; explicit size budgets; SDK provenance;
+and required package roles. The result is a candidate-bound
+`package-hardening/v1` receipt. Hardening is read-only, exposes every warning,
+and never converts a blocked build into a package digest.
+
+```python
+from skills_sdk.packaging import harden_skill_package
+
+hardening = harden_skill_package(receipt)
+if hardening.status == "blocked":
+    for blocker in hardening.blockers:
+        print(blocker.id, blocker.message)
+```
+
+This contract proves deterministic local package hardening only. It does not
+sign, archive, publish, install, or execute the package.
+
 ## Python API
 
 Use the service functions for local package work and the model families for
@@ -199,7 +220,7 @@ source can change between them and a build can return a typed blocked receipt:
 ```python
 from pathlib import Path
 
-from skills_sdk.packaging import build_skill_package
+from skills_sdk.packaging import build_skill_package, harden_skill_package
 from skills_sdk.validation import validate_skill_package
 
 package_root = Path("./path/to/skill")
@@ -211,7 +232,8 @@ if validation.status == "pass":
     if receipt.status == "built":
         assert receipt.manifest is not None
         assert receipt.package_digest is not None
-        print(receipt.package_digest)
+        hardening = harden_skill_package(receipt)
+        print(hardening.status, receipt.package_digest)
     else:
         assert receipt.blocker is not None
         print(receipt.blocker.code, receipt.blocker.message)

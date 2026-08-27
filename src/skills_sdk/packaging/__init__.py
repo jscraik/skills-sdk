@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from skills_sdk.models.packaging import PackageReceipt
+from skills_sdk.models.packaging import PackageHardeningPolicy, PackageHardeningReceipt, PackageReceipt
 
 if TYPE_CHECKING:
     from skills_sdk.validation import SkillValidationPolicy
@@ -32,4 +32,16 @@ def build_skill_package(
     )
 
 
-__all__ = ["build_skill_package"]
+def harden_skill_package(
+    package_receipt: PackageReceipt,
+    *,
+    policy: PackageHardeningPolicy | None = None,
+) -> PackageHardeningReceipt:
+    """Load package hardening lazily to preserve the public import boundary."""
+
+    from skills_sdk.packaging.hardening import harden_skill_package as _harden_skill_package
+
+    return _harden_skill_package(package_receipt, policy=policy)
+
+
+__all__ = ["build_skill_package", "harden_skill_package"]

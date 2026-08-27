@@ -22,6 +22,7 @@ SCHEMA_NAMES = frozenset(
         "package-inventory.v1",
         "package-inventory.v2",
         "package-manifest.v1",
+        "package-hardening.v1",
         "package-receipt.v1",
         "receipt-base.v1",
         "risk-classification.v1",
@@ -84,6 +85,10 @@ class SchemaRegistry:
             from skills_sdk.models.packaging import PackageManifest
 
             model = PackageManifest
+        elif name == "package-hardening.v1":
+            from skills_sdk.models.packaging import PackageHardeningReceipt
+
+            model = PackageHardeningReceipt
         elif name == "package-receipt.v1":
             from skills_sdk.models.packaging import PackageReceipt
 

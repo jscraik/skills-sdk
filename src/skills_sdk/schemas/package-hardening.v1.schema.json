@@ -1,0 +1,229 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageHardeningCheck": {
+      "additionalProperties": false,
+      "description": "One deterministic hardening decision and its evidence.",
+      "properties": {
+        "evidence": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "warning",
+            "blocker"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "message"
+      ],
+      "title": "PackageHardeningCheck",
+      "type": "object"
+    },
+    "PackageHardeningPolicy": {
+      "additionalProperties": false,
+      "description": "Portable, explicit package-hardening limits.",
+      "properties": {
+        "max_file_count": {
+          "default": 250,
+          "minimum": 1,
+          "title": "Max File Count",
+          "type": "integer"
+        },
+        "max_total_bytes": {
+          "default": 5242880,
+          "minimum": 1,
+          "title": "Max Total Bytes",
+          "type": "integer"
+        },
+        "require_readme": {
+          "default": true,
+          "title": "Require Readme",
+          "type": "boolean"
+        }
+      },
+      "title": "PackageHardeningPolicy",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/package-hardening.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Candidate-bound, non-mutating package hardening result.",
+  "properties": {
+    "acceptance_trace": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Acceptance Trace",
+      "type": "array"
+    },
+    "blockers": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PackageHardeningCheck"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "build_status": {
+      "enum": [
+        "built",
+        "blocked"
+      ],
+      "title": "Build Status",
+      "type": "string"
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "effective_policy": {
+      "$ref": "#/$defs/PackageHardeningPolicy"
+    },
+    "file_count": {
+      "minimum": 0,
+      "title": "File Count",
+      "type": "integer"
+    },
+    "hardening_checks": {
+      "items": {
+        "$ref": "#/$defs/PackageHardeningCheck"
+      },
+      "minItems": 1,
+      "title": "Hardening Checks",
+      "type": "array"
+    },
+    "included_files": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+        "type": "string"
+      },
+      "title": "Included Files",
+      "type": "array"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "package_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Package Digest"
+    },
+    "schema_version": {
+      "const": "package-hardening/v1",
+      "default": "package-hardening/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "total_size_bytes": {
+      "minimum": 0,
+      "title": "Total Size Bytes",
+      "type": "integer"
+    },
+    "warnings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PackageHardeningCheck"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "build_status",
+    "status",
+    "effective_policy",
+    "file_count",
+    "total_size_bytes",
+    "hardening_checks",
+    "acceptance_trace"
+  ],
+  "title": "PackageHardeningReceipt",
+  "type": "object"
+}

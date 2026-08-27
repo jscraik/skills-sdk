@@ -3,7 +3,8 @@
 The public API is the typed contract layer under `skills_sdk`. The top-level
 package exports the inventory, risk, and evaluation contracts listed in its
 `__all__`. Import family-specific contracts such as
-`PackageCandidateIdentity`, `PackageManifest`, and `PackageReceipt` from
+`PackageCandidateIdentity`, `PackageManifest`, `PackageReceipt`, and
+`PackageHardeningReceipt` from
 `skills_sdk.models` (or their submodules), as shown below.
 
 ## Contract families
@@ -15,8 +16,11 @@ package exports the inventory, risk, and evaluation contracts listed in its
 - **Intake and package identity:** `PackageCandidateIdentity`, `SkillIdentity`,
   `PluginIdentity`, `PackageSource`, `PackageOwner`, `IntakeDecision`, and
   `NormalizedPackage`.
-- **Packaging:** `PackageManifest`, `PackageManifestFile`, and
-  `PackageReceipt` with typed blockers and immutable candidate binding.
+- **Packaging:** `PackageManifest`, `PackageManifestFile`, `PackageReceipt`,
+  `PackageHardeningPolicy`, and `PackageHardeningReceipt` with typed blockers,
+  explicit warnings, and immutable candidate binding. Use
+  `build_skill_package` before `harden_skill_package`; hardening consumes the
+  receipt and does not rescan the source filesystem.
 - **Evaluation:** `ScenarioSet`, `ScenarioCase`, and `ScorerProfile`. Judge and
   external scorers must declare calibration probes and deterministic checks
   first.

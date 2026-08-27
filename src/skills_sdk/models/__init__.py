@@ -36,6 +36,9 @@ from skills_sdk.models.package import (
 )
 from skills_sdk.models.packaging import (
     PackageFileRole,
+    PackageHardeningCheck,
+    PackageHardeningPolicy,
+    PackageHardeningReceipt,
     PackageManifest,
     PackageManifestFile,
     PackageManifestProvenance,
@@ -58,6 +61,9 @@ __all__ = [
     "PackageCandidateIdentity",
     "PackageDisposition",
     "PackageFileRole",
+    "PackageHardeningCheck",
+    "PackageHardeningPolicy",
+    "PackageHardeningReceipt",
     "PackageInventory",
     "PackageInventoryRecord",
     "PackageInventoryRecordV2",
