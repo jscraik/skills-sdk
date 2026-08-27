@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -87,6 +88,10 @@ def _observations(scenario_set: ScenarioSet) -> tuple[ScenarioObservation, ...]:
             runner_version_or_digest="v1",
         ),
     )
+
+
+def _schema_errors(name: str, payload: object) -> list[object]:
+    return list(Draft202012Validator(SchemaRegistry().load(name)).iter_errors(payload))
 
 
 def test_evaluator_emits_deterministic_candidate_bound_receipt() -> None:
@@ -367,6 +372,64 @@ def test_runner_identity_is_bound_into_result_and_receipt_identity() -> None:
     assert first.case_results[0].runner_id == "local-runner"
     assert first.case_results[0].runner_version_or_digest == "v1"
     assert first.receipt_id != second.receipt_id
+
+
+def test_receipt_identity_includes_complete_scorer_policy() -> None:
+    scenario_set = _scenario_set()
+    baseline = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+    changed_policy = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=_scorer().model_copy(update={"pass_threshold": 0.5}),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+
+    assert baseline.receipt_id != changed_policy.receipt_id
+
+
+def test_generated_observation_schema_rejects_blocked_completed_claims() -> None:
+    payload = _observations(_scenario_set())[0].model_dump(mode="json")
+    payload.update(
+        {
+            "status": "blocked",
+            "blocker": {"code": "runner_unavailable", "message": "runner unavailable", "evidence_refs": []},
+        }
+    )
+
+    assert _schema_errors("scenario-observation.v1", payload)
+
+
+def test_generated_result_schema_rejects_pass_with_failures() -> None:
+    scenario_set = _scenario_set()
+    receipt = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+    payload = receipt.case_results[0].model_dump(mode="json")
+    payload["missing_signals"] = ["fabricated"]
+
+    assert _schema_errors("scenario-case-result.v1", payload)
+
+
+def test_generated_receipt_schema_rejects_completed_receipt_without_score() -> None:
+    scenario_set = _scenario_set()
+    receipt = evaluate_scenario_set(
+        scenario_set,
+        _observations(scenario_set),
+        scorer=_scorer(),
+        completed_calibration_probe_ids=("positive", "negative"),
+    )
+    payload = receipt.model_dump(mode="json")
+    payload["score"] = None
+
+    assert _schema_errors("evaluation-receipt.v1", payload)
 
 
 @pytest.mark.parametrize(

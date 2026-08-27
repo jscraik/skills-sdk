@@ -27,8 +27,7 @@ def _receipt_id(
     payload = {
         "candidate": scenario_set.candidate.model_dump(mode="json"),
         "scenario_set_id": scenario_set.scenario_set_id,
-        "scorer_id": scorer.scorer_id,
-        "scorer_version_or_digest": scorer.version_or_digest,
+        "scorer": scorer.model_dump(mode="json"),
         "status": status,
         "case_results": [result.model_dump(mode="json") for result in case_results],
         "blocker": blocker.model_dump(mode="json") if blocker is not None else None,

@@ -1,4 +1,5 @@
 {
+  "$comment": "Validate candidate, scenario-set, and identifier binding with skills_sdk.core.schema_registry.SchemaRegistry.validate.",
   "$defs": {
     "PackageCandidateIdentity": {
       "additionalProperties": false,
@@ -70,6 +71,111 @@
   "$id": "https://schemas.skills-sdk.dev/scenario-case-result.v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "pass"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "forbidden_commands_observed": {
+            "maxItems": 0
+          },
+          "missing_signals": {
+            "maxItems": 0
+          },
+          "observation_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "fail"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "missing_signals": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "missing_signals"
+            ]
+          },
+          {
+            "properties": {
+              "forbidden_commands_observed": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "forbidden_commands_observed"
+            ]
+          }
+        ],
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "observation_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "$ref": "#/$defs/PackageReceiptBlocker"
+          },
+          "observation_sha256": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "blocker"
+        ]
+      }
+    }
+  ],
   "description": "One deterministic decision over a scenario observation.",
   "properties": {
     "blocker": {
@@ -99,7 +205,8 @@
         "type": "string"
       },
       "title": "Evidence Refs",
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "forbidden_commands_observed": {
       "default": [],
@@ -178,5 +285,11 @@
     "runner_version_or_digest"
   ],
   "title": "ScenarioCaseResult",
-  "type": "object"
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "scenario result evidence refs and case ids must be unique"
+    ]
+  }
 }

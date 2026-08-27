@@ -38,8 +38,9 @@ anything, mutate a runtime, or publish to a registry.
 ## What the SDK guarantees
 
 - Typed Pydantic contracts for package identity, source and ownership, intake,
-  inventory, evaluation scenarios, observations, case results and receipts,
-  risk and security, validation, manifests, and packaging receipts.
+  inventory, evaluation scenarios, scorer profiles, observations, case results
+  and receipts, risk and security, validation, manifests, and packaging
+  receipts.
 - Deterministic, non-executing evaluation of externally produced observations,
   with explicit blockers for unsupported oracles, incomplete calibration, and
   candidate or scenario-set identity drift.
