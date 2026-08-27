@@ -9,6 +9,7 @@ from skills_sdk.models.packaging import (
     PackageHardeningCheck,
     PackageHardeningPolicy,
     PackageHardeningReceipt,
+    PackageManifestFile,
     PackageReceipt,
 )
 
@@ -89,8 +90,9 @@ def _forbidden_paths_check(receipt: PackageReceipt) -> PackageHardeningCheck:
     )
 
 
-def _size_budget_check(receipt: PackageReceipt, policy: PackageHardeningPolicy) -> PackageHardeningCheck:
-    files = receipt.manifest.files if receipt.manifest is not None else ()
+def _size_budget_check(
+    files: tuple[PackageManifestFile, ...], policy: PackageHardeningPolicy
+) -> PackageHardeningCheck:
     total_size = sum(item.size_bytes for item in files)
     within_budget = len(files) <= policy.max_file_count and total_size <= policy.max_total_bytes
     return _check(
@@ -122,8 +124,9 @@ def _provenance_check(receipt: PackageReceipt) -> PackageHardeningCheck:
     )
 
 
-def _required_role_check(receipt: PackageReceipt, policy: PackageHardeningPolicy) -> PackageHardeningCheck:
-    files = receipt.manifest.files if receipt.manifest is not None else ()
+def _required_role_check(
+    files: tuple[PackageManifestFile, ...], policy: PackageHardeningPolicy
+) -> PackageHardeningCheck:
     roles = tuple(sorted({item.role.value for item in files}))
     has_skill = "skill_md" in roles
     has_readme = any(item.role.value == "readme" and item.path == "README.md" for item in files)
@@ -145,18 +148,18 @@ def harden_skill_package(
     """Return a typed, read-only hardening decision for one build receipt."""
 
     active_policy = policy or PackageHardeningPolicy()
-    checks = (
-        _package_receipt_check(package_receipt),
-        _forbidden_paths_check(package_receipt),
-        _size_budget_check(package_receipt, active_policy),
-        _provenance_check(package_receipt),
-        _required_role_check(package_receipt, active_policy),
-    )
-    blockers = tuple(item for item in checks if item.status == "blocker")
-    warnings = tuple(item for item in checks if item.status == "warning")
     manifest_files = package_receipt.manifest.files if package_receipt.manifest is not None else ()
     included_paths = set(package_receipt.included_files)
     files = tuple(item for item in manifest_files if item.path in included_paths)
+    checks = (
+        _package_receipt_check(package_receipt),
+        _forbidden_paths_check(package_receipt),
+        _size_budget_check(files, active_policy),
+        _provenance_check(package_receipt),
+        _required_role_check(files, active_policy),
+    )
+    blockers = tuple(item for item in checks if item.status == "blocker")
+    warnings = tuple(item for item in checks if item.status == "warning")
     return PackageHardeningReceipt(
         candidate=package_receipt.candidate,
         build_status=package_receipt.status,

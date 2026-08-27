@@ -155,3 +155,5 @@ def test_hardening_returns_typed_blocker_for_partial_blocked_manifest(tmp_path: 
     assert receipt.package_digest is None
     assert receipt.file_count == 1
     assert "package_receipt_built" in {item.id for item in receipt.blockers}
+    budget = next(item for item in receipt.hardening_checks if item.id == "package_size_budget")
+    assert budget.evidence[0] == "files:1/250"
