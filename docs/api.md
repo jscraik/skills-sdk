@@ -34,10 +34,13 @@ package exports the inventory, risk, and evaluation contracts listed in its
   candidate identities return typed blockers rather than guessed outcomes.
   The additive v2 family (`ScenarioSetV2`, `ScenarioCaseV2`,
   `ScenarioObservationV2`, `ScenarioCaseResultV2`, and `EvaluationReceiptV2`)
-  binds observations and receipts to a secret-free `ProviderIdentity` and lets
+  binds observations and receipts to a hardened, secret-free
+  `ProviderIdentityV2` and lets
   `evaluate_scenario_set_v2` decide `exact_match` from expected and observed
   SHA-256 digests only. The v1 symbols and `evaluate_scenario_set` retain their
-  historical behavior.
+  historical behavior. `ProviderIdentity` preserves the
+  `provider-identity/v1` wire contract; provider-bearing evaluation-v2
+  payloads require `provider-identity/v2` and do not reinterpret v1 identities.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
 
@@ -72,6 +75,13 @@ corresponding Pydantic model explicitly (for example,
 `PackageInventoryRecord.model_validate(payload)` for an inventory record).
 Validation is read-only: it does not write receipts, contact providers, install
 packages, or publish to a registry.
+
+`parse_receipt` accepts only explicitly registered receipt wire versions:
+`receipt-base/v1`, package receipt v1/v2, and evaluation receipt v1/v2. An
+unknown future or foreign `schema_version` fails with the typed
+`unsupported_receipt_family` error instead of being interpreted through the
+generic base receipt schema. Missing or non-string versions fail with
+`invalid_receipt_schema_version`.
 
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test

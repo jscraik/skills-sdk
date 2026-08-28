@@ -60,7 +60,7 @@ from skills_sdk.models.packaging import (
     PackageReceiptBlocker,
     PackageReceiptV2,
 )
-from skills_sdk.models.provider import ProviderIdentity
+from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
 from skills_sdk.models.risk import RiskClassification, RiskSensor, SecurityFinding, SecurityScreeningResult
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
@@ -99,6 +99,7 @@ __all__ = [
     "PackageType",
     "PluginIdentity",
     "ProviderIdentity",
+    "ProviderIdentityV2",
     "RecommendedMechanism",
     "RightsStatus",
     "RiskClass",

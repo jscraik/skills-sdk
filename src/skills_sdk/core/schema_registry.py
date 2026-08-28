@@ -31,6 +31,7 @@ SCHEMA_NAMES = frozenset(
         "evaluation-receipt.v1",
         "evaluation-receipt.v2",
         "provider-identity.v1",
+        "provider-identity.v2",
         "scenario-case-result.v1",
         "scenario-case-result.v2",
         "scenario-observation.v1",
@@ -114,6 +115,10 @@ class SchemaRegistry:
             from skills_sdk.models.provider import ProviderIdentity
 
             model = ProviderIdentity
+        elif name == "provider-identity.v2":
+            from skills_sdk.models.provider import ProviderIdentityV2
+
+            model = ProviderIdentityV2
         elif name == "security-screening.v1":
             from skills_sdk.models.risk import SecurityScreeningResult
 

@@ -42,7 +42,7 @@ from skills_sdk.models.packaging import (
     PackageReceipt,
     PackageReceiptV2,
 )
-from skills_sdk.models.provider import ProviderIdentity
+from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 from skills_sdk.models.validation import SkillPackageValidation
 
@@ -53,10 +53,15 @@ _PORTABLE_PATH_PATTERN = (
 _NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"
 _NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
 _PROVIDER_IDENTITY_FIELDS = ("provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest")
-_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
+_V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
+_V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
+    r"(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
+    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+)
+_MODEL_ID_URI_SCHEME_SCHEMA_PATTERN = r"^[A-Za-z][A-Za-z0-9+.-]*:"
 
 
 def _append_portable_path_constraints(schema: Any) -> None:
@@ -76,10 +81,18 @@ def _append_provider_identity_constraints(schema: Any) -> None:
     """Project the secret-free contract into standalone and nested provider schemas."""
 
     if isinstance(schema, dict):
-        if schema.get("title") == "ProviderIdentity":
+        title = schema.get("title")
+        if title == "ProviderIdentity":
             properties = schema.get("properties", {})
             for field in _PROVIDER_IDENTITY_FIELDS:
-                properties[field]["not"] = {"pattern": _CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
+                properties[field]["not"] = {"pattern": _V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
+        elif title == "ProviderIdentityV2":
+            properties = schema.get("properties", {})
+            for field in _PROVIDER_IDENTITY_FIELDS:
+                properties[field]["not"] = {"pattern": _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
+            properties["model_id"].setdefault("allOf", []).append(
+                {"not": {"pattern": _MODEL_ID_URI_SCHEME_SCHEMA_PATTERN}}
+            )
         for value in schema.values():
             _append_provider_identity_constraints(value)
     elif isinstance(schema, list):
@@ -419,7 +432,7 @@ def _append_evaluation_result_constraints(schema: dict[str, Any], filename: str)
     }
 
 
-def _append_evaluation_receipt_constraints(schema: dict[str, Any]) -> None:
+def _append_evaluation_receipt_constraints(schema: dict[str, Any], filename: str) -> None:
     """Project receipt status invariants and mark cross-object model checks."""
 
     properties = schema["properties"]
@@ -466,6 +479,13 @@ def _append_evaluation_receipt_constraints(schema: dict[str, Any]) -> None:
             },
         },
     ]
+    if filename == "evaluation-receipt.v2.schema.json":
+        schema["allOf"].append(
+            {
+                "if": {"properties": {"case_results": {"minItems": 1}}, "required": ["case_results"]},
+                "then": {"properties": {"provider": {"not": {"type": "null"}}}, "required": ["provider"]},
+            }
+        )
     schema["$comment"] = (
         "Validate candidate, scorer, case-result, calibration, threshold, and identifier binding with "
         "skills_sdk.core.schema_registry.SchemaRegistry.validate."
@@ -478,6 +498,10 @@ def _append_evaluation_receipt_constraints(schema: dict[str, Any]) -> None:
             "receipt status must match the scorer threshold",
         ],
     }
+    if filename == "evaluation-receipt.v2.schema.json":
+        schema["x-skills-sdk-semantic-validator"]["required_for"].append(
+            "a receipt retaining case results must bind one provider"
+        )
 
 
 def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> None:
@@ -595,7 +619,7 @@ def _render_schema(model: type[object], filename: str) -> str:
     }:
         _append_evaluation_result_constraints(schema, filename)
     elif filename in {"evaluation-receipt.v1.schema.json", "evaluation-receipt.v2.schema.json"}:
-        _append_evaluation_receipt_constraints(schema)
+        _append_evaluation_receipt_constraints(schema, filename)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
@@ -626,6 +650,7 @@ def main() -> int:
         (PackageReceiptV2, "package-receipt.v2.schema.json"),
         (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
         (ProviderIdentity, "provider-identity.v1.schema.json"),
+        (ProviderIdentityV2, "provider-identity.v2.schema.json"),
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),

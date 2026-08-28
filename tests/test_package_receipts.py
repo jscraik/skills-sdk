@@ -85,8 +85,10 @@ def test_generic_parser_rejects_non_string_schema_version_as_typed_contract_erro
     payload = json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
     payload["schema_version"] = []
 
-    with pytest.raises(ContractError, match="contract_validation_failed"):
+    with pytest.raises(ContractError) as error:
         parse_receipt(payload)
+
+    assert error.value.code == "invalid_receipt_schema_version"
 
 
 def test_package_receipt_payload_is_deeply_immutable() -> None:

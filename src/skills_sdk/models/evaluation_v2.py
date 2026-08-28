@@ -11,7 +11,7 @@ from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import PackageReceiptBlocker, ReceiptId
-from skills_sdk.models.provider import ProviderIdentity
+from skills_sdk.models.provider import ProviderIdentityV2
 
 
 class ScenarioCaseV2(_ContractModel):
@@ -54,7 +54,7 @@ class ScenarioObservationV2(_ContractModel):
     candidate: PackageCandidateIdentity
     scenario_set_id: NonEmptyText
     case_id: NonEmptyText
-    provider: ProviderIdentity
+    provider: ProviderIdentityV2
     status: Literal["completed", "blocked"]
     observed_signals: tuple[NonEmptyText, ...] = ()
     observed_commands: tuple[NonEmptyText, ...] = ()
@@ -91,7 +91,7 @@ class ScenarioCaseResultV2(_ContractModel):
     candidate: PackageCandidateIdentity
     scenario_set_id: NonEmptyText
     case_id: NonEmptyText
-    provider: ProviderIdentity
+    provider: ProviderIdentityV2
     status: Literal["pass", "fail", "blocked"]
     missing_signals: tuple[NonEmptyText, ...] = ()
     forbidden_commands_observed: tuple[NonEmptyText, ...] = ()
@@ -139,7 +139,7 @@ class EvaluationReceiptV2(_ContractModel):
     candidate: PackageCandidateIdentity
     lane: Literal["evaluation"] = "evaluation"
     scenario_set_id: NonEmptyText
-    provider: ProviderIdentity | None = None
+    provider: ProviderIdentityV2 | None = None
     scorer: ScorerProfile
     status: Literal["pass", "fail", "blocked"]
     score: float | None = Field(default=None, ge=0, le=1)
@@ -163,6 +163,8 @@ class EvaluationReceiptV2(_ContractModel):
             for result in self.case_results
         ):
             raise ValueError("evaluation receipt results must bind the same candidate and scenario set")
+        if self.case_results and self.provider is None:
+            raise ValueError("evaluation receipt with results must bind one provider")
         if self.provider is not None and any(result.provider != self.provider for result in self.case_results):
             raise ValueError("evaluation receipt results must bind the same provider")
         probes = tuple(self.completed_calibration_probe_ids)

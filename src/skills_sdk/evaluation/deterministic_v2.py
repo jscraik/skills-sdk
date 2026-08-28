@@ -14,7 +14,7 @@ from skills_sdk.models.evaluation_v2 import (
     ScenarioSetV2,
 )
 from skills_sdk.models.packaging import PackageReceiptBlocker
-from skills_sdk.models.provider import ProviderIdentity
+from skills_sdk.models.provider import ProviderIdentityV2
 
 
 def _blocker(code: str, message: str, evidence_refs: tuple[str, ...] = ()) -> PackageReceiptBlocker:
@@ -24,7 +24,7 @@ def _blocker(code: str, message: str, evidence_refs: tuple[str, ...] = ()) -> Pa
 def _receipt_id(
     scenario_set: ScenarioSetV2,
     scorer: ScorerProfile,
-    provider: ProviderIdentity | None,
+    provider: ProviderIdentityV2 | None,
     case_results: tuple[ScenarioCaseResultV2, ...],
     status: str,
     blocker: PackageReceiptBlocker | None,
@@ -49,7 +49,7 @@ def _blocked_receipt(
     scorer: ScorerProfile,
     blocker: PackageReceiptBlocker,
     *,
-    provider: ProviderIdentity | None = None,
+    provider: ProviderIdentityV2 | None = None,
     case_results: tuple[ScenarioCaseResultV2, ...] = (),
     completed_probes: tuple[str, ...] = (),
 ) -> EvaluationReceiptV2:

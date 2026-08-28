@@ -67,14 +67,14 @@
       "title": "PackageReceiptBlocker",
       "type": "object"
     },
-    "ProviderIdentity": {
+    "ProviderIdentityV2": {
       "additionalProperties": false,
-      "description": "Secret-free identity for the external producer of an observation.",
+      "description": "Hardened provider identity for provider-bearing v2 contracts.",
       "properties": {
         "adapter_id": {
           "maxLength": 64,
           "not": {
-            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Adapter Id",
@@ -83,25 +83,32 @@
         "adapter_version_or_digest": {
           "maxLength": 128,
           "not": {
-            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
           "title": "Adapter Version Or Digest",
           "type": "string"
         },
         "model_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+              }
+            }
+          ],
           "maxLength": 128,
           "not": {
-            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*(?:/[A-Za-z0-9][A-Za-z0-9._:+-]*)*$",
           "title": "Model Id",
           "type": "string"
         },
         "provider_id": {
           "maxLength": 64,
           "not": {
-            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Provider Id",
@@ -117,15 +124,15 @@
           "type": "string"
         },
         "schema_version": {
-          "const": "provider-identity/v1",
-          "default": "provider-identity/v1",
+          "const": "provider-identity/v2",
+          "default": "provider-identity/v2",
           "title": "Schema Version",
           "type": "string"
         },
         "version_or_digest": {
           "maxLength": 128,
           "not": {
-            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
           "title": "Version Or Digest",
@@ -140,7 +147,7 @@
         "adapter_id",
         "adapter_version_or_digest"
       ],
-      "title": "ProviderIdentity",
+      "title": "ProviderIdentityV2",
       "type": "object"
     }
   },
@@ -349,7 +356,7 @@
       "type": "boolean"
     },
     "provider": {
-      "$ref": "#/$defs/ProviderIdentity"
+      "$ref": "#/$defs/ProviderIdentityV2"
     },
     "runner_id": {
       "minLength": 1,
