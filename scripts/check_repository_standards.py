@@ -60,6 +60,8 @@ PINNED_TOOLS = {
     "uv_build": "0.11.3",
     "vale": "3.19.0",
 }
+MISE_ACTION = "jdx/mise-action@v4"
+PR_TEMPLATE_VALIDATOR = ".github/scripts/validate_pr_template_body.py"
 
 
 @dataclass(frozen=True)
@@ -352,11 +354,50 @@ def _config_findings(root: Path) -> list[Finding]:
             json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             findings.append(Finding(_relative(root, path), error.lineno, "json", error.msg))
+    pr_template_enforced = False
     for path in _iter_files(root, (".github/workflows",), (".yaml", ".yml")):
+        workflow_text = path.read_text(encoding="utf-8")
+        if "trusted-base/.github/scripts/validate_pr_template_body.py" in workflow_text:
+            pr_template_enforced = True
         try:
-            yaml.safe_load(path.read_text(encoding="utf-8"))
+            workflow = yaml.safe_load(workflow_text)
         except yaml.YAMLError as error:
             findings.append(Finding(_relative(root, path), 1, "yaml", str(error)))
+            continue
+        for job in workflow.get("jobs", {}).values():
+            steps = job.get("steps", [])
+            validate_indexes = [
+                index
+                for index, step in enumerate(steps)
+                if "bash scripts/validate-repository.sh" in str(step.get("run", ""))
+            ]
+            if not validate_indexes:
+                continue
+            mise_indexes = [
+                index
+                for index, step in enumerate(steps)
+                if step.get("uses") == MISE_ACTION
+                and step.get("with", {}).get("install", True) is not False
+                and ("install_args" not in step.get("with", {}) or "vale" in str(step["with"]["install_args"]).split())
+            ]
+            if not mise_indexes or min(mise_indexes) > min(validate_indexes):
+                findings.append(
+                    Finding(
+                        _relative(root, path),
+                        1,
+                        "ci-tooling",
+                        f"{MISE_ACTION} must install Vale before repository validation",
+                    )
+                )
+    if (root / ".github/PULL_REQUEST_TEMPLATE.md").is_file() and not pr_template_enforced:
+        findings.append(
+            Finding(
+                ".github/workflows",
+                1,
+                "pr-template",
+                f"hosted validation must invoke trusted-base/{PR_TEMPLATE_VALIDATOR}",
+            )
+        )
     ignored = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
     for required in REQUIRED_IGNORES:
         if required not in ignored:

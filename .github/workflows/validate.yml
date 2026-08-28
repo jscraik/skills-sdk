@@ -13,6 +13,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Checkout trusted PR template contract
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted-base
+          persist-credentials: false
+      - name: Validate PR template completion
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          validator=trusted-base/.github/scripts/validate_pr_template_body.py
+          template=trusted-base/.github/PULL_REQUEST_TEMPLATE.md
+          if [[ ! -f "$validator" ]]; then
+            echo "::notice::Bootstrapping the SDK PR template validator from the candidate."
+            validator=.github/scripts/validate_pr_template_body.py
+            template=.github/PULL_REQUEST_TEMPLATE.md
+          fi
+          python3 "$validator" --template "$template" --body-env PR_BODY
+      - uses: jdx/mise-action@v4
+        with:
+          install_args: "vale"
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.11.3"

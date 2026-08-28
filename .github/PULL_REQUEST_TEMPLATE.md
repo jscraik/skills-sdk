@@ -1,5 +1,9 @@
 # Pull request
 
+Write for maintainers. Use `n.a.` with a concrete reason when a field does not
+apply. Do not include secrets, raw transcripts, bulky telemetry, or local
+absolute paths.
+
 ## Summary
 
 - Problem:
@@ -28,12 +32,18 @@
 
 ## Validation
 
-- Command:
-- Outcome:
+- Regression coverage:
+<!-- Add one evidence line for each command:
+- Command: `bash scripts/validate-repository.sh` -> pass
+- Command: `uv run pytest tests/test_repository_standards.py -q` -> blocked (reason)
+-->
 - Untested or blocked paths:
 
-## Review
+## Review and readiness
 
+- Create readiness:
+- Update readiness:
+- Guarded body refresh:
 - CodeRabbit:
 - Codex:
 - Unresolved findings:
@@ -45,4 +55,5 @@
 - [ ] Public contracts include schema and compatibility proof.
 - [ ] Required validation passed without a waiver or suppression.
 - [ ] Private package source, generated receipts, and credentials are absent.
+- [ ] The PR body was refreshed only through the receipt-bound body helper.
 - [ ] The branch will be removed after merge.

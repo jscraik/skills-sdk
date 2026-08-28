@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts.check_repository_standards import (
+    _config_findings,
     _local_link_findings,
     _python_findings,
     _tool_pin_findings,
@@ -186,6 +187,66 @@ def test_tool_pin_drift_is_rejected() -> None:
     assert any(finding.code == "tool-pin" for finding in findings)
     assert any("vale" in finding.message for finding in findings)
     assert any(finding.code == "lock-pin" for finding in findings)
+
+
+def test_ci_rejects_repository_validation_without_mise_vale_bootstrap(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "validate.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n"
+        "  validate:\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v5\n"
+        "      - run: bash scripts/validate-repository.sh\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / ".mise.toml").write_text(
+        (REPOSITORY_ROOT / ".mise.toml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        (REPOSITORY_ROOT / "uv.lock").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / ".gitignore").write_text(
+        "\n".join([".venv/", ".pytest_cache/", ".ruff_cache/", "__pycache__/", "dist/", "build/"]), encoding="utf-8"
+    )
+
+    findings = _config_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [("ci-tooling", ".github/workflows/validate.yml")]
+
+
+def test_ci_rejects_unenforced_pr_template_contract(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "validate.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("jobs: {}\n", encoding="utf-8")
+    template = tmp_path / ".github" / "PULL_REQUEST_TEMPLATE.md"
+    template.write_text("# Pull request\n\n## Summary\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / ".mise.toml").write_text(
+        (REPOSITORY_ROOT / ".mise.toml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text(
+        (REPOSITORY_ROOT / "uv.lock").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / ".gitignore").write_text(
+        "\n".join([".venv/", ".pytest_cache/", ".ruff_cache/", "__pycache__/", "dist/", "build/"]),
+        encoding="utf-8",
+    )
+
+    findings = _config_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [("pr-template", ".github/workflows")]
 
 
 def test_tuple_containing_broad_exception_is_rejected(tmp_path: Path) -> None:
