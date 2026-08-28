@@ -361,7 +361,7 @@ def test_ci_rejects_repository_validation_without_mise_vale_bootstrap(tmp_path: 
         "jobs:\n"
         "  validate:\n"
         "    steps:\n"
-        "      - uses: actions/checkout@v5\n"
+        "      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09\n"
         "      - run: bash scripts/validate-repository.sh\n",
         encoding="utf-8",
     )
@@ -387,6 +387,73 @@ def test_ci_rejects_repository_validation_without_mise_vale_bootstrap(tmp_path: 
         ("ci-tooling", ".github/workflows/validate.yml"),
         ("ci-checkout", ".github/workflows/validate.yml"),
     ]
+
+
+@pytest.mark.parametrize(
+    "action",
+    (
+        "actions/checkout@v5",
+        "actions/checkout@main",
+        "actions/checkout",
+        "actions/checkout@${{ github.sha }}",
+        "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c0",
+        "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c090",
+        "actions/checkout@FBC6F3992D24B796D5A048FF273F7FCC4A7B6C09",
+        "actions/checkout@v5@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+        "docker://example.invalid/tool:latest",
+        "docker://example.invalid/tool",
+        "docker://example.invalid/tool@sha256:0123456789abcdef",
+        "docker://example.invalid/tool@sha256:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+        "docker://example.invalid/tool@sha512:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    ),
+)
+def test_ci_rejects_third_party_actions_without_full_commit_sha(tmp_path: Path, action: str) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "fixture.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(f"jobs:\n  audit:\n    steps:\n      - uses: {action}\n", encoding="utf-8")
+    for relative in ("pyproject.toml", ".mise.toml", "uv.lock", ".gitignore"):
+        (tmp_path / relative).write_text((REPOSITORY_ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+
+    findings = _config_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [("action-pin", ".github/workflows/fixture.yml")]
+
+
+def test_ci_rejects_reusable_workflow_without_full_commit_sha(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "fixture.yaml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  delegated:\n    uses: example/actions/.github/workflows/check.yml@main\n",
+        encoding="utf-8",
+    )
+    for relative in ("pyproject.toml", ".mise.toml", "uv.lock", ".gitignore"):
+        (tmp_path / relative).write_text((REPOSITORY_ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+
+    findings = _config_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [("action-pin", ".github/workflows/fixture.yaml")]
+
+
+def test_ci_accepts_full_sha_local_and_digest_bound_container_actions(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "fixture.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n"
+        "  delegated:\n"
+        "    uses: example/actions/.github/workflows/check.yml@"
+        "0123456789abcdef0123456789abcdef01234567\n"
+        "  audit:\n"
+        "    steps:\n"
+        "      - uses: actions/checkout/fetch-depth@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09\n"
+        "      - uses: ./actions/local\n"
+        "      - uses: docker://example.invalid/tool@sha256:"
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n",
+        encoding="utf-8",
+    )
+    for relative in ("pyproject.toml", ".mise.toml", "uv.lock", ".gitignore"):
+        (tmp_path / relative).write_text((REPOSITORY_ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+
+    assert _config_findings(tmp_path) == []
 
 
 def test_ci_rejects_unenforced_pr_template_contract(tmp_path: Path) -> None:
@@ -436,7 +503,7 @@ def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) ->
         "jobs:\n"
         "  validate:\n"
         "    steps:\n"
-        "      - uses: actions/checkout@v5\n"
+        "      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09\n"
         "        with:\n"
         "          persist-credentials: false\n"
         "      - run: |\n"
@@ -444,7 +511,7 @@ def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) ->
         '          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .body > "$body_file"\n'
         "          python3 trusted-base/.github/scripts/validate_pr_template_body.py "
         '--body-file "$body_file"\n'
-        "      - uses: jdx/mise-action@v4\n"
+        "      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c\n"
         "        with:\n"
         '          install_args: "python uv ruff vale"\n'
         "      - run: bash scripts/validate-repository.sh\n",

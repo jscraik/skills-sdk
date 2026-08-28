@@ -65,7 +65,9 @@ PINNED_TOOLS = {
     "uv_build": "0.11.3",
     "vale": "3.19.0",
 }
-MISE_ACTION = "jdx/mise-action@v4"
+MISE_ACTION = "jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c"
+ACTION_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+CONTAINER_ACTION_RE = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-f]{64}$")
 PR_TEMPLATE_VALIDATOR = ".github/scripts/validate_pr_template_body.py"
 PR_TEMPLATE_BOOTSTRAP_BASE = "564c5df731897f082410b9a643f518c5e301820a"
 REQUIRED_MYPY_FILES = ("scripts/check_repository_standards.py", "tests/test_repository_standards.py")
@@ -538,7 +540,35 @@ def _config_findings(root: Path) -> list[Finding]:
             findings.append(Finding(_relative(root, path), 1, "yaml", str(error)))
             continue
         for job in workflow.get("jobs", {}).values():
+            if not isinstance(job, dict):
+                continue
             steps = [step for step in job.get("steps", []) if isinstance(step, dict)]
+            action_references = [job.get("uses"), *(step.get("uses") for step in steps)]
+            for reference in action_references:
+                action = str(reference or "")
+                if not action or action.startswith("./"):
+                    continue
+                if action.startswith("docker://"):
+                    if not CONTAINER_ACTION_RE.fullmatch(action):
+                        findings.append(
+                            Finding(
+                                _relative(root, path),
+                                1,
+                                "action-pin",
+                                f"container action must use a full lowercase sha256 digest: {action!r}",
+                            )
+                        )
+                    continue
+                _, separator, revision = action.rpartition("@")
+                if action.count("@") != 1 or not separator or not ACTION_COMMIT_RE.fullmatch(revision):
+                    findings.append(
+                        Finding(
+                            _relative(root, path),
+                            1,
+                            "action-pin",
+                            f"third-party action must use a full lowercase commit SHA: {action!r}",
+                        )
+                    )
             run_steps = [str(step.get("run", "")) for step in steps]
             for run_step in run_steps:
                 if "validator=.github/scripts/validate_pr_template_body.py" in run_step and not all(
