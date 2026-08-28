@@ -371,6 +371,14 @@ def _config_findings(root: Path) -> list[Finding]:
             continue
         for job in workflow.get("jobs", {}).values():
             steps = job.get("steps", [])
+            pr_template_indexes = [
+                index
+                for index, step in enumerate(steps)
+                if "trusted-base/.github/scripts/validate_pr_template_body.py" in str(step.get("run", ""))
+            ]
+            trusted_base_cleanup_indexes = [
+                index for index, step in enumerate(steps) if "rm -rf -- trusted-base" in str(step.get("run", ""))
+            ]
             validate_indexes = [
                 index
                 for index, step in enumerate(steps)
@@ -395,6 +403,19 @@ def _config_findings(root: Path) -> list[Finding]:
                         1,
                         "ci-tooling",
                         f"{MISE_ACTION} must install uv and Vale before repository validation",
+                    )
+                )
+            if pr_template_indexes and (
+                not trusted_base_cleanup_indexes
+                or min(trusted_base_cleanup_indexes) < min(pr_template_indexes)
+                or min(trusted_base_cleanup_indexes) > min(validate_indexes)
+            ):
+                findings.append(
+                    Finding(
+                        _relative(root, path),
+                        1,
+                        "ci-workspace",
+                        "trusted-base must be removed after PR-template validation and before repository validation",
                     )
                 )
     if (root / ".github/PULL_REQUEST_TEMPLATE.md").is_file() and not pr_template_enforced:

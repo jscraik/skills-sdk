@@ -285,6 +285,31 @@ def test_ci_rejects_unenforced_pr_template_contract(tmp_path: Path) -> None:
     assert [(finding.code, finding.path) for finding in findings] == [("pr-template", ".github/workflows")]
 
 
+def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "validate.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n"
+        "  validate:\n"
+        "    steps:\n"
+        "      - run: python3 trusted-base/.github/scripts/validate_pr_template_body.py\n"
+        "      - uses: jdx/mise-action@v4\n"
+        "        with:\n"
+        '          install_args: "uv vale"\n'
+        "      - run: bash scripts/validate-repository.sh\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".github" / "PULL_REQUEST_TEMPLATE.md").write_text("# Pull request\n", encoding="utf-8")
+    for relative in ("pyproject.toml", ".mise.toml", "uv.lock", ".gitignore"):
+        (tmp_path / relative).write_text((REPOSITORY_ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+
+    findings = _config_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [
+        ("ci-workspace", ".github/workflows/validate.yml")
+    ]
+
+
 def test_tuple_containing_broad_exception_is_rejected(tmp_path: Path) -> None:
     source = tmp_path / "tests" / "fixture.py"
     source.parent.mkdir()

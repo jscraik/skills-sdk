@@ -33,6 +33,7 @@ jobs:
             template=.github/PULL_REQUEST_TEMPLATE.md
           fi
           python3 "$validator" --template "$template" --body-env PR_BODY
+          rm -rf -- trusted-base
       - uses: jdx/mise-action@v4
         with:
           install_args: "uv vale"
