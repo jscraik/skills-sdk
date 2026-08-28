@@ -75,6 +75,67 @@ def test_unknown_schema_validation_is_typed() -> None:
         SchemaRegistry().validate("unknown.v1", {})
 
 
+def test_structurally_compatible_unknown_receipt_family_fails_closed() -> None:
+    payload = _receipt()
+    payload["schema_version"] = "future-receipt/v99"
+
+    with pytest.raises(ContractError) as error:
+        parse_receipt(payload)
+
+    assert error.value.code == "unsupported_receipt_family"
+
+
+@pytest.mark.parametrize(
+    "schema_version",
+    ["receipt-base/v01", "receipt-base/v2", " receipt-base/v1", "receipt-base/v1 "],
+)
+def test_unregistered_receipt_version_strings_fail_closed(schema_version: str) -> None:
+    payload = _receipt()
+    payload["schema_version"] = schema_version
+
+    with pytest.raises(ContractError) as error:
+        parse_receipt(payload)
+
+    assert error.value.code == "unsupported_receipt_family"
+
+
+@pytest.mark.parametrize("schema_version", [None, [], 1])
+def test_malformed_receipt_versions_are_typed(schema_version: object) -> None:
+    payload = _receipt()
+    payload["schema_version"] = schema_version
+
+    with pytest.raises(ContractError) as error:
+        parse_receipt(payload)
+
+    assert error.value.code == "invalid_receipt_schema_version"
+
+
+def test_missing_receipt_version_is_typed() -> None:
+    payload = _receipt()
+    payload.pop("schema_version")
+
+    with pytest.raises(ContractError) as error:
+        parse_receipt(payload)
+
+    assert error.value.code == "invalid_receipt_schema_version"
+
+
+def test_schema_registry_does_not_adapt_unknown_receipt_family() -> None:
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("future-receipt.v99", _receipt())
+
+    assert error.value.code == "unknown_schema"
+
+
+def test_public_core_parser_keeps_explicit_receipt_base_support() -> None:
+    from skills_sdk.core import parse_receipt as public_parse_receipt
+
+    receipt = public_parse_receipt(_receipt())
+
+    assert receipt.status == "pass"
+    assert receipt.artifact_status is None
+
+
 def test_blocked_receipt_requires_typed_blocker() -> None:
     payload = _receipt()
     payload["status"] = "blocked"

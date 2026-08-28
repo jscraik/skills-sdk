@@ -11,6 +11,16 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import SchemaRegistry
 
+_RECEIPT_SCHEMAS = {
+    "receipt-base/v1": "receipt-base.v1",
+    "package-receipt/v1": "package-receipt.v1",
+    "package-receipt/v2": "package-receipt.v2",
+    "evaluation-receipt/v1": "evaluation-receipt.v1",
+    "evaluation-receipt/v2": "evaluation-receipt.v2",
+}
+_PACKAGE_RECEIPT_VERSIONS = frozenset({"package-receipt/v1", "package-receipt/v2"})
+_EVALUATION_RECEIPT_VERSIONS = frozenset({"evaluation-receipt/v1", "evaluation-receipt/v2"})
+
 
 @dataclass(frozen=True, slots=True)
 class CandidateIdentity:
@@ -78,23 +88,24 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
 
     active_registry = registry or SchemaRegistry()
     schema_version = payload.get("schema_version")
-    package_receipt_schemas = {
-        "package-receipt/v1": "package-receipt.v1",
-        "package-receipt/v2": "package-receipt.v2",
-    }
-    package_receipt_schema = package_receipt_schemas.get(schema_version) if isinstance(schema_version, str) else None
-    evaluation_receipt = schema_version == "evaluation-receipt/v1"
-    if package_receipt_schema is not None:
-        # Package receipts are a concrete result contract layered on the
-        # generic receipt shape. Validate their richer invariants first, then
-        # expose the stable generic Receipt API to callers.
-        active_registry.validate(package_receipt_schema, payload)
-    elif evaluation_receipt:
-        active_registry.validate("evaluation-receipt.v1", payload)
-    else:
-        active_registry.validate("receipt-base.v1", payload)
+    if not isinstance(schema_version, str):
+        raise ContractError(
+            "invalid_receipt_schema_version",
+            "receipt schema_version must be a registered string",
+        )
+    receipt_schema = _RECEIPT_SCHEMAS.get(schema_version)
+    if receipt_schema is None:
+        raise ContractError(
+            "unsupported_receipt_family",
+            "receipt schema_version is not registered",
+        )
+    package_receipt = schema_version in _PACKAGE_RECEIPT_VERSIONS
+    evaluation_receipt = schema_version in _EVALUATION_RECEIPT_VERSIONS
+    # Concrete receipt families validate their richer invariants before the
+    # stable generic Receipt API is exposed to callers.
+    active_registry.validate(receipt_schema, payload)
     candidate_payload = payload.get("candidate")
-    if package_receipt_schema is None and not evaluation_receipt:
+    if not package_receipt and not evaluation_receipt:
         active_registry.validate("package-identity.v1", candidate_payload)
     raw_evidence = payload.get("evidence", ())
     if evaluation_receipt:
@@ -108,7 +119,7 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
     for ref in evidence:
         require_portable_relative_path(ref)
     blocker_payload = payload.get("blocker")
-    if blocker_payload is not None and package_receipt_schema is None and not evaluation_receipt:
+    if blocker_payload is not None and not package_receipt and not evaluation_receipt:
         active_registry.validate("blocker.v1", blocker_payload)
     candidate = (
         CandidateIdentity(
@@ -119,7 +130,7 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         if isinstance(candidate_payload, Mapping)
         else None
     )
-    artifact_status = str(payload["status"]) if package_receipt_schema is not None else None
+    artifact_status = str(payload["status"]) if package_receipt else None
     generic_status = {
         "built": "pass",
         "blocked": "blocked",

@@ -63,6 +63,35 @@ deterministic scorer profiles and currently decides only `expected_signal`
 oracles. Other scorer and oracle types remain valid declarations but require a
 separate adapter and produce a typed blocker in the local service.
 
+The explicit v2 evaluation family adds `scenario-set/v2`,
+`scenario-observation/v2`, `scenario-case-result/v2`, and
+`evaluation-receipt/v2`. V2 observations require the hardened, redaction-safe
+`provider-identity/v2`; completed receipts bind one provider across every case
+result. Provider identity v2 accepts provider-native slash-separated model IDs
+while rejecting URI-scheme-bearing model IDs, empty path segments, and the
+expanded credential-component set. `provider-identity/v1` retains its original
+field grammar, credential screening, model behavior, and schema bytes;
+provider-bearing v2 evaluation payloads reject a v1 identity instead of
+reinterpreting it. V2 exact-match cases compare only
+`expected_output_sha256` with the observation's `output_sha256`. A missing
+expected digest returns the typed `exact_match_digest_required` blocker,
+structured oracles remain blocked, and no raw output is accepted or retained.
+Generic receipt parsing dispatches both evaluation receipt versions without
+changing their payload meaning.
+
+The v1 models, schemas, fixtures, registry names, parser dispatch, and
+`evaluate_scenario_set` semantics remain unchanged. In particular, v1
+`exact_match` remains an `unsupported_oracle` outcome; callers must opt into
+the v2 types and evaluator rather than placing v2 fields in a v1 payload.
+
+Generic receipt parsing is fail-closed by wire version. Only explicitly
+registered receipt families are accepted; a structurally base-compatible
+future or foreign family is not treated as `receipt-base/v1`. Unknown families
+return `unsupported_receipt_family`, while missing or non-string versions
+return `invalid_receipt_schema_version`. This routing rule does not change the
+payload meaning, candidate matching, or immutable generic representation of
+any supported v1 or v2 receipt.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

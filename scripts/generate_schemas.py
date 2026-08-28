@@ -15,6 +15,12 @@ from skills_sdk.models.evaluation import (
     ScenarioSet,
     ScorerProfile,
 )
+from skills_sdk.models.evaluation_v2 import (
+    EvaluationReceiptV2,
+    ScenarioCaseResultV2,
+    ScenarioObservationV2,
+    ScenarioSetV2,
+)
 from skills_sdk.models.inventory import (
     PackageInventory,
     PackageInventoryRecord,
@@ -36,6 +42,7 @@ from skills_sdk.models.packaging import (
     PackageReceipt,
     PackageReceiptV2,
 )
+from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
 from skills_sdk.models.validation import SkillPackageValidation
 
@@ -45,6 +52,16 @@ _PORTABLE_PATH_PATTERN = (
 )
 _NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"
 _NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
+_PROVIDER_IDENTITY_FIELDS = ("provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest")
+_V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
+    r"(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
+    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+)
+_V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
+    r"(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
+    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+)
+_MODEL_ID_URI_SCHEME_SCHEMA_PATTERN = r"^[A-Za-z][A-Za-z0-9+.-]*:"
 
 
 def _append_portable_path_constraints(schema: Any) -> None:
@@ -58,6 +75,29 @@ def _append_portable_path_constraints(schema: Any) -> None:
     elif isinstance(schema, list):
         for value in schema:
             _append_portable_path_constraints(value)
+
+
+def _append_provider_identity_constraints(schema: Any) -> None:
+    """Project the secret-free contract into standalone and nested provider schemas."""
+
+    if isinstance(schema, dict):
+        title = schema.get("title")
+        if title == "ProviderIdentity":
+            properties = schema.get("properties", {})
+            for field in _PROVIDER_IDENTITY_FIELDS:
+                properties[field]["not"] = {"pattern": _V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
+        elif title == "ProviderIdentityV2":
+            properties = schema.get("properties", {})
+            for field in _PROVIDER_IDENTITY_FIELDS:
+                properties[field]["not"] = {"pattern": _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
+            properties["model_id"].setdefault("allOf", []).append(
+                {"not": {"pattern": _MODEL_ID_URI_SCHEME_SCHEMA_PATTERN}}
+            )
+        for value in schema.values():
+            _append_provider_identity_constraints(value)
+    elif isinstance(schema, list):
+        for value in schema:
+            _append_provider_identity_constraints(value)
 
 
 def _append_risk_constraints(schema: dict[str, Any]) -> None:
@@ -108,7 +148,7 @@ def _append_risk_constraints(schema: dict[str, Any]) -> None:
                         }
                     }
                 }
-            }
+            },
         },
         {
             "not": {
@@ -161,7 +201,7 @@ def _append_security_constraints(schema: dict[str, Any]) -> None:
                                 "required": ["severity"],
                             }
                         }
-                    }
+                    },
                 }
             },
         },
@@ -224,14 +264,15 @@ def _append_security_constraints(schema: dict[str, Any]) -> None:
 def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> None:
     """Project evaluation policy invariants into the committed schemas."""
 
-    if filename == "scenario-set.v1.schema.json":
-        scenario_case_properties = schema["$defs"]["ScenarioCase"]["properties"]
+    if filename in {"scenario-set.v1.schema.json", "scenario-set.v2.schema.json"}:
+        case_name = "ScenarioCase" if filename.endswith("v1.schema.json") else "ScenarioCaseV2"
+        scenario_case_properties = schema["$defs"][case_name]["properties"]
         scenario_case_properties["case_id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
         scenario_case_properties["prompt"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
         scenario_case_properties["expected_signals"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
         scenario_case_properties["forbidden_commands"]["items"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
         schema["properties"]["scenario_set_id"]["pattern"] = _NON_WHITESPACE_TEXT_PATTERN
-        schema["properties"]["cases"]["items"]["$ref"] = "#/$defs/ScenarioCase"
+        schema["properties"]["cases"]["items"]["$ref"] = f"#/$defs/{case_name}"
         schema["allOf"] = [
             *schema.get("allOf", []),
             {
@@ -305,7 +346,7 @@ def _append_evaluation_result_constraints(schema: dict[str, Any], filename: str)
 
     properties = schema["properties"]
     properties["evidence_refs"]["uniqueItems"] = True
-    if filename == "scenario-observation.v1.schema.json":
+    if filename in {"scenario-observation.v1.schema.json", "scenario-observation.v2.schema.json"}:
         schema["allOf"] = [
             {
                 "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]},
@@ -356,6 +397,16 @@ def _append_evaluation_result_constraints(schema: dict[str, Any], filename: str)
                             "properties": {"forbidden_commands_observed": {"minItems": 1}},
                             "required": ["forbidden_commands_observed"],
                         },
+                        *(
+                            [
+                                {
+                                    "properties": {"output_digest_mismatch": {"const": True}},
+                                    "required": ["output_digest_mismatch"],
+                                }
+                            ]
+                            if filename == "scenario-case-result.v2.schema.json"
+                            else []
+                        ),
                     ],
                 },
             },
@@ -381,7 +432,7 @@ def _append_evaluation_result_constraints(schema: dict[str, Any], filename: str)
     }
 
 
-def _append_evaluation_receipt_constraints(schema: dict[str, Any]) -> None:
+def _append_evaluation_receipt_constraints(schema: dict[str, Any], filename: str) -> None:
     """Project receipt status invariants and mark cross-object model checks."""
 
     properties = schema["properties"]
@@ -428,6 +479,13 @@ def _append_evaluation_receipt_constraints(schema: dict[str, Any]) -> None:
             },
         },
     ]
+    if filename == "evaluation-receipt.v2.schema.json":
+        schema["allOf"].append(
+            {
+                "if": {"properties": {"case_results": {"minItems": 1}}, "required": ["case_results"]},
+                "then": {"properties": {"provider": {"not": {"type": "null"}}}, "required": ["provider"]},
+            }
+        )
     schema["$comment"] = (
         "Validate candidate, scorer, case-result, calibration, threshold, and identifier binding with "
         "skills_sdk.core.schema_registry.SchemaRegistry.validate."
@@ -440,16 +498,16 @@ def _append_evaluation_receipt_constraints(schema: dict[str, Any]) -> None:
             "receipt status must match the scorer threshold",
         ],
     }
+    if filename == "evaluation-receipt.v2.schema.json":
+        schema["x-skills-sdk-semantic-validator"]["required_for"].append(
+            "a receipt retaining case results must bind one provider"
+        )
 
 
 def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> None:
     """Require the typed blocker whenever a v2 value decision needs review."""
 
-    target = (
-        schema
-        if filename == "package-inventory.v2.schema.json"
-        else schema["$defs"]["PackageInventoryRecordV2"]
-    )
+    target = schema if filename == "package-inventory.v2.schema.json" else schema["$defs"]["PackageInventoryRecordV2"]
     target["allOf"] = [
         *target.get("allOf", []),
         {
@@ -471,6 +529,7 @@ def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> N
 def _render_schema(model: type[object], filename: str) -> str:
     schema = model.model_json_schema()  # type: ignore[attr-defined]
     _append_portable_path_constraints(schema)
+    _append_provider_identity_constraints(schema)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:
         # Pydantic emits field types but cannot express the status-dependent
         # receipt invariants enforced by PackageReceipt.model_validator.
@@ -550,12 +609,17 @@ def _render_schema(model: type[object], filename: str) -> str:
         _append_risk_constraints(schema)
     elif filename == "security-screening.v1.schema.json":
         _append_security_constraints(schema)
-    elif filename in {"scenario-set.v1.schema.json", "scorer-profile.v1.schema.json"}:
+    elif filename in {"scenario-set.v1.schema.json", "scenario-set.v2.schema.json", "scorer-profile.v1.schema.json"}:
         _append_evaluation_constraints(schema, filename)
-    elif filename in {"scenario-observation.v1.schema.json", "scenario-case-result.v1.schema.json"}:
+    elif filename in {
+        "scenario-observation.v1.schema.json",
+        "scenario-observation.v2.schema.json",
+        "scenario-case-result.v1.schema.json",
+        "scenario-case-result.v2.schema.json",
+    }:
         _append_evaluation_result_constraints(schema, filename)
-    elif filename == "evaluation-receipt.v1.schema.json":
-        _append_evaluation_receipt_constraints(schema)
+    elif filename in {"evaluation-receipt.v1.schema.json", "evaluation-receipt.v2.schema.json"}:
+        _append_evaluation_receipt_constraints(schema, filename)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
@@ -585,6 +649,8 @@ def main() -> int:
         (PackageReceipt, "package-receipt.v1.schema.json"),
         (PackageReceiptV2, "package-receipt.v2.schema.json"),
         (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
+        (ProviderIdentity, "provider-identity.v1.schema.json"),
+        (ProviderIdentityV2, "provider-identity.v2.schema.json"),
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),
@@ -592,6 +658,10 @@ def main() -> int:
         (ScenarioObservation, "scenario-observation.v1.schema.json"),
         (ScenarioCaseResult, "scenario-case-result.v1.schema.json"),
         (EvaluationReceipt, "evaluation-receipt.v1.schema.json"),
+        (ScenarioSetV2, "scenario-set.v2.schema.json"),
+        (ScenarioObservationV2, "scenario-observation.v2.schema.json"),
+        (ScenarioCaseResultV2, "scenario-case-result.v2.schema.json"),
+        (EvaluationReceiptV2, "evaluation-receipt.v2.schema.json"),
         (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)

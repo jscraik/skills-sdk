@@ -29,9 +29,15 @@ SCHEMA_NAMES = frozenset(
         "risk-classification.v1",
         "security-screening.v1",
         "evaluation-receipt.v1",
+        "evaluation-receipt.v2",
+        "provider-identity.v1",
+        "provider-identity.v2",
         "scenario-case-result.v1",
+        "scenario-case-result.v2",
         "scenario-observation.v1",
+        "scenario-observation.v2",
         "scenario-set.v1",
+        "scenario-set.v2",
         "scorer-profile.v1",
         "skill-package-validation.v1",
     }
@@ -105,6 +111,14 @@ class SchemaRegistry:
             from skills_sdk.models.risk import RiskClassification
 
             model = RiskClassification
+        elif name == "provider-identity.v1":
+            from skills_sdk.models.provider import ProviderIdentity
+
+            model = ProviderIdentity
+        elif name == "provider-identity.v2":
+            from skills_sdk.models.provider import ProviderIdentityV2
+
+            model = ProviderIdentityV2
         elif name == "security-screening.v1":
             from skills_sdk.models.risk import SecurityScreeningResult
 
@@ -129,6 +143,22 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation import EvaluationReceipt
 
             model = EvaluationReceipt
+        elif name == "scenario-set.v2":
+            from skills_sdk.models.evaluation_v2 import ScenarioSetV2
+
+            model = ScenarioSetV2
+        elif name == "scenario-observation.v2":
+            from skills_sdk.models.evaluation_v2 import ScenarioObservationV2
+
+            model = ScenarioObservationV2
+        elif name == "scenario-case-result.v2":
+            from skills_sdk.models.evaluation_v2 import ScenarioCaseResultV2
+
+            model = ScenarioCaseResultV2
+        elif name == "evaluation-receipt.v2":
+            from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
+
+            model = EvaluationReceiptV2
         elif name == "skill-package-validation.v1":
             from skills_sdk.models.validation import SkillPackageValidation
 

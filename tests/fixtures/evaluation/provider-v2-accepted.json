@@ -1,0 +1,9 @@
+{
+  "schema_version": "provider-identity/v2",
+  "provider_id": "hugging-face",
+  "provider_kind": "llm",
+  "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+  "version_or_digest": "revision-v1",
+  "adapter_id": "portable-adapter",
+  "adapter_version_or_digest": "adapter-v1"
+}
