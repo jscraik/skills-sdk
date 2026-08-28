@@ -313,6 +313,7 @@ def _local_link_findings(root: Path) -> list[Finding]:
     )
     inline_link_pattern = re.compile(r"!?\[[^]]*]\(([^)]+)\)")
     reference_link_pattern = re.compile(r"!?\[(?P<text>[^]]*)]\[(?P<label>[^]]*)]")
+    shortcut_reference_pattern = re.compile(r"(?<![!\]])\[(?P<label>[^]\n]+)](?![([])")
     reference_definition_pattern = re.compile(r"^\s*\[(?P<label>[^]]+)]\s*:\s*(?P<destination>\S+)")
     for path in sorted(set(markdown_paths)):
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -322,6 +323,8 @@ def _local_link_findings(root: Path) -> list[Finding]:
             if (match := reference_definition_pattern.match(line))
         }
         for line_number, line in enumerate(lines, start=1):
+            if reference_definition_pattern.match(line):
+                continue
             for match in inline_link_pattern.finditer(line):
                 findings.extend(_link_destination_findings(root, repository_root, path, line_number, match.group(1)))
             for match in reference_link_pattern.finditer(line):
@@ -331,6 +334,12 @@ def _local_link_findings(root: Path) -> list[Finding]:
                     findings.append(
                         Finding(_relative(root, path), line_number, "broken-link", f"missing reference {label!r}")
                     )
+                    continue
+                destination, definition_line = definition
+                findings.extend(_link_destination_findings(root, repository_root, path, definition_line, destination))
+            for match in shortcut_reference_pattern.finditer(line):
+                definition = definitions.get(match.group("label").casefold())
+                if definition is None:
                     continue
                 destination, definition_line = definition
                 findings.extend(_link_destination_findings(root, repository_root, path, definition_line, destination))

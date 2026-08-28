@@ -531,6 +531,29 @@ def test_local_links_include_images_and_reference_style(tmp_path: Path) -> None:
     assert [(finding.code, finding.line) for finding in findings] == [("broken-link", 1), ("broken-link", 3)]
 
 
+def test_local_links_include_shortcut_references(tmp_path: Path) -> None:
+    source = tmp_path / "docs" / "links.md"
+    source.parent.mkdir()
+    source.write_text("[guide]\n\n[guide]: missing.md\n", encoding="utf-8")
+
+    findings = _local_link_findings(tmp_path)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("broken-link", 3)]
+
+
+def test_shortcut_reference_scan_ignores_non_shortcut_brackets(tmp_path: Path) -> None:
+    source = tmp_path / "docs" / "links.md"
+    target = tmp_path / "docs" / "guide.md"
+    source.parent.mkdir()
+    target.write_text("# Guide\n", encoding="utf-8")
+    source.write_text(
+        "[plain text]\n[inline](guide.md)\n![image](guide.md)\n[full][guide]\n[guide]: guide.md\n",
+        encoding="utf-8",
+    )
+
+    assert _local_link_findings(tmp_path) == []
+
+
 def test_ci_rejects_unbound_candidate_validator_bootstrap(tmp_path: Path) -> None:
     workflow = tmp_path / ".github" / "workflows" / "validate.yml"
     workflow.parent.mkdir(parents=True)
