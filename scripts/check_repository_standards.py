@@ -8,6 +8,7 @@ import ast
 import io
 import json
 import re
+import shlex
 import sys
 import tokenize
 import tomllib
@@ -65,6 +66,7 @@ PINNED_TOOLS = {
 }
 MISE_ACTION = "jdx/mise-action@v4"
 PR_TEMPLATE_VALIDATOR = ".github/scripts/validate_pr_template_body.py"
+PR_TEMPLATE_BOOTSTRAP_BASE = "564c5df731897f082410b9a643f518c5e301820a"
 
 
 @dataclass(frozen=True)
@@ -115,6 +117,42 @@ def _suppression_findings(root: Path, path: Path) -> list[Finding]:
 
 def _annotation_missing(argument: ast.arg) -> bool:
     return argument.annotation is None and argument.arg not in {"self", "cls"}
+
+
+def _qualified_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        owner = _qualified_name(node.value)
+        return f"{owner}.{node.attr}" if owner else node.attr
+    if isinstance(node, ast.Call):
+        return _qualified_name(node.func)
+    return None
+
+
+def _suppression_decorator_names(tree: ast.AST) -> set[str]:
+    names = {"typing.no_type_check"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(f"{alias.asname or 'typing'}.no_type_check" for alias in node.names if alias.name == "typing")
+        elif isinstance(node, ast.ImportFrom) and node.module == "typing":
+            names.update(alias.asname or alias.name for alias in node.names if alias.name == "no_type_check")
+    return names
+
+
+def _broad_exception_names(tree: ast.AST) -> set[str]:
+    names = {"BaseException", "Exception", "builtins.BaseException", "builtins.Exception"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "builtins":
+                    prefix = alias.asname or "builtins"
+                    names.update((f"{prefix}.BaseException", f"{prefix}.Exception"))
+        elif isinstance(node, ast.ImportFrom) and node.module == "builtins":
+            names.update(
+                alias.asname or alias.name for alias in node.names if alias.name in {"BaseException", "Exception"}
+            )
+    return names
 
 
 def _public_function_findings(relative: str, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[Finding]:
@@ -196,14 +234,12 @@ def _forbids_root_sdk_import(relative: str) -> bool:
     return relative.startswith(("src/skills_sdk/core/", "src/skills_sdk/models/", "src/skills_sdk/validation/"))
 
 
-def _catches_broad_exception(node: ast.expr | None) -> bool:
+def _catches_broad_exception(node: ast.expr | None, broad_names: set[str]) -> bool:
     if node is None:
         return True
-    if isinstance(node, ast.Name):
-        return node.id in {"Exception", "BaseException"}
     if isinstance(node, ast.Tuple):
-        return any(_catches_broad_exception(item) for item in node.elts)
-    return False
+        return any(_catches_broad_exception(item, broad_names) for item in node.elts)
+    return _qualified_name(node) in broad_names
 
 
 def _python_findings(root: Path, path: Path) -> list[Finding]:
@@ -218,12 +254,18 @@ def _python_findings(root: Path, path: Path) -> list[Finding]:
     except SyntaxError as error:
         return [*findings, Finding(relative, error.lineno or 1, "syntax", error.msg)]
     forbidden = _forbidden_imports(relative)
+    broad_exception_names = _broad_exception_names(tree)
+    suppression_decorators = _suppression_decorator_names(tree)
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             findings.extend(_public_function_findings(relative, node))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and any(
+            _qualified_name(decorator) in suppression_decorators for decorator in node.decorator_list
+        ):
+            findings.append(Finding(relative, node.lineno, "suppression", "no_type_check decorators are forbidden"))
         elif isinstance(node, ast.Global):
             findings.append(Finding(relative, node.lineno, "global-state", "global declarations are forbidden"))
-        elif isinstance(node, ast.ExceptHandler) and _catches_broad_exception(node.type):
+        elif isinstance(node, ast.ExceptHandler) and _catches_broad_exception(node.type, broad_exception_names):
             findings.append(Finding(relative, node.lineno, "broad-except", "catch a specific exception"))
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -269,34 +311,54 @@ def _local_link_findings(root: Path) -> list[Finding]:
     markdown_paths.extend(
         root / name for name in PORTABLE_TEXT_FILES if name.endswith(".md") and (root / name).is_file()
     )
-    link_pattern = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
+    inline_link_pattern = re.compile(r"!?\[[^]]*]\(([^)]+)\)")
+    reference_link_pattern = re.compile(r"!?\[(?P<text>[^]]*)]\[(?P<label>[^]]*)]")
+    reference_definition_pattern = re.compile(r"^\s*\[(?P<label>[^]]+)]\s*:\s*(?P<destination>\S+)")
     for path in sorted(set(markdown_paths)):
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-            for match in link_pattern.finditer(line):
-                destination_tokens = match.group(1).strip().split()
-                destination = destination_tokens[0].strip("<>") if destination_tokens else ""
-                if not destination or destination.startswith(("#", "http://", "https://", "mailto:")):
-                    continue
-                target = (path.parent / destination.split("#", 1)[0]).resolve()
-                try:
-                    target.relative_to(repository_root)
-                except ValueError:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        definitions = {
+            match.group("label").casefold(): (match.group("destination"), line_number)
+            for line_number, line in enumerate(lines, start=1)
+            if (match := reference_definition_pattern.match(line))
+        }
+        for line_number, line in enumerate(lines, start=1):
+            for match in inline_link_pattern.finditer(line):
+                findings.extend(_link_destination_findings(root, repository_root, path, line_number, match.group(1)))
+            for match in reference_link_pattern.finditer(line):
+                label = (match.group("label") or match.group("text")).casefold()
+                definition = definitions.get(label)
+                if definition is None:
                     findings.append(
-                        Finding(
-                            _relative(root, path),
-                            line_number,
-                            "broken-link",
-                            f"local target escapes repository root {destination!r}",
-                        )
+                        Finding(_relative(root, path), line_number, "broken-link", f"missing reference {label!r}")
                     )
                     continue
-                if not target.exists():
-                    findings.append(
-                        Finding(
-                            _relative(root, path), line_number, "broken-link", f"missing local target {destination!r}"
-                        )
-                    )
+                destination, definition_line = definition
+                findings.extend(_link_destination_findings(root, repository_root, path, definition_line, destination))
     return findings
+
+
+def _link_destination_findings(
+    root: Path, repository_root: Path, path: Path, line_number: int, raw_destination: str
+) -> list[Finding]:
+    destination_tokens = raw_destination.strip().split()
+    destination = destination_tokens[0].strip("<>") if destination_tokens else ""
+    if not destination or destination.startswith(("#", "http://", "https://", "mailto:")):
+        return []
+    target = (path.parent / destination.split("#", 1)[0]).resolve()
+    try:
+        target.relative_to(repository_root)
+    except ValueError:
+        return [
+            Finding(
+                _relative(root, path),
+                line_number,
+                "broken-link",
+                f"local target escapes repository root {destination!r}",
+            )
+        ]
+    if not target.exists():
+        return [Finding(_relative(root, path), line_number, "broken-link", f"missing local target {destination!r}")]
+    return []
 
 
 def _dependency_version(requirements: Sequence[str], package: str) -> str | None:
@@ -333,6 +395,23 @@ def _tooling_suppression_findings(pyproject: dict[str, Any]) -> list[Finding]:
                 1,
                 "tool-suppression",
                 f"prohibited MyPy suppression keys: {sorted(prohibited_mypy)}",
+            )
+        )
+    pytest_options = pyproject.get("tool", {}).get("pytest", {}).get("ini_options", {}).get("addopts", "")
+    option_tokens = shlex.split(pytest_options) if isinstance(pytest_options, str) else list(pytest_options)
+    prohibited_pytest = {
+        token
+        for token in option_tokens
+        if token in {"-k", "-m", "--deselect", "--ignore", "--ignore-glob", "--pyargs"}
+        or token.startswith(("-k", "-m", "--deselect=", "--ignore=", "--ignore-glob="))
+    }
+    if prohibited_pytest:
+        findings.append(
+            Finding(
+                "pyproject.toml",
+                1,
+                "test-selection",
+                f"prohibited pytest selection options: {sorted(prohibited_pytest)}",
             )
         )
     return findings
@@ -391,6 +470,22 @@ def _config_findings(root: Path) -> list[Finding]:
         for job in workflow.get("jobs", {}).values():
             steps = [step for step in job.get("steps", []) if isinstance(step, dict)]
             run_steps = [str(step.get("run", "")) for step in steps]
+            for run_step in run_steps:
+                if "validator=.github/scripts/validate_pr_template_body.py" in run_step and not all(
+                    fragment in run_step
+                    for fragment in (
+                        f"bootstrap_base={PR_TEMPLATE_BOOTSTRAP_BASE}",
+                        '${{ github.event.pull_request.base.sha }}" != "$bootstrap_base',
+                    )
+                ):
+                    findings.append(
+                        Finding(
+                            _relative(root, path),
+                            1,
+                            "pr-template-bootstrap",
+                            "candidate validator fallback must be bound to the approved bootstrap base",
+                        )
+                    )
             pr_template_indexes = [
                 index
                 for index, run_step in enumerate(run_steps)

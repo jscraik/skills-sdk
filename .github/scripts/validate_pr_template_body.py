@@ -15,6 +15,7 @@ SECTION_RE = re.compile(r"^## (?P<title>.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^- \[(?P<state>[ xX])\] (?P<label>.+?)\s*$", re.MULTILINE)
 FIELD_LINE_RE = re.compile(r"^- (?P<label>[^:\n]+):(?P<value>.*)$", re.MULTILINE)
 STATUS_RE = re.compile(r"^\*\*\((?:pending|n\.a\.|n/a|not applicable)\)\*\*\s*", re.IGNORECASE)
+BARE_NOT_APPLICABLE_RE = re.compile(r"^(?:n\.a\.|n/a|not applicable)\.?$", re.IGNORECASE)
 FENCE_START_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[^\n]*$")
 PLACEHOLDER_RE = re.compile(
     r"<(?:[A-Z][A-Z0-9_]*(?:[- ][A-Z0-9_]+)*|"
@@ -156,6 +157,11 @@ def _structure_errors(contract: TemplateContract, body: str) -> list[str]:
             for field in expected_fields
             if field in values and not values[field]
         )
+        errors.extend(
+            f"Not-applicable field in ## {section} requires a concrete reason: {field}:"
+            for field in expected_fields
+            if field in values and BARE_NOT_APPLICABLE_RE.fullmatch(values[field])
+        )
         errors.extend(f"Unexpected field in ## {section}: {field}:" for field in values if field not in expected_fields)
     actual_checklist = tuple(
         _normalize_checklist_label(match.group("label")) for match in CHECKBOX_RE.finditer(blocks.get("Checklist", ""))
@@ -182,7 +188,7 @@ def _command_errors(body: str) -> list[str]:
         return ["Validation must include at least one Command evidence line."]
     errors = [f"Invalid Command evidence: {line}" for line in command_lines if COMMAND_RE.fullmatch(line) is None]
     errors.extend(
-        f"Passing Command evidence cannot report a blocked or unexecuted command: {line}"
+        f"Passing Command evidence cannot contradict the execution result: {line}"
         for line in command_lines
         if _passing_command_contradicts_execution(line)
     )
@@ -203,7 +209,11 @@ def _passing_command_contradicts_execution(line: str) -> bool:
     for index, word in enumerate(words):
         previous = words[index - 1] if index else None
         following = words[index + 1] if index + 1 < len(words) else None
-        if word in {"blocked", "unexecuted"} and previous != "not":
+        if word in {"blocked", "error", "errors", "fail", "failed", "failure", "unexecuted"} and previous not in {
+            "no",
+            "not",
+            "zero",
+        }:
             return True
         if word == "not" and following in {"executed", "run"}:
             return True

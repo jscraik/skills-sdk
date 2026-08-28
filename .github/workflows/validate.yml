@@ -32,6 +32,11 @@ jobs:
           validator=trusted-base/.github/scripts/validate_pr_template_body.py
           template=trusted-base/.github/PULL_REQUEST_TEMPLATE.md
           if [[ ! -f "$validator" ]]; then
+            bootstrap_base=564c5df731897f082410b9a643f518c5e301820a
+            if [[ "${{ github.event.pull_request.base.sha }}" != "$bootstrap_base" ]]; then
+              echo "::error::Trusted base is missing the PR template validator outside the one approved bootstrap revision."
+              exit 1
+            fi
             echo "::notice::Bootstrapping the SDK PR template validator from the candidate."
             validator=.github/scripts/validate_pr_template_body.py
             template=.github/PULL_REQUEST_TEMPLATE.md

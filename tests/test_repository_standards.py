@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from scripts.check_repository_standards import (
+    PR_TEMPLATE_BOOTSTRAP_BASE,
     PYTHON_ROOTS,
     _config_findings,
     _iter_files,
@@ -91,6 +92,27 @@ def test_suppression_comment_is_rejected_without_baseline_exceptions(tmp_path: P
     findings = _python_findings(tmp_path, source)
 
     assert [(finding.code, finding.line) for finding in findings] == [("suppression", 1)]
+
+
+@pytest.mark.parametrize(
+    "source_text",
+    [
+        "import typing\n@typing.no_type_check\ndef checked(value: int) -> int:\n    return value\n",
+        "from typing import no_type_check\n@no_type_check\ndef checked(value: int) -> int:\n    return value\n",
+        "from typing import no_type_check as unchecked\n"
+        "@unchecked\n"
+        "def checked(value: int) -> int:\n"
+        "    return value\n",
+    ],
+)
+def test_no_type_check_decorator_is_rejected(tmp_path: Path, source_text: str) -> None:
+    source = tmp_path / "tests" / "fixture.py"
+    source.parent.mkdir()
+    source.write_text(source_text, encoding="utf-8")
+
+    findings = _python_findings(tmp_path, source)
+
+    assert any(finding.code == "suppression" and finding.line == 3 for finding in findings)
 
 
 def test_public_annotation_and_dependency_findings_are_typed(tmp_path: Path) -> None:
@@ -470,6 +492,66 @@ def test_tuple_containing_broad_exception_is_rejected(tmp_path: Path) -> None:
     findings = _python_findings(tmp_path, source)
 
     assert any(finding.code == "broad-except" for finding in findings)
+
+
+@pytest.mark.parametrize(
+    "source_text",
+    [
+        "import builtins\ntry:\n    pass\nexcept builtins.Exception:\n    pass\n",
+        "import builtins as core\ntry:\n    pass\nexcept core.BaseException:\n    pass\n",
+        "from builtins import Exception as Failure\ntry:\n    pass\nexcept Failure:\n    pass\n",
+    ],
+)
+def test_qualified_or_aliased_broad_exception_is_rejected(tmp_path: Path, source_text: str) -> None:
+    source = tmp_path / "tests" / "fixture.py"
+    source.parent.mkdir()
+    source.write_text(source_text, encoding="utf-8")
+
+    findings = _python_findings(tmp_path, source)
+
+    assert any(finding.code == "broad-except" and finding.line == 4 for finding in findings)
+
+
+@pytest.mark.parametrize("addopts", ["-q --ignore=tests/slow", "--deselect tests/test_api.py::test_case", "-k smoke"])
+def test_pytest_selection_suppression_is_rejected(addopts: str) -> None:
+    pyproject = {"tool": {"ruff": {"lint": {}}, "mypy": {}, "pytest": {"ini_options": {"addopts": addopts}}}}
+
+    findings = _tooling_suppression_findings(pyproject)
+
+    assert [finding.code for finding in findings] == ["test-selection"]
+
+
+def test_local_links_include_images_and_reference_style(tmp_path: Path) -> None:
+    source = tmp_path / "docs" / "links.md"
+    source.parent.mkdir()
+    source.write_text("![diagram](missing.png)\n[guide][g]\n[g]: missing.md\n", encoding="utf-8")
+
+    findings = _local_link_findings(tmp_path)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("broken-link", 1), ("broken-link", 3)]
+
+
+def test_ci_rejects_unbound_candidate_validator_bootstrap(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "validate.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  validate:\n    steps:\n      - run: |\n"
+        "          validator=.github/scripts/validate_pr_template_body.py\n",
+        encoding="utf-8",
+    )
+    for relative in ("pyproject.toml", ".mise.toml", "uv.lock", ".gitignore"):
+        (tmp_path / relative).write_text((REPOSITORY_ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+
+    findings = _config_findings(tmp_path)
+
+    assert any(finding.code == "pr-template-bootstrap" for finding in findings)
+
+
+def test_ci_binds_candidate_validator_fallback_to_approved_base() -> None:
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
+
+    assert f"bootstrap_base={PR_TEMPLATE_BOOTSTRAP_BASE}" in workflow
+    assert '${{ github.event.pull_request.base.sha }}" != "$bootstrap_base' in workflow
 
 
 def test_malformed_indentation_is_a_typed_tokenize_finding(tmp_path: Path) -> None:

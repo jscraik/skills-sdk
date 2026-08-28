@@ -198,7 +198,7 @@ def test_rejects_passing_command_with_nonexecution_detail(detail: str) -> None:
 
     errors = validator.validate_pr_body(_template(), body)
 
-    assert any("cannot report a blocked or unexecuted command" in error for error in errors)
+    assert any("cannot contradict the execution result" in error for error in errors)
 
 
 @pytest.mark.parametrize("detail", ["not blocked; executed", "not   blocked; executed", "not-unexecuted"])
@@ -207,6 +207,31 @@ def test_allows_passing_command_with_negated_blocker_detail(detail: str) -> None
     body = _filled_body().replace(
         "`bash scripts/validate-repository.sh` -> pass",
         f"`bash scripts/validate-repository.sh` -> pass ({detail})",
+        1,
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []
+
+
+@pytest.mark.parametrize("detail", ["tests failed", "failure", "error", "three errors"])
+def test_rejects_passing_command_with_failure_detail(detail: str) -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "`bash scripts/validate-repository.sh` -> pass",
+        f"`bash scripts/validate-repository.sh` -> pass ({detail})",
+        1,
+    )
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert any("cannot contradict the execution result" in error for error in errors)
+
+
+def test_allows_passing_command_with_negated_error_detail() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "`bash scripts/validate-repository.sh` -> pass",
+        "`bash scripts/validate-repository.sh` -> pass (no errors; tests passed)",
         1,
     )
 
@@ -224,6 +249,30 @@ def test_command_line_does_not_fill_empty_required_field() -> None:
     errors = validator.validate_pr_body(_template(), body)
 
     assert "Required field in ## Validation is empty: Regression coverage:" in errors
+
+
+@pytest.mark.parametrize("marker", ["n.a.", "N/A", "not applicable"])
+def test_rejects_bare_not_applicable_field(marker: str) -> None:
+    validator = _load_validator()
+    body = _filled_body().replace("- Public API impact: repo-relative evidence", f"- Public API impact: {marker}", 1)
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert (
+        "Not-applicable field in ## Contract and evidence boundaries requires a concrete reason: Public API impact:"
+        in errors
+    )
+
+
+def test_allows_not_applicable_field_with_reason() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- Public API impact: repo-relative evidence",
+        "- Public API impact: n.a. because no public model changes.",
+        1,
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []
 
 
 def test_rejects_local_absolute_path() -> None:
