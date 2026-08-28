@@ -257,10 +257,14 @@ class PackageInventoryRecord(_ContractModel):
             PackageDisposition.MERGE_WITH_EXISTING,
         ):
             raise ValueError("retire value decision cannot admit or merge a package")
-        if self.intended_disposition in (
-            PackageDisposition.ADMIT_TO_FOUNDRY,
-            PackageDisposition.MERGE_WITH_EXISTING,
-        ) and self.mantra.overall != MantraStatus.PASS:
+        if (
+            self.intended_disposition
+            in (
+                PackageDisposition.ADMIT_TO_FOUNDRY,
+                PackageDisposition.MERGE_WITH_EXISTING,
+            )
+            and self.mantra.overall != MantraStatus.PASS
+        ):
             raise ValueError("admission and merge require a passing mantra assessment")
         return self
 
@@ -304,9 +308,7 @@ class PackageInventoryRecordV2(PackageInventoryRecord):
             self.intended_disposition != PackageDisposition.NEEDS_OWNER_DECISION
             or "value_review_required" not in self.blocker_codes
         ):
-            raise ValueError(
-                "needs_review value decision requires needs_owner_decision and value_review_required"
-            )
+            raise ValueError("needs_review value decision requires needs_owner_decision and value_review_required")
         return self
 
 

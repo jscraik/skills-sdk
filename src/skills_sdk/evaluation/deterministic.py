@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Literal
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.evaluation import (
@@ -100,7 +101,7 @@ def _evaluate_case(case: ScenarioCase, observation: ScenarioObservation) -> Scen
     missing_signals = tuple(signal for signal in case.expected_signals if signal not in observed_signals)
     forbidden = set(case.forbidden_commands)
     forbidden_observed = tuple(command for command in observation.observed_commands if command in forbidden)
-    status = "fail" if missing_signals or forbidden_observed else "pass"
+    status: Literal["pass", "fail"] = "fail" if missing_signals or forbidden_observed else "pass"
     if observation.output_sha256 is None:
         raise ValueError("completed observation must contain output_sha256")
     return ScenarioCaseResult(
@@ -208,7 +209,7 @@ def evaluate_scenario_set(
         )
     passed = sum(result.status == "pass" for result in results)
     score = passed / len(results)
-    status = "pass" if score >= scorer.pass_threshold else "fail"
+    status: Literal["pass", "fail"] = "pass" if score >= scorer.pass_threshold else "fail"
     return EvaluationReceipt(
         receipt_id=_receipt_id(
             scenario_set,

@@ -10,6 +10,7 @@ Use the smallest explicit route for the current task:
 uv sync --frozen
 uv run skills-sdk --help
 uv run skills-sdk inventory --help
+bash scripts/validate-codestyle.sh
 bash scripts/validate-repository.sh
 ```
 
@@ -17,3 +18,6 @@ The `inventory --help` route is the first detailed contract route. Commands
 that prepare, publish, install, or activate a candidate remain separate
 evidence lanes; `tessl prepare` does not publish and `project` does not prove
 runtime behavior.
+
+The standards and tool-pin contract is documented in
+[`CODESTYLE.md`](../CODESTYLE.md) and [`docs/standards.md`](standards.md).

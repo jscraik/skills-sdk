@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
@@ -62,6 +62,11 @@ _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
 _MODEL_ID_URI_SCHEME_SCHEMA_PATTERN = r"^[A-Za-z][A-Za-z0-9+.-]*:"
+
+
+class _SchemaModel(Protocol):
+    @classmethod
+    def model_json_schema(cls) -> dict[str, Any]: ...
 
 
 def _append_portable_path_constraints(schema: Any) -> None:
@@ -526,8 +531,8 @@ def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> N
     ]
 
 
-def _render_schema(model: type[object], filename: str) -> str:
-    schema = model.model_json_schema()  # type: ignore[attr-defined]
+def _render_schema(model: type[_SchemaModel], filename: str) -> str:
+    schema = model.model_json_schema()
     _append_portable_path_constraints(schema)
     _append_provider_identity_constraints(schema)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:

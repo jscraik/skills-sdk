@@ -8,7 +8,7 @@ import re
 import stat
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 import yaml
 
@@ -73,15 +73,17 @@ def _open_directory_tree(path: Path) -> int:
     flags = os.O_RDONLY | directory_flag | nofollow_flag
     absolute = path.absolute()
     descriptor = os.open(absolute.anchor, flags)
+    traversal_completed = False
     try:
         for component in absolute.parts[1:]:
             child = os.open(component, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = child
+        traversal_completed = True
         return descriptor
-    except BaseException:
-        os.close(descriptor)
-        raise
+    finally:
+        if not traversal_completed:
+            os.close(descriptor)
 
 
 def _finding(code: str, message: str, *refs: str) -> SkillPackageFinding:
@@ -367,7 +369,9 @@ def validate_skill_package(
             except (ValueError, yaml.YAMLError):
                 findings.append(_finding("invalid_frontmatter", "SKILL.md frontmatter must be valid YAML", "SKILL.md"))
     candidate = _candidate(root, source_revision, files) if revision_is_valid else None
-    status = "blocked" if any(item.severity is ValidationSeverity.BLOCKER for item in findings) else "pass"
+    status: Literal["pass", "blocked"] = (
+        "blocked" if any(item.severity is ValidationSeverity.BLOCKER for item in findings) else "pass"
+    )
     return SkillPackageValidation(
         candidate=candidate,
         status=status,

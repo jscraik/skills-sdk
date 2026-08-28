@@ -87,22 +87,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "validate":
         from skills_sdk.validation import validate_skill_package
 
-        result = validate_skill_package(
+        validation_result = validate_skill_package(
             arguments.package_root,
             source_revision=arguments.source_revision or "",
             policy=policy,
         )
-        successful = result.status == "pass"
+        successful = validation_result.status == "pass"
+        _print_result(arguments.command, validation_result, json_output=arguments.json_output)
     else:
         from skills_sdk.packaging import build_skill_package
 
-        result = build_skill_package(
+        package_result = build_skill_package(
             arguments.package_root,
             source_revision=arguments.source_revision or "",
             policy=policy,
         )
-        successful = result.status == "built"
-    _print_result(arguments.command, result, json_output=arguments.json_output)
+        successful = package_result.status == "built"
+        _print_result(arguments.command, package_result, json_output=arguments.json_output)
     return 0 if successful else 2
 
 

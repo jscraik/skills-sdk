@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -172,9 +174,11 @@ def test_risk_schema_propagates_selected_sensor_receipt_requirement() -> None:
         ("security-blocked.json", lambda payload: payload["findings"][0].update(severity="warning")),
     ],
 )
-def test_security_schema_enforces_status_and_finding_severity(filename: str, mutation: object) -> None:
+def test_security_schema_enforces_status_and_finding_severity(
+    filename: str, mutation: Callable[[dict[str, Any]], None]
+) -> None:
     payload = json.loads((FIXTURE_ROOT / filename).read_text(encoding="utf-8"))
-    mutation(payload)  # type: ignore[operator]
+    mutation(payload)
     assert _schema_errors("security-screening.v1", payload)
 
 

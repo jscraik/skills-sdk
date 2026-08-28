@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
@@ -27,7 +29,9 @@ def _candidate(*, digest: str = "a" * 64) -> PackageCandidateIdentity:
     )
 
 
-def _scenario_set(*, oracle: str = "expected_signal") -> ScenarioSet:
+def _scenario_set(
+    *, oracle: Literal["exact_match", "expected_signal", "structured"] = "expected_signal"
+) -> ScenarioSet:
     return ScenarioSet(
         candidate=_candidate(),
         scenario_set_id="release-1",
@@ -404,9 +408,7 @@ def test_runner_identity_is_bound_into_result_and_receipt_identity() -> None:
     scenario_set = _scenario_set()
     original = _observations(scenario_set)
     changed = list(original)
-    changed[0] = original[0].model_copy(
-        update={"runner_id": "replacement-runner", "runner_version_or_digest": "v2"}
-    )
+    changed[0] = original[0].model_copy(update={"runner_id": "replacement-runner", "runner_version_or_digest": "v2"})
 
     first = evaluate_scenario_set(
         scenario_set,
