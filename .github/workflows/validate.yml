@@ -48,7 +48,7 @@ jobs:
           exit 1
       - uses: jdx/mise-action@v4
         with:
-          install_args: "uv vale"
+          install_args: "uv ruff vale"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

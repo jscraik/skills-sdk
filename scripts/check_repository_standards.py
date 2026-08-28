@@ -21,7 +21,7 @@ import yaml
 MAX_MODULE_LINES = 800
 MAX_FUNCTION_LINES = 120
 MAX_PUBLIC_PARAMETERS = 5
-PYTHON_ROOTS = ("src", "scripts", "tests")
+PYTHON_ROOTS = ("src", "scripts", "tests", ".github/scripts")
 TEXT_ROOTS = ("src", "scripts", "tests", "docs")
 PORTABLE_TEXT_FILES = (
     "AGENTS.md",
@@ -50,6 +50,7 @@ SUPPRESSION_FRAGMENTS = (
 MACHINE_PATH_PATTERNS = (
     re.compile("/" + r"Users/[^/\s]+/"),
     re.compile("/" + r"home/[^/\s]+/"),
+    re.compile(r"(?<![\w.])/" + r"(?:private|tmp|workspace|var/folders)(?:/[^/\s]+)+"),
     re.compile(r"[A-Za-z]:\\" + r"Users\\[^\\\s]+\\"),
 )
 PINNED_TOOLS = {
@@ -191,6 +192,10 @@ def _forbidden_imports(relative: str) -> tuple[str, ...]:
     return ()
 
 
+def _forbids_root_sdk_import(relative: str) -> bool:
+    return relative.startswith(("src/skills_sdk/core/", "src/skills_sdk/models/"))
+
+
 def _catches_broad_exception(node: ast.expr | None) -> bool:
     if node is None:
         return True
@@ -223,7 +228,8 @@ def _python_findings(root: Path, path: Path) -> list[Finding]:
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             for target in _import_targets(node, relative):
-                if any(target == prefix or target.startswith(f"{prefix}.") for prefix in forbidden):
+                root_import = target == "skills_sdk" and _forbids_root_sdk_import(relative)
+                if root_import or any(target == prefix or target.startswith(f"{prefix}.") for prefix in forbidden):
                     findings.append(
                         Finding(relative, node.lineno, "dependency-direction", f"forbidden import {target!r}")
                     )
@@ -400,7 +406,7 @@ def _config_findings(root: Path) -> list[Finding]:
                 and step.get("with", {}).get("install", True) is not False
                 and (
                     "install_args" not in step.get("with", {})
-                    or {"uv", "vale"} <= set(str(step["with"]["install_args"]).split())
+                    or {"uv", "ruff", "vale"} <= set(str(step["with"]["install_args"]).split())
                 )
             ]
             if not mise_indexes or min(mise_indexes) > min(validate_indexes):
@@ -409,7 +415,7 @@ def _config_findings(root: Path) -> list[Finding]:
                         _relative(root, path),
                         1,
                         "ci-tooling",
-                        f"{MISE_ACTION} must install uv and Vale before repository validation",
+                        f"{MISE_ACTION} must install uv, Ruff, and Vale before repository validation",
                     )
                 )
             if pr_template_indexes and (

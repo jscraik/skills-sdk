@@ -211,7 +211,7 @@ def test_non_blocked_receipt_rejects_blocker() -> None:
 @pytest.mark.parametrize(
     "value",
     [
-        "/tmp/receipt.json",
+        "/" + "tmp/receipt.json",
         "../receipt.json",
         "C:/receipt.json",
         "a\\b.json",
@@ -227,7 +227,7 @@ def test_non_portable_paths_are_rejected(value: str) -> None:
 
 def test_receipt_schema_rejects_candidate_shape_drift() -> None:
     payload: dict[str, Any] = copy.deepcopy(_receipt())
-    payload["candidate"]["runtime_path"] = "/tmp/synthetic"
+    payload["candidate"]["runtime_path"] = "/" + "tmp/synthetic"
     with pytest.raises(ContractError, match="contract_validation_failed"):
         parse_receipt(payload)
 

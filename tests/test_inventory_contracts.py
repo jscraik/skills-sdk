@@ -82,7 +82,9 @@ def test_inventory_record_is_frozen_and_versioned() -> None:
 
 def test_inventory_rejects_absolute_or_escaping_paths() -> None:
     with pytest.raises(ValidationError, match="invalid_portable_path"):
-        PackageInventoryRecord.model_validate(_record().model_dump() | {"current_path": "/tmp/skills/synthetic-skill"})
+        PackageInventoryRecord.model_validate(
+            _record().model_dump() | {"current_path": "/" + "tmp/skills/synthetic-skill"}
+        )
     with pytest.raises(ValidationError, match="invalid_portable_path"):
         PackageInventoryRecord.model_validate(_record().model_dump() | {"current_path": "../skills/synthetic-skill"})
 

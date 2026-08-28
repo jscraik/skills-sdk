@@ -109,6 +109,17 @@ def test_allows_explicit_pending_checklist_state() -> None:
     assert validator.validate_pr_body(_template(), body) == []
 
 
+def test_allows_documented_dotted_not_applicable_checklist_state() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- [x] The branch will be removed after merge.",
+        "- [ ] **(n.a.)** The branch will be removed after merge.",
+        1,
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []
+
+
 def test_rejects_unclassified_unchecked_checklist_item() -> None:
     validator = _load_validator()
     body = _filled_body().replace("- [x] The branch will", "- [ ] The branch will", 1)
@@ -127,10 +138,32 @@ def test_rejects_missing_or_malformed_command_evidence() -> None:
     assert any("Invalid Command evidence" in error for error in errors)
 
 
+def test_rejects_not_applicable_command_outcome() -> None:
+    validator = _load_validator()
+    body = re.sub(r"^- Command:.*$", "- Command: pytest -> n.a. (not run)", _filled_body(), flags=re.MULTILINE)
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert any("Invalid Command evidence" in error for error in errors)
+
+
+def test_command_line_does_not_fill_empty_required_field() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- Regression coverage: focused contract proof\n",
+        "- Regression coverage:\n",
+        1,
+    )
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert "Required field in ## Validation is empty: Regression coverage:" in errors
+
+
 def test_rejects_local_absolute_path() -> None:
     validator = _load_validator()
     body = _filled_body().replace(
-        "- Problem: repo-relative evidence", "- Problem: observed at /private/tmp/sdk-fixture"
+        "- Problem: repo-relative evidence", "- Problem: observed at /" + "private/tmp/sdk-fixture"
     )
 
     errors = validator.validate_pr_body(_template(), body)

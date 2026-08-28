@@ -7,8 +7,11 @@ from pathlib import Path
 import pytest
 
 from scripts.check_repository_standards import (
+    PYTHON_ROOTS,
     _config_findings,
+    _iter_files,
     _local_link_findings,
+    _portable_text_findings,
     _python_findings,
     _tool_pin_findings,
     _tooling_suppression_findings,
@@ -158,6 +161,27 @@ def test_package_level_forbidden_import_alias_is_rejected(tmp_path: Path, statem
     assert [(finding.code, finding.line) for finding in findings] == [("dependency-direction", 1)]
 
 
+def test_lower_layer_rejects_bare_root_sdk_import(tmp_path: Path) -> None:
+    source = tmp_path / "src" / "skills_sdk" / "core" / "fixture.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("import skills_sdk\n", encoding="utf-8")
+
+    findings = _python_findings(tmp_path, source)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("dependency-direction", 1)]
+
+
+def test_python_roots_include_github_validation_scripts(tmp_path: Path) -> None:
+    source = tmp_path / ".github" / "scripts" / "fixture.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("value: int = 1  # type:" + " ignore\n", encoding="utf-8")
+
+    paths = list(_iter_files(tmp_path, PYTHON_ROOTS, (".py",)))
+
+    assert source in paths
+    assert [(finding.code, finding.line) for finding in _python_findings(tmp_path, source)] == [("suppression", 1)]
+
+
 @pytest.mark.parametrize(
     "directive",
     ["# mypy: ignore-errors\n", "# mypy: disable-error-code=assignment\n"],
@@ -176,8 +200,21 @@ def test_validation_wrappers_use_repository_pinned_mise_toolchain() -> None:
     for relative in ("scripts/validate-codestyle.sh", "scripts/validate-repository.sh"):
         script = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
         assert 'MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"' in script
-        assert "mise exec -- uv " in script
+        assert "mise exec -- uv run --frozen " in script
         assert not any(line.startswith("uv ") for line in script.splitlines())
+
+
+def test_portable_text_rejects_checkout_and_temp_paths(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "paths.md").write_text(
+        "Checkout: /" + "workspace/skills-sdk/source.py\nTemp: /" + "tmp/skills-sdk/result.json\n",
+        encoding="utf-8",
+    )
+
+    findings = _portable_text_findings(tmp_path)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("machine-path", 1), ("machine-path", 2)]
 
 
 def test_tooling_suppression_configuration_is_rejected() -> None:
@@ -293,6 +330,7 @@ def test_ci_fetches_live_pr_body_for_template_validation() -> None:
     assert '--body-file "$body_file"' in workflow
     assert "for attempt in 1 2 3 4" in workflow
     assert "github.event.pull_request.body" not in workflow
+    assert 'install_args: "uv ruff vale"' in workflow
 
 
 def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) -> None:
@@ -309,7 +347,7 @@ def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) ->
         '--body-file "$body_file"\n'
         "      - uses: jdx/mise-action@v4\n"
         "        with:\n"
-        '          install_args: "uv vale"\n'
+        '          install_args: "uv ruff vale"\n'
         "      - run: bash scripts/validate-repository.sh\n",
         encoding="utf-8",
     )

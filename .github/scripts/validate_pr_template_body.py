@@ -14,7 +14,7 @@ from pathlib import Path
 SECTION_RE = re.compile(r"^## (?P<title>.+?)\s*$", re.MULTILINE)
 CHECKBOX_RE = re.compile(r"^- \[[ xX]\] (?P<label>.+?)\s*$", re.MULTILINE)
 FIELD_LINE_RE = re.compile(r"^- (?P<label>[^:\n]+):(?P<value>.*)$", re.MULTILINE)
-STATUS_RE = re.compile(r"^\*\*\((?:pending|n/a|not applicable)\)\*\*\s*", re.IGNORECASE)
+STATUS_RE = re.compile(r"^\*\*\((?:pending|n\.a\.|n/a|not applicable)\)\*\*\s*", re.IGNORECASE)
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PLACEHOLDER_RE = re.compile(r"<[^>\n]+>")
 LOCAL_ABSOLUTE_PATH_RE = re.compile(
@@ -22,8 +22,7 @@ LOCAL_ABSOLUTE_PATH_RE = re.compile(
 )
 COMMAND_RE = re.compile(
     r"^-\s*Command:\s*(?:`[^\n`]+`|(?=\S).*?\S)\s*->\s*"
-    r"(?:(?:pass|fail)(?:\s*\([^)]+\)\.?)?|"
-    r"(?:n\.a\.|n/a)(?:\s*\([^)]+\))?|blocked\s*\([^)]+\))\s*$",
+    r"(?:(?:pass|fail)(?:\s*\([^)]+\)\.?)?|blocked\s*\([^)]+\))\s*$",
     re.IGNORECASE,
 )
 
@@ -73,12 +72,14 @@ def _template_contract(template: str) -> TemplateContract:
 
 
 def _field_values(block: str) -> tuple[dict[str, str], Counter[str]]:
-    matches = [match for match in FIELD_LINE_RE.finditer(block) if match.group("label").strip() != "Command"]
+    matches = list(FIELD_LINE_RE.finditer(block))
     values: dict[str, str] = {}
     counts: Counter[str] = Counter()
     for index, match in enumerate(matches):
         next_start = matches[index + 1].start() if index + 1 < len(matches) else len(block)
         label = match.group("label").strip()
+        if label == "Command":
+            continue
         continuation = block[match.end() : next_start].strip()
         counts[label] += 1
         values[label] = f"{match.group('value').strip()}\n{continuation}".strip()

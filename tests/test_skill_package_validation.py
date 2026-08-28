@@ -149,7 +149,7 @@ def test_distinct_invalid_roots_cannot_alias_candidate_identity(tmp_path: Path) 
 
 
 def test_surrogate_root_name_has_deterministic_fallback_identity() -> None:
-    candidate = skill_package_module._candidate(Path("/tmp/bad-\udcff"), REVISION, [])
+    candidate = skill_package_module._candidate(Path("/" + "tmp/bad-\udcff"), REVISION, [])
 
     assert candidate.package_id.startswith("invalid-package-")
 
@@ -216,7 +216,7 @@ def test_missing_source_is_blocked_without_touching_filesystem(tmp_path: Path) -
     assert not root.exists()
 
 
-@pytest.mark.parametrize("reference", ["/tmp/x", "../x", "a//b", "a/./b"])
+@pytest.mark.parametrize("reference", ["/" + "tmp/x", "../x", "a//b", "a/./b"])
 def test_finding_evidence_refs_require_portable_paths(reference: str) -> None:
     from pydantic import ValidationError
 
