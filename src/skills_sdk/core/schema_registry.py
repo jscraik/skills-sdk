@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import json
+import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib.resources import files
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from referencing import Registry, Resource
 
 from skills_sdk.core.errors import ContractError
+
+type JsonValue = str | int | float | bool | None | dict[str, "JsonValue"] | list["JsonValue"]
+MAX_JSON_NESTING_DEPTH = 100
 
 SCHEMA_NAMES = frozenset(
     {
@@ -44,6 +49,36 @@ SCHEMA_NAMES = frozenset(
 )
 
 
+def _require_json_value(
+    value: object,
+    active_containers: set[int] | None = None,
+    depth: int = 0,
+) -> JsonValue:
+    if depth > MAX_JSON_NESTING_DEPTH:
+        raise ContractError("invalid_json_value", "schema payload exceeds the maximum JSON nesting depth")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ContractError("invalid_json_value", "schema payload cannot contain non-finite numbers")
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        raise ContractError("invalid_json_value", "schema payload must contain only JSON-compatible values")
+    if isinstance(value, (Mapping, Sequence)):
+        active = active_containers if active_containers is not None else set()
+        container_id = id(value)
+        if container_id in active:
+            raise ContractError("invalid_json_value", "schema payload cannot contain cyclic containers")
+        active.add(container_id)
+        try:
+            if isinstance(value, Mapping):
+                if not all(isinstance(key, str) for key in value):
+                    raise ContractError("invalid_json_value", "JSON object keys must be strings")
+                return {str(key): _require_json_value(item, active, depth + 1) for key, item in value.items()}
+            return [_require_json_value(item, active, depth + 1) for item in value]
+        finally:
+            active.remove(container_id)
+    raise ContractError("invalid_json_value", "schema payload must contain only JSON-compatible values")
+
+
 @dataclass(frozen=True, slots=True)
 class SchemaRegistry:
     """Resolve only known, packaged schema versions."""
@@ -73,7 +108,10 @@ class SchemaRegistry:
             format_checker=FormatChecker(),
             registry=registry,
         )
-        errors = sorted(validator.iter_errors(payload), key=lambda error: tuple(str(part) for part in error.path))
+        errors = sorted(
+            validator.iter_errors(_require_json_value(payload)),
+            key=lambda error: tuple(str(part) for part in error.path),
+        )
         if errors:
             details = tuple(error.message for error in errors)
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details)
@@ -83,6 +121,7 @@ class SchemaRegistry:
     def _validate_registered_model(name: str, payload: object) -> None:
         """Apply semantic invariants after structural schema validation."""
 
+        model: type[BaseModel]
         if name == "package-inventory.v2":
             from skills_sdk.models.inventory import PackageInventoryRecordV2
 

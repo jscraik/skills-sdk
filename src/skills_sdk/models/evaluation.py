@@ -172,9 +172,7 @@ class EvaluationReceipt(_ContractModel):
     @model_validator(mode="after")
     def receipt_is_candidate_bound(self) -> EvaluationReceipt:
         scorer_mismatch_blocked = (
-            self.status == "blocked"
-            and self.blocker is not None
-            and self.blocker.code == "scorer_candidate_mismatch"
+            self.status == "blocked" and self.blocker is not None and self.blocker.code == "scorer_candidate_mismatch"
         )
         if self.scorer.candidate != self.candidate and not scorer_mismatch_blocked:
             raise ValueError("evaluation receipt scorer must bind the same candidate")
@@ -197,11 +195,7 @@ class EvaluationReceipt(_ContractModel):
         )
         if self.completed_calibration_probe_ids != canonical_completed_probes:
             raise ValueError("completed calibration probes must follow scorer profile order")
-        if (
-            self.status != "blocked"
-            and self.scorer.calibration_required
-            and completed_probe_set != declared_probe_set
-        ):
+        if self.status != "blocked" and self.scorer.calibration_required and completed_probe_set != declared_probe_set:
             raise ValueError("completed calibration probes must match the scorer profile")
         blocked_results = tuple(result for result in self.case_results if result.status == "blocked")
         if self.status == "blocked":
@@ -216,9 +210,7 @@ class EvaluationReceipt(_ContractModel):
                 raise ValueError("completed evaluation receipt requires score and case results")
             if self.scorer.scorer_type != "deterministic":
                 raise ValueError("completed evaluation receipt requires a deterministic scorer")
-            expected_score = sum(result.status == "pass" for result in self.case_results) / len(
-                self.case_results
-            )
+            expected_score = sum(result.status == "pass" for result in self.case_results) / len(self.case_results)
             if self.score != expected_score:
                 raise ValueError("evaluation receipt score must match the case-result pass ratio")
             expected_status = "pass" if self.score >= self.scorer.pass_threshold else "fail"

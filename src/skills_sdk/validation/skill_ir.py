@@ -14,9 +14,7 @@ class _UniqueKeyLoader(yaml.SafeLoader):
     """Safe YAML loader that rejects ambiguous duplicate mapping keys."""
 
 
-def _construct_unique_mapping(
-    loader: _UniqueKeyLoader, node: yaml.MappingNode, deep: bool = False
-) -> dict[str, Any]:
+def _construct_unique_mapping(loader: _UniqueKeyLoader, node: yaml.MappingNode, deep: bool = False) -> dict[str, Any]:
     loader.flatten_mapping(node)
     mapping: dict[str, Any] = {}
     for key_node, value_node in node.value:

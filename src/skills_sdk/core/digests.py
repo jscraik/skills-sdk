@@ -9,8 +9,11 @@ from typing import Protocol
 
 
 class _ContentDigestFile(Protocol):
-    path: str
-    sha256: str
+    @property
+    def path(self) -> str: ...
+
+    @property
+    def sha256(self) -> str: ...
 
 
 def canonical_json_sha256(value: object) -> str:

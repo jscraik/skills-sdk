@@ -19,7 +19,7 @@ def test_portable_sdk_does_not_import_transitional_or_provider_hosts() -> None:
                 names = (node.module,)
             for name in names:
                 if name in FORBIDDEN_PREFIXES or name.startswith(tuple(f"{prefix}." for prefix in FORBIDDEN_PREFIXES)):
-                    violations.append(f"{path.relative_to(SDK_ROOT)}:{node.lineno}:{name}")
+                    violations.append(f"{path.relative_to(SDK_ROOT)}:{getattr(node, 'lineno', 0)}:{name}")
     assert violations == []
 
 

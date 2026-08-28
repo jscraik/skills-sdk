@@ -7,9 +7,11 @@ provider credentials, runtime state, or distribution instructions.
 Use the smallest explicit route for the current task:
 
 ```bash
-uv sync --frozen
-uv run skills-sdk --help
-uv run skills-sdk inventory --help
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
+mise exec -- uv sync --frozen
+mise exec -- uv run --frozen skills-sdk --help
+mise exec -- uv run --frozen skills-sdk inventory --help
+bash scripts/validate-codestyle.sh
 bash scripts/validate-repository.sh
 ```
 
@@ -17,3 +19,6 @@ The `inventory --help` route is the first detailed contract route. Commands
 that prepare, publish, install, or activate a candidate remain separate
 evidence lanes; `tessl prepare` does not publish and `project` does not prove
 runtime behavior.
+
+The standards and tool-pin contract is documented in
+[`CODESTYLE.md`](../CODESTYLE.md) and [`docs/standards.md`](standards.md).

@@ -29,6 +29,7 @@ def test_built_receipt_fixture_is_candidate_bound() -> None:
     payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
     receipt = PackageReceipt.model_validate(payload)
     assert receipt.status == "built"
+    assert receipt.manifest is not None
     assert receipt.manifest.candidate == receipt.candidate
     assert set(receipt.included_files) == {"README.md", "SKILL.md"}
     assert receipt.mutation_performed is False
@@ -52,6 +53,10 @@ def test_v2_receipt_binds_digest_to_canonical_manifest() -> None:
     SchemaRegistry().validate("package-receipt.v2", payload)
 
 
+def test_v2_package_receipt_preserves_v1_python_inheritance() -> None:
+    assert issubclass(PackageReceiptV2, PackageReceipt)
+
+
 def test_blocked_receipt_fixture_requires_an_explicit_blocker() -> None:
     payload = json.loads((FIXTURE_ROOT / "blocked.json").read_text(encoding="utf-8"))
     receipt = PackageReceipt.model_validate(payload)
@@ -68,6 +73,7 @@ def test_package_receipt_is_available_through_generic_parser() -> None:
     assert receipt.status == "pass"
     assert receipt.artifact_status == "built"
     assert receipt.payload["status"] == "built"
+    assert receipt.candidate is not None
     assert receipt.candidate.package_id == "synthetic-skill"
 
 

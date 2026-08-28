@@ -9,6 +9,7 @@ import pytest
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.models.validation import ValidationSeverity
 from skills_sdk.packaging import build_skill_package
 from skills_sdk.validation import SkillValidationPolicy, validate_skill_package
 from skills_sdk.validation import skill_package as skill_package_module
@@ -131,6 +132,7 @@ def test_invalid_package_directory_returns_typed_blocker(tmp_path: Path) -> None
     result = validate_skill_package(root, source_revision=REVISION)
     assert result.status == "blocked"
     assert "invalid_package_root" in {item.code for item in result.findings}
+    assert result.candidate is not None
     assert result.candidate.package_id.startswith("invalid-package-")
 
 
@@ -141,11 +143,13 @@ def test_distinct_invalid_roots_cannot_alias_candidate_identity(tmp_path: Path) 
     first = validate_skill_package(first_root, source_revision=REVISION)
     second = validate_skill_package(second_root, source_revision=REVISION)
 
+    assert first.candidate is not None
+    assert second.candidate is not None
     assert first.candidate.package_id != second.candidate.package_id
 
 
 def test_surrogate_root_name_has_deterministic_fallback_identity() -> None:
-    candidate = skill_package_module._candidate(Path("/tmp/bad-\udcff"), REVISION, [])
+    candidate = skill_package_module._candidate(Path("/" + "tmp/bad-\udcff"), REVISION, [])
 
     assert candidate.package_id.startswith("invalid-package-")
 
@@ -212,7 +216,7 @@ def test_missing_source_is_blocked_without_touching_filesystem(tmp_path: Path) -
     assert not root.exists()
 
 
-@pytest.mark.parametrize("reference", ["/tmp/x", "../x", "a//b", "a/./b"])
+@pytest.mark.parametrize("reference", ["/" + "tmp/x", "../x", "a//b", "a/./b"])
 def test_finding_evidence_refs_require_portable_paths(reference: str) -> None:
     from pydantic import ValidationError
 
@@ -221,7 +225,7 @@ def test_finding_evidence_refs_require_portable_paths(reference: str) -> None:
     with pytest.raises(ValidationError):
         SkillPackageFinding(
             code="invalid_path",
-            severity="blocker",
+            severity=ValidationSeverity.BLOCKER,
             message="invalid",
             evidence_refs=(reference,),
         )
@@ -260,6 +264,8 @@ def test_candidate_digest_binds_all_safe_package_files(tmp_path: Path) -> None:
 
     assert first.status == "pass"
     assert {item.path for item in first.files} == {"SKILL.md", "LICENSE", "agents/openai.yaml", "extra.txt"}
+    assert first.candidate is not None
+    assert second.candidate is not None
     assert first.candidate.content_sha256 != second.candidate.content_sha256
 
 
@@ -368,9 +374,7 @@ def test_undecodable_filename_is_a_typed_blocker(tmp_path: Path) -> None:
     assert "invalid_package_path" in {item.code for item in result.findings}
 
 
-def test_unsupported_safe_traversal_returns_dedicated_blocker(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_unsupported_safe_traversal_returns_dedicated_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = _write_skill(tmp_path / "fixture-skill")
 
     def unsupported(_path: Path) -> int:

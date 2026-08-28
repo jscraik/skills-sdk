@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -103,9 +104,9 @@ def test_evaluation_schemas_reject_whitespace_only_text(
     schema_name: str, fixture_name: str, field_path: tuple[str | int, ...]
 ) -> None:
     payload = json.loads((FIXTURE_ROOT / fixture_name).read_text(encoding="utf-8"))
-    target: object = payload
+    target: Any = payload
     for key in field_path[:-1]:
-        target = target[key]  # type: ignore[index]
-    target[field_path[-1]] = "   "  # type: ignore[index]
+        target = target[key]
+    target[field_path[-1]] = "   "
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate(schema_name, payload)

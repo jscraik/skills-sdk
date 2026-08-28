@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Literal, TypedDict
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.evaluation import ScorerProfile
@@ -13,8 +14,19 @@ from skills_sdk.models.evaluation_v2 import (
     ScenarioObservationV2,
     ScenarioSetV2,
 )
+from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.provider import ProviderIdentityV2
+
+
+class _CaseResultCommon(TypedDict):
+    candidate: PackageCandidateIdentity
+    scenario_set_id: str
+    case_id: str
+    provider: ProviderIdentityV2
+    evidence_refs: tuple[str, ...]
+    runner_id: str
+    runner_version_or_digest: str
 
 
 def _blocker(code: str, message: str, evidence_refs: tuple[str, ...] = ()) -> PackageReceiptBlocker:
@@ -67,7 +79,7 @@ def _blocked_receipt(
 
 
 def _evaluate_case(case: ScenarioCaseV2, observation: ScenarioObservationV2) -> ScenarioCaseResultV2:
-    common = {
+    common: _CaseResultCommon = {
         "candidate": observation.candidate,
         "scenario_set_id": observation.scenario_set_id,
         "case_id": case.case_id,
@@ -107,8 +119,9 @@ def _evaluate_case(case: ScenarioCaseV2, observation: ScenarioObservationV2) -> 
     )
     forbidden = tuple(command for command in observation.observed_commands if command in set(case.forbidden_commands))
     mismatch = case.oracle == "exact_match" and observation.output_sha256 != case.expected_output_sha256
+    status: Literal["pass", "fail"] = "fail" if missing or forbidden or mismatch else "pass"
     return ScenarioCaseResultV2(
-        status="fail" if missing or forbidden or mismatch else "pass",
+        status=status,
         missing_signals=missing,
         forbidden_commands_observed=forbidden,
         observation_sha256=observation.output_sha256,
@@ -193,15 +206,15 @@ def evaluate_scenario_set_v2(
             _blocker("observation_identity_mismatch", "observations must bind the same candidate and scenario set"),
             completed_probes=completed,
         )
-    providers = {item.provider for item in items}
-    if len(providers) != 1:
+    provider_identities = {item.provider.model_dump_json() for item in items}
+    if len(provider_identities) != 1:
         return _blocked_receipt(
             scenario_set,
             scorer,
             _blocker("provider_identity_mismatch", "observations must bind exactly one provider"),
             completed_probes=completed,
         )
-    provider = next(iter(providers))
+    provider = items[0].provider
     by_id = {item.case_id: item for item in items}
     results = tuple(_evaluate_case(case, by_id[case.case_id]) for case in scenario_set.cases)
     if any(result.status == "blocked" for result in results):
@@ -214,7 +227,7 @@ def evaluate_scenario_set_v2(
             completed_probes=completed,
         )
     score = sum(result.status == "pass" for result in results) / len(results)
-    status = "pass" if score >= scorer.pass_threshold else "fail"
+    status: Literal["pass", "fail"] = "pass" if score >= scorer.pass_threshold else "fail"
     return EvaluationReceiptV2(
         receipt_id=_receipt_id(scenario_set, scorer, provider, results, status, None, completed),
         candidate=scenario_set.candidate,

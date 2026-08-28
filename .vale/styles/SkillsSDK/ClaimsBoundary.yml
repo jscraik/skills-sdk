@@ -1,0 +1,10 @@
+extends: existence
+message: "Replace the absolute claim '%s' with an evidence-bound status."
+level: error
+ignorecase: true
+scope: text
+tokens:
+  - '(?<!not )\bproduction[- ]ready (?:in|for) (?:all|any|every) (?:environment|runtime|provider|deployment)s?\b'
+  - '(?<!not )\bfully validated (?:across|for|in) (?:all|any|every) (?:lane|environment|runtime|provider|deployment)s?\b'
+  - '\bsecurity (?:is|remains) guaranteed\b'
+  - '\bno security risks?\b'

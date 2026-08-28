@@ -32,28 +32,32 @@ def _candidate() -> PackageCandidateIdentity:
 
 
 def _source() -> PackageSource:
-    return PackageSource(
-        package_id="synthetic-skill",
-        provenance={
-            "repository": "jscraik/agent-skills",
-            "revision": "1" * 40,
-            "path": "tests/fixtures/synthetic-skill/SKILL.md",
-            "content_sha256": "a" * 64,
+    return PackageSource.model_validate(
+        {
+            "package_id": "synthetic-skill",
+            "provenance": {
+                "repository": "jscraik/agent-skills",
+                "revision": "1" * 40,
+                "path": "tests/fixtures/synthetic-skill/SKILL.md",
+                "content_sha256": "a" * 64,
+            },
+            "source_kind": PackageSourceKind.GIT,
         },
-        source_kind=PackageSourceKind.GIT,
     )
 
 
 def _owner() -> PackageOwner:
-    return PackageOwner(
-        owner="jscraik",
-        maintainer="jscraik",
-        ownership_state=OwnershipState.CANONICAL,
-        rights={
-            "basis": "authored",
-            "license": "Apache-2.0",
-            "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md",
-        },
+    return PackageOwner.model_validate(
+        {
+            "owner": "jscraik",
+            "maintainer": "jscraik",
+            "ownership_state": OwnershipState.CANONICAL,
+            "rights": {
+                "basis": "authored",
+                "license": "Apache-2.0",
+                "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md",
+            },
+        }
     )
 
 

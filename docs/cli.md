@@ -4,9 +4,9 @@ Install the pinned development environment and inspect the CLI through the
 managed `uv` entrypoint:
 
 ```bash
-uv sync --frozen
-uv run skills-sdk --help
-uv run skills-sdk --version
+mise exec -- uv sync --frozen
+mise exec -- uv run --frozen skills-sdk --help
+mise exec -- uv run --frozen skills-sdk --version
 ```
 
 The CLI exposes these explicit routes without provider, runtime, or
@@ -17,12 +17,12 @@ inventory   intake   validate   build   eval   package   project   verify
 tessl prepare   tessl verify
 ```
 
-Use `uv run skills-sdk <route> --help` for a short route description. The
+Use `mise exec -- uv run --frozen skills-sdk <route> --help` for a short route description. The
 `validate` and `build` routes are implemented local commands:
 
 ```bash
-uv run skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
-uv run skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
+mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
+mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
 ```
 
 Both commands are non-interactive and non-mutating. For an invocation that

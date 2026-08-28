@@ -55,9 +55,7 @@ def _forbidden_paths_check(receipt: PackageReceipt) -> PackageHardeningCheck:
     )
 
 
-def _size_budget_check(
-    files: tuple[PackageManifestFile, ...], policy: PackageHardeningPolicy
-) -> PackageHardeningCheck:
+def _size_budget_check(files: tuple[PackageManifestFile, ...], policy: PackageHardeningPolicy) -> PackageHardeningCheck:
     total_size = sum(item.size_bytes for item in files)
     within_budget = len(files) <= policy.max_file_count and total_size <= policy.max_total_bytes
     return _check(

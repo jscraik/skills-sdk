@@ -36,9 +36,7 @@ def _skill(root: Path, *, readme: bool = True) -> Path:
     return root
 
 
-def _receipt_with_extra_file(
-    package_receipt: PackageReceiptV2, extra_file: PackageManifestFile
-) -> PackageReceiptV2:
+def _receipt_with_extra_file(package_receipt: PackageReceiptV2, extra_file: PackageManifestFile) -> PackageReceiptV2:
     """Return a validated receipt whose digest covers the added manifest file."""
 
     payload = package_receipt.model_dump(mode="json")
@@ -140,9 +138,7 @@ def test_hardening_blocks_forbidden_manifest_paths_without_mutation(tmp_path: Pa
         "references/build-receipt.json",
     ),
 )
-def test_hardening_uses_canonical_validator_path_safety_policy(
-    tmp_path: Path, unsafe_path: str
-) -> None:
+def test_hardening_uses_canonical_validator_path_safety_policy(tmp_path: Path, unsafe_path: str) -> None:
     package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
     assert package_receipt.manifest is not None
     unsafe_file = PackageManifestFile(
@@ -174,9 +170,7 @@ def test_hardening_check_has_one_status_axis() -> None:
 
 def test_hardening_propagates_blocked_build_without_claiming_digest(tmp_path: Path) -> None:
     root = _skill(tmp_path / "fixture")
-    (root / "SKILL.md").write_text(
-        "---\nname: other\ndescription: Invalid identity.\n---\n", encoding="utf-8"
-    )
+    (root / "SKILL.md").write_text("---\nname: other\ndescription: Invalid identity.\n---\n", encoding="utf-8")
     package_receipt = build_skill_package(root, source_revision=REVISION, clock=_clock)
 
     receipt = harden_skill_package(package_receipt)

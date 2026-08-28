@@ -7,16 +7,55 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v7
         with:
-          version: "0.11.3"
-          enable-cache: true
+          persist-credentials: false
+      - name: Checkout trusted PR template contract
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted-base
+          persist-credentials: false
+      - name: Validate PR template completion
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          validator=trusted-base/.github/scripts/validate_pr_template_body.py
+          template=trusted-base/.github/PULL_REQUEST_TEMPLATE.md
+          if [[ ! -f "$validator" ]]; then
+            bootstrap_base=564c5df731897f082410b9a643f518c5e301820a
+            if [[ "${{ github.event.pull_request.base.sha }}" != "$bootstrap_base" ]]; then
+              echo "::error::Trusted base is missing the PR template validator outside the one approved bootstrap revision."
+              exit 1
+            fi
+            echo "::notice::Bootstrapping the SDK PR template validator from the candidate."
+            validator=.github/scripts/validate_pr_template_body.py
+            template=.github/PULL_REQUEST_TEMPLATE.md
+          fi
+          body_file="$RUNNER_TEMP/pr-body.md"
+          for attempt in 1 2 3 4; do
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .body > "$body_file"
+            if python3 "$validator" --template "$template" --body-file "$body_file"; then
+              rm -rf -- trusted-base
+              exit 0
+            fi
+            if [[ "$attempt" -lt 4 ]]; then
+              sleep 10
+            fi
+          done
+          exit 1
+      - uses: jdx/mise-action@v4
+        with:
+          install_args: "python uv ruff vale"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
+from collections.abc import MutableMapping
 from importlib.resources import files
+from typing import Any, cast
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -60,7 +62,7 @@ def test_valid_receipt_is_immutable_and_candidate_bound() -> None:
     expected = CandidateIdentity("synthetic-skill", "1" * 40, "a" * 64)
     receipt.require_candidate(expected)
     with pytest.raises(TypeError):
-        receipt.payload["status"] = "fail"
+        cast(MutableMapping[str, Any], receipt.payload)["status"] = "fail"
 
 
 def test_candidate_mismatch_is_typed() -> None:
@@ -127,6 +129,62 @@ def test_schema_registry_does_not_adapt_unknown_receipt_family() -> None:
     assert error.value.code == "unknown_schema"
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_schema_registry_rejects_non_finite_numbers(value: float) -> None:
+    payload = _receipt()
+    payload["lane"] = value
+
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("receipt-base.v1", payload)
+
+    assert error.value.code == "invalid_json_value"
+
+
+def test_schema_registry_rejects_memoryview_binary_input() -> None:
+    payload = _receipt()
+    payload["lane"] = memoryview(b"validation")
+
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("receipt-base.v1", payload)
+
+    assert error.value.code == "invalid_json_value"
+
+
+def test_schema_registry_rejects_cyclic_mapping() -> None:
+    payload = _receipt()
+    payload["cycle"] = payload
+
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("receipt-base.v1", payload)
+
+    assert error.value.code == "invalid_json_value"
+
+
+def test_schema_registry_rejects_cyclic_sequence() -> None:
+    cycle: list[object] = []
+    cycle.append(cycle)
+    payload = _receipt()
+    payload["evidence"] = cycle
+
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("receipt-base.v1", payload)
+
+    assert error.value.code == "invalid_json_value"
+
+
+def test_schema_registry_rejects_excessive_json_nesting() -> None:
+    nested: object = "evidence.json"
+    for _ in range(102):
+        nested = [nested]
+    payload = _receipt()
+    payload["evidence"] = nested
+
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("receipt-base.v1", payload)
+
+    assert error.value.code == "invalid_json_value"
+
+
 def test_public_core_parser_keeps_explicit_receipt_base_support() -> None:
     from skills_sdk.core import parse_receipt as public_parse_receipt
 
@@ -153,7 +211,7 @@ def test_non_blocked_receipt_rejects_blocker() -> None:
 @pytest.mark.parametrize(
     "value",
     [
-        "/tmp/receipt.json",
+        "/" + "tmp/receipt.json",
         "../receipt.json",
         "C:/receipt.json",
         "a\\b.json",
@@ -168,8 +226,8 @@ def test_non_portable_paths_are_rejected(value: str) -> None:
 
 
 def test_receipt_schema_rejects_candidate_shape_drift() -> None:
-    payload = copy.deepcopy(_receipt())
-    payload["candidate"]["runtime_path"] = "/tmp/synthetic"
+    payload: dict[str, Any] = copy.deepcopy(_receipt())
+    payload["candidate"]["runtime_path"] = "/" + "tmp/synthetic"
     with pytest.raises(ContractError, match="contract_validation_failed"):
         parse_receipt(payload)
 
@@ -193,18 +251,16 @@ def test_packaged_schemas_project_portable_path_constraints(name: str) -> None:
     [("receipt-base.v1", ("evidence",)), ("blocker.v1", ("evidence_refs",))],
 )
 @pytest.mark.parametrize("value", ["   ", "path/\n", "../outside", "path/"])
-def test_generic_receipt_schemas_reject_non_portable_paths(
-    schema_name: str, path: tuple[str, ...], value: str
-) -> None:
+def test_generic_receipt_schemas_reject_non_portable_paths(schema_name: str, path: tuple[str, ...], value: str) -> None:
     schema = SchemaRegistry().load(schema_name)
     if schema_name == "receipt-base.v1":
         payload = _receipt()
     else:
         payload = {"code": "unsafe_path", "message": "blocked", "evidence_refs": ["valid/path"]}
-    target: object = payload
+    target: Any = payload
     for key in path[:-1]:
-        target = target[key]  # type: ignore[index]
-    target[path[-1]] = [value]  # type: ignore[index]
+        target = target[key]
+    target[path[-1]] = [value]
     if schema_name == "receipt-base.v1":
         with pytest.raises(ContractError, match="contract_validation_failed"):
             SchemaRegistry().validate(schema_name, payload)

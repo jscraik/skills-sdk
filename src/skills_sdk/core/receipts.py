@@ -130,11 +130,15 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         if isinstance(candidate_payload, Mapping)
         else None
     )
-    artifact_status = str(payload["status"]) if package_receipt else None
-    generic_status = {
-        "built": "pass",
-        "blocked": "blocked",
-    }.get(artifact_status, str(payload["status"]))
+    if package_receipt:
+        artifact_status = str(payload["status"])
+        generic_status = {
+            "built": "pass",
+            "blocked": "blocked",
+        }.get(artifact_status, str(payload["status"]))
+    else:
+        artifact_status = None
+        generic_status = str(payload["status"])
     return Receipt(
         receipt_id=str(payload["receipt_id"]),
         candidate=candidate,

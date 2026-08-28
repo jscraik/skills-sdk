@@ -52,12 +52,12 @@ publication service.
 
 ## Development and validation
 
-- Use Python `3.12` and the pinned `uv` environment: `uv sync --frozen`.
+- Use Python `3.12` and the pinned `uv` environment: `mise exec -- uv sync --frozen`.
 - Run the narrowest relevant check first. Schema changes require
-  `uv run python scripts/generate_schemas.py --check` for the
+  `mise exec -- uv run --frozen python scripts/generate_schemas.py --check` for the
   generator-managed subset and this canonical focused route for the
   hand-maintained resources:
-  `uv run pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py`.
+  `mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py`.
   That route checks the `receipt-base.v1`, `blocker.v1`, and
   `package-identity.v1` resources with Draft 2020-12 through
   `SchemaRegistry.load` and exercises their candidate, receipt, and blocker
