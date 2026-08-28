@@ -35,11 +35,7 @@ jobs:
           python3 "$validator" --template "$template" --body-env PR_BODY
       - uses: jdx/mise-action@v4
         with:
-          install_args: "vale"
-      - uses: astral-sh/setup-uv@v7
-        with:
-          version: "0.11.3"
-          enable-cache: true
+          install_args: "uv vale"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

@@ -144,6 +144,42 @@ def test_relative_forbidden_import_is_rejected(tmp_path: Path) -> None:
     assert [(finding.code, finding.line) for finding in findings] == [("dependency-direction", 1)]
 
 
+@pytest.mark.parametrize(
+    "statement",
+    ["from skills_sdk import cli\n", "from .. import providers\n"],
+)
+def test_package_level_forbidden_import_alias_is_rejected(tmp_path: Path, statement: str) -> None:
+    source = tmp_path / "src" / "skills_sdk" / "core" / "fixture.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(statement, encoding="utf-8")
+
+    findings = _python_findings(tmp_path, source)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("dependency-direction", 1)]
+
+
+@pytest.mark.parametrize(
+    "directive",
+    ["# mypy: ignore-errors\n", "# mypy: disable-error-code=assignment\n"],
+)
+def test_mypy_file_level_suppression_is_rejected(tmp_path: Path, directive: str) -> None:
+    source = tmp_path / "tests" / "fixture.py"
+    source.parent.mkdir()
+    source.write_text(f"{directive}value: int = 'invalid'\n", encoding="utf-8")
+
+    findings = _python_findings(tmp_path, source)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("suppression", 1)]
+
+
+def test_validation_wrappers_use_repository_pinned_mise_toolchain() -> None:
+    for relative in ("scripts/validate-codestyle.sh", "scripts/validate-repository.sh"):
+        script = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+        assert 'MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"' in script
+        assert "mise exec -- uv " in script
+        assert not any(line.startswith("uv ") for line in script.splitlines())
+
+
 def test_tooling_suppression_configuration_is_rejected() -> None:
     pyproject = {
         "tool": {

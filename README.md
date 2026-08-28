@@ -291,14 +291,15 @@ Install the pinned environment and run the repository gate before a commit or
 pull request:
 
 ```bash
-uv sync --frozen
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install uv vale
+mise exec -- uv sync --frozen
 bash scripts/validate-repository.sh
 ```
 
 The canonical focused route for the hand-maintained schema subset is:
 
 ```bash
-uv run pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
+mise exec -- uv run pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
 ```
 
 This route loads `receipt-base.v1.schema.json`, `blocker.v1.schema.json`, and

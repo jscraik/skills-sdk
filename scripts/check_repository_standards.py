@@ -39,6 +39,8 @@ REQUIRED_IGNORES = (".venv/", ".pytest_cache/", ".ruff_cache/", "__pycache__/", 
 SUPPRESSION_FRAGMENTS = (
     "type:" + " ignore",
     "pyright:" + " ignore",
+    "mypy: ignore-errors",
+    "mypy: disable-error-code",
     "noqa",
     "pylint:" + " disable",
     "pragma:" + " no cover",
@@ -150,11 +152,14 @@ def _public_function_findings(relative: str, node: ast.FunctionDef | ast.AsyncFu
 def _import_targets(node: ast.Import | ast.ImportFrom, relative: str) -> tuple[str, ...]:
     if isinstance(node, ast.ImportFrom):
         if node.level == 0:
-            return (node.module or "",)
-        containing_package = list(Path(relative).with_suffix("").parts[1:-1])
-        retained_parts = max(0, len(containing_package) - node.level + 1)
-        target_parts = [*containing_package[:retained_parts], *(node.module or "").split(".")]
-        return (".".join(part for part in target_parts if part),)
+            base = node.module or ""
+        else:
+            containing_package = list(Path(relative).with_suffix("").parts[1:-1])
+            retained_parts = max(0, len(containing_package) - node.level + 1)
+            target_parts = [*containing_package[:retained_parts], *(node.module or "").split(".")]
+            base = ".".join(part for part in target_parts if part)
+        targets = tuple(f"{base}.{alias.name}" if base else alias.name for alias in node.names if alias.name != "*")
+        return targets or (base,)
     return tuple(alias.name for alias in node.names)
 
 
@@ -378,7 +383,10 @@ def _config_findings(root: Path) -> list[Finding]:
                 for index, step in enumerate(steps)
                 if step.get("uses") == MISE_ACTION
                 and step.get("with", {}).get("install", True) is not False
-                and ("install_args" not in step.get("with", {}) or "vale" in str(step["with"]["install_args"]).split())
+                and (
+                    "install_args" not in step.get("with", {})
+                    or {"uv", "vale"} <= set(str(step["with"]["install_args"]).split())
+                )
             ]
             if not mise_indexes or min(mise_indexes) > min(validate_indexes):
                 findings.append(
@@ -386,7 +394,7 @@ def _config_findings(root: Path) -> list[Finding]:
                         _relative(root, path),
                         1,
                         "ci-tooling",
-                        f"{MISE_ACTION} must install Vale before repository validation",
+                        f"{MISE_ACTION} must install uv and Vale before repository validation",
                     )
                 )
     if (root / ".github/PULL_REQUEST_TEMPLATE.md").is_file() and not pr_template_enforced:

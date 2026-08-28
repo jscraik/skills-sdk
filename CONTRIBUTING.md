@@ -11,7 +11,8 @@ compatibility documentation synchronized with contract changes.
 Run:
 
 ```bash
-uv sync --frozen
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install uv vale
+mise exec -- uv sync --frozen
 bash scripts/validate-codestyle.sh
 bash scripts/validate-repository.sh
 ```

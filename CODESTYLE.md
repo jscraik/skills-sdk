@@ -33,8 +33,10 @@ runtime policy are not dependencies of this SDK.
 
 - Do not use lint, type, formatter, test, coverage, security, or validation
   suppressions. Repair the cause or return a typed blocker.
-- Use Python 3.12 and run `uv sync --frozen` before validation to create or
-  refresh the exact pinned environment.
+- Use Python 3.12. Install the repository-pinned `uv` and Vale tools with
+  `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install uv vale`, then run
+  `mise exec -- uv sync --frozen` before validation to create or refresh the
+  exact pinned environment.
 - Run `bash scripts/validate-codestyle.sh` for formatter, lint, type, structural,
   documentation-link, configuration, dependency-direction, and suppression
   checks. The same command runs the repository-pinned Vale binary against all
@@ -44,6 +46,9 @@ runtime policy are not dependencies of this SDK.
   regressions. The repository-wide AST gate separately requires typed public
   interfaces without reinterpreting frozen Pydantic v1/v2 inheritance.
 - Run `bash scripts/validate-repository.sh` before a commit or pull request.
+  Both validation wrappers bind trust to this checkout's plain-version
+  `.mise.toml` for the command and invoke `uv` through `mise`; they do not
+  mutate global trust state or accept an ambient `uv` release.
   Generated output must be checked, not hand-edited, and caches/build artifacts
   remain ignored.
 - Record every validation command with an explicit `pass`, `fail`, or `blocked`
