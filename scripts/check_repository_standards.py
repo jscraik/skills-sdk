@@ -362,7 +362,14 @@ def _config_findings(root: Path) -> list[Finding]:
     pr_template_enforced = False
     for path in _iter_files(root, (".github/workflows",), (".yaml", ".yml")):
         workflow_text = path.read_text(encoding="utf-8")
-        if "trusted-base/.github/scripts/validate_pr_template_body.py" in workflow_text:
+        if all(
+            fragment in workflow_text
+            for fragment in (
+                "trusted-base/.github/scripts/validate_pr_template_body.py",
+                'gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"',
+                '--body-file "$body_file"',
+            )
+        ):
             pr_template_enforced = True
         try:
             workflow = yaml.safe_load(workflow_text)

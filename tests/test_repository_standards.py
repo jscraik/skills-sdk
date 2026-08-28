@@ -285,6 +285,16 @@ def test_ci_rejects_unenforced_pr_template_contract(tmp_path: Path) -> None:
     assert [(finding.code, finding.path) for finding in findings] == [("pr-template", ".github/workflows")]
 
 
+def test_ci_fetches_live_pr_body_for_template_validation() -> None:
+    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
+
+    assert "pull-requests: read" in workflow
+    assert 'gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"' in workflow
+    assert '--body-file "$body_file"' in workflow
+    assert "for attempt in 1 2 3 4" in workflow
+    assert "github.event.pull_request.body" not in workflow
+
+
 def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) -> None:
     workflow = tmp_path / ".github" / "workflows" / "validate.yml"
     workflow.parent.mkdir(parents=True)
@@ -292,7 +302,11 @@ def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) ->
         "jobs:\n"
         "  validate:\n"
         "    steps:\n"
-        "      - run: python3 trusted-base/.github/scripts/validate_pr_template_body.py\n"
+        "      - run: |\n"
+        "          body_file=$RUNNER_TEMP/pr-body.md\n"
+        '          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .body > "$body_file"\n'
+        "          python3 trusted-base/.github/scripts/validate_pr_template_body.py "
+        '--body-file "$body_file"\n'
         "      - uses: jdx/mise-action@v4\n"
         "        with:\n"
         '          install_args: "uv vale"\n'
