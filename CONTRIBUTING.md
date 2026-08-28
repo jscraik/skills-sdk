@@ -11,7 +11,7 @@ compatibility documentation synchronized with contract changes.
 Run:
 
 ```bash
-MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install uv vale
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
 mise exec -- uv sync --frozen
 bash scripts/validate-codestyle.sh
 bash scripts/validate-repository.sh
@@ -27,11 +27,13 @@ requests must follow the repository template; local checks do not establish
 hosted CI, review, mergeability, publication, or runtime readiness.
 
 Before creating a pull request, write the exact repository-relative scope file
-and run the projected `pr-readiness.py --phase create` gate. Before updating the
-description or claiming merge readiness, run its `--phase update` gate against
-the current hosted head. Refresh the description only through the projected
-`pr-body-refresh.py` helper so the update receipt, repository identity, pull
-request number, required sections, fields, command evidence, and checklist stay
-bound together. The hosted `validate` job checks the body against the trusted
-base template; the first validator-bearing pull request uses the candidate only
-for the explicit bootstrap case where the base has no validator yet.
+and run the projected `python3 ~/.codex/scripts/pr-readiness.py --phase create`
+gate. Before updating the description or claiming merge readiness, run its
+`--phase update` gate against the current hosted head. Refresh the description
+only through the projected `python3 ~/.codex/scripts/pr-body-refresh.py` helper
+so the update receipt, repository identity, pull request number, required
+sections, fields, command evidence, and checklist stay bound together. These
+are user-level projected workflow controls, not repository-owned SDK scripts.
+The hosted `validate` job checks the body against the trusted base template;
+the first validator-bearing pull request uses the candidate only for the
+explicit bootstrap case where the base has no validator yet.

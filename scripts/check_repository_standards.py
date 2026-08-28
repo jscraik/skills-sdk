@@ -22,7 +22,7 @@ MAX_MODULE_LINES = 800
 MAX_FUNCTION_LINES = 120
 MAX_PUBLIC_PARAMETERS = 5
 PYTHON_ROOTS = ("src", "scripts", "tests", ".github/scripts")
-TEXT_ROOTS = ("src", "scripts", "tests", "docs")
+TEXT_ROOTS = ("src", "scripts", "tests", "docs", ".github")
 PORTABLE_TEXT_FILES = (
     "AGENTS.md",
     "ARCHITECTURE.md",
@@ -193,7 +193,7 @@ def _forbidden_imports(relative: str) -> tuple[str, ...]:
 
 
 def _forbids_root_sdk_import(relative: str) -> bool:
-    return relative.startswith(("src/skills_sdk/core/", "src/skills_sdk/models/"))
+    return relative.startswith(("src/skills_sdk/core/", "src/skills_sdk/models/", "src/skills_sdk/validation/"))
 
 
 def _catches_broad_exception(node: ast.expr | None) -> bool:
@@ -237,13 +237,28 @@ def _python_findings(root: Path, path: Path) -> list[Finding]:
 
 
 def _portable_text_findings(root: Path) -> list[Finding]:
-    paths = list(_iter_files(root, TEXT_ROOTS, (".py", ".md", ".toml", ".yaml", ".yml", ".json")))
+    paths = list(
+        _iter_files(root, TEXT_ROOTS, (".py", ".md", ".mdx", ".adoc", ".rst", ".toml", ".yaml", ".yml", ".json"))
+    )
     paths.extend(root / name for name in PORTABLE_TEXT_FILES if (root / name).is_file())
     findings: list[Finding] = []
     for path in sorted(set(paths)):
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if any(pattern.search(line) for pattern in MACHINE_PATH_PATTERNS):
                 findings.append(Finding(_relative(root, path), line_number, "machine-path", "machine-specific path"))
+            if path.suffix in {".md", ".mdx", ".adoc", ".rst"} and re.search(r"<!--\s*vale\b", line, re.IGNORECASE):
+                findings.append(
+                    Finding(_relative(root, path), line_number, "suppression", "Vale control comments are forbidden")
+                )
+            if path.suffix in {".md", ".mdx", ".adoc", ".rst"} and (
+                ("uv run " in line and "uv run --frozen " not in line)
+                or ("uv sync" in line and "uv sync --frozen" not in line)
+            ):
+                findings.append(
+                    Finding(
+                        _relative(root, path), line_number, "unfrozen-command", "documented uv commands must be frozen"
+                    )
+                )
     return findings
 
 
@@ -368,35 +383,47 @@ def _config_findings(root: Path) -> list[Finding]:
     pr_template_enforced = False
     for path in _iter_files(root, (".github/workflows",), (".yaml", ".yml")):
         workflow_text = path.read_text(encoding="utf-8")
-        if all(
-            fragment in workflow_text
-            for fragment in (
-                "trusted-base/.github/scripts/validate_pr_template_body.py",
-                'gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"',
-                '--body-file "$body_file"',
-            )
-        ):
-            pr_template_enforced = True
         try:
             workflow = yaml.safe_load(workflow_text)
         except yaml.YAMLError as error:
             findings.append(Finding(_relative(root, path), 1, "yaml", str(error)))
             continue
         for job in workflow.get("jobs", {}).values():
-            steps = job.get("steps", [])
+            steps = [step for step in job.get("steps", []) if isinstance(step, dict)]
+            run_steps = [str(step.get("run", "")) for step in steps]
             pr_template_indexes = [
                 index
-                for index, step in enumerate(steps)
-                if "trusted-base/.github/scripts/validate_pr_template_body.py" in str(step.get("run", ""))
+                for index, run_step in enumerate(run_steps)
+                if all(
+                    fragment in run_step
+                    for fragment in (
+                        "trusted-base/.github/scripts/validate_pr_template_body.py",
+                        'gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"',
+                        '--body-file "$body_file"',
+                    )
+                )
             ]
+            pr_template_enforced = pr_template_enforced or bool(pr_template_indexes)
             trusted_base_cleanup_indexes = [
-                index for index, step in enumerate(steps) if "rm -rf -- trusted-base" in str(step.get("run", ""))
+                index for index, run_step in enumerate(run_steps) if "rm -rf -- trusted-base" in run_step
             ]
             validate_indexes = [
-                index
-                for index, step in enumerate(steps)
-                if "bash scripts/validate-repository.sh" in str(step.get("run", ""))
+                index for index, run_step in enumerate(run_steps) if "bash scripts/validate-repository.sh" in run_step
             ]
+            if pr_template_indexes and (
+                not trusted_base_cleanup_indexes
+                or min(trusted_base_cleanup_indexes) < min(pr_template_indexes)
+                or (validate_indexes and min(trusted_base_cleanup_indexes) > min(validate_indexes))
+            ):
+                findings.append(
+                    Finding(
+                        _relative(root, path),
+                        1,
+                        "ci-workspace",
+                        "trusted-base must be removed after PR-template validation "
+                        "and before same-job repository validation",
+                    )
+                )
             if not validate_indexes:
                 continue
             mise_indexes = [
@@ -406,7 +433,7 @@ def _config_findings(root: Path) -> list[Finding]:
                 and step.get("with", {}).get("install", True) is not False
                 and (
                     "install_args" not in step.get("with", {})
-                    or {"uv", "ruff", "vale"} <= set(str(step["with"]["install_args"]).split())
+                    or {"python", "uv", "ruff", "vale"} <= set(str(step["with"]["install_args"]).split())
                 )
             ]
             if not mise_indexes or min(mise_indexes) > min(validate_indexes):
@@ -415,20 +442,23 @@ def _config_findings(root: Path) -> list[Finding]:
                         _relative(root, path),
                         1,
                         "ci-tooling",
-                        f"{MISE_ACTION} must install uv, Ruff, and Vale before repository validation",
+                        f"{MISE_ACTION} must install Python, uv, Ruff, and Vale before repository validation",
                     )
                 )
-            if pr_template_indexes and (
-                not trusted_base_cleanup_indexes
-                or min(trusted_base_cleanup_indexes) < min(pr_template_indexes)
-                or min(trusted_base_cleanup_indexes) > min(validate_indexes)
+            head_checkouts = [
+                step
+                for step in steps[: min(validate_indexes)]
+                if str(step.get("uses", "")).startswith("actions/checkout@") and not step.get("with", {}).get("path")
+            ]
+            if not head_checkouts or any(
+                step.get("with", {}).get("persist-credentials") is not False for step in head_checkouts
             ):
                 findings.append(
                     Finding(
                         _relative(root, path),
                         1,
-                        "ci-workspace",
-                        "trusted-base must be removed after PR-template validation and before repository validation",
+                        "ci-checkout",
+                        "head checkout must set persist-credentials: false before repository validation",
                     )
                 )
     if (root / ".github/PULL_REQUEST_TEMPLATE.md").is_file() and not pr_template_enforced:

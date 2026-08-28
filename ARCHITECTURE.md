@@ -172,7 +172,7 @@ its `--check` mode for the generated subset. The canonical focused route for
 the hand-maintained subset is:
 
 ```bash
-uv run pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
+uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
 ```
 
 That route loads all three resources through `SchemaRegistry.load`, which

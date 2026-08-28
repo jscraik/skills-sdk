@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +20,22 @@ from scripts.check_repository_standards import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _run_vale(source: Path) -> subprocess.CompletedProcess[str]:
+    mise = shutil.which("mise")
+    if mise is None:
+        pytest.fail("mise is a mandatory repository tool; install the pinned toolchain before testing")
+    environment = os.environ.copy()
+    environment["MISE_TRUSTED_CONFIG_PATHS"] = str(REPOSITORY_ROOT / ".mise.toml")
+    return subprocess.run(
+        [mise, "exec", "--", "vale", "--config", str(REPOSITORY_ROOT / ".vale.ini"), str(source)],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
 
 
 def test_repository_standards_cli_accepts_current_tree() -> None:
@@ -44,21 +62,7 @@ def test_vale_rejects_absolute_readiness_claim(tmp_path: Path, claim: str) -> No
     source = tmp_path / "overclaim.md"
     source.write_text(f"# Status\n\n{claim}\n", encoding="utf-8")
 
-    result = subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--",
-            "vale",
-            "--config",
-            str(REPOSITORY_ROOT / ".vale.ini"),
-            str(source),
-        ],
-        cwd=REPOSITORY_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_vale(source)
 
     assert result.returncode == 1
     assert "SkillsSDK.ClaimsBoundary" in result.stdout
@@ -73,21 +77,7 @@ def test_vale_accepts_qualified_or_negated_readiness_claims(tmp_path: Path) -> N
         encoding="utf-8",
     )
 
-    result = subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--",
-            "vale",
-            "--config",
-            str(REPOSITORY_ROOT / ".vale.ini"),
-            str(source),
-        ],
-        cwd=REPOSITORY_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_vale(source)
 
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -171,6 +161,16 @@ def test_lower_layer_rejects_bare_root_sdk_import(tmp_path: Path) -> None:
     assert [(finding.code, finding.line) for finding in findings] == [("dependency-direction", 1)]
 
 
+def test_validation_layer_rejects_bare_root_sdk_import(tmp_path: Path) -> None:
+    source = tmp_path / "src" / "skills_sdk" / "validation" / "fixture.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("import skills_sdk\n", encoding="utf-8")
+
+    findings = _python_findings(tmp_path, source)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("dependency-direction", 1)]
+
+
 def test_python_roots_include_github_validation_scripts(tmp_path: Path) -> None:
     source = tmp_path / ".github" / "scripts" / "fixture.py"
     source.parent.mkdir(parents=True)
@@ -202,6 +202,9 @@ def test_validation_wrappers_use_repository_pinned_mise_toolchain() -> None:
         assert 'MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"' in script
         assert "mise exec -- uv run --frozen " in script
         assert not any(line.startswith("uv ") for line in script.splitlines())
+    codestyle = (REPOSITORY_ROOT / "scripts/validate-codestyle.sh").read_text(encoding="utf-8")
+    assert "git ls-files -- '*.md' '*.mdx' '*.adoc' '*.rst'" in codestyle
+    assert "vale --config .vale.ini ." not in codestyle
 
 
 def test_portable_text_rejects_checkout_and_temp_paths(tmp_path: Path) -> None:
@@ -215,6 +218,36 @@ def test_portable_text_rejects_checkout_and_temp_paths(tmp_path: Path) -> None:
     findings = _portable_text_findings(tmp_path)
 
     assert [(finding.code, finding.line) for finding in findings] == [("machine-path", 1), ("machine-path", 2)]
+
+
+def test_portable_text_includes_github_metadata(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "fixture.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("evidence: /" + "workspace/sdk/result.json\n", encoding="utf-8")
+
+    findings = _portable_text_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [("machine-path", ".github/workflows/fixture.yml")]
+
+
+def test_portable_text_rejects_vale_control_comments(tmp_path: Path) -> None:
+    source = tmp_path / "docs" / "fixture.md"
+    source.parent.mkdir()
+    source.write_text("<!-- " + "vale off -->\nUnchecked claim.\n", encoding="utf-8")
+
+    findings = _portable_text_findings(tmp_path)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("suppression", 1)]
+
+
+def test_portable_text_rejects_unfrozen_documented_uv_command(tmp_path: Path) -> None:
+    source = tmp_path / "docs" / "fixture.md"
+    source.parent.mkdir()
+    source.write_text("Run `uv " + "run pytest`.\n", encoding="utf-8")
+
+    findings = _portable_text_findings(tmp_path)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("unfrozen-command", 1)]
 
 
 def test_tooling_suppression_configuration_is_rejected() -> None:
@@ -291,7 +324,10 @@ def test_ci_rejects_repository_validation_without_mise_vale_bootstrap(tmp_path: 
 
     findings = _config_findings(tmp_path)
 
-    assert [(finding.code, finding.path) for finding in findings] == [("ci-tooling", ".github/workflows/validate.yml")]
+    assert [(finding.code, finding.path) for finding in findings] == [
+        ("ci-tooling", ".github/workflows/validate.yml"),
+        ("ci-checkout", ".github/workflows/validate.yml"),
+    ]
 
 
 def test_ci_rejects_unenforced_pr_template_contract(tmp_path: Path) -> None:
@@ -330,7 +366,8 @@ def test_ci_fetches_live_pr_body_for_template_validation() -> None:
     assert '--body-file "$body_file"' in workflow
     assert "for attempt in 1 2 3 4" in workflow
     assert "github.event.pull_request.body" not in workflow
-    assert 'install_args: "uv ruff vale"' in workflow
+    assert 'install_args: "python uv ruff vale"' in workflow
+    assert "persist-credentials: false" in workflow
 
 
 def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) -> None:
@@ -340,6 +377,9 @@ def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) ->
         "jobs:\n"
         "  validate:\n"
         "    steps:\n"
+        "      - uses: actions/checkout@v5\n"
+        "        with:\n"
+        "          persist-credentials: false\n"
         "      - run: |\n"
         "          body_file=$RUNNER_TEMP/pr-body.md\n"
         '          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .body > "$body_file"\n'
@@ -347,7 +387,7 @@ def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) ->
         '--body-file "$body_file"\n'
         "      - uses: jdx/mise-action@v4\n"
         "        with:\n"
-        '          install_args: "uv ruff vale"\n'
+        '          install_args: "python uv ruff vale"\n'
         "      - run: bash scripts/validate-repository.sh\n",
         encoding="utf-8",
     )
@@ -360,6 +400,51 @@ def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) ->
     assert [(finding.code, finding.path) for finding in findings] == [
         ("ci-workspace", ".github/workflows/validate.yml")
     ]
+
+
+def test_ci_rejects_trusted_base_left_by_template_only_job(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "validate.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n"
+        "  template:\n"
+        "    steps:\n"
+        "      - run: |\n"
+        "          body_file=$RUNNER_TEMP/pr-body.md\n"
+        '          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .body > "$body_file"\n'
+        "          python3 trusted-base/.github/scripts/validate_pr_template_body.py "
+        '--body-file "$body_file"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / ".github" / "PULL_REQUEST_TEMPLATE.md").write_text("# Pull request\n", encoding="utf-8")
+    for relative in ("pyproject.toml", ".mise.toml", "uv.lock", ".gitignore"):
+        (tmp_path / relative).write_text((REPOSITORY_ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+
+    findings = _config_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [
+        ("ci-workspace", ".github/workflows/validate.yml")
+    ]
+
+
+def test_ci_does_not_accept_template_contract_fragments_outside_run_steps(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "validate.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "env:\n"
+        "  VALIDATOR: trusted-base/.github/scripts/validate_pr_template_body.py\n"
+        '  FETCH: gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"\n'
+        '  BODY: --body-file "$body_file"\n'
+        "jobs: {}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".github" / "PULL_REQUEST_TEMPLATE.md").write_text("# Pull request\n", encoding="utf-8")
+    for relative in ("pyproject.toml", ".mise.toml", "uv.lock", ".gitignore"):
+        (tmp_path / relative).write_text((REPOSITORY_ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8")
+
+    findings = _config_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [("pr-template", ".github/workflows")]
 
 
 def test_tuple_containing_broad_exception_is_rejected(tmp_path: Path) -> None:

@@ -6,7 +6,7 @@ SDK implementation of that policy.
 ## Validation entrypoints
 
 Install `uv` and Vale from `.mise.toml` with
-`MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install uv vale`, then create
+`MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale`, then create
 the project environment with `mise exec -- uv sync --frozen`. The validation
 wrappers apply the same checkout-scoped trust binding and invoke `uv` through
 `mise`, so an ambient tool release or persistent global trust record cannot
@@ -43,7 +43,8 @@ signed Conventional Commits, and exact SDK tool pins. They do not import
 Agent-Skills scripts, infrastructure, Codex configuration, skill graphs, local
 memory, runtime installation, Tessl workflows, or non-Python toolchains.
 
-Vale is pinned by `.mise.toml` and runs from `scripts/validate-codestyle.sh`.
+Vale is pinned by `.mise.toml` and runs from `scripts/validate-codestyle.sh`
+against the repository's tracked prose files only.
 The destination-owned `SkillsSDK` package rejects absolute, evidence-free
 readiness and security claims while allowing truthful negated or scoped claims,
 and enforces the project name in reader-facing prose. The rules

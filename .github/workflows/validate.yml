@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Checkout trusted PR template contract
         if: github.event_name == 'pull_request'
         uses: actions/checkout@v5
@@ -48,7 +50,7 @@ jobs:
           exit 1
       - uses: jdx/mise-action@v4
         with:
-          install_args: "uv ruff vale"
+          install_args: "python uv ruff vale"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"

@@ -182,10 +182,10 @@ _Avoid_: build, runtime projection, source admission
 
 | User phrase | Canonical action |
 | --- | --- |
-| “Validate this skill” | Run `uv run skills-sdk validate <package-root> --source-revision <40-lowercase-hex> --json --robot`; for an invocation that reaches the validator, treat exit `0` as a passing result and exit `2` as a typed blocker. Argparse also uses exit `2` for malformed invocations before a versioned result exists. |
-| “Build this package” | Run `uv run skills-sdk build <package-root> --source-revision <40-lowercase-hex> --json --robot`; for an invocation that reaches the builder, call the result a candidate-bound receipt, not an archive or publication. Argparse rejects malformed invocations before a versioned receipt exists. |
+| “Validate this skill” | Run `uv run --frozen skills-sdk validate <package-root> --source-revision <40-lowercase-hex> --json --robot`; for an invocation that reaches the validator, treat exit `0` as a passing result and exit `2` as a typed blocker. Argparse also uses exit `2` for malformed invocations before a versioned result exists. |
+| “Build this package” | Run `uv run --frozen skills-sdk build <package-root> --source-revision <40-lowercase-hex> --json --robot`; for an invocation that reaches the builder, call the result a candidate-bound receipt, not an archive or publication. Argparse rejects malformed invocations before a versioned receipt exists. |
 | “Make it available” | First name the target lane. Use `validate` or `build` for local contract proof; hand installation, provider execution, and publication to their owning adapter or registry workflow. |
-| “Check the schemas” | Run `uv run python scripts/generate_schemas.py --check` for generated-schema drift, then use `SchemaRegistry` or the documented Draft 2020-12 validator for the payload family. |
+| “Check the schemas” | Run `uv run --frozen python scripts/generate_schemas.py --check` for generated-schema drift, then use `SchemaRegistry` or the documented Draft 2020-12 validator for the payload family. |
 | “Is it verified?” | Identify the evidence lane and candidate identity, then inspect that lane's result; a local receipt alone does not prove runtime, provider, registry, or hosted state. |
 
 ## Example Dialogue

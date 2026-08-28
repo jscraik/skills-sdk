@@ -35,7 +35,7 @@ absolute paths.
 - Regression coverage:
 <!-- Add one evidence line for each command:
 - Command: `bash scripts/validate-repository.sh` -> pass
-- Command: `uv run pytest tests/test_repository_standards.py -q` -> blocked (reason)
+- Command: `uv run --frozen pytest tests/test_repository_standards.py -q` -> blocked (reason)
 -->
 - Untested or blocked paths:
 

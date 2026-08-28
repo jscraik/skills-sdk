@@ -16,7 +16,10 @@ CHECKBOX_RE = re.compile(r"^- \[[ xX]\] (?P<label>.+?)\s*$", re.MULTILINE)
 FIELD_LINE_RE = re.compile(r"^- (?P<label>[^:\n]+):(?P<value>.*)$", re.MULTILINE)
 STATUS_RE = re.compile(r"^\*\*\((?:pending|n\.a\.|n/a|not applicable)\)\*\*\s*", re.IGNORECASE)
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-PLACEHOLDER_RE = re.compile(r"<[^>\n]+>")
+PLACEHOLDER_RE = re.compile(
+    r"<(?:[A-Z][A-Z0-9_]*(?:[- ][A-Z0-9_]+)*|"
+    r"(?i:(?:describe|enter|fill|provide|replace|todo|your)\b[^<>\n]*))>"
+)
 LOCAL_ABSOLUTE_PATH_RE = re.compile(
     r"(?<![\w:/])(?:/(?:Users|home|private|tmp|var/folders|workspace)(?:/[^\s`),;]+)+|[A-Za-z]:[\\/][^\s`),;]+)"
 )
@@ -126,7 +129,14 @@ def _command_errors(body: str) -> list[str]:
     command_lines = [line.strip() for line in validation.splitlines() if line.strip().lower().startswith("- command:")]
     if not command_lines:
         return ["Validation must include at least one Command evidence line."]
-    return [f"Invalid Command evidence: {line}" for line in command_lines if COMMAND_RE.fullmatch(line) is None]
+    errors = [f"Invalid Command evidence: {line}" for line in command_lines if COMMAND_RE.fullmatch(line) is None]
+    aggregate_command = re.compile(
+        r"^-\s*Command:\s*`?bash scripts/validate-repository\.sh`?\s*->",
+        re.IGNORECASE,
+    )
+    if not any(aggregate_command.match(line) for line in command_lines):
+        errors.append("Validation must include Command evidence for bash scripts/validate-repository.sh.")
+    return errors
 
 
 def validate_pr_body(template: str, body: str) -> list[str]:

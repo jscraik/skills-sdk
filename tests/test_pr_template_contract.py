@@ -38,7 +38,8 @@ def _filled_body() -> str:
     return body.replace(
         "- Regression coverage: repo-relative evidence",
         "- Regression coverage: focused contract proof\n"
-        "- Command: `uv run pytest tests/test_pr_template_contract.py -q` -> pass",
+        "- Command: `uv run --frozen pytest tests/test_pr_template_contract.py -q` -> pass\n"
+        "- Command: `bash scripts/validate-repository.sh` -> pass",
         1,
     )
 
@@ -138,6 +139,15 @@ def test_rejects_missing_or_malformed_command_evidence() -> None:
     assert any("Invalid Command evidence" in error for error in errors)
 
 
+def test_rejects_validation_without_aggregate_repository_evidence() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace("- Command: `bash scripts/validate-repository.sh` -> pass\n", "", 1)
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert "Validation must include Command evidence for bash scripts/validate-repository.sh." in errors
+
+
 def test_rejects_not_applicable_command_outcome() -> None:
     validator = _load_validator()
     body = re.sub(r"^- Command:.*$", "- Command: pytest -> n.a. (not run)", _filled_body(), flags=re.MULTILINE)
@@ -179,3 +189,22 @@ def test_allows_web_urls_and_repository_relative_paths() -> None:
     )
 
     assert validator.validate_pr_body(_template(), body) == []
+
+
+def test_allows_html_details_and_markdown_autolinks() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- Problem: repo-relative evidence",
+        "- Problem: <details><summary>Evidence</summary><https://example.test/evidence></details>",
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []
+
+
+def test_rejects_genuine_placeholder_tokens() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace("- Problem: repo-relative evidence", "- Problem: <describe the problem>")
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert "Replace unresolved placeholder token: <describe the problem>" in errors
