@@ -17,6 +17,9 @@ FIELD_LINE_RE = re.compile(r"^- (?P<label>[^:\n]+):(?P<value>.*)$", re.MULTILINE
 STATUS_RE = re.compile(r"^\*\*\((?:pending|n/a|not applicable)\)\*\*\s*", re.IGNORECASE)
 HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PLACEHOLDER_RE = re.compile(r"<[^>\n]+>")
+LOCAL_ABSOLUTE_PATH_RE = re.compile(
+    r"(?<![\w:/])(?:/(?:Users|home|private|tmp|var/folders|workspace)(?:/[^\s`),;]+)+|[A-Za-z]:[\\/][^\s`),;]+)"
+)
 COMMAND_RE = re.compile(
     r"^-\s*Command:\s*(?:`[^\n`]+`|(?=\S).*?\S)\s*->\s*"
     r"(?:(?:pass|fail)(?:\s*\([^)]+\)\.?)?|"
@@ -131,6 +134,8 @@ def validate_pr_body(template: str, body: str) -> list[str]:
     errors = _structure_errors(_template_contract(template), body)
     errors.extend(_command_errors(body))
     errors.extend(f"Replace unresolved placeholder token: {token}" for token in PLACEHOLDER_RE.findall(_visible(body)))
+    if LOCAL_ABSOLUTE_PATH_RE.search(_visible(body)):
+        errors.append("PR body must not contain local absolute paths.")
     return errors
 
 

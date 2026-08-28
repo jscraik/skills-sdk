@@ -125,3 +125,24 @@ def test_rejects_missing_or_malformed_command_evidence() -> None:
     errors = validator.validate_pr_body(_template(), body)
 
     assert any("Invalid Command evidence" in error for error in errors)
+
+
+def test_rejects_local_absolute_path() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- Problem: repo-relative evidence", "- Problem: observed at /private/tmp/sdk-fixture"
+    )
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert "PR body must not contain local absolute paths." in errors
+
+
+def test_allows_web_urls_and_repository_relative_paths() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- Problem: repo-relative evidence",
+        "- Problem: see https://example.test/evidence and docs/standards.md",
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []
