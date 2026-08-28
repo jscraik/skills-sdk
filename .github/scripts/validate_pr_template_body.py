@@ -17,6 +17,7 @@ FIELD_LINE_RE = re.compile(r"^- (?P<label>[^:\n]+):(?P<value>.*)$", re.MULTILINE
 STATUS_RE = re.compile(r"^\*\*\((?:pending|n\.a\.|n/a|not applicable)\)\*\*\s*", re.IGNORECASE)
 BARE_NOT_APPLICABLE_RE = re.compile(r"^(?:n\.a\.|n/a|not applicable)\.?$", re.IGNORECASE)
 FENCE_START_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[^\n]*$")
+INDENTED_CODE_RE = re.compile(r"^(?: {4}|\t)")
 PLACEHOLDER_RE = re.compile(
     r"<(?:[A-Z][A-Z0-9_]*(?:[- ][A-Z0-9_]+)*|"
     r"(?i:(?:describe|enter|fill|provide|replace|todo|your)\b[^<>\n]*))>"
@@ -57,6 +58,8 @@ def _visible(markdown: str) -> str:
                 minimum_fence_length = 0
             continue
         content, inside_comment = _without_html_comments(content, inside_comment)
+        if INDENTED_CODE_RE.match(content):
+            continue
         opening = FENCE_START_RE.fullmatch(content)
         if opening is not None:
             fence = opening.group("fence")

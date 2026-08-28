@@ -11,6 +11,7 @@ import pytest
 from scripts.check_repository_standards import (
     PR_TEMPLATE_BOOTSTRAP_BASE,
     PYTHON_ROOTS,
+    REQUIRED_MYPY_FILES,
     _config_findings,
     _iter_files,
     _local_link_findings,
@@ -264,6 +265,20 @@ def test_portable_text_includes_github_metadata(tmp_path: Path) -> None:
     assert [(finding.code, finding.path) for finding in findings] == [("machine-path", ".github/workflows/fixture.yml")]
 
 
+def test_portable_text_includes_examples_and_support(tmp_path: Path) -> None:
+    example = tmp_path / "examples" / "reader.py"
+    example.parent.mkdir()
+    example.write_text('PATH = "/' + 'workspace/sdk/example"\n', encoding="utf-8")
+    (tmp_path / "SUPPORT.md").write_text("See /" + "workspace/sdk/support\n", encoding="utf-8")
+
+    findings = _portable_text_findings(tmp_path)
+
+    assert [(finding.code, finding.path) for finding in findings] == [
+        ("machine-path", "SUPPORT.md"),
+        ("machine-path", "examples/reader.py"),
+    ]
+
+
 def test_portable_text_rejects_vale_control_comments(tmp_path: Path) -> None:
     source = tmp_path / "docs" / "fixture.md"
     source.parent.mkdir()
@@ -288,7 +303,7 @@ def test_tooling_suppression_configuration_is_rejected() -> None:
     pyproject = {
         "tool": {
             "ruff": {"lint": {"per-file-ignores": {"tests/*.py": ["S101"]}}},
-            "mypy": {"disable_error_code": ["assignment"]},
+            "mypy": {"disable_error_code": ["assignment"], "files": list(REQUIRED_MYPY_FILES)},
         }
     }
 
@@ -514,11 +529,43 @@ def test_qualified_or_aliased_broad_exception_is_rejected(tmp_path: Path, source
 
 @pytest.mark.parametrize("addopts", ["-q --ignore=tests/slow", "--deselect tests/test_api.py::test_case", "-k smoke"])
 def test_pytest_selection_suppression_is_rejected(addopts: str) -> None:
-    pyproject = {"tool": {"ruff": {"lint": {}}, "mypy": {}, "pytest": {"ini_options": {"addopts": addopts}}}}
+    pyproject = {
+        "tool": {
+            "ruff": {"lint": {}},
+            "mypy": {"files": list(REQUIRED_MYPY_FILES)},
+            "pytest": {"ini_options": {"addopts": addopts}},
+        }
+    }
 
     findings = _tooling_suppression_findings(pyproject)
 
     assert [finding.code for finding in findings] == ["test-selection"]
+
+
+def test_narrowed_mypy_target_set_is_rejected() -> None:
+    pyproject = {"tool": {"ruff": {"lint": {}}, "mypy": {"files": ["scripts/__init__.py"]}}}
+
+    findings = _tooling_suppression_findings(pyproject)
+
+    assert [finding.code for finding in findings] == ["mypy-targets"]
+
+
+@pytest.mark.parametrize(
+    "source_text",
+    [
+        "import pytest\n\n@pytest.mark.xfail\ndef test_contract() -> None:\n    assert False\n",
+        "import pytest as pt\n\n@pt.mark.xfail()\ndef test_contract() -> None:\n    assert False\n",
+        "from pytest import mark as checks\n\n@checks.xfail\ndef test_contract() -> None:\n    assert False\n",
+    ],
+)
+def test_pytest_xfail_decorators_are_rejected(tmp_path: Path, source_text: str) -> None:
+    source = tmp_path / "tests" / "fixture.py"
+    source.parent.mkdir()
+    source.write_text(source_text, encoding="utf-8")
+
+    findings = _python_findings(tmp_path, source)
+
+    assert any(finding.code == "suppression" and "xfail" in finding.message for finding in findings)
 
 
 def test_local_links_include_images_and_reference_style(tmp_path: Path) -> None:
@@ -548,6 +595,17 @@ def test_shortcut_reference_scan_ignores_non_shortcut_brackets(tmp_path: Path) -
     target.write_text("# Guide\n", encoding="utf-8")
     source.write_text(
         "[plain text]\n[inline](guide.md)\n![image](guide.md)\n[full][guide]\n[guide]: guide.md\n",
+        encoding="utf-8",
+    )
+
+    assert _local_link_findings(tmp_path) == []
+
+
+def test_local_link_scan_ignores_fenced_and_indented_code(tmp_path: Path) -> None:
+    source = tmp_path / "docs" / "links.md"
+    source.parent.mkdir()
+    source.write_text(
+        "```markdown\n[missing](fenced.md)\n```\n\n    [missing](indented.md)\n",
         encoding="utf-8",
     )
 

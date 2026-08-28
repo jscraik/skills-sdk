@@ -23,7 +23,7 @@ MAX_MODULE_LINES = 800
 MAX_FUNCTION_LINES = 120
 MAX_PUBLIC_PARAMETERS = 5
 PYTHON_ROOTS = ("src", "scripts", "tests", "examples", ".github/scripts")
-TEXT_ROOTS = ("src", "scripts", "tests", "docs", ".github")
+TEXT_ROOTS = ("src", "scripts", "tests", "examples", "docs", ".github")
 PORTABLE_TEXT_FILES = (
     "AGENTS.md",
     "ARCHITECTURE.md",
@@ -32,6 +32,7 @@ PORTABLE_TEXT_FILES = (
     "CONTRIBUTING.md",
     "README.md",
     "SECURITY.md",
+    "SUPPORT.md",
     "UBIQUITOUS.md",
     "pyproject.toml",
     ".mise.toml",
@@ -67,6 +68,8 @@ PINNED_TOOLS = {
 MISE_ACTION = "jdx/mise-action@v4"
 PR_TEMPLATE_VALIDATOR = ".github/scripts/validate_pr_template_body.py"
 PR_TEMPLATE_BOOTSTRAP_BASE = "564c5df731897f082410b9a643f518c5e301820a"
+REQUIRED_MYPY_FILES = ("scripts/check_repository_standards.py", "tests/test_repository_standards.py")
+MARKDOWN_FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[^\n]*$")
 
 
 @dataclass(frozen=True)
@@ -137,6 +140,16 @@ def _suppression_decorator_names(tree: ast.AST) -> set[str]:
             names.update(f"{alias.asname or 'typing'}.no_type_check" for alias in node.names if alias.name == "typing")
         elif isinstance(node, ast.ImportFrom) and node.module == "typing":
             names.update(alias.asname or alias.name for alias in node.names if alias.name == "no_type_check")
+    return names
+
+
+def _xfail_decorator_names(tree: ast.AST) -> set[str]:
+    names = {"pytest.mark.xfail"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(f"{alias.asname or 'pytest'}.mark.xfail" for alias in node.names if alias.name == "pytest")
+        elif isinstance(node, ast.ImportFrom) and node.module == "pytest":
+            names.update(f"{alias.asname or alias.name}.xfail" for alias in node.names if alias.name == "mark")
     return names
 
 
@@ -256,6 +269,7 @@ def _python_findings(root: Path, path: Path) -> list[Finding]:
     forbidden = _forbidden_imports(relative)
     broad_exception_names = _broad_exception_names(tree)
     suppression_decorators = _suppression_decorator_names(tree)
+    xfail_decorators = _xfail_decorator_names(tree)
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             findings.extend(_public_function_findings(relative, node))
@@ -263,6 +277,10 @@ def _python_findings(root: Path, path: Path) -> list[Finding]:
             _qualified_name(decorator) in suppression_decorators for decorator in node.decorator_list
         ):
             findings.append(Finding(relative, node.lineno, "suppression", "no_type_check decorators are forbidden"))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and any(
+            _qualified_name(decorator) in xfail_decorators for decorator in node.decorator_list
+        ):
+            findings.append(Finding(relative, node.lineno, "suppression", "pytest xfail decorators are forbidden"))
         elif isinstance(node, ast.Global):
             findings.append(Finding(relative, node.lineno, "global-state", "global declarations are forbidden"))
         elif isinstance(node, ast.ExceptHandler) and _catches_broad_exception(node.type, broad_exception_names):
@@ -317,12 +335,13 @@ def _local_link_findings(root: Path) -> list[Finding]:
     reference_definition_pattern = re.compile(r"^\s*\[(?P<label>[^]]+)]\s*:\s*(?P<destination>\S+)")
     for path in sorted(set(markdown_paths)):
         lines = path.read_text(encoding="utf-8").splitlines()
+        visible_lines = _visible_markdown_lines(lines)
         definitions = {
             match.group("label").casefold(): (match.group("destination"), line_number)
-            for line_number, line in enumerate(lines, start=1)
+            for line_number, line in visible_lines
             if (match := reference_definition_pattern.match(line))
         }
-        for line_number, line in enumerate(lines, start=1):
+        for line_number, line in visible_lines:
             if reference_definition_pattern.match(line):
                 continue
             for match in inline_link_pattern.finditer(line):
@@ -344,6 +363,27 @@ def _local_link_findings(root: Path) -> list[Finding]:
                 destination, definition_line = definition
                 findings.extend(_link_destination_findings(root, repository_root, path, definition_line, destination))
     return findings
+
+
+def _visible_markdown_lines(lines: Sequence[str]) -> list[tuple[int, str]]:
+    visible: list[tuple[int, str]] = []
+    fence_character: str | None = None
+    minimum_fence_length = 0
+    for line_number, line in enumerate(lines, start=1):
+        if fence_character is not None:
+            if re.fullmatch(rf"[ \t]*{re.escape(fence_character)}{{{minimum_fence_length},}}[ \t]*", line):
+                fence_character = None
+                minimum_fence_length = 0
+            continue
+        opening = MARKDOWN_FENCE_RE.fullmatch(line)
+        if opening is not None:
+            fence = opening.group("fence")
+            fence_character = fence[0]
+            minimum_fence_length = len(fence)
+            continue
+        if not line.startswith(("    ", "\t")):
+            visible.append((line_number, line))
+    return visible
 
 
 def _link_destination_findings(
@@ -404,6 +444,15 @@ def _tooling_suppression_findings(pyproject: dict[str, Any]) -> list[Finding]:
                 1,
                 "tool-suppression",
                 f"prohibited MyPy suppression keys: {sorted(prohibited_mypy)}",
+            )
+        )
+    if tuple(mypy.get("files", ())) != REQUIRED_MYPY_FILES:
+        findings.append(
+            Finding(
+                "pyproject.toml",
+                1,
+                "mypy-targets",
+                f"MyPy files must remain exactly {list(REQUIRED_MYPY_FILES)!r}",
             )
         )
     pytest_options = pyproject.get("tool", {}).get("pytest", {}).get("ini_options", {}).get("addopts", "")

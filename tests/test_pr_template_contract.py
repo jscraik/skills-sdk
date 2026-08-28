@@ -251,6 +251,19 @@ def test_command_line_does_not_fill_empty_required_field() -> None:
     assert "Required field in ## Validation is empty: Regression coverage:" in errors
 
 
+def test_indented_code_does_not_satisfy_command_evidence() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- Command: `bash scripts/validate-repository.sh` -> pass",
+        "    - Command: `bash scripts/validate-repository.sh` -> pass",
+        1,
+    )
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert "Validation must include Command evidence for bash scripts/validate-repository.sh." in errors
+
+
 @pytest.mark.parametrize("marker", ["n.a.", "N/A", "not applicable"])
 def test_rejects_bare_not_applicable_field(marker: str) -> None:
     validator = _load_validator()
