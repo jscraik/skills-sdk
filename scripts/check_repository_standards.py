@@ -319,6 +319,18 @@ def _portable_text_findings(root: Path) -> list[Finding]:
                         _relative(root, path), line_number, "unfrozen-command", "documented uv commands must be frozen"
                     )
                 )
+            if path.suffix in {".md", ".mdx", ".adoc", ".rst"} and (
+                ("uv run --frozen " in line and "mise exec -- uv run --frozen " not in line)
+                or ("uv sync --frozen" in line and "mise exec -- uv sync --frozen" not in line)
+            ):
+                findings.append(
+                    Finding(
+                        _relative(root, path),
+                        line_number,
+                        "unmanaged-command",
+                        "documented uv commands must use the repository-pinned mise environment",
+                    )
+                )
     return findings
 
 

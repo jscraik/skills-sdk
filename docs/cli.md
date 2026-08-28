@@ -17,7 +17,7 @@ inventory   intake   validate   build   eval   package   project   verify
 tessl prepare   tessl verify
 ```
 
-Use `uv run --frozen skills-sdk <route> --help` for a short route description. The
+Use `mise exec -- uv run --frozen skills-sdk <route> --help` for a short route description. The
 `validate` and `build` routes are implemented local commands:
 
 ```bash

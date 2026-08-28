@@ -299,6 +299,16 @@ def test_portable_text_rejects_unfrozen_documented_uv_command(tmp_path: Path) ->
     assert [(finding.code, finding.line) for finding in findings] == [("unfrozen-command", 1)]
 
 
+def test_portable_text_rejects_uv_command_outside_managed_mise(tmp_path: Path) -> None:
+    source = tmp_path / "docs" / "fixture.md"
+    source.parent.mkdir()
+    source.write_text("Run `uv " + "run --frozen pytest`.\n", encoding="utf-8")
+
+    findings = _portable_text_findings(tmp_path)
+
+    assert [(finding.code, finding.line) for finding in findings] == [("unmanaged-command", 1)]
+
+
 def test_tooling_suppression_configuration_is_rejected() -> None:
     pyproject = {
         "tool": {

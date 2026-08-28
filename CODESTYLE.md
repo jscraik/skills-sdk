@@ -33,7 +33,7 @@ runtime policy are not dependencies of this SDK.
 
 - Do not use lint, type, formatter, test, coverage, security, or validation
   suppressions. Repair the cause or return a typed blocker.
-- Use Python 3.12. Install the repository-pinned `uv` and Vale tools with
+- Use Python 3.12. Install the repository-pinned Python, `uv`, Ruff, and Vale tools with
   `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale`, then run
   `mise exec -- uv sync --frozen` before validation to create or refresh the
   exact pinned environment.

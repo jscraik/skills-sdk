@@ -8,7 +8,7 @@ publication.
 ## Before opening an issue
 
 1. Confirm the SDK version, Python version, and operating system.
-2. Reproduce from a clean checkout with `uv sync --frozen`.
+2. Reproduce from a clean checkout with `mise exec -- uv sync --frozen`.
 3. Run `bash scripts/validate-repository.sh` and include the exact command and
    outcome.
 4. Include the smallest redacted payload or schema name that reproduces the

@@ -172,7 +172,7 @@ its `--check` mode for the generated subset. The canonical focused route for
 the hand-maintained subset is:
 
 ```bash
-uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
+mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
 ```
 
 That route loads all three resources through `SchemaRegistry.load`, which
@@ -225,7 +225,7 @@ Use the pinned environment and the repository wrapper before a commit or pull
 request:
 
 ```bash
-uv sync --frozen
+mise exec -- uv sync --frozen
 bash scripts/validate-repository.sh
 ```
 

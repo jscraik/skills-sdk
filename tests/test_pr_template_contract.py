@@ -40,7 +40,7 @@ def _filled_body() -> str:
     return body.replace(
         "- Regression coverage: repo-relative evidence",
         "- Regression coverage: focused contract proof\n"
-        "- Command: `uv run --frozen pytest tests/test_pr_template_contract.py -q` -> pass\n"
+        "- Command: `mise exec -- uv run --frozen pytest tests/test_pr_template_contract.py -q` -> pass\n"
         "- Command: `bash scripts/validate-repository.sh` -> pass",
         1,
     )
