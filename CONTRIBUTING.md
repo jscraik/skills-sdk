@@ -16,6 +16,10 @@ bash scripts/validate-codestyle.sh
 bash scripts/validate-repository.sh
 ```
 
+The codestyle wrapper runs the pinned Vale release with the SDK-owned prose
+rules. Repair prose findings in the owning document; do not add inline
+suppression comments or exclusions.
+
 Commits use Conventional Commit subjects and native Git signing through the
 configured signer. Do not bypass hooks or use an unsigned fallback. Pull
 requests must follow the repository template; local checks do not establish

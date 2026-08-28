@@ -37,7 +37,9 @@ runtime policy are not dependencies of this SDK.
   refresh the exact pinned environment.
 - Run `bash scripts/validate-codestyle.sh` for formatter, lint, type, structural,
   documentation-link, configuration, dependency-direction, and suppression
-  checks.
+  checks. The same command runs the repository-pinned Vale binary against all
+  Markdown, MDX, AsciiDoc, and reStructuredText prose using the SDK-owned
+  `SkillsSDK` rules.
 - MyPy semantically checks the repository-standards implementation and its
   regressions. The repository-wide AST gate separately requires typed public
   interfaces without reinterpreting frozen Pydantic v1/v2 inheritance.
@@ -48,7 +50,8 @@ runtime policy are not dependencies of this SDK.
   outcome. A blocked result includes its concrete reason and nearest meaningful
   fallback; it is never reported as a pass.
 - Tool versions are exact and destination-owned in `pyproject.toml`,
-  `.mise.toml`, and `uv.lock`.
+  `.mise.toml`, and `uv.lock`. Vale is pinned in `.mise.toml`; its local style
+  package is source-controlled under `.vale/styles/SkillsSDK/`.
 
 See [Repository standards](docs/standards.md) for enforcement details and
 [Compatibility](docs/compatibility.md) for public versioning rules.

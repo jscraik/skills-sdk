@@ -27,6 +27,67 @@ def test_repository_standards_cli_accepts_current_tree() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "This package is production-ready in every environment.",
+        "This package is fully validated across all lanes.",
+        "Security is guaranteed.",
+        "There are no security risks.",
+    ],
+)
+def test_vale_rejects_absolute_readiness_claim(tmp_path: Path, claim: str) -> None:
+    source = tmp_path / "overclaim.md"
+    source.write_text(f"# Status\n\n{claim}\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            "mise",
+            "exec",
+            "--",
+            "vale",
+            "--config",
+            str(REPOSITORY_ROOT / ".vale.ini"),
+            str(source),
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "SkillsSDK.ClaimsBoundary" in result.stdout
+
+
+def test_vale_accepts_qualified_or_negated_readiness_claims(tmp_path: Path) -> None:
+    source = tmp_path / "bounded-claim.md"
+    source.write_text(
+        "# Status\n\n"
+        "This package is not production-ready.\n\n"
+        "It is fully validated against the declared local contract.\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "mise",
+            "exec",
+            "--",
+            "vale",
+            "--config",
+            str(REPOSITORY_ROOT / ".vale.ini"),
+            str(source),
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_suppression_comment_is_rejected_without_baseline_exceptions(tmp_path: Path) -> None:
     source = tmp_path / "tests" / "fixture.py"
     source.parent.mkdir()
@@ -109,7 +170,7 @@ def test_tool_pin_drift_is_rejected() -> None:
             ]
         },
     }
-    mise = {"tools": {"python": "3.12", "uv": "0.11.3", "ruff": "0.15.22"}}
+    mise = {"tools": {"python": "3.12", "uv": "0.11.3", "ruff": "0.15.22", "vale": "3.18.0"}}
     lock = {
         "package": [
             {"name": "mypy", "version": "1.18.1"},
@@ -123,6 +184,7 @@ def test_tool_pin_drift_is_rejected() -> None:
     findings = _tool_pin_findings(pyproject, mise, lock)
 
     assert any(finding.code == "tool-pin" for finding in findings)
+    assert any("vale" in finding.message for finding in findings)
     assert any(finding.code == "lock-pin" for finding in findings)
 
 

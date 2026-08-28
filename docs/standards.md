@@ -36,11 +36,14 @@ signed Conventional Commits, and exact SDK tool pins. They do not import
 Agent-Skills scripts, infrastructure, Codex configuration, skill graphs, local
 memory, runtime installation, Tessl workflows, or non-Python toolchains.
 
-Vale is intentionally not enabled. The repository has no destination-owned Vale
-vocabulary or style package with a clean baseline, and an empty configuration
-would create a hollow gate. Markdown link and portability checks are enforced
-locally; prose linting can be added only with a maintained SDK-specific style
-configuration and baseline proof.
+Vale is pinned by `.mise.toml` and runs from `scripts/validate-codestyle.sh`.
+The destination-owned `SkillsSDK` package rejects absolute, evidence-free
+readiness and security claims while allowing truthful negated or scoped claims,
+and enforces the project name in reader-facing prose. The rules
+lint Markdown, MDX, AsciiDoc, and reStructuredText while leaving code spans and
+blocks to their language-specific tools. The current repository is the clean
+baseline: there are no exclusions, inline suppressions, or imported Foundry and
+Agent-Skills vocabularies.
 
 ## Evidence boundary
 

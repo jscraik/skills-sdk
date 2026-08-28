@@ -58,6 +58,7 @@ PINNED_TOOLS = {
     "types_jsonschema": "4.26.0.20260518",
     "types_pyyaml": "6.0.12.20250822",
     "uv_build": "0.11.3",
+    "vale": "3.19.0",
 }
 
 
@@ -321,6 +322,7 @@ def _tool_pin_findings(pyproject: dict[str, Any], mise: dict[str, Any], lock: di
         "types_jsonschema": _dependency_version(dev_dependencies, "types-jsonschema"),
         "types_pyyaml": _dependency_version(dev_dependencies, "types-pyyaml"),
         "uv_build": _dependency_version(build_requirements, "uv_build"),
+        "vale": mise["tools"].get("vale"),
     }
     if mise["tools"].get("ruff") != observed["ruff"]:
         findings.append(Finding(".mise.toml", 1, "tool-pin", "Ruff must match the exact project dependency"))
