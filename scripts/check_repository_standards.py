@@ -21,7 +21,7 @@ import yaml
 MAX_MODULE_LINES = 800
 MAX_FUNCTION_LINES = 120
 MAX_PUBLIC_PARAMETERS = 5
-PYTHON_ROOTS = ("src", "scripts", "tests", ".github/scripts")
+PYTHON_ROOTS = ("src", "scripts", "tests", "examples", ".github/scripts")
 TEXT_ROOTS = ("src", "scripts", "tests", "docs", ".github")
 PORTABLE_TEXT_FILES = (
     "AGENTS.md",

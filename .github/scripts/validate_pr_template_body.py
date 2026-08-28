@@ -12,10 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SECTION_RE = re.compile(r"^## (?P<title>.+?)\s*$", re.MULTILINE)
-CHECKBOX_RE = re.compile(r"^- \[[ xX]\] (?P<label>.+?)\s*$", re.MULTILINE)
+CHECKBOX_RE = re.compile(r"^- \[(?P<state>[ xX])\] (?P<label>.+?)\s*$", re.MULTILINE)
 FIELD_LINE_RE = re.compile(r"^- (?P<label>[^:\n]+):(?P<value>.*)$", re.MULTILINE)
 STATUS_RE = re.compile(r"^\*\*\((?:pending|n\.a\.|n/a|not applicable)\)\*\*\s*", re.IGNORECASE)
-HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+FENCE_START_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[^\n]*$")
 PLACEHOLDER_RE = re.compile(
     r"<(?:[A-Z][A-Z0-9_]*(?:[- ][A-Z0-9_]+)*|"
     r"(?i:(?:describe|enter|fill|provide|replace|todo|your)\b[^<>\n]*))>"
@@ -28,6 +28,7 @@ COMMAND_RE = re.compile(
     r"(?:(?:pass|fail)(?:\s*\([^)]+\)\.?)?|blocked\s*\([^)]+\))\s*$",
     re.IGNORECASE,
 )
+PASS_DETAIL_RE = re.compile(r"->\s*pass\s*\((?P<detail>[^)]*)\)\.?\s*$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,52 @@ class TemplateContract:
 
 
 def _visible(markdown: str) -> str:
-    return HTML_COMMENT_RE.sub("", markdown)
+    visible: list[str] = []
+    inside_comment = False
+    fence_character: str | None = None
+    minimum_fence_length = 0
+    for line in markdown.splitlines(keepends=True):
+        content = line.rstrip("\r\n")
+        line_ending = line[len(content) :]
+        if fence_character is not None:
+            closing = re.fullmatch(
+                rf"[ \t]*{re.escape(fence_character)}{{{minimum_fence_length},}}[ \t]*",
+                content,
+            )
+            if closing is not None:
+                fence_character = None
+                minimum_fence_length = 0
+            continue
+        content, inside_comment = _without_html_comments(content, inside_comment)
+        opening = FENCE_START_RE.fullmatch(content)
+        if opening is not None:
+            fence = opening.group("fence")
+            fence_character = fence[0]
+            minimum_fence_length = len(fence)
+            continue
+        visible.append(f"{content}{line_ending}")
+    return "".join(visible)
+
+
+def _without_html_comments(content: str, inside_comment: bool) -> tuple[str, bool]:
+    visible: list[str] = []
+    cursor = 0
+    while cursor < len(content):
+        if inside_comment:
+            comment_end = content.find("-->", cursor)
+            if comment_end < 0:
+                return "".join(visible), True
+            cursor = comment_end + 3
+            inside_comment = False
+            continue
+        comment_start = content.find("<!--", cursor)
+        if comment_start < 0:
+            visible.append(content[cursor:])
+            break
+        visible.append(content[cursor:comment_start])
+        cursor = comment_start + 4
+        inside_comment = True
+    return "".join(visible), inside_comment
 
 
 def _section_blocks(markdown: str) -> dict[str, str]:
@@ -119,7 +165,12 @@ def _structure_errors(contract: TemplateContract, body: str) -> list[str]:
     errors.extend(
         f"Unchecked checklist item requires an explicit Pending or N/A marker: {match.group(0).strip()}"
         for match in CHECKBOX_RE.finditer(blocks.get("Checklist", ""))
-        if match.group(0).startswith("- [ ]") and not STATUS_RE.match(match.group("label"))
+        if match.group("state") == " " and not STATUS_RE.match(match.group("label").lstrip())
+    )
+    errors.extend(
+        f"Checked checklist item cannot use a Pending or N/A marker: {match.group(0).strip()}"
+        for match in CHECKBOX_RE.finditer(blocks.get("Checklist", ""))
+        if match.group("state").casefold() == "x" and STATUS_RE.match(match.group("label").lstrip())
     )
     return errors
 
@@ -130,6 +181,11 @@ def _command_errors(body: str) -> list[str]:
     if not command_lines:
         return ["Validation must include at least one Command evidence line."]
     errors = [f"Invalid Command evidence: {line}" for line in command_lines if COMMAND_RE.fullmatch(line) is None]
+    errors.extend(
+        f"Passing Command evidence cannot report a blocked or unexecuted command: {line}"
+        for line in command_lines
+        if _passing_command_contradicts_execution(line)
+    )
     aggregate_command = re.compile(
         r"^-\s*Command:\s*`?bash scripts/validate-repository\.sh`?\s*->",
         re.IGNORECASE,
@@ -137,6 +193,21 @@ def _command_errors(body: str) -> list[str]:
     if not any(aggregate_command.match(line) for line in command_lines):
         errors.append("Validation must include Command evidence for bash scripts/validate-repository.sh.")
     return errors
+
+
+def _passing_command_contradicts_execution(line: str) -> bool:
+    match = PASS_DETAIL_RE.search(line)
+    if match is None:
+        return False
+    words = re.findall(r"[a-z]+", match.group("detail").casefold())
+    for index, word in enumerate(words):
+        previous = words[index - 1] if index else None
+        following = words[index + 1] if index + 1 < len(words) else None
+        if word in {"blocked", "unexecuted"} and previous != "not":
+            return True
+        if word == "not" and following in {"executed", "run"}:
+            return True
+    return False
 
 
 def validate_pr_body(template: str, body: str) -> list[str]:

@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -110,6 +112,17 @@ def test_allows_explicit_pending_checklist_state() -> None:
     assert validator.validate_pr_body(_template(), body) == []
 
 
+def test_allows_indented_pending_checklist_state() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- [x] The branch will be removed after merge.",
+        "- [ ]   **(Pending)** The branch will be removed after merge.",
+        1,
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []
+
+
 def test_allows_documented_dotted_not_applicable_checklist_state() -> None:
     validator = _load_validator()
     body = _filled_body().replace(
@@ -128,6 +141,20 @@ def test_rejects_unclassified_unchecked_checklist_item() -> None:
     errors = validator.validate_pr_body(_template(), body)
 
     assert any("requires an explicit Pending or N/A marker" in error for error in errors)
+
+
+@pytest.mark.parametrize("status", ["Pending", "n.a.", "N/A", "not applicable"])
+def test_rejects_status_marker_on_checked_checklist_item(status: str) -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "- [x] The branch will be removed after merge.",
+        f"- [x] **({status})** The branch will be removed after merge.",
+        1,
+    )
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert any("Checked checklist item cannot use" in error for error in errors)
 
 
 def test_rejects_missing_or_malformed_command_evidence() -> None:
@@ -155,6 +182,35 @@ def test_rejects_not_applicable_command_outcome() -> None:
     errors = validator.validate_pr_body(_template(), body)
 
     assert any("Invalid Command evidence" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "detail",
+    ["not run", "not-run", "not executed", "not-executed", "unexecuted", "blocked by missing tool"],
+)
+def test_rejects_passing_command_with_nonexecution_detail(detail: str) -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "`bash scripts/validate-repository.sh` -> pass",
+        f"`bash scripts/validate-repository.sh` -> pass ({detail})",
+        1,
+    )
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert any("cannot report a blocked or unexecuted command" in error for error in errors)
+
+
+@pytest.mark.parametrize("detail", ["not blocked; executed", "not   blocked; executed", "not-unexecuted"])
+def test_allows_passing_command_with_negated_blocker_detail(detail: str) -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "`bash scripts/validate-repository.sh` -> pass",
+        f"`bash scripts/validate-repository.sh` -> pass ({detail})",
+        1,
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []
 
 
 def test_command_line_does_not_fill_empty_required_field() -> None:
@@ -208,3 +264,34 @@ def test_rejects_genuine_placeholder_tokens() -> None:
     errors = validator.validate_pr_body(_template(), body)
 
     assert "Replace unresolved placeholder token: <describe the problem>" in errors
+
+
+def test_rejects_template_contract_rendered_only_inside_fenced_code() -> None:
+    validator = _load_validator()
+    body = f"```markdown\n{_filled_body()}\n```\n"
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert any("sections must match" in error for error in errors)
+    assert "Validation must include at least one Command evidence line." in errors
+
+
+def test_rejects_fenced_template_with_longer_valid_closing_fence() -> None:
+    validator = _load_validator()
+    body = f"```markdown\n{_filled_body()}\n````\n"
+
+    errors = validator.validate_pr_body(_template(), body)
+
+    assert any("sections must match" in error for error in errors)
+    assert "Validation must include at least one Command evidence line." in errors
+
+
+def test_html_comment_inside_fence_does_not_hide_following_contract() -> None:
+    validator = _load_validator()
+    body = _filled_body().replace(
+        "## Summary",
+        "```markdown\n<!-- literal comment opener\n```\n-->\n## Summary",
+        1,
+    )
+
+    assert validator.validate_pr_body(_template(), body) == []

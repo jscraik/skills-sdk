@@ -72,7 +72,8 @@ def test_vale_accepts_qualified_or_negated_readiness_claims(tmp_path: Path) -> N
     source = tmp_path / "bounded-claim.md"
     source.write_text(
         "# Status\n\n"
-        "This package is not production-ready.\n\n"
+        "This package is not production-ready in every environment.\n\n"
+        "It is not fully validated across all lanes.\n\n"
         "It is fully validated against the declared local contract.\n",
         encoding="utf-8",
     )
@@ -173,6 +174,17 @@ def test_validation_layer_rejects_bare_root_sdk_import(tmp_path: Path) -> None:
 
 def test_python_roots_include_github_validation_scripts(tmp_path: Path) -> None:
     source = tmp_path / ".github" / "scripts" / "fixture.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("value: int = 1  # type:" + " ignore\n", encoding="utf-8")
+
+    paths = list(_iter_files(tmp_path, PYTHON_ROOTS, (".py",)))
+
+    assert source in paths
+    assert [(finding.code, finding.line) for finding in _python_findings(tmp_path, source)] == [("suppression", 1)]
+
+
+def test_python_roots_include_tracked_examples(tmp_path: Path) -> None:
+    source = tmp_path / "examples" / "fixture.py"
     source.parent.mkdir(parents=True)
     source.write_text("value: int = 1  # type:" + " ignore\n", encoding="utf-8")
 
