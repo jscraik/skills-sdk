@@ -22,8 +22,10 @@ The standards program scans all Python source and tests for public annotations,
 module and function bounds, broad exception handling, global declarations,
 dependency-direction violations, suppressions, and machine-specific paths. It
 also parses repository TOML, JSON, and workflow YAML; checks exact tool pins,
-required ignored output, and local Markdown link targets; and fails with typed,
-path-bound findings.
+immutable full-commit references for third-party actions and reusable
+workflows, required ignored output, and local Markdown link targets; and fails
+with typed, path-bound findings. Local actions and digest-bound container
+actions retain their native reference forms.
 
 The narrower semantic MyPy lane is intentional: versioned frozen Pydantic
 models retain their public v2-subclasses-v1 compatibility, while the structural

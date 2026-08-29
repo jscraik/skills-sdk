@@ -57,6 +57,9 @@ runtime policy are not dependencies of this SDK.
 - Tool versions are exact and destination-owned in `pyproject.toml`,
   `.mise.toml`, and `uv.lock`. Vale is pinned in `.mise.toml`; its local style
   package is source-controlled under `.vale/styles/SkillsSDK/`.
+- Third-party GitHub Actions are pinned to audited, immutable lowercase
+  40-character commit SHAs. Local actions and digest-bound container actions
+  keep their native reference forms.
 
 See [Repository standards](docs/standards.md) for enforcement details and
 [Compatibility](docs/compatibility.md) for public versioning rules.
