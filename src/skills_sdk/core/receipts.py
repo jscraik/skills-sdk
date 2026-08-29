@@ -18,10 +18,12 @@ _RECEIPT_SCHEMAS = {
     "evaluation-receipt/v1": "evaluation-receipt.v1",
     "evaluation-receipt/v2": "evaluation-receipt.v2",
     "registry-preparation/v1": "registry-preparation.v1",
+    "package-safety-evidence/v1": "package-safety-evidence.v1",
 }
 _PACKAGE_RECEIPT_VERSIONS = frozenset({"package-receipt/v1", "package-receipt/v2"})
 _EVALUATION_RECEIPT_VERSIONS = frozenset({"evaluation-receipt/v1", "evaluation-receipt/v2"})
 _REGISTRY_RECEIPT_VERSIONS = frozenset({"registry-preparation/v1"})
+_SAFETY_RECEIPT_VERSIONS = frozenset({"package-safety-evidence/v1"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,11 +106,12 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
     package_receipt = schema_version in _PACKAGE_RECEIPT_VERSIONS
     evaluation_receipt = schema_version in _EVALUATION_RECEIPT_VERSIONS
     registry_receipt = schema_version in _REGISTRY_RECEIPT_VERSIONS
+    safety_receipt = schema_version in _SAFETY_RECEIPT_VERSIONS
     # Concrete receipt families validate their richer invariants before the
     # stable generic Receipt API is exposed to callers.
     active_registry.validate(receipt_schema, payload)
     candidate_payload = payload.get("candidate")
-    if not package_receipt and not evaluation_receipt and not registry_receipt:
+    if not package_receipt and not evaluation_receipt and not registry_receipt and not safety_receipt:
         active_registry.validate("package-identity.v1", candidate_payload)
     raw_evidence = payload.get("evidence", ())
     if evaluation_receipt:
@@ -118,11 +121,19 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
             if isinstance(result, Mapping)
             for ref in result.get("evidence_refs", ())
         )
+    elif safety_receipt:
+        raw_evidence = tuple(str(item.get("ref")) for item in payload.get("evidence", ()) if isinstance(item, Mapping))
     evidence = tuple(str(ref) for ref in raw_evidence)
     for ref in evidence:
         require_portable_relative_path(ref)
     blocker_payload = payload.get("blocker")
-    if blocker_payload is not None and not package_receipt and not evaluation_receipt and not registry_receipt:
+    if (
+        blocker_payload is not None
+        and not package_receipt
+        and not evaluation_receipt
+        and not registry_receipt
+        and not safety_receipt
+    ):
         active_registry.validate("blocker.v1", blocker_payload)
     candidate = (
         CandidateIdentity(
@@ -133,11 +144,15 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         if isinstance(candidate_payload, Mapping)
         else None
     )
-    if package_receipt or registry_receipt:
+    if package_receipt or registry_receipt or safety_receipt:
         artifact_status = str(payload["status"])
         generic_status = {
             "built": "pass",
             "prepared": "pass",
+            "reviewed_no_issue": "pass",
+            "not_reviewed": "blocked",
+            "issue_found": "blocked",
+            "metadata_insufficient": "blocked",
             "blocked": "blocked",
         }.get(artifact_status, str(payload["status"]))
     else:

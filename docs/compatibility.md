@@ -106,6 +106,18 @@ neither silently discarded nor exposed or reinterpreted as filesystem paths.
 This contract records local preparation only; a future publication adapter must
 produce separate registry evidence and bind the same candidate identity.
 
+`package-safety-evidence/v1` is additive and does not reinterpret
+`risk-classification/v1`, `security-screening/v1`, `package-hardening/v1`, or
+any existing receipt family. Its four states are explicit: `not_reviewed`,
+`reviewed_no_issue`, `issue_found`, and `metadata_insufficient`. Callers must
+not translate a scanner `pass`, an empty finding list, or a skipped review
+into `reviewed_no_issue` without the required digest-bound evidence. Generic
+receipt parsing exposes `reviewed_no_issue` as `pass` and the remaining states
+as `blocked`, while retaining the original state as `artifact_status`.
+Unknown future safety families fail closed. The contract contains no generic
+`safe` boolean and does not decide rights, admission, runtime behavior, or
+publication.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

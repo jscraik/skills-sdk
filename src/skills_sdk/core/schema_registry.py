@@ -30,6 +30,7 @@ SCHEMA_NAMES = frozenset(
         "package-hardening.v1",
         "package-receipt.v1",
         "package-receipt.v2",
+        "package-safety-evidence.v1",
         "receipt-base.v1",
         "risk-classification.v1",
         "security-screening.v1",
@@ -173,6 +174,10 @@ class SchemaRegistry:
             from skills_sdk.models.registry import RegistryPreparationRequest
 
             model = RegistryPreparationRequest
+        elif name == "package-safety-evidence.v1":
+            from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
+
+            model = PackageSafetyEvidenceReceipt
         elif name == "security-screening.v1":
             from skills_sdk.models.risk import SecurityScreeningResult
 

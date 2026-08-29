@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
+
+import package_safety_schema
 
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
@@ -51,6 +53,7 @@ from skills_sdk.models.registry import (
     RegistryPreparationRequest,
 )
 from skills_sdk.models.risk import RiskClassification, SecurityScreeningResult
+from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 from skills_sdk.models.validation import SkillPackageValidation
 
 _PORTABLE_PATH_PATTERN = (
@@ -78,11 +81,6 @@ _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
 _MODEL_ID_URI_SCHEME_SCHEMA_PATTERN = r"^[A-Za-z][A-Za-z0-9+.-]*:"
-
-
-class _SchemaModel(Protocol):
-    @classmethod
-    def model_json_schema(cls) -> dict[str, Any]: ...
 
 
 def _append_portable_path_constraints(schema: Any) -> None:
@@ -638,11 +636,12 @@ def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> N
     ]
 
 
-def _render_schema(model: type[_SchemaModel], filename: str) -> str:
+def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str) -> str:
     schema = model.model_json_schema()
     _append_portable_path_constraints(schema)
     _append_provider_identity_constraints(schema)
     _append_registry_identity_constraints(schema)
+    package_safety_schema.append_package_safety_schema_constraints(schema, filename)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:
         # Pydantic emits field types but cannot express the status-dependent
         # receipt invariants enforced by PackageReceipt.model_validator.
@@ -769,6 +768,7 @@ def main() -> int:
         (RegistryIdentity, "registry-identity.v1.schema.json"),
         (RegistryPreparationReceipt, "registry-preparation.v1.schema.json"),
         (RegistryPreparationRequest, "registry-preparation-request.v1.schema.json"),
+        (PackageSafetyEvidenceReceipt, "package-safety-evidence.v1.schema.json"),
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         (ScenarioSet, "scenario-set.v1.schema.json"),
