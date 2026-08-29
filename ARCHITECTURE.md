@@ -27,6 +27,10 @@ operational contracts.
 - Changing the receipt path: follow `build_skill_package` through
   `src/skills_sdk/packaging/manifest.py` and the receipt models under
   `src/skills_sdk/models/packaging.py`.
+- Changing private-registry preparation: follow
+  `prepare_private_registry_candidate` in
+  `src/skills_sdk/distribution/private_registry.py` and the versioned models
+  under `src/skills_sdk/models/registry.py`.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
@@ -61,8 +65,11 @@ core/schema_registry.py + models/*
 
 Local candidate-bound proof
     |
-    +--> provider, runtime, distribution, and publication adapters
-         (separate lanes; not implemented by this core package)
+    +--> distribution/private_registry.py
+    |    (local receipt composition only; no registry interaction)
+    |
+    +--> provider, runtime, and publication adapters
+         (separate external lanes)
 ```
 
 The CLI is an outer adapter over the implemented local services. `validate`
@@ -83,6 +90,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/validation/` | Read-only standalone-skill capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. | `SkillIR`, `read_frontmatter`, `validate_skill_package` |
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
 | `src/skills_sdk/evaluation/` | Pure deterministic scoring over externally produced, candidate-bound observations; no prompt, provider, package, or runtime execution. | `evaluate_scenario_set` in `deterministic.py` |
+| `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
@@ -102,13 +110,19 @@ docstrings and the linked API or CLI guides.
 - `packaging` composes validation and packaging models. Hardening consumes the
   build receipt and never rescans source state. Its public wrapper loads service
   implementations lazily so validation and packaging imports remain acyclic.
+- `distribution` composes validated v2 package, hardening, and registry
+  identity contracts into a local preparation receipt. It does not contain a
+  registry client, credential boundary, filesystem writer, or publication
+  operation.
 - `cli` is the outermost process adapter. It imports the implemented services
   lazily, prints their versioned results, and maps a blocked result to the
   documented exit status.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The repository's dependency direction is `CLI -> validation/packaging/evaluation -> models/core`; provider, runtime, distribution, and publication adapters remain external boundaries.
+- The repository's dependency direction is
+  `CLI -> validation/packaging/evaluation/distribution -> models/core`;
+  provider, runtime, and publication adapters remain external boundaries.
 
 ## Architectural invariants
 

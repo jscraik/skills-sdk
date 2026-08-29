@@ -37,6 +37,9 @@ SCHEMA_NAMES = frozenset(
         "evaluation-receipt.v2",
         "provider-identity.v1",
         "provider-identity.v2",
+        "registry-identity.v1",
+        "registry-preparation.v1",
+        "registry-preparation-request.v1",
         "scenario-case-result.v1",
         "scenario-case-result.v2",
         "scenario-observation.v1",
@@ -158,6 +161,18 @@ class SchemaRegistry:
             from skills_sdk.models.provider import ProviderIdentityV2
 
             model = ProviderIdentityV2
+        elif name == "registry-identity.v1":
+            from skills_sdk.models.registry import RegistryIdentity
+
+            model = RegistryIdentity
+        elif name == "registry-preparation.v1":
+            from skills_sdk.models.registry import RegistryPreparationReceipt
+
+            model = RegistryPreparationReceipt
+        elif name == "registry-preparation-request.v1":
+            from skills_sdk.models.registry import RegistryPreparationRequest
+
+            model = RegistryPreparationRequest
         elif name == "security-screening.v1":
             from skills_sdk.models.risk import SecurityScreeningResult
 

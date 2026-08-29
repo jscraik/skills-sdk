@@ -1,0 +1,44 @@
+{
+  "$id": "https://schemas.skills-sdk.dev/registry-identity.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Opaque, secret-free identity for one private registry namespace.",
+  "properties": {
+    "namespace": {
+      "maxLength": 64,
+      "not": {
+        "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+      },
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Namespace",
+      "type": "string"
+    },
+    "registry_id": {
+      "maxLength": 64,
+      "not": {
+        "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+      },
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Registry Id",
+      "type": "string"
+    },
+    "registry_kind": {
+      "const": "private",
+      "default": "private",
+      "title": "Registry Kind",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "registry-identity/v1",
+      "default": "registry-identity/v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "registry_id",
+    "namespace"
+  ],
+  "title": "RegistryIdentity",
+  "type": "object"
+}

@@ -61,6 +61,13 @@ from skills_sdk.models.packaging import (
     PackageReceiptV2,
 )
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
+from skills_sdk.models.registry import (
+    RegistryIdentity,
+    RegistryPreparationBlocker,
+    RegistryPreparationReceipt,
+    RegistryPreparationRequest,
+    RegistryPreparationWarning,
+)
 from skills_sdk.models.risk import RiskClassification, RiskSensor, SecurityFinding, SecurityScreeningResult
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
@@ -101,6 +108,11 @@ __all__ = [
     "ProviderIdentity",
     "ProviderIdentityV2",
     "RecommendedMechanism",
+    "RegistryIdentity",
+    "RegistryPreparationBlocker",
+    "RegistryPreparationReceipt",
+    "RegistryPreparationRequest",
+    "RegistryPreparationWarning",
     "RightsStatus",
     "RiskClass",
     "RiskClassification",

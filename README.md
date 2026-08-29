@@ -48,6 +48,11 @@ anything, mutate a runtime, or publish to a registry.
   digest-only exact-match decisions, deterministic receipt identity, and
   generic receipt parsing. Existing v1 payloads and evaluator semantics remain
   unchanged.
+- A local private-registry preparation contract that binds a v2 package
+  receipt, package-hardening receipt, secret-free registry identity, immutable
+  manifest digest, and caller-supplied evidence into a deterministic
+  `registry-preparation/v1` receipt. Preparation performs no publication,
+  registry mutation, credential use, or network access.
 - Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
   names. The registry applies structural validation to those names and
   semantic invariants only for registered model families; other packaged
@@ -258,6 +263,31 @@ wire-shape exceptions, see [`docs/api.md`](docs/api.md). The small
 shows a portable candidate identity without requiring a provider, credential,
 runtime installation, or generated receipt.
 
+After a successful v2 build and package-hardening pass, callers can prepare a
+private-registry candidate locally:
+
+```python
+from skills_sdk.distribution import prepare_private_registry_candidate
+from skills_sdk.models import RegistryIdentity, RegistryPreparationRequest
+
+registry_receipt = prepare_private_registry_candidate(
+    receipt,
+    hardening,
+    RegistryPreparationRequest(
+        registry=RegistryIdentity(registry_id="private-registry", namespace="example-team"),
+        package_name=receipt.candidate.package_id,
+        version=receipt.manifest.version,
+        evidence=("evidence/private-registry-preparation.json",),
+    ),
+)
+assert registry_receipt.mutation_performed is False
+assert registry_receipt.publication_performed is False
+```
+
+This function validates immutable receipt inputs and returns either
+`prepared` or a typed `blocked` result. It does not contact a registry, check
+credentials, upload an artifact, reserve a version, or prove publication.
+
 ## Contract and evidence boundaries
 
 The same candidate identity should travel through each local proof artifact,
@@ -270,6 +300,7 @@ while the artifact type states which lane actually ran:
 | Evaluation           | Candidate-bound scenarios and scorer calibration requirements                 | A passing score from a scorer that did not run               |
 | Risk and security    | Sensor coverage, redacted findings, and explicit pass/review/block states     | Provider or runtime security beyond the declared sensors     |
 | Manifest and receipt | Immutable candidate, files, digest, timestamps, and blockers                  | Distribution, installation, publication, or hosted readiness |
+| Registry preparation | Candidate-, hardening-, registry-, digest-, and evidence-bound local intent    | Registry acceptance, upload, version reservation, or publication |
 
 This separation is deliberate: local contract proof, hosted CI and review,
 provider or registry state, and installed behavior are different claims.
