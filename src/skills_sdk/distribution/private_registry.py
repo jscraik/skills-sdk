@@ -160,12 +160,12 @@ def _input_blockers(
         )
     assert package_receipt.manifest is not None
     if request.version != package_receipt.manifest.version:
-        return (
-            RegistryPreparationBlocker(
-                code="package_version_mismatch",
-                message="Registry version must match the immutable package manifest version.",
-            ),
+        version_blocker = RegistryPreparationBlocker(
+            code="package_version_mismatch",
+            message="Registry version must match the immutable package manifest version.",
         )
+        hardening_blockers = _hardening_blockers(hardening_receipt) if hardening_receipt.status == "blocked" else ()
+        return (version_blocker, *hardening_blockers)
     if hardening_receipt.status == "blocked":
         return _hardening_blockers(hardening_receipt)
     assert package_receipt.candidate is not None

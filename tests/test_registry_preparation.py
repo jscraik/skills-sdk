@@ -239,6 +239,39 @@ def test_manifest_version_mismatch_is_typed_blocker() -> None:
     assert result.blocker.code == "package_version_mismatch"
 
 
+def test_manifest_version_mismatch_retains_hardening_blockers() -> None:
+    package_receipt = _package_receipt()
+    baseline = harden_skill_package(package_receipt)
+    hardening_blocker = PackageHardeningCheck(
+        id="policy_blocked",
+        status="blocker",
+        message="policy blocked",
+        evidence=("evidence/policy.json",),
+    )
+    hardening = baseline.model_copy(
+        update={
+            "status": "blocked",
+            "hardening_checks": (*baseline.hardening_checks, hardening_blocker),
+            "blockers": (hardening_blocker,),
+        }
+    )
+
+    result = prepare_private_registry_candidate(
+        package_receipt,
+        hardening,
+        RegistryPreparationRequest(
+            registry=RegistryIdentity(registry_id="private-registry", namespace="example-team"),
+            package_name="synthetic-skill",
+            version="9.9.9",
+            evidence=("evidence/private-registry-preparation.json",),
+        ),
+    )
+
+    assert result.blocker is not None
+    assert result.blocker.code == "package_version_mismatch"
+    assert tuple(blocker.code for blocker in result.blockers) == ("package_version_mismatch", "policy_blocked")
+
+
 def test_package_name_mismatch_is_typed_blocker() -> None:
     result = _prepare(_package_receipt(), package_name="different-skill")
     assert result.status == "blocked"
