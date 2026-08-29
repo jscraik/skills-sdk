@@ -62,12 +62,16 @@ _NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
 _PROVIDER_IDENTITY_FIELDS = ("provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest")
 _REGISTRY_IDENTITY_FIELDS = ("registry_id", "namespace")
 _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN = (
-    r"(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
-    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+    r"(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
+    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
 _V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+)
+_REGISTRY_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
+    r"(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
+    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
 _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
@@ -124,9 +128,13 @@ def _append_registry_identity_constraints(schema: Any) -> None:
         if schema.get("title") == "RegistryIdentity":
             properties = schema.get("properties", {})
             for field in _REGISTRY_IDENTITY_FIELDS:
-                properties[field]["not"] = {"pattern": _V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
+                properties[field]["not"] = {"pattern": _REGISTRY_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
         elif schema.get("title") == "RegistryPreparationRequest":
-            schema["properties"]["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
+            properties = schema["properties"]
+            for field in ("package_name", "version"):
+                properties[field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
+            properties["evidence"]["uniqueItems"] = True
+            properties["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
         elif schema.get("title") == "RegistryPreparationBlocker":
             for field in ("code", "message"):
                 schema["properties"][field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
@@ -138,7 +146,10 @@ def _append_registry_identity_constraints(schema: Any) -> None:
                 "pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN
             }
         elif schema.get("title") == "RegistryPreparationReceipt":
-            schema["properties"]["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
+            properties = schema["properties"]
+            for field in ("package_name", "version"):
+                properties[field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
+            properties["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
         for value in schema.values():
             _append_registry_identity_constraints(value)
     elif isinstance(schema, list):
@@ -198,6 +209,7 @@ def _append_registry_preparation_constraints(schema: dict[str, Any]) -> None:
             "package name must match candidate package_id",
             "package and manifest digests must match",
             "registry preparation evidence paths must be unique",
+            "blocked registry receipt must retain its primary blocker first",
         ],
     }
 

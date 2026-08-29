@@ -67,14 +67,19 @@ def _split_evidence(values: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str
     source_digests: list[str] = []
     for value in values:
         if not registry_evidence_is_redaction_safe(value):
-            source_digests.append(canonical_json_sha256(value))
+            digest = canonical_json_sha256(value)
+            if digest not in source_digests:
+                source_digests.append(digest)
             continue
         try:
             require_portable_relative_path(value)
         except ContractError:
-            source_digests.append(canonical_json_sha256(value))
+            digest = canonical_json_sha256(value)
+            if digest not in source_digests:
+                source_digests.append(digest)
         else:
-            refs.append(value)
+            if value not in refs:
+                refs.append(value)
     return tuple(refs), tuple(source_digests)
 
 

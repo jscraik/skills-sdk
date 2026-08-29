@@ -25,7 +25,7 @@ REGISTRY_VERSION_PATTERN = (
 )
 _REGISTRY_VERSION_PATTERN = re.compile(REGISTRY_VERSION_PATTERN)
 
-_CREDENTIAL_PREFIXES = ("akia", "bearer", "ghp_", "github_pat_", "sk-", "xoxb-", "xoxp-")
+_CREDENTIAL_PREFIXES = ("aiza", "akia", "bearer", "ghp_", "github_pat_", "hf_", "sk-", "xoxb-", "xoxp-")
 _CREDENTIAL_COMPONENT_PATTERN = re.compile(
     rf"(?:^|[._-])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)})",
     re.IGNORECASE,
@@ -37,7 +37,7 @@ _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
 
 
 def registry_evidence_is_redaction_safe(value: str) -> bool:
-    """Return whether evidence text can be exposed without credential-shaped components."""
+    """Return whether text avoids the configured credential-prefix components."""
 
     return _PUBLIC_TEXT_CREDENTIAL_PATTERN.search(value) is None
 
@@ -70,11 +70,21 @@ class RegistryPreparationRequest(_ContractModel):
     version: NonEmptyText
     evidence: tuple[PortablePath, ...] = Field(min_length=1)
 
+    @field_validator("package_name", mode="before")
+    @classmethod
+    def package_name_is_redaction_safe(cls, value: object) -> object:
+        if isinstance(value, str) and not registry_evidence_is_redaction_safe(value):
+            raise ValueError("registry package name must not contain credential-shaped values")
+        return value
+
     @field_validator("version", mode="before")
     @classmethod
     def version_is_canonical_text(cls, value: object) -> object:
-        if isinstance(value, str) and value != value.strip():
-            raise ValueError("registry version must not contain surrounding whitespace")
+        if isinstance(value, str):
+            if value != value.strip():
+                raise ValueError("registry version must not contain surrounding whitespace")
+            if not registry_evidence_is_redaction_safe(value):
+                raise ValueError("registry version must not contain credential-shaped values")
         return value
 
     @field_validator("evidence")
@@ -159,11 +169,21 @@ class RegistryPreparationReceipt(_ContractModel):
     mutation_performed: Literal[False] = False
     publication_performed: Literal[False] = False
 
+    @field_validator("package_name", mode="before")
+    @classmethod
+    def package_name_is_redaction_safe(cls, value: object) -> object:
+        if isinstance(value, str) and not registry_evidence_is_redaction_safe(value):
+            raise ValueError("registry package name must not contain credential-shaped values")
+        return value
+
     @field_validator("version", mode="before")
     @classmethod
     def version_is_canonical_text(cls, value: object) -> object:
-        if isinstance(value, str) and value != value.strip():
-            raise ValueError("registry version must not contain surrounding whitespace")
+        if isinstance(value, str):
+            if value != value.strip():
+                raise ValueError("registry version must not contain surrounding whitespace")
+            if not registry_evidence_is_redaction_safe(value):
+                raise ValueError("registry version must not contain credential-shaped values")
         return value
 
     @field_validator("evidence")

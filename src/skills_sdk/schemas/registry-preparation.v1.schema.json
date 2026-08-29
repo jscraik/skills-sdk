@@ -42,7 +42,7 @@
         "namespace": {
           "maxLength": 64,
           "not": {
-            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Namespace",
@@ -51,7 +51,7 @@
         "registry_id": {
           "maxLength": 64,
           "not": {
-            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
           "title": "Registry Id",
@@ -84,7 +84,7 @@
         "code": {
           "minLength": 1,
           "not": {
-            "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "title": "Code",
           "type": "string"
@@ -94,7 +94,7 @@
           "items": {
             "minLength": 1,
             "not": {
-              "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+              "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
             },
             "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
             "type": "string"
@@ -106,7 +106,7 @@
         "message": {
           "minLength": 1,
           "not": {
-            "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
           },
           "title": "Message",
           "type": "string"
@@ -150,7 +150,7 @@
           "items": {
             "minLength": 1,
             "not": {
-              "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+              "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
             },
             "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
             "type": "string"
@@ -312,7 +312,7 @@
       "items": {
         "minLength": 1,
         "not": {
-          "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
         },
         "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
         "type": "string"
@@ -379,6 +379,9 @@
       "title": "Package Digest"
     },
     "package_name": {
+      "not": {
+        "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+      },
       "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
       "title": "Package Name",
       "type": "string"
@@ -413,6 +416,9 @@
     },
     "version": {
       "minLength": 1,
+      "not": {
+        "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+      },
       "title": "Version",
       "type": "string"
     },
@@ -441,7 +447,8 @@
     "required_for": [
       "package name must match candidate package_id",
       "package and manifest digests must match",
-      "registry preparation evidence paths must be unique"
+      "registry preparation evidence paths must be unique",
+      "blocked registry receipt must retain its primary blocker first"
     ]
   }
 }

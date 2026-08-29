@@ -80,6 +80,56 @@ def test_preparation_rejects_duplicate_evidence_paths() -> None:
         )
 
 
+def test_duplicate_projected_hardening_evidence_is_deduplicated() -> None:
+    package_receipt = _package_receipt()
+    baseline = harden_skill_package(package_receipt)
+    blocker = PackageHardeningCheck(
+        id="policy_blocked",
+        status="blocker",
+        message="policy blocked",
+        evidence=("evidence/repeated.json", "evidence/repeated.json"),
+    )
+    hardening = baseline.model_copy(
+        update={
+            "status": "blocked",
+            "hardening_checks": (*baseline.hardening_checks, blocker),
+            "blockers": (blocker,),
+        }
+    )
+    result = prepare_private_registry_candidate(
+        package_receipt,
+        hardening,
+        RegistryPreparationRequest(
+            registry=RegistryIdentity(registry_id="private-registry", namespace="example-team"),
+            package_name="synthetic-skill",
+            version="0.1.0",
+            evidence=("evidence/private-registry-preparation.json",),
+        ),
+    )
+
+    assert result.status == "blocked"
+    assert result.blocker is not None
+    assert result.blocker.evidence_refs == ("evidence/repeated.json",)
+
+
+@pytest.mark.parametrize(("field", "value"), [("package_name", "sk-live-secret"), ("version", "sk-live-secret")])
+def test_preparation_revalidates_credential_shaped_public_package_fields(field: str, value: str) -> None:
+    request = RegistryPreparationRequest.model_construct(
+        registry=RegistryIdentity(registry_id="private-registry", namespace="example-team"),
+        package_name="synthetic-skill",
+        version="0.1.0",
+        evidence=("evidence/private-registry-preparation.json",),
+    )
+    object.__setattr__(request, field, value)
+
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        prepare_private_registry_candidate(
+            _package_receipt(),
+            harden_skill_package(_package_receipt()),
+            request,
+        )
+
+
 def test_blocked_package_receipt_stays_blocked_without_digest_claims() -> None:
     payload = json.loads((FIXTURE_ROOT / "blocked-v2.json").read_text(encoding="utf-8"))
     package_receipt = PackageReceiptV2.model_validate(payload)

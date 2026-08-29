@@ -7,7 +7,7 @@
     "namespace": {
       "maxLength": 64,
       "not": {
-        "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+        "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
       },
       "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
       "title": "Namespace",
@@ -16,7 +16,7 @@
     "registry_id": {
       "maxLength": 64,
       "not": {
-        "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+        "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
       },
       "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
       "title": "Registry Id",

@@ -78,6 +78,7 @@ def test_registry_request_is_registered_and_rejects_duplicate_evidence() -> None
         RegistryPreparationRequest.model_validate(payload)
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("registry-preparation-request.v1", payload)
+    assert list(Draft202012Validator(schema).iter_errors(payload))
 
 
 @pytest.mark.parametrize("delimiter", ["=", "@", "%", "#", "$"])
@@ -209,6 +210,41 @@ def test_registry_identity_rejects_embedded_credential_components(field: str, va
     assert list(Draft202012Validator(schema).iter_errors(payload))
 
 
+@pytest.mark.parametrize("prefix", ["aiza", "hf_"])
+@pytest.mark.parametrize("field", ["registry_id", "namespace"])
+def test_registry_identity_rejects_additional_credential_prefixes_in_all_lanes(prefix: str, field: str) -> None:
+    payload = _identity_payload()
+    payload[field] = f"{prefix}synthetic"
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        RegistryIdentity.model_validate(payload)
+    schema = SchemaRegistry().load("registry-identity.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("registry-identity.v1", payload)
+
+
+@pytest.mark.parametrize("field", ["package_name", "version"])
+@pytest.mark.parametrize("prefix", ["aiza", "hf_", "sk-"])
+def test_registry_public_package_fields_reject_credential_prefixes_in_all_lanes(field: str, prefix: str) -> None:
+    request_payload = _request_payload()
+    request_payload[field] = f"{prefix}synthetic"
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        RegistryPreparationRequest.model_validate(request_payload)
+    request_schema = SchemaRegistry().load("registry-preparation-request.v1")
+    assert list(Draft202012Validator(request_schema).iter_errors(request_payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("registry-preparation-request.v1", request_payload)
+
+    receipt_payload = _prepared_payload()
+    receipt_payload[field] = f"{prefix}synthetic"
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        RegistryPreparationReceipt.model_validate(receipt_payload)
+    receipt_schema = SchemaRegistry().load("registry-preparation.v1")
+    assert list(Draft202012Validator(receipt_schema).iter_errors(receipt_payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("registry-preparation.v1", receipt_payload)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -330,3 +366,8 @@ def test_blocked_receipt_retains_all_typed_blockers_and_evidence() -> None:
     payload["blocker"] = blockers[1]
     with pytest.raises(ValidationError, match="primary blocker first"):
         RegistryPreparationReceipt.model_validate(payload)
+
+    assert (
+        "blocked registry receipt must retain its primary blocker first"
+        in schema["x-skills-sdk-semantic-validator"]["required_for"]
+    )
