@@ -125,31 +125,29 @@ def _append_registry_identity_constraints(schema: Any) -> None:
     """Project the secret-free contract into registry identity schemas."""
 
     if isinstance(schema, dict):
-        if schema.get("title") == "RegistryIdentity":
+        title = schema.get("title")
+        if title == "RegistryIdentity":
             properties = schema.get("properties", {})
             for field in _REGISTRY_IDENTITY_FIELDS:
                 properties[field]["not"] = {"pattern": _REGISTRY_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
-        elif schema.get("title") == "RegistryPreparationRequest":
+        elif title in {"RegistryPreparationRequest", "RegistryPreparationReceipt"}:
             properties = schema["properties"]
             for field in ("package_name", "version"):
                 properties[field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
-            properties["evidence"]["uniqueItems"] = True
+            properties["version"]["pattern"] = _NORMALIZED_TEXT_PATTERN
+            if title == "RegistryPreparationRequest":
+                properties["evidence"]["uniqueItems"] = True
             properties["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
-        elif schema.get("title") == "RegistryPreparationBlocker":
+        elif title == "RegistryPreparationBlocker":
             for field in ("code", "message"):
                 schema["properties"][field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
             schema["properties"]["evidence_refs"]["items"]["not"] = {
                 "pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN
             }
-        elif schema.get("title") == "RegistryPreparationWarning":
+        elif title == "RegistryPreparationWarning":
             schema["properties"]["evidence_refs"]["items"]["not"] = {
                 "pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN
             }
-        elif schema.get("title") == "RegistryPreparationReceipt":
-            properties = schema["properties"]
-            for field in ("package_name", "version"):
-                properties[field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
-            properties["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
         for value in schema.values():
             _append_registry_identity_constraints(value)
     elif isinstance(schema, list):

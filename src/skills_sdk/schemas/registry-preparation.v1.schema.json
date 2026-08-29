@@ -419,6 +419,7 @@
       "not": {
         "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
       },
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
       "title": "Version",
       "type": "string"
     },

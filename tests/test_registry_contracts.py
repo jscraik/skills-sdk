@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
@@ -243,6 +245,49 @@ def test_registry_public_package_fields_reject_credential_prefixes_in_all_lanes(
     assert list(Draft202012Validator(receipt_schema).iter_errors(receipt_payload))
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("registry-preparation.v1", receipt_payload)
+
+
+@pytest.mark.parametrize("value", [b"sk-live-secret", bytearray(b"sk-live-secret")])
+@pytest.mark.parametrize(
+    ("model", "payload_factory"),
+    [
+        (RegistryPreparationRequest, _request_payload),
+        (RegistryPreparationReceipt, _prepared_payload),
+    ],
+)
+def test_registry_package_name_rejects_byte_like_inputs(
+    value: bytes | bytearray,
+    model: type[RegistryPreparationRequest] | type[RegistryPreparationReceipt],
+    payload_factory: Callable[[], dict[str, object]],
+) -> None:
+    payload = payload_factory()
+    payload["package_name"] = value
+    with pytest.raises(ValidationError, match="must be a string"):
+        model.model_validate(payload)
+
+
+@pytest.mark.parametrize("version", [" 0.1.0", "0.1.0 "])
+def test_registry_raw_schemas_reject_surrounding_version_whitespace(version: str) -> None:
+    request_payload = _request_payload()
+    request_payload["version"] = version
+    request_schema = SchemaRegistry().load("registry-preparation-request.v1")
+    assert list(Draft202012Validator(request_schema).iter_errors(request_payload))
+
+    receipt_payload = _prepared_payload()
+    blocker = {"code": "blocked", "message": "blocked", "evidence_refs": []}
+    receipt_payload.update(
+        {
+            "version": version,
+            "status": "blocked",
+            "package_digest": None,
+            "manifest_digest": None,
+            "hardening_receipt_sha256": None,
+            "blocker": blocker,
+            "blockers": [blocker],
+        }
+    )
+    receipt_schema = SchemaRegistry().load("registry-preparation.v1")
+    assert list(Draft202012Validator(receipt_schema).iter_errors(receipt_payload))
 
 
 @pytest.mark.parametrize(

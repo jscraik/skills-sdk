@@ -73,7 +73,9 @@ class RegistryPreparationRequest(_ContractModel):
     @field_validator("package_name", mode="before")
     @classmethod
     def package_name_is_redaction_safe(cls, value: object) -> object:
-        if isinstance(value, str) and not registry_evidence_is_redaction_safe(value):
+        if not isinstance(value, str):
+            raise ValueError("registry package name must be a string")
+        if not registry_evidence_is_redaction_safe(value):
             raise ValueError("registry package name must not contain credential-shaped values")
         return value
 
@@ -172,7 +174,9 @@ class RegistryPreparationReceipt(_ContractModel):
     @field_validator("package_name", mode="before")
     @classmethod
     def package_name_is_redaction_safe(cls, value: object) -> object:
-        if isinstance(value, str) and not registry_evidence_is_redaction_safe(value):
+        if not isinstance(value, str):
+            raise ValueError("registry package name must be a string")
+        if not registry_evidence_is_redaction_safe(value):
             raise ValueError("registry package name must not contain credential-shaped values")
         return value
 
