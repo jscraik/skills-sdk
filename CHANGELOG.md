@@ -21,6 +21,11 @@ breaking contract change cannot remain compatible.
   evaluation v1/v2 support.
 - Add `package-receipt/v2` with canonical manifest/digest binding while
   preserving `package-receipt/v1` acceptance semantics.
+- Add secret-free `registry-identity/v1` and deterministic,
+  candidate-bound `registry-preparation/v1` contracts plus a local preparation
+  service. The service composes package and hardening receipts without
+  credentials, network access, registry mutation, or publication, and generic
+  receipt parsing remains compatible with package and evaluation v1/v2.
 - Package versioned JSON Schemas and a semantic `SchemaRegistry` validator.
 - Expose a boundary-only `skills-sdk` CLI with explicit lifecycle and Tessl
   preparation route names; no route publishes, installs, or mutates a runtime.

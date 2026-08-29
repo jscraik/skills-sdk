@@ -92,6 +92,20 @@ return `invalid_receipt_schema_version`. This routing rule does not change the
 payload meaning, candidate matching, or immutable generic representation of
 any supported v1 or v2 receipt.
 
+`registry-identity/v1` and `registry-preparation/v1` are additive contracts.
+Registry identity fields reject credential-shaped values at component
+boundaries while permitting ordinary identifiers that merely contain similar
+text. A prepared receipt requires a built `package-receipt/v2`, a matching
+package-hardening receipt, matching package/version identity, immutable
+manifest and hardening digests, and portable unique evidence paths. The generic
+receipt parser dispatches the new receipt without changing package v1/v2 or
+evaluation v1/v2 semantics. Unknown receipt families continue to fail closed.
+Blocked preparation binds non-path or credential-shaped hardening evidence by
+SHA-256 separately from portable `evidence_refs`, so valid hardening inputs are
+neither silently discarded nor exposed or reinterpreted as filesystem paths.
+This contract records local preparation only; a future publication adapter must
+produce separate registry evidence and bind the same candidate identity.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

@@ -43,6 +43,24 @@ package exports the inventory, risk, and evaluation contracts listed in its
   payloads require `provider-identity/v2` and do not reinterpret v1 identities.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
+- **Registry preparation:** `RegistryIdentity`, `RegistryPreparationRequest`,
+  and `RegistryPreparationReceipt`. Use `prepare_private_registry_candidate` with
+  a built `PackageReceiptV2` and its matching `PackageHardeningReceipt` to
+  create a deterministic local preparation receipt. The prepared result binds
+  the candidate, registry namespace, package/version, manifest digest,
+  hardening-receipt digest, and portable evidence paths. Blocked inputs retain
+  typed blockers and cannot claim prepared digests. Path-shaped hardening
+  evidence remains in blocker `evidence_refs`; other accepted hardening
+  evidence is retained only through `source_evidence_sha256` rather than being
+  exposed or reinterpreted as a path. Credential-shaped evidence is likewise
+  digest-bound and never copied into the receipt. Hardening warnings use the
+  same projection: the complete warning is digest-bound, safe portable evidence
+  references remain readable, and raw warning IDs/messages are not copied.
+  This service performs no registry I/O or publication.
+  Credential-shaped request evidence is rejected. Unsafe source blocker
+  code/message text is replaced by a generic typed blocker and bound through
+  `source_blocker_sha256`; safe source metadata and portable references remain
+  readable.
 
 ## Schema validation
 
@@ -62,9 +80,10 @@ candidate = PackageCandidateIdentity(
 SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json", exclude={"schema_version"}))
 ```
 
-The registry accepts only known schema names and raises `ContractError` for an
+The schema registry accepts only known schema names and raises `ContractError` for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
-manifest, provider identity, receipt, risk, security, scenario, and scorer schemas. The registered
+manifest, provider identity, private-registry preparation, receipt, risk,
+security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake
@@ -77,7 +96,11 @@ Validation is read-only: it does not write receipts, contact providers, install
 packages, or publish to a registry.
 
 `parse_receipt` accepts only explicitly registered receipt wire versions:
-`receipt-base/v1`, package receipt v1/v2, and evaluation receipt v1/v2. An
+`receipt-base/v1`, package receipt v1/v2, evaluation receipt v1/v2, and
+`registry-preparation/v1`. A prepared registry artifact maps to the generic
+`pass` status while preserving `artifact_status="prepared"`; a blocked artifact
+remains blocked. Parsing validates the versioned registry schema and does not
+reinterpret older receipt payloads. An
 unknown future or foreign `schema_version` fails with the typed
 `unsupported_receipt_family` error instead of being interpreted through the
 generic base receipt schema. Missing or non-string versions fail with

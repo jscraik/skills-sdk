@@ -1,5 +1,6 @@
 """Portable lifecycle contracts and tooling for Agent Skills packages."""
 
+from skills_sdk.distribution import prepare_private_registry_candidate
 from skills_sdk.evaluation import evaluate_scenario_set, evaluate_scenario_set_v2
 from skills_sdk.models import (
     EvaluationReceipt,
@@ -13,6 +14,11 @@ from skills_sdk.models import (
     ProviderIdentity,
     ProviderIdentityV2,
     RecommendedMechanism,
+    RegistryIdentity,
+    RegistryPreparationBlocker,
+    RegistryPreparationReceipt,
+    RegistryPreparationRequest,
+    RegistryPreparationWarning,
     RiskClassification,
     ScenarioCaseResult,
     ScenarioCaseResultV2,
@@ -41,6 +47,11 @@ __all__ = [
     "ProviderIdentity",
     "ProviderIdentityV2",
     "RecommendedMechanism",
+    "RegistryIdentity",
+    "RegistryPreparationBlocker",
+    "RegistryPreparationReceipt",
+    "RegistryPreparationRequest",
+    "RegistryPreparationWarning",
     "RiskClassification",
     "ScenarioCaseResult",
     "ScenarioCaseResultV2",
@@ -56,4 +67,5 @@ __all__ = [
     "__version__",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
+    "prepare_private_registry_candidate",
 ]

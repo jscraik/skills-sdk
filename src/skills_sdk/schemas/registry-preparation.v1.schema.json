@@ -1,0 +1,447 @@
+{
+  "$comment": "Validate candidate, package-name, digest, warning, and evidence binding with skills_sdk.core.schema_registry.SchemaRegistry.validate.",
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "RegistryIdentity": {
+      "additionalProperties": false,
+      "description": "Opaque, secret-free identity for one private registry namespace.",
+      "properties": {
+        "namespace": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Namespace",
+          "type": "string"
+        },
+        "registry_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Registry Id",
+          "type": "string"
+        },
+        "registry_kind": {
+          "const": "private",
+          "default": "private",
+          "title": "Registry Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "registry-identity/v1",
+          "default": "registry-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "registry_id",
+        "namespace"
+      ],
+      "title": "RegistryIdentity",
+      "type": "object"
+    },
+    "RegistryPreparationBlocker": {
+      "additionalProperties": false,
+      "description": "Registry-owned blocker retaining both path and non-path source evidence.",
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "not": {
+              "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            },
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "message": {
+          "minLength": 1,
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "title": "Message",
+          "type": "string"
+        },
+        "source_blocker_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Blocker Sha256"
+        },
+        "source_evidence_sha256": {
+          "default": [],
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Source Evidence Sha256",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "RegistryPreparationBlocker",
+      "type": "object"
+    },
+    "RegistryPreparationWarning": {
+      "additionalProperties": false,
+      "description": "Secret-free digest projection of one hardening warning.",
+      "properties": {
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "not": {
+              "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+            },
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "source_evidence_sha256": {
+          "default": [],
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Source Evidence Sha256",
+          "type": "array"
+        },
+        "status": {
+          "const": "warning",
+          "default": "warning",
+          "title": "Status",
+          "type": "string"
+        },
+        "warning_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Warning Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "warning_sha256"
+      ],
+      "title": "RegistryPreparationWarning",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/registry-preparation.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "prepared"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "blockers": {
+            "maxItems": 0
+          },
+          "candidate": {
+            "$ref": "#/$defs/PackageCandidateIdentity"
+          },
+          "hardening_receipt_sha256": {
+            "type": "string"
+          },
+          "manifest_digest": {
+            "type": "string"
+          },
+          "package_digest": {
+            "type": "string"
+          },
+          "package_name": {
+            "maxLength": 64
+          },
+          "version": {
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+          }
+        },
+        "required": [
+          "candidate",
+          "hardening_receipt_sha256",
+          "manifest_digest",
+          "package_digest"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "$ref": "#/$defs/RegistryPreparationBlocker"
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/$defs/RegistryPreparationBlocker"
+            },
+            "minItems": 1
+          },
+          "hardening_receipt_sha256": {
+            "type": "null"
+          },
+          "manifest_digest": {
+            "type": "null"
+          },
+          "package_digest": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "blocker",
+          "blockers"
+        ]
+      }
+    }
+  ],
+  "description": "Candidate-bound local preparation result that never publishes.",
+  "properties": {
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RegistryPreparationBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "blockers": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RegistryPreparationBlocker"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence": {
+      "items": {
+        "minLength": 1,
+        "not": {
+          "pattern": "(^|[^A-Za-z0-9])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+        },
+        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "hardening_receipt_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hardening Receipt Sha256"
+    },
+    "input_receipt_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Input Receipt Id",
+      "type": "string"
+    },
+    "lane": {
+      "const": "distribution",
+      "default": "distribution",
+      "title": "Lane",
+      "type": "string"
+    },
+    "manifest_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Manifest Digest"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "package_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Package Digest"
+    },
+    "package_name": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Package Name",
+      "type": "string"
+    },
+    "publication_performed": {
+      "const": false,
+      "default": false,
+      "title": "Publication Performed",
+      "type": "boolean"
+    },
+    "receipt_id": {
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "registry": {
+      "$ref": "#/$defs/RegistryIdentity"
+    },
+    "schema_version": {
+      "const": "registry-preparation/v1",
+      "default": "registry-preparation/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "prepared",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    },
+    "warnings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RegistryPreparationWarning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "registry",
+    "package_name",
+    "version",
+    "input_receipt_id",
+    "status",
+    "evidence"
+  ],
+  "title": "RegistryPreparationReceipt",
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "package name must match candidate package_id",
+      "package and manifest digests must match",
+      "registry preparation evidence paths must be unique"
+    ]
+  }
+}
