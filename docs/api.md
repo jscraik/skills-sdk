@@ -63,8 +63,11 @@ package exports the inventory, risk, and evaluation contracts listed in its
   readable.
 - **Package safety evidence:** `PackageSafetyEvidenceReceipt`,
   `PackageSafetyEvidenceReference`, `PackageSafetyFinding`, and
-  `PackageSafetyBlocker`. The receipt binds one exact candidate and package
-  digest to a caller-supplied reviewer adapter and one of four states:
+  `PackageSafetyBlocker`. The receipt binds one exact candidate and the
+  canonical manifest `package_digest` from its upstream `PackageReceiptV2` to
+  a caller-supplied reviewer adapter and one of four states. The manifest
+  digest and the candidate's source `content_sha256` identify different
+  artifacts and are intentionally not required to be equal:
   `not_reviewed`, `reviewed_no_issue`, `issue_found`, or
   `metadata_insufficient`. A reviewed-no-issue state requires digest-bound
   evidence and forbids findings; issue-found requires evidence, a warning or

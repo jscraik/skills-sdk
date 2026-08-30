@@ -175,8 +175,6 @@ class PackageSafetyEvidenceReceipt(_ContractModel):
 
     @model_validator(mode="after")
     def state_matches_evidence(self) -> PackageSafetyEvidenceReceipt:
-        if self.package_digest != self.candidate.content_sha256:
-            raise ValueError("package digest must match the candidate content digest")
         evidence_ids = tuple(item.evidence_id for item in self.evidence)
         if len(evidence_ids) != len(set(evidence_ids)):
             raise ValueError("safety evidence ids must be unique")

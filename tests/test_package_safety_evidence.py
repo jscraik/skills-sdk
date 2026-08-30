@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
@@ -9,7 +11,10 @@ from pydantic import ValidationError
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.models.packaging import PackageReceiptV2
 from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
+
+FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "package-receipts"
 
 
 def _payload(status: str = "reviewed_no_issue") -> dict[str, object]:
@@ -178,7 +183,6 @@ def test_schema_names_structural_only_package_safety_semantics() -> None:
     assert schema["x-skills-sdk-semantic-validator"] == {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
         "required_for": [
-            "package digest must match candidate content digest",
             "findings must reference supplied evidence ids",
             "finding codes, evidence ids, and evidence refs must be unique",
             "issue and insufficient states must retain the primary blocker first",
@@ -217,16 +221,22 @@ def test_schema_names_structural_only_package_safety_semantics() -> None:
             SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
-def test_candidate_digest_binding_is_a_documented_semantic_invariant() -> None:
+def test_safety_receipt_accepts_upstream_manifest_digest_distinct_from_source_identity() -> None:
     payload = _payload()
-    payload["package_digest"] = "d" * 64
+    upstream_receipt = PackageReceiptV2.model_validate(
+        json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
+    )
+    assert upstream_receipt.candidate is not None
+    assert upstream_receipt.package_digest is not None
+    assert upstream_receipt.package_digest != upstream_receipt.candidate.content_sha256
+    payload["candidate"] = upstream_receipt.candidate.model_dump(mode="json")
+    payload["package_digest"] = upstream_receipt.package_digest
     schema = SchemaRegistry().load("package-safety-evidence.v1")
 
     assert not list(Draft202012Validator(schema).iter_errors(payload))
-    with pytest.raises(ValidationError, match="candidate content digest"):
-        PackageSafetyEvidenceReceipt.model_validate(payload)
-    with pytest.raises(ContractError, match="contract_validation_failed"):
-        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+    receipt = PackageSafetyEvidenceReceipt.model_validate(payload)
+    SchemaRegistry().validate("package-safety-evidence.v1", payload)
+    assert receipt.package_digest == upstream_receipt.package_digest
 
 
 def test_duplicate_evidence_refs_fail_semantic_validation() -> None:

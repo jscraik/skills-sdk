@@ -143,7 +143,6 @@ def append_package_safety_constraints(schema: dict[str, Any]) -> None:
     schema["x-skills-sdk-semantic-validator"] = {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
         "required_for": [
-            "package digest must match candidate content digest",
             "findings must reference supplied evidence ids",
             "finding codes, evidence ids, and evidence refs must be unique",
             "issue and insufficient states must retain the primary blocker first",
