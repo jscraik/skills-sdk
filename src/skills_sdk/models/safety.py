@@ -20,6 +20,7 @@ _CREDENTIAL_PREFIXES = ("aiza", "akia", "bearer", "ghp_", "github_pat_", "hf_", 
 _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
     r"(?:api[_-]?key|credential|password|secret|token)"
+    r"(?:[_-][A-Za-z0-9]+)*"
     r"[\s\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
     re.IGNORECASE | re.ASCII,
 )
@@ -65,8 +66,11 @@ class PackageSafetyEvidenceReference(_ContractModel):
     @field_validator("evidence_id", mode="before")
     @classmethod
     def evidence_id_must_be_redaction_safe(cls, value: object) -> object:
-        if isinstance(value, str) and not _public_text_is_redaction_safe(value):
-            raise ValueError("safety evidence id must not contain credential-shaped values")
+        if isinstance(value, str):
+            if value != value.strip():
+                raise ValueError("safety evidence id must already be normalized")
+            if not _public_text_is_redaction_safe(value):
+                raise ValueError("safety evidence id must not contain credential-shaped values")
         return value
 
     @field_validator("ref")
@@ -115,8 +119,11 @@ class PackageSafetyFinding(_ContractModel):
         if isinstance(values, Iterable) and not isinstance(values, (str, bytes, bytearray, Mapping)):
             materialized = tuple(values)
             for value in materialized:
-                if isinstance(value, str) and not _public_text_is_redaction_safe(value):
-                    raise ValueError("safety finding evidence ids must not contain credential-shaped values")
+                if isinstance(value, str):
+                    if value != value.strip():
+                        raise ValueError("safety finding evidence ids must already be normalized")
+                    if not _public_text_is_redaction_safe(value):
+                        raise ValueError("safety finding evidence ids must not contain credential-shaped values")
             return materialized
         return values
 
@@ -153,7 +160,7 @@ class PackageSafetyEvidenceReceipt(_ContractModel):
     schema_version: Literal["package-safety-evidence/v1"] = "package-safety-evidence/v1"
     receipt_id: ReceiptId
     candidate: PackageCandidateIdentity
-    lane: Literal["safety_review"] = "safety_review"
+    lane: Literal["safety_review"]
     input_receipt_id: ReceiptId
     package_digest: Sha256
     reviewer: PackageSafetyReviewer

@@ -303,6 +303,26 @@ def test_finding_evidence_ids_screen_generator_input_before_coercion() -> None:
         PackageSafetyEvidenceReceipt.model_validate(payload)
 
 
+@pytest.mark.parametrize("target", ["evidence_id", "finding_evidence_id"])
+def test_safety_evidence_ids_reject_surrounding_whitespace_at_all_boundaries(target: str) -> None:
+    payload = _payload("issue_found")
+    evidence = payload["evidence"]
+    findings = payload["findings"]
+    assert isinstance(evidence, list)
+    assert isinstance(findings, list)
+    if target == "evidence_id":
+        evidence[0]["evidence_id"] = " review-report "
+    else:
+        findings[0]["evidence_ids"] = [" review-report "]
+
+    with pytest.raises(ValidationError, match="already be normalized"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
 @pytest.mark.parametrize("accepted_id", ["ghp-safe", "hf-safe"])
 def test_finding_evidence_ids_accept_noncredential_boundaries(accepted_id: str) -> None:
     payload = _payload("issue_found")
@@ -426,6 +446,7 @@ def test_embedded_machine_paths_fail_in_model_draft_and_registry(target: str) ->
         "source at C:relative" + "\\" + "result.json",
         "source at Z:folder/file.txt",
         "source at /" + "root/project/result.json",
+        "AWS_" + "SE" + "CRET" + "_ACCESS_KEY=opaque-value",
         "token\u00a0=opaque-value",
     ],
 )
@@ -455,6 +476,20 @@ def test_public_safety_fields_accept_non_file_urls_at_all_boundaries() -> None:
     schema = SchemaRegistry().load("package-safety-evidence.v1")
     assert not list(Draft202012Validator(schema).iter_errors(payload))
     SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_receipt_requires_lane_at_all_boundaries() -> None:
+    payload = _payload()
+    payload.pop("lane")
+
+    with pytest.raises(ValidationError):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        parse_receipt(payload)
 
 
 def test_package_safety_contract_rejects_generic_safe_boolean() -> None:
