@@ -148,13 +148,18 @@ def append_provider_execution_constraints(schema: dict[str, Any], filename: str)
                 },
             },
         ]
-    schema["x-skills-sdk-semantic-validator"] = {
-        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
-        "required_for": [
+    required_for = (
+        ["request status and blocker must agree"]
+        if filename == "provider-execution-request.v1.schema.json"
+        else [
             "timestamps must be ordered",
             "usage totals must match their components",
             "a replay result cannot reference itself",
-        ],
+        ]
+    )
+    schema["x-skills-sdk-semantic-validator"] = {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": required_for,
     }
 
 

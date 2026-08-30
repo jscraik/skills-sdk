@@ -440,9 +440,7 @@
   "x-skills-sdk-semantic-validator": {
     "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
     "required_for": [
-      "timestamps must be ordered",
-      "usage totals must match their components",
-      "a replay result cannot reference itself"
+      "request status and blocker must agree"
     ]
   }
 }

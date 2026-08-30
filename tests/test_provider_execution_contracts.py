@@ -577,8 +577,25 @@ def test_valid_nested_models_remain_supported() -> None:
 def test_raw_secret_and_cost_fields_are_rejected(extra_field: str) -> None:
     payload = _request()
     payload[extra_field] = "not-allowed"
-    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        ProviderExecutionRequest.model_validate(payload)
+    _assert_model_draft_and_registry_reject(payload)
+
+
+def test_semantic_validator_metadata_is_contract_specific() -> None:
+    request_metadata = SchemaRegistry().load("provider-execution-request.v1")["x-skills-sdk-semantic-validator"]
+    result_metadata = SchemaRegistry().load("provider-execution-result.v1")["x-skills-sdk-semantic-validator"]
+
+    assert request_metadata == {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": ["request status and blocker must agree"],
+    }
+    assert result_metadata == {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": [
+            "timestamps must be ordered",
+            "usage totals must match their components",
+            "a replay result cannot reference itself",
+        ],
+    }
 
 
 def test_request_and_result_contracts_are_not_generic_receipts() -> None:

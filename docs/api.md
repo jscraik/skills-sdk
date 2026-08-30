@@ -122,8 +122,8 @@ SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json
 The schema registry accepts only known schema names and raises `ContractError`
 for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
-manifest, provider identity, private-registry preparation, package-safety
-evidence, receipt, risk, security, scenario, and scorer schemas. The registered
+manifest, provider identity, provider execution, private-registry preparation,
+package-safety evidence, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake
