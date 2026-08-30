@@ -20,7 +20,7 @@ _CREDENTIAL_PREFIXES = ("aiza", "akia", "bearer", "ghp_", "github_pat_", "hf_", 
 _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
     r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
-    r"(?:api[_-]?key|credential|password|secret|token)"
+    r"(?:(?:ssh_)?private[_-]?key|api[_-]?key|credential|password|secret|token)"
     r"(?:[_-][A-Za-z0-9]+)*"
     r"[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
     re.IGNORECASE | re.ASCII,
@@ -38,13 +38,20 @@ def _public_text_is_redaction_safe(value: str) -> bool:
     return _PUBLIC_TEXT_CREDENTIAL_PATTERN.search(value) is None and _MACHINE_PATH_PATTERN.search(value) is None
 
 
-def _contains_byte_string(value: object) -> bool:
+def _contains_byte_string(value: object, active_container_ids: set[int] | None = None) -> bool:
     if isinstance(value, (bytes, bytearray)):
         return True
-    if isinstance(value, Mapping):
-        return any(_contains_byte_string(item) for item in value.values())
-    if isinstance(value, (list, tuple, set, frozenset)):
-        return any(_contains_byte_string(item) for item in value)
+    if isinstance(value, Mapping | list | tuple | set | frozenset):
+        active_container_ids = active_container_ids if active_container_ids is not None else set()
+        container_id = id(value)
+        if container_id in active_container_ids:
+            raise ValueError("safety public fields must not contain cyclic containers")
+        active_container_ids.add(container_id)
+        try:
+            values = value.values() if isinstance(value, Mapping) else value
+            return any(_contains_byte_string(item, active_container_ids) for item in values)
+        finally:
+            active_container_ids.remove(container_id)
     return False
 
 
@@ -216,6 +223,13 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
                 raise ValueError("safety receipt identity must already be normalized")
             if not _public_text_is_redaction_safe(value):
                 raise ValueError("safety receipt identity must not contain credential-shaped values")
+        return value
+
+    @field_validator("observed_at", mode="before")
+    @classmethod
+    def observed_at_must_be_a_string(cls, value: object) -> object:
+        if not isinstance(value, str):
+            raise ValueError("safety observed_at must be an RFC3339 string")
         return value
 
     @model_validator(mode="after")

@@ -528,6 +528,38 @@ def test_public_safety_fields_reject_private_key_markers_and_unc_paths(unsafe_te
 @pytest.mark.parametrize(
     "unsafe_text",
     [
+        "-----" + "BEGIN rsa PRIVATE KEY----- synthetic",
+        "SSH_" + "PRIVATE_KEY=opaque-value",
+        "private_key=opaque-value",
+    ],
+)
+def test_public_safety_fields_reject_case_insensitive_private_key_values(unsafe_text: str) -> None:
+    payload = _payload("issue_found")
+    findings = payload["findings"]
+    assert isinstance(findings, list)
+    findings[0]["message"] = unsafe_text
+
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_receipt_rejects_cyclic_adapter_payloads() -> None:
+    payload = _payload()
+    evidence = payload["evidence"]
+    assert isinstance(evidence, list)
+    evidence.append(evidence)
+
+    with pytest.raises(ValidationError, match="cyclic containers"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "unsafe_text",
+    [
         "source at " + "\\" + "server\\share\\private\\skill.md",
         "source at /etc/hosts",
         "source at file:///opt/tool/config",
@@ -575,6 +607,18 @@ def test_safety_observed_at_requires_datetime_format_at_all_boundaries() -> None
     payload["observed_at"] = "not-a-datetime"
 
     with pytest.raises(ValidationError):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_observed_at_rejects_non_string_inputs_at_all_boundaries() -> None:
+    payload = _payload()
+    payload["observed_at"] = 0
+
+    with pytest.raises(ValidationError, match="observed_at must be an RFC3339 string"):
         PackageSafetyEvidenceReceipt.model_validate(payload)
     schema = SchemaRegistry().load("package-safety-evidence.v1")
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
