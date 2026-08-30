@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
@@ -24,7 +24,7 @@ _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
     r"(?:(?:ssh_)?private[_-]?key|api[_-]?key|credential|password|secret|token)"
     r"(?:[_-][A-Za-z0-9]+)*"
-    r"[\"']?[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
+    r"[\"']?[\s\u001c-\u001f\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
     re.IGNORECASE | re.ASCII,
 )
 _MACHINE_PATH_PATTERN = re.compile(
@@ -51,6 +51,8 @@ def _contains_byte_string(
         return True
     if isinstance(value, str):
         return False
+    if isinstance(value, BaseModel):
+        return _contains_byte_string(value.model_dump(mode="python"), active_container_ids, depth + 1)
     if isinstance(value, Mapping | Sequence):
         active_container_ids = active_container_ids if active_container_ids is not None else set()
         container_id = id(value)
@@ -288,6 +290,8 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
     def validate_against_package_receipt(self, package_receipt: PackageReceiptV2) -> PackageSafetyEvidenceReceipt:
         """Require this evidence receipt to bind one supplied built package receipt."""
 
+        if not isinstance(package_receipt, PackageReceiptV2):
+            raise ValueError("safety evidence requires a built v2 upstream package receipt")
         if (
             package_receipt.status != "built"
             or package_receipt.candidate is None

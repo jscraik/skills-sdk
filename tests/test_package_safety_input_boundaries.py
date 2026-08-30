@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
@@ -11,8 +12,13 @@ from pydantic import ValidationError
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models.packaging import PackageReceiptV2
-from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
+from skills_sdk.models.package import PackageCandidateIdentity
+from skills_sdk.models.packaging import PackageReceipt, PackageReceiptV2
+from skills_sdk.models.safety import (
+    PackageSafetyEvidenceReceipt,
+    PackageSafetyEvidenceReference,
+    PackageSafetyReviewer,
+)
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "package-receipts"
 
@@ -106,6 +112,34 @@ def test_safety_rejects_quoted_credential_keys_at_all_boundaries(value: str) -> 
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
+def test_safety_rejects_control_whitespace_credential_keys_at_all_boundaries() -> None:
+    payload = _payload()
+    payload["status"] = "issue_found"
+    payload["findings"] = [
+        {
+            "code": "unsafe_operation",
+            "category": "unsafe_operation",
+            "severity": "blocker",
+            "message": "declared token\x1c=opaque-value",
+            "evidence_ids": ["review-report"],
+        }
+    ]
+    blocker = {
+        "code": "issue_found",
+        "message": "package safety issue found",
+        "evidence_refs": ["evidence/safety-review.json"],
+    }
+    payload["blocker"] = blocker
+    payload["blockers"] = [blocker]
+
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
 def test_safety_rejects_generator_carried_bytes_at_direct_model_boundary() -> None:
     payload = _payload()
     payload["status"] = "issue_found"
@@ -132,6 +166,19 @@ def test_safety_rejects_generator_carried_bytes_at_direct_model_boundary() -> No
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
+def test_safety_accepts_nested_exported_contract_models() -> None:
+    payload = _payload()
+    payload["candidate"] = PackageCandidateIdentity.model_validate(payload["candidate"])
+    payload["reviewer"] = PackageSafetyReviewer.model_validate(payload["reviewer"])
+    evidence = payload["evidence"]
+    assert isinstance(evidence, list)
+    payload["evidence"] = tuple(PackageSafetyEvidenceReference.model_validate(item) for item in evidence)
+
+    receipt = PackageSafetyEvidenceReceipt.model_validate(payload)
+
+    assert receipt.candidate.package_id == "synthetic-skill"
+
+
 def test_safety_rejects_whitespace_candidate_identity_before_upstream_binding() -> None:
     upstream = PackageReceiptV2.model_validate(
         json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
@@ -152,3 +199,21 @@ def test_safety_rejects_whitespace_candidate_identity_before_upstream_binding() 
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_rejects_historical_v1_upstream_receipt_binding() -> None:
+    upstream_receipt = PackageReceipt.model_validate(
+        json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
+    )
+    assert upstream_receipt.candidate is not None
+    assert upstream_receipt.package_digest is not None
+    payload = _payload()
+    payload["candidate"] = upstream_receipt.candidate.model_dump(mode="json")
+    payload["input_receipt_id"] = upstream_receipt.receipt_id
+    payload["package_digest"] = upstream_receipt.package_digest
+    safety_receipt = PackageSafetyEvidenceReceipt.model_validate(payload)
+
+    with pytest.raises(ValueError, match="built v2 upstream package receipt"):
+        safety_receipt.validate_against_package_receipt(cast(PackageReceiptV2, upstream_receipt))
+    with pytest.raises(ContractError, match="upstream package receipt binding"):
+        SchemaRegistry().validate_package_safety_evidence_against_package_receipt(payload, upstream_receipt)
