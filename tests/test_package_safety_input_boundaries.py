@@ -147,6 +147,7 @@ def test_safety_rejects_access_key_assignments_at_all_boundaries(value: str) -> 
     [
         "source at $" + "HOME/review.json",
         "$" + "TMPDIR/safety.json",
+        "build\\output",
         "workspace\\private\\skill.md",
         "eyJ" + "hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevalue",
     ],

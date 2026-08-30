@@ -28,7 +28,7 @@ PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN = (
 )
 MACHINE_PATH_SCHEMA_PATTERN = (
     r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\$[A-Za-z_][A-Za-z0-9_]*/|"
-    r"(?:[A-Za-z0-9._-]+\\){2,}|(?:^|[^A-Za-z0-9])\\|(?:^|[^A-Za-z0-9/])/(?!/)|"
+    r"(?:[A-Za-z0-9._-]+\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\|(?:^|[^A-Za-z0-9/])/(?!/)|"
     r"(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|"
     r"[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|"
     r"[Rr][Oo][Oo][Tt])/|"
