@@ -18,10 +18,12 @@ from skills_sdk import (
     ProviderIdentityV2,
     ProviderUsageMetadata,
 )
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.package import PackageCandidateIdentity
+from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 
 FIXTURES = Path(__file__).parent / "fixtures" / "provider-execution"
 
@@ -45,6 +47,40 @@ def _provider() -> dict[str, object]:
         "adapter_id": "synthetic-adapter",
         "adapter_version_or_digest": "v1",
     }
+
+
+def _safety_receipt() -> PackageSafetyEvidenceReceipt:
+    return PackageSafetyEvidenceReceipt.model_validate(
+        {
+            "schema_version": "package-safety-evidence/v1",
+            "receipt_id": "package-safety-review-1234",
+            "candidate": _candidate(),
+            "lane": "safety_review",
+            "input_receipt_id": "package-receipt-1234",
+            "package_digest": "a" * 64,
+            "reviewer": {
+                "adapter_id": "review/manual",
+                "adapter_version_or_digest": "v1",
+                "method": "manual_review",
+            },
+            "status": "reviewed_no_issue",
+            "observed_at": "2026-08-29T09:00:00Z",
+            "evidence": [
+                {
+                    "evidence_id": "review-report",
+                    "kind": "manual_review",
+                    "ref": "evidence/safety-review.json",
+                    "sha256": "c" * 64,
+                }
+            ],
+            "findings": [],
+            "blocker": None,
+            "blockers": [],
+            "mutation_performed": False,
+            "rights_decision_performed": False,
+            "admission_performed": False,
+        }
+    )
 
 
 def _request(status: str = "prepared") -> dict[str, object]:
@@ -164,6 +200,111 @@ def test_provider_execution_states_validate_in_model_registry_and_draft(
     SchemaRegistry().validate(schema_name, payload)
     schema = SchemaRegistry().load(schema_name)
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload)) == []
+
+
+@pytest.mark.parametrize(
+    ("factory", "field"),
+    [
+        (_request, "provider_execution_performed"),
+        (_request, "credentials_included"),
+        (_request, "raw_payloads_included"),
+        (_request, "cost_claimed"),
+        (_result, "sdk_execution_performed"),
+        (_result, "credentials_retained"),
+        (_result, "raw_payloads_retained"),
+        (_result, "cost_claimed"),
+    ],
+)
+def test_false_only_adapter_claims_are_required_at_all_boundaries(
+    factory: Callable[[], dict[str, object]], field: str
+) -> None:
+    payload = factory()
+    del payload[field]
+    _assert_model_draft_and_registry_reject(payload)
+
+
+def test_provider_execution_models_revalidate_idempotently() -> None:
+    request = ProviderExecutionRequest.model_validate(_request())
+    result = ProviderExecutionResult.model_validate(_result())
+
+    assert ProviderExecutionRequest.model_validate(request) == request
+    assert ProviderExecutionResult.model_validate(result) == result
+
+
+@pytest.mark.parametrize("mismatch", ["receipt_id", "receipt_digest", "candidate"])
+def test_request_must_bind_the_supplied_safety_receipt(mismatch: str) -> None:
+    safety = _safety_receipt()
+    safety_payload = safety.model_dump(mode="json")
+    request_payload = _request()
+    request_payload["package_safety_receipt_sha256"] = canonical_json_sha256(safety_payload)
+    if mismatch == "receipt_id":
+        request_payload["package_safety_receipt_id"] = "package-safety-review-other"
+    elif mismatch == "receipt_digest":
+        request_payload["package_safety_receipt_sha256"] = "e" * 64
+    else:
+        request_payload["candidate"] = {**_candidate(), "content_sha256": "b" * 64}
+
+    request = ProviderExecutionRequest.model_validate(request_payload)
+    if mismatch:
+        with pytest.raises(ValueError, match=r"safety receipt|candidate"):
+            request.validate_against_package_safety_evidence(safety)
+        with pytest.raises(ContractError, match="package safety evidence binding"):
+            SchemaRegistry().validate_provider_execution_request_against_safety_evidence(
+                request_payload, safety_payload
+            )
+
+
+def test_request_accepts_the_exact_supplied_safety_receipt() -> None:
+    safety = _safety_receipt()
+    safety_payload = safety.model_dump(mode="json")
+    request_payload = _request()
+    request_payload["package_safety_receipt_sha256"] = canonical_json_sha256(safety_payload)
+    request = ProviderExecutionRequest.model_validate(request_payload)
+
+    assert request.validate_against_package_safety_evidence(safety) is request
+    SchemaRegistry().validate_provider_execution_request_against_safety_evidence(request_payload, safety_payload)
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    ["request_digest", "request_id", "idempotency", "candidate", "scenario", "case", "provider"],
+)
+def test_result_must_bind_the_supplied_request(mismatch: str) -> None:
+    request_payload = _request()
+    result_payload = _result()
+    result_payload["request_sha256"] = canonical_json_sha256(request_payload)
+    if mismatch == "request_digest":
+        result_payload["request_sha256"] = "d" * 64
+    elif mismatch == "request_id":
+        result_payload["request_id"] = "request-other"
+    elif mismatch == "idempotency":
+        result_payload["idempotency_key_sha256"] = "d" * 64
+    elif mismatch == "candidate":
+        result_payload["candidate"] = {**_candidate(), "content_sha256": "b" * 64}
+    elif mismatch == "scenario":
+        result_payload["scenario_set_id"] = "scenario-set-other"
+    elif mismatch == "case":
+        result_payload["case_id"] = "case-other"
+    else:
+        result_payload["provider"] = {**_provider(), "model_id": "provider/model-other"}
+
+    result = ProviderExecutionResult.model_validate(result_payload)
+    request = ProviderExecutionRequest.model_validate(request_payload)
+    with pytest.raises(ValueError, match=r"request|bindings|idempotency"):
+        result.validate_against_request(request)
+    with pytest.raises(ContractError, match="provider request binding"):
+        SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
+
+
+def test_result_accepts_the_exact_supplied_request() -> None:
+    request_payload = _request()
+    result_payload = _result()
+    result_payload["request_sha256"] = canonical_json_sha256(request_payload)
+    result = ProviderExecutionResult.model_validate(result_payload)
+    request = ProviderExecutionRequest.model_validate(request_payload)
+
+    assert result.validate_against_request(request) is result
+    SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
 
 
 @pytest.mark.parametrize(
@@ -587,6 +728,9 @@ def test_semantic_validator_metadata_is_contract_specific() -> None:
     assert request_metadata == {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
         "required_for": ["request status and blocker must agree"],
+        "external_inputs_required_for": [
+            "safety receipt identity, canonical digest, and candidate must match the supplied receipt"
+        ],
     }
     assert result_metadata == {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
@@ -594,6 +738,10 @@ def test_semantic_validator_metadata_is_contract_specific() -> None:
             "timestamps must be ordered",
             "usage totals must match their components",
             "a replay result cannot reference itself",
+        ],
+        "external_inputs_required_for": [
+            "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
+            "match the supplied request"
         ],
     }
 

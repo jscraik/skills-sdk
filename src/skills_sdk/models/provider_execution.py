@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
@@ -14,6 +14,9 @@ from skills_sdk.models.inventory import PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import BlockerCode, ReceiptId
 from skills_sdk.models.provider import ProviderIdentityV2
+
+if TYPE_CHECKING:
+    from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 
 ExecutionId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")]
 _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH = 100
@@ -59,7 +62,7 @@ def _normalize_json_input(
     if depth > _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH:
         raise ValueError("provider execution input exceeds the maximum JSON nesting depth")
     if isinstance(value, BaseModel):
-        return _normalize_json_input(dict(value), active_container_ids, depth + 1)
+        return _normalize_json_input(value.model_dump(mode="json"), active_container_ids, depth + 1)
     if value is None or isinstance(value, (str, bool, int)):
         return value
     if isinstance(value, float):
@@ -89,6 +92,18 @@ def _normalize_json_input(
 
 class _ProviderExecutionContractModel(_ContractModel):
     model_config = ConfigDict(revalidate_instances="always")
+
+    @classmethod
+    def model_validate(
+        cls,
+        obj: Any,
+        **kwargs: Any,
+    ) -> Self:
+        """Revalidate exact model instances through their strict JSON representation."""
+
+        if isinstance(obj, cls):
+            obj = obj.model_dump(mode="json")
+        return super().model_validate(obj, **kwargs)
 
     @model_validator(mode="before")
     @classmethod
@@ -196,10 +211,10 @@ class ProviderExecutionRequest(_ProviderExecutionContractModel):
     status: Literal["prepared", "blocked"]
     blocker: ProviderExecutionBlocker | None = None
     evidence_refs: tuple[PortablePath, ...] = ()
-    provider_execution_performed: Literal[False] = False
-    credentials_included: Literal[False] = False
-    raw_payloads_included: Literal[False] = False
-    cost_claimed: Literal[False] = False
+    provider_execution_performed: Literal[False]
+    credentials_included: Literal[False]
+    raw_payloads_included: Literal[False]
+    cost_claimed: Literal[False]
 
     @field_validator("prepared_at", mode="before")
     @classmethod
@@ -268,6 +283,27 @@ class ProviderExecutionRequest(_ProviderExecutionContractModel):
             raise ValueError("blocked provider execution request requires a blocker")
         return self
 
+    def validate_against_package_safety_evidence(
+        self,
+        safety_receipt: PackageSafetyEvidenceReceipt,
+    ) -> ProviderExecutionRequest:
+        """Require this request to bind one supplied package safety receipt."""
+
+        from skills_sdk.core.digests import canonical_json_sha256
+        from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
+
+        if not isinstance(safety_receipt, PackageSafetyEvidenceReceipt):
+            raise ValueError("provider execution request requires package safety evidence")
+        safety_receipt = PackageSafetyEvidenceReceipt.model_validate(safety_receipt.model_dump(mode="json"))
+        safety_payload = safety_receipt.model_dump(mode="json")
+        if self.package_safety_receipt_id != safety_receipt.receipt_id:
+            raise ValueError("provider execution safety receipt id must match the supplied receipt")
+        if self.package_safety_receipt_sha256 != canonical_json_sha256(safety_payload):
+            raise ValueError("provider execution safety receipt digest must match the supplied receipt")
+        if self.candidate != safety_receipt.candidate:
+            raise ValueError("provider execution candidate must match the supplied safety receipt")
+        return self
+
 
 class ProviderExecutionResult(_ProviderExecutionContractModel):
     """Adapter-supplied execution observation; the SDK does not run a provider."""
@@ -291,10 +327,10 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
     error: ProviderExecutionError | None = None
     replay_of_result_id: ExecutionId | None = None
     replay_of_result_sha256: Sha256 | None = None
-    sdk_execution_performed: Literal[False] = False
-    credentials_retained: Literal[False] = False
-    raw_payloads_retained: Literal[False] = False
-    cost_claimed: Literal[False] = False
+    sdk_execution_performed: Literal[False]
+    credentials_retained: Literal[False]
+    raw_payloads_retained: Literal[False]
+    cost_claimed: Literal[False]
 
     @field_validator("started_at", "finished_at", mode="before")
     @classmethod
@@ -390,6 +426,30 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
                 raise ValueError("blocked provider execution requires only a blocker")
         elif self.error is None or self.blocker is not None or self.output_sha256 is not None or self.usage is not None:
             raise ValueError("indeterminate provider execution requires only a typed error")
+        return self
+
+    def validate_against_request(self, request: ProviderExecutionRequest) -> ProviderExecutionResult:
+        """Require this result to bind one supplied provider execution request."""
+
+        from skills_sdk.core.digests import canonical_json_sha256
+
+        if not isinstance(request, ProviderExecutionRequest):
+            raise ValueError("provider execution result requires a provider execution request")
+        request = ProviderExecutionRequest.model_validate(request.model_dump(mode="json"))
+        request_payload = request.model_dump(mode="json")
+        if self.request_sha256 != canonical_json_sha256(request_payload):
+            raise ValueError("provider execution request digest must match the supplied request")
+        if self.request_id != request.request_id:
+            raise ValueError("provider execution request id must match the supplied request")
+        if self.idempotency_key_sha256 != request.idempotency_key_sha256:
+            raise ValueError("provider execution idempotency key must match the supplied request")
+        if (self.candidate, self.scenario_set_id, self.case_id, self.provider) != (
+            request.candidate,
+            request.scenario_set_id,
+            request.case_id,
+            request.provider,
+        ):
+            raise ValueError("provider execution result bindings must match the supplied request")
         return self
 
 

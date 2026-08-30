@@ -160,6 +160,14 @@ def append_provider_execution_constraints(schema: dict[str, Any], filename: str)
     schema["x-skills-sdk-semantic-validator"] = {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
         "required_for": required_for,
+        "external_inputs_required_for": (
+            ["safety receipt identity, canonical digest, and candidate must match the supplied receipt"]
+            if filename == "provider-execution-request.v1.schema.json"
+            else [
+                "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
+                "match the supplied request"
+            ]
+        ),
     }
 
 

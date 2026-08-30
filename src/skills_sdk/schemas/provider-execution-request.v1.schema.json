@@ -276,13 +276,11 @@
     },
     "cost_claimed": {
       "const": false,
-      "default": false,
       "title": "Cost Claimed",
       "type": "boolean"
     },
     "credentials_included": {
       "const": false,
-      "default": false,
       "title": "Credentials Included",
       "type": "boolean"
     },
@@ -362,13 +360,11 @@
     },
     "provider_execution_performed": {
       "const": false,
-      "default": false,
       "title": "Provider Execution Performed",
       "type": "boolean"
     },
     "raw_payloads_included": {
       "const": false,
-      "default": false,
       "title": "Raw Payloads Included",
       "type": "boolean"
     },
@@ -433,12 +429,19 @@
     "package_safety_receipt_id",
     "package_safety_receipt_sha256",
     "prepared_at",
-    "status"
+    "status",
+    "provider_execution_performed",
+    "credentials_included",
+    "raw_payloads_included",
+    "cost_claimed"
   ],
   "title": "ProviderExecutionRequest",
   "type": "object",
   "x-skills-sdk-semantic-validator": {
     "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "external_inputs_required_for": [
+      "safety receipt identity, canonical digest, and candidate must match the supplied receipt"
+    ],
     "required_for": [
       "request status and blocker must agree"
     ]

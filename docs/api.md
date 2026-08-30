@@ -138,7 +138,12 @@ packages, or publish to a registry.
 `ProviderExecutionRequest` and `ProviderExecutionResult` are registered schema
 families, not generic receipts. Their `schema_version` values therefore fail
 closed through `parse_receipt` and must be validated by model or
-`SchemaRegistry` name. `parse_receipt` accepts only explicitly registered
+`SchemaRegistry` name. Cross-envelope claims require the supplied objects:
+`validate_provider_execution_request_against_safety_evidence` binds the safety
+receipt identity, canonical digest, and candidate, while
+`validate_provider_execution_result_against_request` binds the request digest
+and duplicated request/result identities. Standalone schema validation cannot
+establish those external-object relations. `parse_receipt` accepts only explicitly registered
 receipt wire versions:
 `receipt-base/v1`, package receipt v1/v2, evaluation receipt v1/v2, and
 `registry-preparation/v1`, plus `package-safety-evidence/v1`. A prepared

@@ -510,13 +510,11 @@
     },
     "cost_claimed": {
       "const": false,
-      "default": false,
       "title": "Cost Claimed",
       "type": "boolean"
     },
     "credentials_retained": {
       "const": false,
-      "default": false,
       "title": "Credentials Retained",
       "type": "boolean"
     },
@@ -582,7 +580,6 @@
     },
     "raw_payloads_retained": {
       "const": false,
-      "default": false,
       "title": "Raw Payloads Retained",
       "type": "boolean"
     },
@@ -688,7 +685,6 @@
     },
     "sdk_execution_performed": {
       "const": false,
-      "default": false,
       "title": "Sdk Execution Performed",
       "type": "boolean"
     },
@@ -730,12 +726,19 @@
     "provider",
     "status",
     "started_at",
-    "finished_at"
+    "finished_at",
+    "sdk_execution_performed",
+    "credentials_retained",
+    "raw_payloads_retained",
+    "cost_claimed"
   ],
   "title": "ProviderExecutionResult",
   "type": "object",
   "x-skills-sdk-semantic-validator": {
     "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "external_inputs_required_for": [
+      "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must match the supplied request"
+    ],
     "required_for": [
       "timestamps must be ordered",
       "usage totals must match their components",
