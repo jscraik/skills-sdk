@@ -79,7 +79,11 @@ package exports the inventory, risk, and evaluation contracts listed in its
   semantic invariants identified by schema metadata and enforced by
   `SchemaRegistry.validate`. The contract validates supplied metadata and never
   performs a review, rights decision, admission, provider call, installation,
-  runtime action, or publication.
+  runtime action, or publication. A raw safety payload cannot dereference its
+  opaque `input_receipt_id`; when a caller has the upstream
+  `PackageReceiptV2`, call
+  `SchemaRegistry.validate_package_safety_evidence_against_package_receipt`
+  to require matching receipt ID, candidate, and canonical manifest digest.
 
 ## Schema validation
 

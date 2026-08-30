@@ -188,6 +188,12 @@ def test_schema_names_structural_only_package_safety_semantics() -> None:
             "issue and insufficient states must retain the primary blocker first",
             "blocker evidence refs must resolve to supplied digest-bound evidence",
         ],
+        "external_entrypoint": (
+            "skills_sdk.core.schema_registry.SchemaRegistry.validate_package_safety_evidence_against_package_receipt"
+        ),
+        "external_inputs_required_for": [
+            "input receipt id, candidate, and package digest must match a supplied package-receipt/v2",
+        ],
     }
 
     missing_evidence_id = _payload("issue_found")
@@ -239,6 +245,33 @@ def test_safety_receipt_accepts_upstream_manifest_digest_distinct_from_source_id
     SchemaRegistry().validate("package-safety-evidence.v1", payload)
     assert receipt.input_receipt_id == upstream_receipt.receipt_id
     assert receipt.package_digest == upstream_receipt.package_digest
+    receipt.validate_against_package_receipt(upstream_receipt)
+    SchemaRegistry().validate_package_safety_evidence_against_package_receipt(payload, upstream_receipt)
+
+
+@pytest.mark.parametrize("field", ["input_receipt_id", "candidate", "package_digest"])
+def test_safety_receipt_rejects_mismatched_upstream_package_receipt_binding(field: str) -> None:
+    payload = _payload()
+    upstream_receipt = PackageReceiptV2.model_validate(
+        json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
+    )
+    assert upstream_receipt.candidate is not None
+    assert upstream_receipt.package_digest is not None
+    payload["candidate"] = upstream_receipt.candidate.model_dump(mode="json")
+    payload["input_receipt_id"] = upstream_receipt.receipt_id
+    payload["package_digest"] = upstream_receipt.package_digest
+    if field == "input_receipt_id":
+        payload[field] = "other-package-receipt"
+    elif field == "candidate":
+        payload[field] = {**payload[field], "content_sha256": "b" * 64}
+    else:
+        payload[field] = "b" * 64
+
+    safety_receipt = PackageSafetyEvidenceReceipt.model_validate(payload)
+    with pytest.raises(ValueError, match="upstream package receipt"):
+        safety_receipt.validate_against_package_receipt(upstream_receipt)
+    with pytest.raises(ContractError, match="upstream package receipt binding"):
+        SchemaRegistry().validate_package_safety_evidence_against_package_receipt(payload, upstream_receipt)
 
 
 def test_duplicate_evidence_refs_fail_semantic_validation() -> None:

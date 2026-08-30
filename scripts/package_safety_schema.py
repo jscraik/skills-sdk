@@ -153,6 +153,12 @@ def append_package_safety_constraints(schema: dict[str, Any]) -> None:
             "issue and insufficient states must retain the primary blocker first",
             "blocker evidence refs must resolve to supplied digest-bound evidence",
         ],
+        "external_entrypoint": (
+            "skills_sdk.core.schema_registry.SchemaRegistry.validate_package_safety_evidence_against_package_receipt"
+        ),
+        "external_inputs_required_for": [
+            "input receipt id, candidate, and package digest must match a supplied package-receipt/v2",
+        ],
     }
 
 

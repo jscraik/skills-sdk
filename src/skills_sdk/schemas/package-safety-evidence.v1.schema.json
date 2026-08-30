@@ -583,6 +583,10 @@
   "type": "object",
   "x-skills-sdk-semantic-validator": {
     "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "external_entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate_package_safety_evidence_against_package_receipt",
+    "external_inputs_required_for": [
+      "input receipt id, candidate, and package digest must match a supplied package-receipt/v2"
+    ],
     "required_for": [
       "findings must reference supplied evidence ids",
       "finding codes, evidence ids, and evidence refs must be unique",

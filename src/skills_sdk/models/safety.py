@@ -11,7 +11,7 @@ from pydantic import AwareDatetime, Field, StringConstraints, field_validator, m
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
-from skills_sdk.models.packaging import BlockerCode, ReceiptId
+from skills_sdk.models.packaging import BlockerCode, PackageReceiptV2, ReceiptId
 
 SafetyEvidenceId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")]
 SafetyAdapterId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._/-][a-z0-9]+)*$")]
@@ -255,6 +255,23 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
                 raise ValueError("metadata_insufficient cannot claim an observed issue")
             if self.blocker is None or not self.blockers or self.blockers[0] != self.blocker:
                 raise ValueError("metadata_insufficient requires its primary blocker first")
+        return self
+
+    def validate_against_package_receipt(self, package_receipt: PackageReceiptV2) -> PackageSafetyEvidenceReceipt:
+        """Require this evidence receipt to bind one supplied built package receipt."""
+
+        if (
+            package_receipt.status != "built"
+            or package_receipt.candidate is None
+            or package_receipt.package_digest is None
+        ):
+            raise ValueError("safety evidence requires a built upstream package receipt")
+        if self.input_receipt_id != package_receipt.receipt_id:
+            raise ValueError("safety input receipt id must match the upstream package receipt")
+        if self.candidate != package_receipt.candidate:
+            raise ValueError("safety candidate must match the upstream package receipt")
+        if self.package_digest != package_receipt.package_digest:
+            raise ValueError("safety package digest must match the upstream package receipt")
         return self
 
 
