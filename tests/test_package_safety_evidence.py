@@ -484,6 +484,7 @@ def test_embedded_machine_paths_fail_in_model_draft_and_registry(target: str) ->
         "source at Z:folder/file.txt",
         "source at /" + "root/project/result.json",
         "AWS_" + "SE" + "CRET" + "_ACCESS_KEY=opaque-value",
+        *("clientSecret=opaque-value", "accessToken: opaque-value"),
         "token\u00a0=opaque-value",
         "token\u0085=opaque-value",
     ],
