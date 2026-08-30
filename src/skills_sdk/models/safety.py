@@ -22,6 +22,7 @@ _RFC3339_DATETIME_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}
 _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
     r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
+    r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|"
     r"(?:client|access)[_-]?(?:secret|token|key(?:[_-]?id)?)|"
     r"(?:(?:ssh_)?private[_-]?key|api[_-]?key|credential|password|secret|token)"
     r"(?:[_-][A-Za-z0-9]+)*"
@@ -29,7 +30,8 @@ _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     re.IGNORECASE | re.ASCII,
 )
 _MACHINE_PATH_PATTERN = re.compile(
-    r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\|(?:^|[^A-Za-z0-9/])/(?!/)|"
+    r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\$[A-Za-z_][A-Za-z0-9_]*/|"
+    r"(?:^|[^A-Za-z0-9])\\|(?:^|[^A-Za-z0-9/])/(?!/)|"
     r"(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|"
     r"[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|"
     r"[Rr][Oo][Oo][Tt])/|"
@@ -42,6 +44,32 @@ _MACHINE_PATH_PATTERN = re.compile(
 
 def _public_text_is_redaction_safe(value: str) -> bool:
     return _PUBLIC_TEXT_CREDENTIAL_PATTERN.search(value) is None and _MACHINE_PATH_PATTERN.search(value) is None
+
+
+def _normalize_nested_models(
+    value: object,
+    active_container_ids: set[int] | None = None,
+    depth: int = 0,
+) -> object:
+    if depth > _MAX_SAFETY_INPUT_NESTING_DEPTH:
+        raise ValueError("safety public fields exceed the maximum JSON nesting depth")
+    if isinstance(value, BaseModel):
+        return _normalize_nested_models(value.model_dump(mode="python"), active_container_ids, depth + 1)
+    if isinstance(value, Mapping | Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        active_container_ids = active_container_ids if active_container_ids is not None else set()
+        container_id = id(value)
+        if container_id in active_container_ids:
+            raise ValueError("safety public fields must not contain cyclic containers")
+        active_container_ids.add(container_id)
+        try:
+            if isinstance(value, Mapping):
+                return {
+                    key: _normalize_nested_models(item, active_container_ids, depth + 1) for key, item in value.items()
+                }
+            return tuple(_normalize_nested_models(item, active_container_ids, depth + 1) for item in value)
+        finally:
+            active_container_ids.remove(container_id)
+    return value
 
 
 def _contains_byte_string(
@@ -77,9 +105,10 @@ class _SafetyContractModel(_ContractModel):
     @model_validator(mode="before")
     @classmethod
     def byte_strings_must_not_be_coerced(cls, value: object) -> object:
-        if _contains_byte_string(value):
+        normalized = _normalize_nested_models(value)
+        if _contains_byte_string(normalized):
             raise ValueError("safety public fields must not coerce byte strings")
-        return value
+        return normalized
 
 
 class PackageSafetyReviewer(_SafetyContractModel):
@@ -241,6 +270,13 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
                 raise ValueError("safety receipt identity must already be normalized")
             if not _public_text_is_redaction_safe(value):
                 raise ValueError("safety receipt identity must not contain credential-shaped values")
+        return value
+
+    @field_validator("package_digest", mode="before")
+    @classmethod
+    def package_digest_must_be_normalized(cls, value: object) -> object:
+        if isinstance(value, str) and value != value.strip():
+            raise ValueError("safety package digest must already be normalized")
         return value
 
     @field_validator("observed_at", mode="before")

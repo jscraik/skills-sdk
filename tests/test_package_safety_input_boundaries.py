@@ -17,6 +17,7 @@ from skills_sdk.models.packaging import PackageReceipt, PackageReceiptV2
 from skills_sdk.models.safety import (
     PackageSafetyEvidenceReceipt,
     PackageSafetyEvidenceReference,
+    PackageSafetyFinding,
     PackageSafetyReviewer,
 )
 
@@ -139,6 +140,78 @@ def test_safety_rejects_access_key_assignments_at_all_boundaries(value: str) -> 
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "source at $" + "HOME/review.json",
+        "$" + "TMPDIR/safety.json",
+        "eyJ" + "hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevalue",
+    ],
+)
+def test_safety_rejects_environment_paths_and_raw_jwts_at_all_boundaries(value: str) -> None:
+    payload = _payload()
+    payload["status"] = "issue_found"
+    payload["findings"] = [
+        {
+            "code": "unsafe_operation",
+            "category": "secret",
+            "severity": "blocker",
+            "message": value,
+            "evidence_ids": ["review-report"],
+        }
+    ]
+    blocker = {
+        "code": "issue_found",
+        "message": "package safety issue found",
+        "evidence_refs": ["evidence/safety-review.json"],
+    }
+    payload["blocker"] = blocker
+    payload["blockers"] = [blocker]
+
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_package_digest_rejects_whitespace_at_all_boundaries() -> None:
+    payload = _payload()
+    payload["package_digest"] = " " + "a" * 64 + " "
+
+    with pytest.raises(ValidationError, match="package digest must already be normalized"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_revalidates_mutated_nested_model_instances() -> None:
+    payload = _payload()
+    payload["status"] = "issue_found"
+    payload["findings"] = [
+        PackageSafetyFinding(
+            code="unsafe_operation",
+            category="secret",
+            severity="blocker",
+            message="declared operation requires review",
+            evidence_ids=("review-report",),
+        ).model_copy(update={"message": "password=hunter2"})
+    ]
+    blocker = {
+        "code": "issue_found",
+        "message": "package safety issue found",
+        "evidence_refs": ["evidence/safety-review.json"],
+    }
+    payload["blocker"] = blocker
+    payload["blockers"] = [blocker]
+
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
 
 
 def test_safety_rejects_control_whitespace_credential_keys_at_all_boundaries() -> None:
