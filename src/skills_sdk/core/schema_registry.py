@@ -129,6 +129,8 @@ class SchemaRegistry:
         """Validate safety evidence against one supplied package-receipt/v2 object."""
 
         self.validate("package-safety-evidence.v1", payload)
+        if isinstance(package_receipt, Mapping):
+            self.validate("package-receipt.v2", package_receipt)
         try:
             from skills_sdk.models.packaging import PackageReceiptV2
             from skills_sdk.models.safety import PackageSafetyEvidenceReceipt

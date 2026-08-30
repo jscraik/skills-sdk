@@ -84,6 +84,8 @@ package exports the inventory, risk, and evaluation contracts listed in its
   `PackageReceiptV2`, call
   `SchemaRegistry.validate_package_safety_evidence_against_package_receipt`
   to require matching receipt ID, candidate, and canonical manifest digest.
+  A raw upstream mapping is first validated through the `package-receipt/v2`
+  JSON boundary before that binding is applied.
 
 ## Schema validation
 
