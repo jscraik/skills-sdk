@@ -262,6 +262,18 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
     rights_decision_performed: Literal[False] = False
     admission_performed: Literal[False] = False
 
+    @model_validator(mode="before")
+    @classmethod
+    def candidate_identity_must_be_normalized_for_safety(cls, value: object) -> object:
+        if isinstance(value, Mapping):
+            candidate = value.get("candidate")
+            if isinstance(candidate, Mapping):
+                for field in ("package_id", "source_revision", "content_sha256"):
+                    field_value = candidate.get(field)
+                    if isinstance(field_value, str) and field_value != field_value.strip():
+                        raise ValueError("safety candidate identity fields must already be normalized")
+        return value
+
     @field_validator("receipt_id", "input_receipt_id", mode="before")
     @classmethod
     def receipt_ids_must_be_redaction_safe(cls, value: object) -> object:
@@ -277,6 +289,13 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
     def package_digest_must_be_normalized(cls, value: object) -> object:
         if isinstance(value, str) and value != value.strip():
             raise ValueError("safety package digest must already be normalized")
+        return value
+
+    @field_validator("mutation_performed", "rights_decision_performed", "admission_performed", mode="before")
+    @classmethod
+    def false_only_proof_fields_must_be_json_booleans(cls, value: object) -> object:
+        if type(value) is not bool:
+            raise ValueError("safety false-only proof fields must be JSON booleans")
         return value
 
     @field_validator("observed_at", mode="before")
@@ -332,6 +351,7 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
 
         if not isinstance(package_receipt, PackageReceiptV2):
             raise ValueError("safety evidence requires a built v2 upstream package receipt")
+        package_receipt = PackageReceiptV2.model_validate(package_receipt.model_dump(mode="python"))
         if (
             package_receipt.status != "built"
             or package_receipt.candidate is None

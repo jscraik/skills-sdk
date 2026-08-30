@@ -297,12 +297,61 @@ def test_safety_rejects_whitespace_candidate_identity_before_upstream_binding() 
     payload["input_receipt_id"] = upstream.receipt_id
     payload["package_digest"] = upstream.package_digest
 
-    with pytest.raises(ValidationError, match="candidate identity fields must already be normalized"):
+    with pytest.raises(ValidationError, match="safety candidate identity fields must already be normalized"):
         PackageSafetyEvidenceReceipt.model_validate(payload)
     schema = SchemaRegistry().load("package-safety-evidence.v1")
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_package_candidate_identity_keeps_its_existing_whitespace_normalization() -> None:
+    candidate = PackageCandidateIdentity(
+        package_id=" synthetic-skill ",
+        source_revision=" " + "1" * 40 + " ",
+        content_sha256=" " + "a" * 64 + " ",
+    )
+
+    assert candidate.package_id == "synthetic-skill"
+    assert candidate.source_revision == "1" * 40
+    assert candidate.content_sha256 == "a" * 64
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("mutation_performed", 0),
+        ("rights_decision_performed", 0.0),
+        ("admission_performed", 0),
+    ],
+)
+def test_safety_false_only_proof_fields_reject_non_boolean_values_at_all_boundaries(field: str, value: object) -> None:
+    payload = _payload()
+    payload[field] = value
+
+    with pytest.raises(ValidationError, match="false-only proof fields must be JSON booleans"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_direct_binding_revalidates_mutated_typed_upstream_receipts() -> None:
+    upstream = PackageReceiptV2.model_validate(
+        json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
+    )
+    assert upstream.candidate is not None
+    forged_digest = "b" * 64
+    payload = _payload()
+    payload["candidate"] = upstream.candidate.model_dump(mode="json")
+    payload["input_receipt_id"] = upstream.receipt_id
+    payload["package_digest"] = forged_digest
+    safety_receipt = PackageSafetyEvidenceReceipt.model_validate(payload)
+    forged_upstream = upstream.model_copy(update={"package_digest": forged_digest})
+
+    with pytest.raises(ValidationError, match="built package receipt digest must match the canonical manifest"):
+        safety_receipt.validate_against_package_receipt(forged_upstream)
 
 
 def test_safety_rejects_historical_v1_upstream_receipt_binding() -> None:
