@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
@@ -24,7 +24,7 @@ _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
     r"(?:(?:ssh_)?private[_-]?key|api[_-]?key|credential|password|secret|token)"
     r"(?:[_-][A-Za-z0-9]+)*"
-    r"[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
+    r"[\"']?[\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
     re.IGNORECASE | re.ASCII,
 )
 _MACHINE_PATH_PATTERN = re.compile(
@@ -49,7 +49,9 @@ def _contains_byte_string(
         raise ValueError("safety public fields exceed the maximum JSON nesting depth")
     if isinstance(value, (bytes, bytearray)):
         return True
-    if isinstance(value, Mapping | list | tuple | set | frozenset):
+    if isinstance(value, str):
+        return False
+    if isinstance(value, Mapping | Sequence):
         active_container_ids = active_container_ids if active_container_ids is not None else set()
         container_id = id(value)
         if container_id in active_container_ids:
@@ -60,6 +62,8 @@ def _contains_byte_string(
             return any(_contains_byte_string(item, active_container_ids, depth + 1) for item in values)
         finally:
             active_container_ids.remove(container_id)
+    if isinstance(value, Iterable):
+        raise ValueError("safety public fields must use JSON-compatible containers")
     return False
 
 

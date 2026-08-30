@@ -65,6 +65,13 @@ class PackageCandidateIdentity(_ContractModel):
     source_revision: GitRevision
     content_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 
+    @field_validator("package_id", "source_revision", "content_sha256", mode="before")
+    @classmethod
+    def identity_fields_must_be_normalized(cls, value: object) -> object:
+        if isinstance(value, str) and value != value.strip():
+            raise ValueError("package candidate identity fields must already be normalized")
+        return value
+
 
 class SkillIdentity(_ContractModel):
     """Agent Skills identity, independent of runtime installation."""

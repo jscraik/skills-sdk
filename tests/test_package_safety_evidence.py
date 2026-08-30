@@ -328,13 +328,13 @@ def test_finding_evidence_ids_reject_credential_shapes_at_all_boundaries(credent
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
-def test_finding_evidence_ids_screen_generator_input_before_coercion() -> None:
+def test_finding_evidence_ids_reject_generator_input_before_coercion() -> None:
     payload = _payload("issue_found")
     findings = payload["findings"]
     assert isinstance(findings, list)
     findings[0]["evidence_ids"] = (value for value in ("ghp_secret",))
 
-    with pytest.raises(ValidationError, match="credential-shaped"):
+    with pytest.raises(ValidationError, match="JSON-compatible containers"):
         PackageSafetyEvidenceReceipt.model_validate(payload)
 
 
