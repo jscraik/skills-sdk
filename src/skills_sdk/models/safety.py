@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping
 from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
@@ -18,14 +19,15 @@ SafetyAdapterVersion = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A
 _CREDENTIAL_PREFIXES = ("aiza", "akia", "bearer", "ghp_", "github_pat_", "hf_", "sk-", "xoxb-", "xoxp-")
 _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
-    r"(?:api[_-]?key|credential|password|secret|token)\s*[:=])",
+    r"(?:api[_-]?key|credential|password|secret|token)"
+    r"[\s\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
     re.IGNORECASE | re.ASCII,
 )
 _MACHINE_PATH_PATTERN = re.compile(
     r"(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
     r"[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|"
-    r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|"
-    r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]"
+    r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|"
+    r"(?:^|[^A-Za-z0-9])[A-Za-z]:"
 )
 
 
@@ -106,6 +108,17 @@ class PackageSafetyFinding(_ContractModel):
             raise ValueError("safety finding evidence ids must be unique")
         return values
 
+    @field_validator("evidence_ids", mode="before")
+    @classmethod
+    def evidence_ids_must_be_redaction_safe(cls, values: object) -> object:
+        if isinstance(values, Iterable) and not isinstance(values, (str, bytes, bytearray, Mapping)):
+            materialized = tuple(values)
+            for value in materialized:
+                if isinstance(value, str) and not _public_text_is_redaction_safe(value):
+                    raise ValueError("safety finding evidence ids must not contain credential-shaped values")
+            return materialized
+        return values
+
 
 class PackageSafetyBlocker(_ContractModel):
     """Typed reason that a safety-review state cannot establish no issue."""
@@ -165,9 +178,11 @@ class PackageSafetyEvidenceReceipt(_ContractModel):
         if self.package_digest != self.candidate.content_sha256:
             raise ValueError("package digest must match the candidate content digest")
         evidence_ids = tuple(item.evidence_id for item in self.evidence)
-        evidence_ids = tuple(item.evidence_id for item in self.evidence)
         if len(evidence_ids) != len(set(evidence_ids)):
             raise ValueError("safety evidence ids must be unique")
+        evidence_refs = tuple(item.ref for item in self.evidence)
+        if len(evidence_refs) != len(set(evidence_refs)):
+            raise ValueError("safety evidence refs must be unique")
         finding_codes = tuple(item.code for item in self.findings)
         if len(finding_codes) != len(set(finding_codes)):
             raise ValueError("safety finding codes must be unique")

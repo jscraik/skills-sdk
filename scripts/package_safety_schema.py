@@ -17,13 +17,14 @@ PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN = (
     r"[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|"
     r"[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|"
     r"(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|"
-    r"[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\s*[:=])"
+    r"[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])"
+    r"[\s\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])"
 )
 MACHINE_PATH_SCHEMA_PATTERN = (
     r"(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
     r"[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|"
-    r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|"
-    r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]"
+    r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|"
+    r"(?:^|[^A-Za-z0-9])[A-Za-z]:"
 )
 
 
@@ -52,6 +53,9 @@ def append_package_safety_identity_constraints(
                 properties[field].setdefault("allOf", []).extend(
                     ({"not": {"pattern": credential_pattern}}, {"not": {"pattern": machine_path_pattern}})
                 )
+            properties["evidence_ids"]["items"].setdefault("allOf", []).extend(
+                ({"not": {"pattern": credential_pattern}}, {"not": {"pattern": machine_path_pattern}})
+            )
         elif title == "PackageSafetyBlocker":
             for field in ("code", "message"):
                 properties[field].setdefault("allOf", []).extend(
@@ -139,8 +143,9 @@ def append_package_safety_constraints(schema: dict[str, Any]) -> None:
     schema["x-skills-sdk-semantic-validator"] = {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
         "required_for": [
+            "package digest must match candidate content digest",
             "findings must reference supplied evidence ids",
-            "finding codes and evidence ids must be unique",
+            "finding codes, evidence ids, and evidence refs must be unique",
             "issue and insufficient states must retain the primary blocker first",
             "blocker evidence refs must resolve to supplied digest-bound evidence",
         ],

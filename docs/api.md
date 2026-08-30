@@ -70,9 +70,13 @@ package exports the inventory, risk, and evaluation contracts listed in its
   evidence and forbids findings; issue-found requires evidence, a warning or
   blocker finding, and typed blockers. Metadata-insufficient requires a typed
   blocker but cannot claim an observed issue. There is no generic `safe`
-  field. The contract validates supplied metadata and never performs a review,
-  rights decision, admission, provider call, installation, runtime action, or
-  publication.
+  field. Draft 2020-12 validates the structural state, shape, uniqueness, and
+  public-text constraints it can express. Cross-object evidence membership,
+  blocker-reference membership, and primary-blocker equality remain explicit
+  semantic invariants identified by schema metadata and enforced by
+  `SchemaRegistry.validate`. The contract validates supplied metadata and never
+  performs a review, rights decision, admission, provider call, installation,
+  runtime action, or publication.
 
 ## Schema validation
 
@@ -95,8 +99,8 @@ SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json
 The schema registry accepts only known schema names and raises `ContractError`
 for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
-manifest, provider identity, private-registry preparation, receipt, risk,
-security, scenario, and scorer schemas. The registered
+manifest, provider identity, private-registry preparation, package-safety
+evidence, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake

@@ -127,6 +127,12 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
     for ref in evidence:
         require_portable_relative_path(ref)
     blocker_payload = payload.get("blocker")
+    if safety_receipt and payload.get("status") == "not_reviewed":
+        blocker_payload = {
+            "code": "not_reviewed",
+            "message": "package safety review was not performed",
+            "evidence_refs": (),
+        }
     if (
         blocker_payload is not None
         and not package_receipt
