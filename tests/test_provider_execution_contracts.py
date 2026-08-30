@@ -367,13 +367,20 @@ def test_replay_identity_and_digest_are_required_together_by_model_and_draft(mis
 @pytest.mark.parametrize("mismatch", [None, "result_id", "result_digest"])
 def test_replay_provenance_must_bind_the_supplied_prior_result(mismatch: str | None) -> None:
     prior_payload = _result()
+    if mismatch is None:
+        prior_payload.pop("usage")
+        prior_payload.pop("replay_of_result_id")
+        prior_payload.pop("replay_of_result_sha256")
+        prior_payload["started_at"] = "2026-08-29T15:01:00+01:00"
+        prior_payload["finished_at"] = "2026-08-29T15:01:01+01:00"
+    prior = ProviderExecutionResult.model_validate(prior_payload)
     payload = _result()
     payload["result_id"] = "result-current"
-    payload["replay_of_result_id"] = prior_payload["result_id"]
-    payload["replay_of_result_sha256"] = canonical_json_sha256(prior_payload)
+    payload["replay_of_result_id"] = prior.result_id
+    payload["replay_of_result_sha256"] = canonical_json_sha256(prior.model_dump(mode="json"))
     if mismatch is None:
         result = ProviderExecutionResult.model_validate(payload)
-        prior = ProviderExecutionResult.model_validate(prior_payload)
+        assert payload["replay_of_result_sha256"] != canonical_json_sha256(prior_payload)
         assert result.validate_against_replayed_result(prior) is result
         SchemaRegistry().validate_provider_execution_replay_against_prior_result(payload, prior_payload)
         return
@@ -383,7 +390,6 @@ def test_replay_provenance_must_bind_the_supplied_prior_result(mismatch: str | N
         payload["replay_of_result_sha256"] = "9" * 64
 
     result = ProviderExecutionResult.model_validate(payload)
-    prior = ProviderExecutionResult.model_validate(prior_payload)
     with pytest.raises(ValueError, match=r"replay result (?:id|digest)"):
         result.validate_against_replayed_result(prior)
     with pytest.raises(ContractError, match="replay provenance binding"):
@@ -463,11 +469,16 @@ def test_execution_identity_rejects_extended_credential_prefixes_at_all_boundari
 
 
 @pytest.mark.parametrize("factory", [_request, _result])
+@pytest.mark.parametrize(
+    "evidence_ref",
+    ["evidence/token\N{NO-BREAK SPACE}=opaque-value.json", 'evidence/{"token":"opaque-value"}.json'],
+)
 def test_credential_labels_with_unicode_whitespace_are_rejected_at_all_boundaries(
     factory: Callable[[], dict[str, object]],
+    evidence_ref: str,
 ) -> None:
     payload = factory()
-    payload["evidence_refs"] = ["evidence/token\N{NO-BREAK SPACE}=opaque-value.json"]
+    payload["evidence_refs"] = [evidence_ref]
 
     _assert_model_draft_and_registry_reject(payload)
     coded_payload = _request("blocked") if factory is _request else _result("failed")
@@ -544,8 +555,13 @@ def test_execution_evidence_rejects_embedded_machine_paths_at_all_boundaries(mac
 def test_completed_result_requires_evidence_refs_at_all_boundaries() -> None:
     payload = _result()
     payload.pop("evidence_refs")
-
     _assert_model_draft_and_registry_reject(payload)
+    for coerced_value in (0, 1, "false", "true"):
+        failed = _result("failed")
+        error = failed["error"]
+        assert isinstance(error, dict)
+        error["retryable"] = coerced_value
+        _assert_model_draft_and_registry_reject(failed)
 
 
 @pytest.mark.parametrize("coerced_value", [0, 1, "false", "true"])
@@ -567,16 +583,6 @@ def test_false_only_fields_reject_boolean_coercion_at_all_boundaries(
 ) -> None:
     payload = factory()
     payload[field] = coerced_value
-
-    _assert_model_draft_and_registry_reject(payload)
-
-
-@pytest.mark.parametrize("coerced_value", [0, 1, "false", "true"])
-def test_retryable_rejects_boolean_coercion_at_all_boundaries(coerced_value: object) -> None:
-    payload = _result("failed")
-    error = payload["error"]
-    assert isinstance(error, dict)
-    error["retryable"] = coerced_value
 
     _assert_model_draft_and_registry_reject(payload)
 
@@ -638,25 +644,23 @@ def test_candidate_bindings_reject_surrounding_whitespace_at_all_boundaries(
     _assert_model_draft_and_registry_reject(payload)
 
 
-def test_usage_counts_reject_string_coercion_at_all_boundaries() -> None:
-    payload = _result()
-    usage = payload["usage"]
+def test_non_json_scalar_and_container_inputs_are_rejected_at_all_boundaries() -> None:
+    result = _result()
+    usage = result["usage"]
     assert isinstance(usage, dict)
     usage["input_units"] = "3"
+    request = _request()
+    request["evidence_refs"] = (item for item in ["evidence/request.json"])
+    for payload in (result, request):
+        _assert_model_draft_and_registry_reject(payload)
 
-    _assert_model_draft_and_registry_reject(payload)
 
-
-def test_timestamps_reject_python_datetime_coercion_at_all_boundaries() -> None:
+@pytest.mark.parametrize(
+    "timestamp", [datetime(2026, 8, 29, 14, 0, tzinfo=UTC), "2026-08-29 14:00:00Z", "2026-08-29T14:00:00"]
+)
+def test_timestamps_reject_non_rfc3339_values_at_all_boundaries(timestamp: object) -> None:
     payload = _request()
-    payload["prepared_at"] = datetime(2026, 8, 29, 14, 0, tzinfo=UTC)
-
-    _assert_model_draft_and_registry_reject(payload)
-
-
-def test_evidence_refs_reject_generator_input_at_all_boundaries() -> None:
-    payload = _request()
-    payload["evidence_refs"] = (item for item in ["evidence/request.json"])
+    payload["prepared_at"] = timestamp
 
     _assert_model_draft_and_registry_reject(payload)
 

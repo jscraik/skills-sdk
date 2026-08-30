@@ -148,7 +148,8 @@ provenance to the supplied prior result. Standalone schema validation cannot
 establish those external-object relations. Cross-envelope digests use canonical
 JSON from the fully validated model's `model_dump(mode="json")`; they do not
 hash an adapter's non-canonical input spelling, omitted defaults, or timestamp
-offset representation. `parse_receipt` accepts only explicitly registered
+offset representation. Replay digests apply that same rule to the validated
+prior result model. `parse_receipt` accepts only explicitly registered
 receipt wire versions:
 `receipt-base/v1`, package receipt v1/v2, evaluation receipt v1/v2, and
 `registry-preparation/v1`, plus `package-safety-evidence/v1`. A prepared

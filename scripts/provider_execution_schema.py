@@ -9,7 +9,7 @@ _PUBLIC_ID_PATTERN = (
     r"[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|"
     r"[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|"
     r"[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|"
-    r"[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\s*[:=])"
+    r"""[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])["']?\s*[:=])"""
 )
 _MACHINE_PATH_PATTERN = (
     r"(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
@@ -19,6 +19,7 @@ _MACHINE_PATH_PATTERN = (
     r"(?:^|[\\/])(?:\$(?:\{)?(?:HOME|USER|USERPROFILE)(?:\})?|%(?:HOME|USER|USERPROFILE)%|"
     r"[Rr][Oo][Oo][Tt])(?:[\\/]|$)"
 )
+_RFC3339_PATTERN = r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$"
 
 
 def _reject_private_text_patterns(schema: dict[str, Any]) -> None:
@@ -64,6 +65,7 @@ def append_provider_execution_constraints(schema: dict[str, Any], filename: str)
     properties = schema["properties"]
     properties["evidence_refs"]["uniqueItems"] = True
     if filename == "provider-execution-request.v1.schema.json":
+        properties["prepared_at"]["pattern"] = _RFC3339_PATTERN
         schema["$defs"]["ProviderExecutionBlocker"]["properties"]["evidence_refs"]["uniqueItems"] = True
         schema["allOf"] = [
             {
@@ -79,6 +81,8 @@ def append_provider_execution_constraints(schema: dict[str, Any], filename: str)
             },
         ]
     else:
+        properties["started_at"]["pattern"] = _RFC3339_PATTERN
+        properties["finished_at"]["pattern"] = _RFC3339_PATTERN
         schema["$defs"]["ProviderExecutionBlocker"]["properties"]["evidence_refs"]["uniqueItems"] = True
         schema["$defs"]["ProviderExecutionError"]["properties"]["evidence_refs"]["uniqueItems"] = True
         schema["allOf"] = [

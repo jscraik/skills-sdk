@@ -22,9 +22,10 @@ ExecutionId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0
 _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH = 100
 _CREDENTIAL_PATTERN = re.compile(
     r"(?:^|[^A-Za-z0-9])(?:aiza|akia|bearer|ghp_|github_pat_|hf_|sk-|xoxb-|xoxp-|"
-    r"(?:api[_-]?key|credential|password|secret|token)\s*[:=])",
+    r"(?:api[_-]?key|credential|password|secret|token)[\"']?\s*[:=])",
     re.IGNORECASE,
 )
+_RFC3339_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$")
 _MACHINE_PATH_PATTERN = re.compile(
     r"(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
     r"[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|"
@@ -225,7 +226,7 @@ class ProviderExecutionRequest(_ProviderExecutionContractModel):
     @field_validator("prepared_at", mode="before")
     @classmethod
     def prepared_at_must_be_a_json_string(cls, value: object) -> object:
-        if not isinstance(value, str):
+        if not isinstance(value, str) or _RFC3339_PATTERN.fullmatch(value) is None:
             raise ValueError("provider execution prepared_at must be an RFC3339 string")
         return value
 
@@ -334,7 +335,10 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
     blocker: ProviderExecutionBlocker | None = None
     error: ProviderExecutionError | None = None
     replay_of_result_id: ExecutionId | None = None
-    replay_of_result_sha256: Sha256 | None = None
+    replay_of_result_sha256: Sha256 | None = Field(
+        default=None,
+        description="SHA-256 of canonical JSON from the validated prior provider execution result model",
+    )
     sdk_execution_performed: Literal[False]
     credentials_retained: Literal[False]
     raw_payloads_retained: Literal[False]
@@ -343,7 +347,7 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
     @field_validator("started_at", "finished_at", mode="before")
     @classmethod
     def timestamps_must_be_json_strings(cls, value: object) -> object:
-        if not isinstance(value, str):
+        if not isinstance(value, str) or _RFC3339_PATTERN.fullmatch(value) is None:
             raise ValueError("provider execution timestamps must be RFC3339 strings")
         return value
 
