@@ -93,6 +93,11 @@ package exports the inventory, risk, and evaluation contracts listed in its
   observation with output or evidence digests and typed blockers or errors.
   Both contracts require `ProviderIdentityV2`, reject raw payload and
   credential fields, and carry literal-false execution/privacy/cost claims.
+  A prepared request must bind supplied `reviewed_no_issue` package-safety
+  evidence; other safety states cannot authorize preparation. A bound result
+  cannot start before its request was prepared. These cross-envelope relations
+  require the supplied receipt or request and are enforced by the named
+  `SchemaRegistry` binding methods rather than standalone Draft validation.
   Optional usage metadata is an adapter-reported unit count, not billing or
   cost evidence. The SDK validates these envelopes but does not authorize or
   perform provider execution, contact a network, read credentials, evaluate an

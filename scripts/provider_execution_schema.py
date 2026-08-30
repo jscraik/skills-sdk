@@ -5,10 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 _PUBLIC_ID_PATTERN = (
-    r"(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|"
+    r"-----[bB][eE][gG][iI][nN](?: [A-Za-z0-9]+)? [pP][rR][iI][vV][aA][tT][eE] "
+    r"[kK][eE][yY]-----|(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|"
+    r"[bB][eE][aA][rR][eE][rR]|"
     r"[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|"
     r"[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|"
     r"[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|"
+    r"[pP][rR][iI][vV][aA][tT][eE][ _-]?[kK][eE][yY]|"
     r"""[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])["']?\s*[:=])"""
 )
 _MACHINE_PATH_PATTERN = (
@@ -16,8 +19,10 @@ _MACHINE_PATH_PATTERN = (
     r"[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|"
     r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|"
     r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]|"
-    r"(?:^|[\\/])(?:\$(?:\{)?(?:HOME|USER|USERPROFILE)(?:\})?|%(?:HOME|USER|USERPROFILE)%|"
-    r"[Rr][Oo][Oo][Tt])(?:[\\/]|$)"
+    r"(?:^|[\\/])(?:\$(?:\{)?(?:[hH][oO][mM][eE]|[uU][sS][eE][rR]|"
+    r"[uU][sS][eE][rR][pP][rR][oO][fF][iI][lL][eE])(?:\})?|"
+    r"%(?:[hH][oO][mM][eE]|[uU][sS][eE][rR]|"
+    r"[uU][sS][eE][rR][pP][rR][oO][fF][iI][lL][eE])%|[Rr][Oo][Oo][Tt]|~)(?:[\\/]|$)"
 )
 _RFC3339_PATTERN = r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$"
 
@@ -56,6 +61,35 @@ def _append_public_id_constraints(schema: dict[str, Any]) -> None:
             for item in value:
                 if isinstance(item, dict):
                     _append_public_id_constraints(item)
+
+
+def _append_semantic_validator_metadata(schema: dict[str, Any], filename: str) -> None:
+    request_schema = filename == "provider-execution-request.v1.schema.json"
+    schema["x-skills-sdk-semantic-validator"] = {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": (
+            ["request status and blocker must agree"]
+            if request_schema
+            else [
+                "timestamps must be ordered",
+                "usage totals must match their components",
+                "a replay result cannot reference itself",
+            ]
+        ),
+        "external_inputs_required_for": (
+            [
+                "safety receipt identity, canonical digest, and candidate must match the supplied receipt",
+                "prepared requests require a reviewed_no_issue supplied safety receipt",
+            ]
+            if request_schema
+            else [
+                "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
+                "match the supplied request",
+                "result start time cannot precede the supplied request preparation time",
+                "replay identity and canonical digest must match the supplied prior result",
+            ]
+        ),
+    }
 
 
 def append_provider_execution_constraints(schema: dict[str, Any], filename: str) -> None:
@@ -154,28 +188,7 @@ def append_provider_execution_constraints(schema: dict[str, Any], filename: str)
                 },
             },
         ]
-    required_for = (
-        ["request status and blocker must agree"]
-        if filename == "provider-execution-request.v1.schema.json"
-        else [
-            "timestamps must be ordered",
-            "usage totals must match their components",
-            "a replay result cannot reference itself",
-        ]
-    )
-    schema["x-skills-sdk-semantic-validator"] = {
-        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
-        "required_for": required_for,
-        "external_inputs_required_for": (
-            ["safety receipt identity, canonical digest, and candidate must match the supplied receipt"]
-            if filename == "provider-execution-request.v1.schema.json"
-            else [
-                "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
-                "match the supplied request",
-                "replay identity and canonical digest must match the supplied prior result",
-            ]
-        ),
-    }
+    _append_semantic_validator_metadata(schema, filename)
 
 
 __all__ = ["append_provider_execution_constraints"]

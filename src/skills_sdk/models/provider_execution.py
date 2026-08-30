@@ -21,8 +21,9 @@ if TYPE_CHECKING:
 ExecutionId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")]
 _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH = 100
 _CREDENTIAL_PATTERN = re.compile(
+    r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
     r"(?:^|[^A-Za-z0-9])(?:aiza|akia|bearer|ghp_|github_pat_|hf_|sk-|xoxb-|xoxp-|"
-    r"(?:api[_-]?key|credential|password|secret|token)[\"']?\s*[:=])",
+    r"(?:api[_-]?key|credential|password|private[_ -]?key|secret|token)[\"']?\s*[:=])",
     re.IGNORECASE,
 )
 _RFC3339_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$")
@@ -32,7 +33,8 @@ _MACHINE_PATH_PATTERN = re.compile(
     r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|"
     r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]|"
     r"(?:^|[\\/])(?:\$(?:\{)?(?:HOME|USER|USERPROFILE)(?:\})?|%(?:HOME|USER|USERPROFILE)%|"
-    r"[Rr][Oo][Oo][Tt])(?:[\\/]|$)"
+    r"[Rr][Oo][Oo][Tt]|~)(?:[\\/]|$)",
+    re.IGNORECASE,
 )
 
 
@@ -309,6 +311,8 @@ class ProviderExecutionRequest(_ProviderExecutionContractModel):
             raise ValueError("provider execution safety receipt digest must match the supplied receipt")
         if self.candidate != safety_receipt.candidate:
             raise ValueError("provider execution candidate must match the supplied safety receipt")
+        if self.status == "prepared" and safety_receipt.status != "reviewed_no_issue":
+            raise ValueError("prepared provider execution requires reviewed_no_issue safety evidence")
         return self
 
 
@@ -451,6 +455,8 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
         request_payload = request.model_dump(mode="json")
         if request.status == "blocked" and self.status != "blocked":
             raise ValueError("blocked provider execution request requires a blocked result")
+        if self.started_at < request.prepared_at:
+            raise ValueError("provider execution result cannot start before request preparation")
         if self.request_sha256 != canonical_json_sha256(request_payload):
             raise ValueError("provider execution request digest must match the supplied request")
         if self.request_id != request.request_id:

@@ -196,7 +196,9 @@ def test_provider_execution_states_validate_in_model_registry_and_draft(
     schema_name: str, payload: dict[str, object]
 ) -> None:
     model = ProviderExecutionRequest if "request" in schema_name else ProviderExecutionResult
-    assert model.model_validate(payload).status == payload["status"]
+    instance = model.model_validate(payload)
+    assert instance.status == payload["status"]
+    assert model.model_validate(instance) == instance
     SchemaRegistry().validate(schema_name, payload)
     schema = SchemaRegistry().load(schema_name)
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload)) == []
@@ -223,14 +225,6 @@ def test_false_only_adapter_claims_are_required_at_all_boundaries(
     payload = factory()
     del payload[field]
     _assert_model_draft_and_registry_reject(payload)
-
-
-def test_provider_execution_models_revalidate_idempotently() -> None:
-    request = ProviderExecutionRequest.model_validate(_request())
-    result = ProviderExecutionResult.model_validate(_result())
-
-    assert ProviderExecutionRequest.model_validate(request) == request
-    assert ProviderExecutionResult.model_validate(result) == result
 
 
 @pytest.mark.parametrize(
@@ -531,8 +525,14 @@ def test_candidate_package_id_accepts_noncredential_boundaries(
         "records/tmp/provider.json",
         "evidence/C:/" + "Users/alice/provider.json",
         "evidence/$HOME/.config/provider.json",
+        "evidence/$home/.config/provider.json",
+        "evidence/${user}/provider.json",
+        "evidence/%userprofile%/provider.json",
         "records/$USER/provider.json",
         "evidence/root/.config/provider.json",
+        "~/.config/provider.json",
+        "evidence/private_" + "key=opaque.pem",
+        "evidence/-----BEGIN " + "PRIVATE " + "KEY-----.pem",
     ],
 )
 @pytest.mark.parametrize("target", ["request", "result", "blocker", "error"])
