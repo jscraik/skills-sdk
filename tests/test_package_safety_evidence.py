@@ -468,6 +468,50 @@ def test_extended_machine_paths_and_unicode_credential_spacing_fail_at_all_bound
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
+@pytest.mark.parametrize(
+    "unsafe_text",
+    [
+        "-----BEGIN " + "PRIVATE KEY----- synthetic",
+        "source at " + "\\" * 2 + "server" + "\\" + "share" + "\\" + "private" + "\\" + "skill.md",
+    ],
+)
+def test_public_safety_fields_reject_private_key_markers_and_unc_paths(unsafe_text: str) -> None:
+    payload = _payload("issue_found")
+    findings = payload["findings"]
+    assert isinstance(findings, list)
+    findings[0]["message"] = unsafe_text
+
+    with pytest.raises(ValidationError):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+@pytest.mark.parametrize("target", ["finding", "blocker"])
+def test_safety_codes_reject_surrounding_whitespace_at_all_boundaries(target: str) -> None:
+    payload = _payload("issue_found")
+    if target == "finding":
+        findings = payload["findings"]
+        assert isinstance(findings, list)
+        findings[0]["code"] = " unsafe_operation "
+    else:
+        blocker = payload["blocker"]
+        blockers = payload["blockers"]
+        assert isinstance(blocker, dict)
+        assert isinstance(blockers, list)
+        blocker["code"] = " issue_found "
+        blockers[0] = blocker
+
+    with pytest.raises(ValidationError, match="code must already be normalized"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
 def test_public_safety_fields_accept_non_file_urls_at_all_boundaries() -> None:
     payload = _payload("issue_found")
     findings = payload["findings"]

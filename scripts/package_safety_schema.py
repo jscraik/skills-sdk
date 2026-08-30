@@ -16,13 +16,14 @@ PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN = (
     r"(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|"
     r"[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|"
     r"[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|"
+    r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
     r"(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|"
     r"[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])"
     r"(?:[_-][A-Za-z0-9]+)*"
     r"[\s\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])"
 )
 MACHINE_PATH_SCHEMA_PATTERN = (
-    r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9/])/(?!/)|"
+    r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|"
     r"(?:^|/)(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|"
     r"[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|"
     r"[Rr][Oo][Oo][Tt])/|"

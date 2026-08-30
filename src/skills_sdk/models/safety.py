@@ -19,13 +19,14 @@ SafetyAdapterVersion = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A
 _CREDENTIAL_PREFIXES = ("aiza", "akia", "bearer", "ghp_", "github_pat_", "hf_", "sk-", "xoxb-", "xoxp-")
 _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
+    r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
     r"(?:api[_-]?key|credential|password|secret|token)"
     r"(?:[_-][A-Za-z0-9]+)*"
     r"[\s\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
     re.IGNORECASE | re.ASCII,
 )
 _MACHINE_PATH_PATTERN = re.compile(
-    r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9/])/(?!/)|"
+    r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|"
     r"(?:^|/)(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|"
     r"[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|"
     r"[Rr][Oo][Oo][Tt])/|"
@@ -106,6 +107,13 @@ class PackageSafetyFinding(_ContractModel):
             raise ValueError("safety finding text must not contain credential-shaped values")
         return value
 
+    @field_validator("code", mode="before")
+    @classmethod
+    def code_must_be_normalized(cls, value: object) -> object:
+        if isinstance(value, str) and value != value.strip():
+            raise ValueError("safety finding code must already be normalized")
+        return value
+
     @field_validator("evidence_ids")
     @classmethod
     def evidence_ids_must_be_unique(cls, values: tuple[str, ...]) -> tuple[str, ...]:
@@ -140,6 +148,13 @@ class PackageSafetyBlocker(_ContractModel):
     def public_text_must_be_redaction_safe(cls, value: object) -> object:
         if isinstance(value, str) and not _public_text_is_redaction_safe(value):
             raise ValueError("safety blocker text must not contain credential-shaped values")
+        return value
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def code_must_be_normalized(cls, value: object) -> object:
+        if isinstance(value, str) and value != value.strip():
+            raise ValueError("safety blocker code must already be normalized")
         return value
 
     @field_validator("evidence_refs")
