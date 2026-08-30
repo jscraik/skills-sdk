@@ -370,6 +370,8 @@ def test_credential_screening_uses_ascii_case_semantics_at_all_boundaries(
         ("message", "source at /" + "workspace/private.json"),
         ("message", "source at /" + "var/folders/cache/private.json"),
         ("message", "file:///" + "Users/alice/private/skill.md"),
+        ("message", "source at /" + "etc/hosts"),
+        ("message", "file:" + "/" * 3 + "opt/tool/config"),
         ("message", "source at /" + "users/alice/private/skill.md"),
         ("message", "source at /" + "HOME/alice/private/skill.md"),
         ("message", "password=hunter2"),
@@ -441,6 +443,18 @@ def test_extended_machine_paths_and_unicode_credential_spacing_fail_at_all_bound
     assert list(Draft202012Validator(schema).iter_errors(payload))
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_public_safety_fields_accept_non_file_urls_at_all_boundaries() -> None:
+    payload = _payload("issue_found")
+    findings = payload["findings"]
+    assert isinstance(findings, list)
+    findings[0]["message"] = "Reference https://example.test/safety-guidance"
+
+    PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert not list(Draft202012Validator(schema).iter_errors(payload))
+    SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
 def test_package_safety_contract_rejects_generic_safe_boolean() -> None:
