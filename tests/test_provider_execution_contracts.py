@@ -231,80 +231,64 @@ def test_provider_execution_models_revalidate_idempotently() -> None:
     assert ProviderExecutionResult.model_validate(result) == result
 
 
-@pytest.mark.parametrize("mismatch", ["receipt_id", "receipt_digest", "candidate"])
-def test_request_must_bind_the_supplied_safety_receipt(mismatch: str) -> None:
-    safety = _safety_receipt()
-    safety_payload = safety.model_dump(mode="json")
-    request_payload = _request()
-    request_payload["package_safety_receipt_sha256"] = canonical_json_sha256(safety_payload)
-    if mismatch == "receipt_id":
-        request_payload["package_safety_receipt_id"] = "package-safety-review-other"
-    elif mismatch == "receipt_digest":
-        request_payload["package_safety_receipt_sha256"] = "e" * 64
-    else:
-        request_payload["candidate"] = {**_candidate(), "content_sha256": "b" * 64}
-
-    request = ProviderExecutionRequest.model_validate(request_payload)
-    if mismatch:
-        with pytest.raises(ValueError, match=r"safety receipt|candidate"):
-            request.validate_against_package_safety_evidence(safety)
-        with pytest.raises(ContractError, match="package safety evidence binding"):
-            SchemaRegistry().validate_provider_execution_request_against_safety_evidence(
-                request_payload, safety_payload
-            )
-
-
-def test_request_accepts_the_exact_supplied_safety_receipt() -> None:
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        None,
+        lambda payload: payload.__setitem__("package_safety_receipt_id", "package-safety-review-other"),
+        lambda payload: payload.__setitem__("package_safety_receipt_sha256", "e" * 64),
+        lambda payload: payload.__setitem__("candidate", {**_candidate(), "content_sha256": "b" * 64}),
+    ],
+)
+def test_request_must_bind_the_supplied_safety_receipt(
+    mutate: Callable[[dict[str, object]], None] | None,
+) -> None:
     safety = _safety_receipt()
     safety_payload = safety.model_dump(mode="json")
     request_payload = _request()
     request_payload["package_safety_receipt_sha256"] = canonical_json_sha256(safety_payload)
     request = ProviderExecutionRequest.model_validate(request_payload)
-
-    assert request.validate_against_package_safety_evidence(safety) is request
-    SchemaRegistry().validate_provider_execution_request_against_safety_evidence(request_payload, safety_payload)
+    if mutate is None:
+        assert request.validate_against_package_safety_evidence(safety) is request
+        SchemaRegistry().validate_provider_execution_request_against_safety_evidence(request_payload, safety_payload)
+        return
+    mutate(request_payload)
+    request = ProviderExecutionRequest.model_validate(request_payload)
+    with pytest.raises(ValueError, match=r"safety receipt|candidate"):
+        request.validate_against_package_safety_evidence(safety)
+    with pytest.raises(ContractError, match="package safety evidence binding"):
+        SchemaRegistry().validate_provider_execution_request_against_safety_evidence(request_payload, safety_payload)
 
 
 @pytest.mark.parametrize(
-    "mismatch",
-    ["request_digest", "request_id", "idempotency", "candidate", "scenario", "case", "provider"],
+    "mutate",
+    [
+        None,
+        lambda payload: payload.__setitem__("request_sha256", "d" * 64),
+        lambda payload: payload.__setitem__("request_id", "request-other"),
+        lambda payload: payload.__setitem__("idempotency_key_sha256", "d" * 64),
+        lambda payload: payload.__setitem__("candidate", {**_candidate(), "content_sha256": "b" * 64}),
+        lambda payload: payload.__setitem__("scenario_set_id", "scenario-set-other"),
+        lambda payload: payload.__setitem__("case_id", "case-other"),
+        lambda payload: payload.__setitem__("provider", {**_provider(), "model_id": "provider/model-other"}),
+    ],
 )
-def test_result_must_bind_the_supplied_request(mismatch: str) -> None:
+def test_result_must_bind_the_supplied_request(mutate: Callable[[dict[str, object]], None] | None) -> None:
     request_payload = _request()
     result_payload = _result()
     result_payload["request_sha256"] = canonical_json_sha256(request_payload)
-    if mismatch == "request_digest":
-        result_payload["request_sha256"] = "d" * 64
-    elif mismatch == "request_id":
-        result_payload["request_id"] = "request-other"
-    elif mismatch == "idempotency":
-        result_payload["idempotency_key_sha256"] = "d" * 64
-    elif mismatch == "candidate":
-        result_payload["candidate"] = {**_candidate(), "content_sha256": "b" * 64}
-    elif mismatch == "scenario":
-        result_payload["scenario_set_id"] = "scenario-set-other"
-    elif mismatch == "case":
-        result_payload["case_id"] = "case-other"
-    else:
-        result_payload["provider"] = {**_provider(), "model_id": "provider/model-other"}
-
     result = ProviderExecutionResult.model_validate(result_payload)
     request = ProviderExecutionRequest.model_validate(request_payload)
+    if mutate is None:
+        assert result.validate_against_request(request) is result
+        SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
+        return
+    mutate(result_payload)
+    result = ProviderExecutionResult.model_validate(result_payload)
     with pytest.raises(ValueError, match=r"request|bindings|idempotency"):
         result.validate_against_request(request)
     with pytest.raises(ContractError, match="provider request binding"):
         SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
-
-
-def test_result_accepts_the_exact_supplied_request() -> None:
-    request_payload = _request()
-    result_payload = _result()
-    result_payload["request_sha256"] = canonical_json_sha256(request_payload)
-    result = ProviderExecutionResult.model_validate(result_payload)
-    request = ProviderExecutionRequest.model_validate(request_payload)
-
-    assert result.validate_against_request(request) is result
-    SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
 
 
 @pytest.mark.parametrize(
@@ -368,8 +352,32 @@ def test_replay_identity_and_digest_pair_is_accepted() -> None:
 
     assert ProviderExecutionResult.model_validate(payload).replay_of_result_id == "result-prior"
     SchemaRegistry().validate("provider-execution-result.v1", payload)
-    schema = SchemaRegistry().load("provider-execution-result.v1")
-    assert list(Draft202012Validator(schema).iter_errors(payload)) == []
+
+
+@pytest.mark.parametrize("mismatch", [None, "result_id", "result_digest"])
+def test_replay_provenance_must_bind_the_supplied_prior_result(mismatch: str | None) -> None:
+    prior_payload = _result()
+    payload = _result()
+    payload["result_id"] = "result-current"
+    payload["replay_of_result_id"] = prior_payload["result_id"]
+    payload["replay_of_result_sha256"] = canonical_json_sha256(prior_payload)
+    if mismatch is None:
+        result = ProviderExecutionResult.model_validate(payload)
+        prior = ProviderExecutionResult.model_validate(prior_payload)
+        assert result.validate_against_replayed_result(prior) is result
+        SchemaRegistry().validate_provider_execution_replay_against_prior_result(payload, prior_payload)
+        return
+    if mismatch == "result_id":
+        payload["replay_of_result_id"] = "result-other"
+    else:
+        payload["replay_of_result_sha256"] = "9" * 64
+
+    result = ProviderExecutionResult.model_validate(payload)
+    prior = ProviderExecutionResult.model_validate(prior_payload)
+    with pytest.raises(ValueError, match=r"replay result (?:id|digest)"):
+        result.validate_against_replayed_result(prior)
+    with pytest.raises(ContractError, match="replay provenance binding"):
+        SchemaRegistry().validate_provider_execution_replay_against_prior_result(payload, prior_payload)
 
 
 @pytest.mark.parametrize("retained_null", ["replay_of_result_id", "replay_of_result_sha256"])
@@ -441,6 +449,16 @@ def test_execution_identity_rejects_extended_credential_prefixes_at_all_boundari
 ) -> None:
     payload = factory()
     payload[field] = credential_shape
+    _assert_model_draft_and_registry_reject(payload)
+
+
+@pytest.mark.parametrize("factory", [_request, _result])
+def test_credential_labels_with_unicode_whitespace_are_rejected_at_all_boundaries(
+    factory: Callable[[], dict[str, object]],
+) -> None:
+    payload = factory()
+    payload["evidence_refs"] = ["evidence/token\N{NO-BREAK SPACE}=opaque-value.json"]
+
     _assert_model_draft_and_registry_reject(payload)
 
 
@@ -725,25 +743,21 @@ def test_semantic_validator_metadata_is_contract_specific() -> None:
     request_metadata = SchemaRegistry().load("provider-execution-request.v1")["x-skills-sdk-semantic-validator"]
     result_metadata = SchemaRegistry().load("provider-execution-result.v1")["x-skills-sdk-semantic-validator"]
 
-    assert request_metadata == {
-        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
-        "required_for": ["request status and blocker must agree"],
-        "external_inputs_required_for": [
-            "safety receipt identity, canonical digest, and candidate must match the supplied receipt"
-        ],
-    }
-    assert result_metadata == {
-        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
-        "required_for": [
-            "timestamps must be ordered",
-            "usage totals must match their components",
-            "a replay result cannot reference itself",
-        ],
-        "external_inputs_required_for": [
-            "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
-            "match the supplied request"
-        ],
-    }
+    assert request_metadata["entrypoint"] == result_metadata["entrypoint"]
+    assert request_metadata["required_for"] == ["request status and blocker must agree"]
+    assert request_metadata["external_inputs_required_for"] == [
+        "safety receipt identity, canonical digest, and candidate must match the supplied receipt"
+    ]
+    assert result_metadata["required_for"] == [
+        "timestamps must be ordered",
+        "usage totals must match their components",
+        "a replay result cannot reference itself",
+    ]
+    assert result_metadata["external_inputs_required_for"] == [
+        "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
+        "match the supplied request",
+        "replay identity and canonical digest must match the supplied prior result",
+    ]
 
 
 def test_request_and_result_contracts_are_not_generic_receipts() -> None:

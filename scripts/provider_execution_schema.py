@@ -165,7 +165,8 @@ def append_provider_execution_constraints(schema: dict[str, Any], filename: str)
             if filename == "provider-execution-request.v1.schema.json"
             else [
                 "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
-                "match the supplied request"
+                "match the supplied request",
+                "replay identity and canonical digest must match the supplied prior result",
             ]
         ),
     }

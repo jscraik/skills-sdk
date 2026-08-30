@@ -192,6 +192,28 @@ class SchemaRegistry:
                 tuple(str(item) for item in error.errors()) if isinstance(error, ValidationError) else (str(error),),
             ) from error
 
+    def validate_provider_execution_replay_against_prior_result(
+        self,
+        payload: object,
+        replayed_payload: object,
+    ) -> None:
+        """Validate replay provenance against one supplied prior result."""
+
+        self.validate("provider-execution-result.v1", payload)
+        self.validate("provider-execution-result.v1", replayed_payload)
+        try:
+            from skills_sdk.models.provider_execution import ProviderExecutionResult
+
+            result = ProviderExecutionResult.model_validate(payload)
+            replayed_result = ProviderExecutionResult.model_validate(replayed_payload)
+            result.validate_against_replayed_result(replayed_result)
+        except (ValidationError, ValueError) as error:
+            raise ContractError(
+                "contract_validation_failed",
+                "provider-execution-result.v1 rejected the replay provenance binding",
+                tuple(str(item) for item in error.errors()) if isinstance(error, ValidationError) else (str(error),),
+            ) from error
+
     @staticmethod
     def _validate_registered_model(name: str, payload: object) -> None:
         """Apply semantic invariants after structural schema validation."""

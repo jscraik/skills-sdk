@@ -23,7 +23,7 @@ _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH = 100
 _CREDENTIAL_PATTERN = re.compile(
     r"(?:^|[^A-Za-z0-9])(?:aiza|akia|bearer|ghp_|github_pat_|hf_|sk-|xoxb-|xoxp-|"
     r"(?:api[_-]?key|credential|password|secret|token)\s*[:=])",
-    re.IGNORECASE | re.ASCII,
+    re.IGNORECASE,
 )
 _MACHINE_PATH_PATTERN = re.compile(
     r"(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
@@ -450,6 +450,23 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
             request.provider,
         ):
             raise ValueError("provider execution result bindings must match the supplied request")
+        return self
+
+    def validate_against_replayed_result(
+        self,
+        replayed_result: ProviderExecutionResult,
+    ) -> ProviderExecutionResult:
+        """Require replay provenance to bind one supplied prior result."""
+
+        from skills_sdk.core.digests import canonical_json_sha256
+
+        if not isinstance(replayed_result, ProviderExecutionResult):
+            raise ValueError("provider replay provenance requires a prior provider execution result")
+        replayed_result = ProviderExecutionResult.model_validate(replayed_result.model_dump(mode="json"))
+        if self.replay_of_result_id != replayed_result.result_id:
+            raise ValueError("provider replay result id must match the supplied prior result")
+        if self.replay_of_result_sha256 != canonical_json_sha256(replayed_result.model_dump(mode="json")):
+            raise ValueError("provider replay result digest must match the supplied prior result")
         return self
 
 

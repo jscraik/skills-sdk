@@ -142,7 +142,9 @@ closed through `parse_receipt` and must be validated by model or
 `validate_provider_execution_request_against_safety_evidence` binds the safety
 receipt identity, canonical digest, and candidate, while
 `validate_provider_execution_result_against_request` binds the request digest
-and duplicated request/result identities. Standalone schema validation cannot
+and duplicated request/result identities, and
+`validate_provider_execution_replay_against_prior_result` binds optional replay
+provenance to the supplied prior result. Standalone schema validation cannot
 establish those external-object relations. `parse_receipt` accepts only explicitly registered
 receipt wire versions:
 `receipt-base/v1`, package receipt v1/v2, evaluation receipt v1/v2, and
