@@ -548,7 +548,6 @@
     },
     "schema_version": {
       "const": "package-safety-evidence/v1",
-      "default": "package-safety-evidence/v1",
       "title": "Schema Version",
       "type": "string"
     },
@@ -564,6 +563,7 @@
     }
   },
   "required": [
+    "schema_version",
     "receipt_id",
     "candidate",
     "lane",

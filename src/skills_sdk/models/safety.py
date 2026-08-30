@@ -157,7 +157,7 @@ class PackageSafetyBlocker(_ContractModel):
 class PackageSafetyEvidenceReceipt(_ContractModel):
     """One adapter-supplied package safety evidence state, never a safe boolean."""
 
-    schema_version: Literal["package-safety-evidence/v1"] = "package-safety-evidence/v1"
+    schema_version: Literal["package-safety-evidence/v1"]
     receipt_id: ReceiptId
     candidate: PackageCandidateIdentity
     lane: Literal["safety_review"]
@@ -177,8 +177,11 @@ class PackageSafetyEvidenceReceipt(_ContractModel):
     @field_validator("receipt_id", "input_receipt_id", mode="before")
     @classmethod
     def receipt_ids_must_be_redaction_safe(cls, value: object) -> object:
-        if isinstance(value, str) and not _public_text_is_redaction_safe(value):
-            raise ValueError("safety receipt identity must not contain credential-shaped values")
+        if isinstance(value, str):
+            if value != value.strip():
+                raise ValueError("safety receipt identity must already be normalized")
+            if not _public_text_is_redaction_safe(value):
+                raise ValueError("safety receipt identity must not contain credential-shaped values")
         return value
 
     @model_validator(mode="after")

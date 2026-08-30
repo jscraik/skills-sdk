@@ -494,6 +494,20 @@ def test_safety_receipt_requires_lane_at_all_boundaries() -> None:
         parse_receipt(payload)
 
 
+def test_safety_receipt_requires_schema_version_at_all_boundaries() -> None:
+    payload = _payload()
+    payload.pop("schema_version")
+
+    with pytest.raises(ValidationError):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+    with pytest.raises(ContractError, match="invalid_receipt_schema_version"):
+        parse_receipt(payload)
+
+
 def test_package_safety_contract_rejects_generic_safe_boolean() -> None:
     payload = _payload()
     payload["safe"] = True
@@ -510,6 +524,21 @@ def test_safety_receipt_ids_reject_credential_shapes_at_all_boundaries(field: st
     payload[field] = "ghp_secret_marker"
 
     with pytest.raises(ValidationError, match="credential-shaped"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        parse_receipt(payload)
+
+
+@pytest.mark.parametrize("field", ["receipt_id", "input_receipt_id"])
+def test_safety_receipt_ids_reject_surrounding_whitespace_at_all_boundaries(field: str) -> None:
+    payload = _payload()
+    payload[field] = f" {payload[field]} "
+
+    with pytest.raises(ValidationError, match="already be normalized"):
         PackageSafetyEvidenceReceipt.model_validate(payload)
     schema = SchemaRegistry().load("package-safety-evidence.v1")
     assert list(Draft202012Validator(schema).iter_errors(payload))
