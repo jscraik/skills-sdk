@@ -112,6 +112,35 @@ def test_safety_rejects_quoted_credential_keys_at_all_boundaries(value: str) -> 
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
+@pytest.mark.parametrize("value", ["AWS_ACCESS_KEY_ID=opaque-value", "access_key_id: opaque-value"])
+def test_safety_rejects_access_key_assignments_at_all_boundaries(value: str) -> None:
+    payload = _payload()
+    payload["status"] = "issue_found"
+    payload["findings"] = [
+        {
+            "code": "unsafe_operation",
+            "category": "secret",
+            "severity": "blocker",
+            "message": value,
+            "evidence_ids": ["review-report"],
+        }
+    ]
+    blocker = {
+        "code": "issue_found",
+        "message": "package safety issue found",
+        "evidence_refs": ["evidence/safety-review.json"],
+    }
+    payload["blocker"] = blocker
+    payload["blockers"] = [blocker]
+
+    with pytest.raises(ValidationError, match="credential-shaped"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
 def test_safety_rejects_control_whitespace_credential_keys_at_all_boundaries() -> None:
     payload = _payload()
     payload["status"] = "issue_found"
