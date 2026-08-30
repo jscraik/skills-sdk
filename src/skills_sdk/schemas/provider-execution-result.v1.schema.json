@@ -1,0 +1,745 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "ProviderExecutionBlocker": {
+      "additionalProperties": false,
+      "description": "Typed, secret-free reason that execution could not proceed.",
+      "properties": {
+        "category": {
+          "enum": [
+            "policy",
+            "safety",
+            "provider",
+            "adapter",
+            "transport",
+            "input",
+            "unknown"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+                }
+              },
+              {
+                "not": {
+                  "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+                }
+              }
+            ],
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "code",
+        "category"
+      ],
+      "title": "ProviderExecutionBlocker",
+      "type": "object"
+    },
+    "ProviderExecutionError": {
+      "additionalProperties": false,
+      "description": "Redacted adapter error classification with no raw provider response.",
+      "properties": {
+        "category": {
+          "enum": [
+            "provider",
+            "adapter",
+            "transport",
+            "timeout",
+            "policy",
+            "unknown"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+                }
+              },
+              {
+                "not": {
+                  "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+                }
+              }
+            ],
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "retryable",
+        "evidence_refs"
+      ],
+      "title": "ProviderExecutionError",
+      "type": "object"
+    },
+    "ProviderIdentityV2": {
+      "additionalProperties": false,
+      "description": "Hardened provider identity for provider-bearing v2 contracts.",
+      "properties": {
+        "adapter_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "adapter_version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Adapter Version Or Digest",
+          "type": "string"
+        },
+        "model_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+              }
+            }
+          ],
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*(?:/[A-Za-z0-9][A-Za-z0-9._:+-]*)*$",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "provider_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_kind": {
+          "enum": [
+            "llm",
+            "agent",
+            "external"
+          ],
+          "title": "Provider Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "provider-identity/v2",
+          "default": "provider-identity/v2",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Version Or Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "provider_kind",
+        "model_id",
+        "version_or_digest",
+        "adapter_id",
+        "adapter_version_or_digest"
+      ],
+      "title": "ProviderIdentityV2",
+      "type": "object"
+    },
+    "ProviderUsageMetadata": {
+      "additionalProperties": false,
+      "description": "Optional adapter-reported unit counts; never a billing or cost claim.",
+      "properties": {
+        "input_units": {
+          "minimum": 0,
+          "title": "Input Units",
+          "type": "integer"
+        },
+        "output_units": {
+          "minimum": 0,
+          "title": "Output Units",
+          "type": "integer"
+        },
+        "total_units": {
+          "minimum": 0,
+          "title": "Total Units",
+          "type": "integer"
+        },
+        "unit_kind": {
+          "enum": [
+            "tokens",
+            "characters",
+            "items",
+            "provider_units"
+          ],
+          "title": "Unit Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit_kind",
+        "input_units",
+        "output_units",
+        "total_units"
+      ],
+      "title": "ProviderUsageMetadata",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/provider-execution-result.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "replay_of_result_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "replay_of_result_id"
+        ]
+      },
+      "then": {
+        "properties": {
+          "replay_of_result_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "replay_of_result_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "replay_of_result_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "replay_of_result_sha256"
+        ]
+      },
+      "then": {
+        "properties": {
+          "replay_of_result_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "replay_of_result_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "error": {
+            "type": "null"
+          },
+          "evidence_refs": {
+            "minItems": 1
+          },
+          "output_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "output_sha256",
+          "evidence_refs"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "error": {
+            "$ref": "#/$defs/ProviderExecutionError"
+          },
+          "output_sha256": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "$ref": "#/$defs/ProviderExecutionBlocker"
+          },
+          "error": {
+            "type": "null"
+          },
+          "output_sha256": {
+            "type": "null"
+          },
+          "usage": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "blocker"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "indeterminate"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "error": {
+            "$ref": "#/$defs/ProviderExecutionError"
+          },
+          "output_sha256": {
+            "type": "null"
+          },
+          "usage": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    }
+  ],
+  "description": "Adapter-supplied execution observation; the SDK does not run a provider.",
+  "properties": {
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderExecutionBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "case_id": {
+      "allOf": [
+        {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+          }
+        },
+        {
+          "not": {
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Case Id",
+      "type": "string"
+    },
+    "cost_claimed": {
+      "const": false,
+      "default": false,
+      "title": "Cost Claimed",
+      "type": "boolean"
+    },
+    "credentials_retained": {
+      "const": false,
+      "default": false,
+      "title": "Credentials Retained",
+      "type": "boolean"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderExecutionError"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence_refs": {
+      "default": [],
+      "items": {
+        "allOf": [
+          {
+            "not": {
+              "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+            }
+          },
+          {
+            "not": {
+              "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+            }
+          }
+        ],
+        "minLength": 1,
+        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+        "type": "string"
+      },
+      "title": "Evidence Refs",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "idempotency_key_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Idempotency Key Sha256",
+      "type": "string"
+    },
+    "output_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Sha256"
+    },
+    "provider": {
+      "$ref": "#/$defs/ProviderIdentityV2"
+    },
+    "raw_payloads_retained": {
+      "const": false,
+      "default": false,
+      "title": "Raw Payloads Retained",
+      "type": "boolean"
+    },
+    "replay_of_result_id": {
+      "anyOf": [
+        {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replay Of Result Id"
+    },
+    "replay_of_result_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replay Of Result Sha256"
+    },
+    "request_id": {
+      "allOf": [
+        {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+          }
+        },
+        {
+          "not": {
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "request_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Request Sha256",
+      "type": "string"
+    },
+    "result_id": {
+      "allOf": [
+        {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+          }
+        },
+        {
+          "not": {
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Result Id",
+      "type": "string"
+    },
+    "scenario_set_id": {
+      "allOf": [
+        {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])\\s*[:=])"
+          }
+        },
+        {
+          "not": {
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "title": "Scenario Set Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "provider-execution-result/v1",
+      "default": "provider-execution-result/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sdk_execution_performed": {
+      "const": false,
+      "default": false,
+      "title": "Sdk Execution Performed",
+      "type": "boolean"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed",
+        "blocked",
+        "indeterminate"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderUsageMetadata"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "result_id",
+    "request_id",
+    "request_sha256",
+    "idempotency_key_sha256",
+    "candidate",
+    "scenario_set_id",
+    "case_id",
+    "provider",
+    "status",
+    "started_at",
+    "finished_at"
+  ],
+  "title": "ProviderExecutionResult",
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "timestamps must be ordered",
+      "usage totals must match their components",
+      "a replay result cannot reference itself"
+    ]
+  }
+}

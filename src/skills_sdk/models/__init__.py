@@ -61,6 +61,13 @@ from skills_sdk.models.packaging import (
     PackageReceiptV2,
 )
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
+from skills_sdk.models.provider_execution import (
+    ProviderExecutionBlocker,
+    ProviderExecutionError,
+    ProviderExecutionRequest,
+    ProviderExecutionResult,
+    ProviderUsageMetadata,
+)
 from skills_sdk.models.registry import (
     RegistryIdentity,
     RegistryPreparationBlocker,
@@ -117,8 +124,13 @@ __all__ = [
     "PackageSourceKind",
     "PackageType",
     "PluginIdentity",
+    "ProviderExecutionBlocker",
+    "ProviderExecutionError",
+    "ProviderExecutionRequest",
+    "ProviderExecutionResult",
     "ProviderIdentity",
     "ProviderIdentityV2",
+    "ProviderUsageMetadata",
     "RecommendedMechanism",
     "RegistryIdentity",
     "RegistryPreparationBlocker",

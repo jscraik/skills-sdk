@@ -9,20 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import package_safety_schema
+from provider_execution_schema import append_provider_execution_constraints
+from schema_model_groups import evaluation_schema_models, provider_execution_schema_models
 
-from skills_sdk.models.evaluation import (
-    EvaluationReceipt,
-    ScenarioCaseResult,
-    ScenarioObservation,
-    ScenarioSet,
-    ScorerProfile,
-)
-from skills_sdk.models.evaluation_v2 import (
-    EvaluationReceiptV2,
-    ScenarioCaseResultV2,
-    ScenarioObservationV2,
-    ScenarioSetV2,
-)
 from skills_sdk.models.inventory import (
     PackageInventory,
     PackageInventoryRecord,
@@ -736,6 +725,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_inventory_v2_constraints(schema, filename)
     elif filename == "registry-preparation.v1.schema.json":
         _append_registry_preparation_constraints(schema)
+    elif filename in {"provider-execution-request.v1.schema.json", "provider-execution-result.v1.schema.json"}:
+        append_provider_execution_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = f"https://schemas.skills-sdk.dev/{filename}"
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"
@@ -771,15 +762,8 @@ def main() -> int:
         (PackageSafetyEvidenceReceipt, "package-safety-evidence.v1.schema.json"),
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
-        (ScenarioSet, "scenario-set.v1.schema.json"),
-        (ScorerProfile, "scorer-profile.v1.schema.json"),
-        (ScenarioObservation, "scenario-observation.v1.schema.json"),
-        (ScenarioCaseResult, "scenario-case-result.v1.schema.json"),
-        (EvaluationReceipt, "evaluation-receipt.v1.schema.json"),
-        (ScenarioSetV2, "scenario-set.v2.schema.json"),
-        (ScenarioObservationV2, "scenario-observation.v2.schema.json"),
-        (ScenarioCaseResultV2, "scenario-case-result.v2.schema.json"),
-        (EvaluationReceiptV2, "evaluation-receipt.v2.schema.json"),
+        *evaluation_schema_models(),
+        *provider_execution_schema_models(),
         (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)

@@ -31,6 +31,11 @@ breaking contract change cannot remain compatible.
   The additive receipt binds an exact package candidate, package digest,
   adapter identity, and digest-only evidence without introducing a generic
   safety boolean or making rights, admission, runtime, or publication claims.
+- Add secret-free `provider-execution-request/v1` and
+  `provider-execution-result/v1` adapter envelopes with candidate, scenario,
+  provider-v2, idempotency, and digest bindings. The SDK supplies no provider
+  client, credential handling, network execution, billing, or generic receipt
+  interpretation for these contracts.
 - Package versioned JSON Schemas and a semantic `SchemaRegistry` validator.
 - Expose a boundary-only `skills-sdk` CLI with explicit lifecycle and Tessl
   preparation route names; no route publishes, installs, or mutates a runtime.

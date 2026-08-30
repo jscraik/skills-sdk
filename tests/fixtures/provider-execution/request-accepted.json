@@ -1,0 +1,36 @@
+{
+  "blocker": null,
+  "candidate": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "package_id": "synthetic-skill",
+    "schema_version": "package-candidate/v1",
+    "source_revision": "1111111111111111111111111111111111111111"
+  },
+  "case_id": "case-1",
+  "cost_claimed": false,
+  "credentials_included": false,
+  "declared_capability": "response_generation",
+  "evidence_refs": [
+    "evidence/request.json"
+  ],
+  "idempotency_key_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "input_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "package_safety_receipt_id": "package-safety-review-1234",
+  "package_safety_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "prepared_at": "2026-08-29T14:00:00Z",
+  "provider": {
+    "adapter_id": "synthetic-adapter",
+    "adapter_version_or_digest": "v1",
+    "model_id": "provider/model-v1",
+    "provider_id": "synthetic-provider",
+    "provider_kind": "external",
+    "schema_version": "provider-identity/v2",
+    "version_or_digest": "v1"
+  },
+  "provider_execution_performed": false,
+  "raw_payloads_included": false,
+  "request_id": "request-1234",
+  "scenario_set_id": "scenario-set-1",
+  "schema_version": "provider-execution-request/v1",
+  "status": "prepared"
+}

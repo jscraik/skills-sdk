@@ -118,6 +118,20 @@ Unknown future safety families fail closed. The contract contains no generic
 `safe` boolean and does not decide rights, admission, runtime behavior, or
 publication.
 
+`provider-execution-request/v1` and `provider-execution-result/v1` are
+additive, secret-free adapter-envelope contracts. They require
+`provider-identity/v2` and bind the exact candidate, scenario case, provider,
+and digest-only request or result evidence. A prepared request does not prove
+authorization or execution. A completed result is an adapter-supplied
+observation, not an evaluation pass, safety or quality decision, billing
+record, future availability claim, or general success statement. These
+families are deliberately absent from generic receipt dispatch, so older
+receipt payloads and unknown-family failure behavior remain unchanged.
+Optional non-null replay provenance requires the prior result ID and the
+SHA-256 of its complete canonical JSON envelope together; self-references fail semantic
+validation. Direct Draft validation enforces the all-or-none field shape, and
+`SchemaRegistry` applies the cross-field self-reference invariant.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,
