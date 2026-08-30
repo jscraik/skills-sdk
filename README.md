@@ -53,6 +53,11 @@ anything, mutate a runtime, or publish to a registry.
   manifest digest, and caller-supplied evidence into a deterministic
   `registry-preparation/v1` receipt. Preparation performs no publication,
   registry mutation, credential use, or network access.
+- A package-safety evidence contract that records whether an exact candidate
+  was not reviewed, reviewed with no observed issue, had an issue found, or
+  lacked sufficient metadata. Evidence references are portable and
+  digest-bound; the receipt never emits a generic `safe` boolean or decides
+  rights, admission, installation, runtime behavior, or publication.
 - Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
   names. The registry applies structural validation to those names and
   semantic invariants only for registered model families; other packaged
@@ -301,6 +306,7 @@ while the artifact type states which lane actually ran:
 | Risk and security    | Sensor coverage, redacted findings, and explicit pass/review/block states     | Provider or runtime security beyond the declared sensors     |
 | Manifest and receipt | Immutable candidate, files, digest, timestamps, and blockers                  | Distribution, installation, publication, or hosted readiness |
 | Registry preparation | Candidate-, hardening-, registry-, digest-, and evidence-bound local intent    | Registry acceptance, upload, version reservation, or publication |
+| Package safety evidence | Candidate-, package-digest-, reviewer-, finding-, and evidence-bound state | Rights, admission, runtime behavior, or a general safety guarantee |
 
 This separation is deliberate: local contract proof, hosted CI and review,
 provider or registry state, and installed behavior are different claims.

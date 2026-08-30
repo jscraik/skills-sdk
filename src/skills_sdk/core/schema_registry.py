@@ -30,6 +30,7 @@ SCHEMA_NAMES = frozenset(
         "package-hardening.v1",
         "package-receipt.v1",
         "package-receipt.v2",
+        "package-safety-evidence.v1",
         "receipt-base.v1",
         "risk-classification.v1",
         "security-screening.v1",
@@ -120,6 +121,30 @@ class SchemaRegistry:
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details)
         self._validate_registered_model(name, payload)
 
+    def validate_package_safety_evidence_against_package_receipt(
+        self,
+        payload: object,
+        package_receipt: object,
+    ) -> None:
+        """Validate safety evidence against one supplied package-receipt/v2 object."""
+
+        self.validate("package-safety-evidence.v1", payload)
+        if isinstance(package_receipt, Mapping):
+            self.validate("package-receipt.v2", package_receipt)
+        try:
+            from skills_sdk.models.packaging import PackageReceiptV2
+            from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
+
+            safety_receipt = PackageSafetyEvidenceReceipt.model_validate(payload)
+            upstream_receipt = PackageReceiptV2.model_validate(package_receipt)
+            safety_receipt.validate_against_package_receipt(upstream_receipt)
+        except (ValidationError, ValueError) as error:
+            raise ContractError(
+                "contract_validation_failed",
+                "package-safety-evidence.v1 rejected the upstream package receipt binding",
+                tuple(str(item) for item in error.errors()) if isinstance(error, ValidationError) else (str(error),),
+            ) from error
+
     @staticmethod
     def _validate_registered_model(name: str, payload: object) -> None:
         """Apply semantic invariants after structural schema validation."""
@@ -173,6 +198,10 @@ class SchemaRegistry:
             from skills_sdk.models.registry import RegistryPreparationRequest
 
             model = RegistryPreparationRequest
+        elif name == "package-safety-evidence.v1":
+            from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
+
+            model = PackageSafetyEvidenceReceipt
         elif name == "security-screening.v1":
             from skills_sdk.models.risk import SecurityScreeningResult
 

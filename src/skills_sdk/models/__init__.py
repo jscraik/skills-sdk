@@ -69,6 +69,13 @@ from skills_sdk.models.registry import (
     RegistryPreparationWarning,
 )
 from skills_sdk.models.risk import RiskClassification, RiskSensor, SecurityFinding, SecurityScreeningResult
+from skills_sdk.models.safety import (
+    PackageSafetyBlocker,
+    PackageSafetyEvidenceReceipt,
+    PackageSafetyEvidenceReference,
+    PackageSafetyFinding,
+    PackageSafetyReviewer,
+)
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 __all__ = [
@@ -101,6 +108,11 @@ __all__ = [
     "PackageReceipt",
     "PackageReceiptBlocker",
     "PackageReceiptV2",
+    "PackageSafetyBlocker",
+    "PackageSafetyEvidenceReceipt",
+    "PackageSafetyEvidenceReference",
+    "PackageSafetyFinding",
+    "PackageSafetyReviewer",
     "PackageSource",
     "PackageSourceKind",
     "PackageType",

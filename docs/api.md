@@ -61,6 +61,31 @@ package exports the inventory, risk, and evaluation contracts listed in its
   code/message text is replaced by a generic typed blocker and bound through
   `source_blocker_sha256`; safe source metadata and portable references remain
   readable.
+- **Package safety evidence:** `PackageSafetyEvidenceReceipt`,
+  `PackageSafetyEvidenceReference`, `PackageSafetyFinding`, and
+  `PackageSafetyBlocker`. The receipt binds one exact candidate and the
+  canonical manifest `package_digest` from its upstream `PackageReceiptV2` to
+  a caller-supplied reviewer adapter and one of four states. The manifest
+  digest and the candidate's source `content_sha256` identify different
+  artifacts and are intentionally not required to be equal:
+  `not_reviewed`, `reviewed_no_issue`, `issue_found`, or
+  `metadata_insufficient`. A reviewed-no-issue state requires digest-bound
+  evidence and forbids findings; issue-found requires evidence, a warning or
+  blocker finding, and typed blockers. Metadata-insufficient requires a typed
+  blocker but cannot claim an observed issue. There is no generic `safe`
+  field. Draft 2020-12 validates the structural state, shape, uniqueness, and
+  public-text constraints it can express. Cross-object evidence membership,
+  blocker-reference membership, and primary-blocker equality remain explicit
+  semantic invariants identified by schema metadata and enforced by
+  `SchemaRegistry.validate`. The contract validates supplied metadata and never
+  performs a review, rights decision, admission, provider call, installation,
+  runtime action, or publication. A raw safety payload cannot dereference its
+  opaque `input_receipt_id`; when a caller has the upstream
+  `PackageReceiptV2`, call
+  `SchemaRegistry.validate_package_safety_evidence_against_package_receipt`
+  to require matching receipt ID, candidate, and canonical manifest digest.
+  A raw upstream mapping is first validated through the `package-receipt/v2`
+  JSON boundary before that binding is applied.
 
 ## Schema validation
 
@@ -80,10 +105,11 @@ candidate = PackageCandidateIdentity(
 SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json", exclude={"schema_version"}))
 ```
 
-The schema registry accepts only known schema names and raises `ContractError` for an
+The schema registry accepts only known schema names and raises `ContractError`
+for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
-manifest, provider identity, private-registry preparation, receipt, risk,
-security, scenario, and scorer schemas. The registered
+manifest, provider identity, private-registry preparation, package-safety
+evidence, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake
@@ -97,11 +123,16 @@ packages, or publish to a registry.
 
 `parse_receipt` accepts only explicitly registered receipt wire versions:
 `receipt-base/v1`, package receipt v1/v2, evaluation receipt v1/v2, and
-`registry-preparation/v1`. A prepared registry artifact maps to the generic
+`registry-preparation/v1`, plus `package-safety-evidence/v1`. A prepared
+registry artifact maps to the generic
 `pass` status while preserving `artifact_status="prepared"`; a blocked artifact
 remains blocked. Parsing validates the versioned registry schema and does not
-reinterpret older receipt payloads. An
-unknown future or foreign `schema_version` fails with the typed
+reinterpret older receipt payloads. A reviewed-no-issue safety artifact maps
+to generic `pass`; the other three
+safety states map to generic `blocked` while remaining available through
+`artifact_status`. This mapping does not imply that an adapter ran or that a
+package is generally safe. An unknown future or foreign `schema_version`
+fails with the typed
 `unsupported_receipt_family` error instead of being interpreted through the
 generic base receipt schema. Missing or non-string versions fail with
 `invalid_receipt_schema_version`.

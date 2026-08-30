@@ -26,6 +26,11 @@ breaking contract change cannot remain compatible.
   service. The service composes package and hardening receipts without
   credentials, network access, registry mutation, or publication, and generic
   receipt parsing remains compatible with package and evaluation v1/v2.
+- Add `package-safety-evidence/v1` with explicit `not_reviewed`,
+  `reviewed_no_issue`, `issue_found`, and `metadata_insufficient` states.
+  The additive receipt binds an exact package candidate, package digest,
+  adapter identity, and digest-only evidence without introducing a generic
+  safety boolean or making rights, admission, runtime, or publication claims.
 - Package versioned JSON Schemas and a semantic `SchemaRegistry` validator.
 - Expose a boundary-only `skills-sdk` CLI with explicit lifecycle and Tessl
   preparation route names; no route publishes, installs, or mutates a runtime.

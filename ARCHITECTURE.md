@@ -31,6 +31,9 @@ operational contracts.
   `prepare_private_registry_candidate` in
   `src/skills_sdk/distribution/private_registry.py` and the versioned models
   under `src/skills_sdk/models/registry.py`.
+- Changing package-safety evidence: start with
+  `PackageSafetyEvidenceReceipt` in `src/skills_sdk/models/safety.py`; it
+  validates adapter-supplied evidence and does not run a scanner or review.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
@@ -91,6 +94,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
 | `src/skills_sdk/evaluation/` | Pure deterministic scoring over externally produced, candidate-bound observations; no prompt, provider, package, or runtime execution. | `evaluate_scenario_set` in `deterministic.py` |
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
+| `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
