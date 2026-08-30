@@ -392,6 +392,8 @@ def test_credential_screening_uses_ascii_case_semantics_at_all_boundaries(
         ("message", "file:///" + "Users/alice/private/skill.md"),
         ("message", "source at /" + "etc/hosts"),
         ("message", "file:" + "/" * 3 + "opt/tool/config"),
+        ("message", "source:" + "/mnt/ci/result.json"),
+        ("message", "path:" + "/srv/private/report"),
         ("message", "source at /" + "users/alice/private/skill.md"),
         ("message", "source at /" + "HOME/alice/private/skill.md"),
         ("message", "password=hunter2"),
