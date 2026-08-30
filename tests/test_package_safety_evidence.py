@@ -230,12 +230,14 @@ def test_safety_receipt_accepts_upstream_manifest_digest_distinct_from_source_id
     assert upstream_receipt.package_digest is not None
     assert upstream_receipt.package_digest != upstream_receipt.candidate.content_sha256
     payload["candidate"] = upstream_receipt.candidate.model_dump(mode="json")
+    payload["input_receipt_id"] = upstream_receipt.receipt_id
     payload["package_digest"] = upstream_receipt.package_digest
     schema = SchemaRegistry().load("package-safety-evidence.v1")
 
     assert not list(Draft202012Validator(schema).iter_errors(payload))
     receipt = PackageSafetyEvidenceReceipt.model_validate(payload)
     SchemaRegistry().validate("package-safety-evidence.v1", payload)
+    assert receipt.input_receipt_id == upstream_receipt.receipt_id
     assert receipt.package_digest == upstream_receipt.package_digest
 
 
@@ -450,6 +452,7 @@ def test_embedded_machine_paths_fail_in_model_draft_and_registry(target: str) ->
         "source at /" + "root/project/result.json",
         "AWS_" + "SE" + "CRET" + "_ACCESS_KEY=opaque-value",
         "token\u00a0=opaque-value",
+        "token\u0085=opaque-value",
     ],
 )
 def test_extended_machine_paths_and_unicode_credential_spacing_fail_at_all_boundaries(
@@ -489,6 +492,63 @@ def test_public_safety_fields_reject_private_key_markers_and_unc_paths(unsafe_te
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
+@pytest.mark.parametrize(
+    "unsafe_text",
+    [
+        "source at " + "\\" + "server\\share\\private\\skill.md",
+        "source at /etc/hosts",
+        "source at file:///opt/tool/config",
+    ],
+)
+def test_public_safety_fields_reject_rooted_host_paths_at_all_boundaries(unsafe_text: str) -> None:
+    payload = _payload("issue_found")
+    findings = payload["findings"]
+    assert isinstance(findings, list)
+    findings[0]["message"] = unsafe_text
+
+    with pytest.raises(ValidationError):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+@pytest.mark.parametrize("target", ["finding", "blocker"])
+def test_safety_messages_reject_whitespace_only_at_all_boundaries(target: str) -> None:
+    payload = _payload("issue_found")
+    if target == "finding":
+        findings = payload["findings"]
+        assert isinstance(findings, list)
+        findings[0]["message"] = " \t "
+    else:
+        blocker = payload["blocker"]
+        blockers = payload["blockers"]
+        assert isinstance(blocker, dict)
+        assert isinstance(blockers, list)
+        blocker["message"] = " \t "
+        blockers[0] = blocker
+
+    with pytest.raises(ValidationError):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+def test_safety_observed_at_requires_datetime_format_at_all_boundaries() -> None:
+    payload = _payload()
+    payload["observed_at"] = "not-a-datetime"
+
+    with pytest.raises(ValidationError):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
 @pytest.mark.parametrize("target", ["finding", "blocker"])
 def test_safety_codes_reject_surrounding_whitespace_at_all_boundaries(target: str) -> None:
     payload = _payload("issue_found")
@@ -509,6 +569,40 @@ def test_safety_codes_reject_surrounding_whitespace_at_all_boundaries(target: st
     schema = SchemaRegistry().load("package-safety-evidence.v1")
     assert list(Draft202012Validator(schema).iter_errors(payload))
     with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-safety-evidence.v1", payload)
+
+
+@pytest.mark.parametrize("target", ["reviewer", "evidence", "finding", "blocker", "receipt_id"])
+def test_public_safety_fields_reject_byte_strings_at_all_boundaries(target: str) -> None:
+    payload = _payload("issue_found")
+    unsafe_value = b"password=synthetic-value"
+    if target == "reviewer":
+        reviewer = payload["reviewer"]
+        assert isinstance(reviewer, dict)
+        reviewer["adapter_version_or_digest"] = unsafe_value
+    elif target == "evidence":
+        evidence = payload["evidence"]
+        assert isinstance(evidence, list)
+        evidence[0]["evidence_id"] = unsafe_value
+    elif target == "finding":
+        findings = payload["findings"]
+        assert isinstance(findings, list)
+        findings[0]["message"] = unsafe_value
+    elif target == "blocker":
+        blocker = payload["blocker"]
+        blockers = payload["blockers"]
+        assert isinstance(blocker, dict)
+        assert isinstance(blockers, list)
+        blocker["message"] = unsafe_value
+        blockers[0] = blocker
+    else:
+        payload["receipt_id"] = unsafe_value
+
+    with pytest.raises(ValidationError, match="must not coerce byte strings"):
+        PackageSafetyEvidenceReceipt.model_validate(payload)
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="invalid_json_value"):
         SchemaRegistry().validate("package-safety-evidence.v1", payload)
 
 
