@@ -687,7 +687,7 @@ def test_public_safety_fields_accept_non_file_urls_at_all_boundaries() -> None:
     payload = _payload("issue_found")
     findings = payload["findings"]
     assert isinstance(findings, list)
-    findings[0]["message"] = "Reference https://example.test/safety-guidance"
+    findings[0]["message"] = "Reference https://example.test/tmp/safety-guidance"
 
     PackageSafetyEvidenceReceipt.model_validate(payload)
     schema = SchemaRegistry().load("package-safety-evidence.v1")
