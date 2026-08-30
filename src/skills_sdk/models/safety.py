@@ -17,6 +17,8 @@ SafetyEvidenceId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-]
 SafetyAdapterId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._/-][a-z0-9]+)*$")]
 SafetyAdapterVersion = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$")]
 _CREDENTIAL_PREFIXES = ("aiza", "akia", "bearer", "ghp_", "github_pat_", "hf_", "sk-", "xoxb-", "xoxp-")
+_MAX_SAFETY_INPUT_NESTING_DEPTH = 100
+_RFC3339_DATETIME_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$")
 _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
     r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
@@ -38,7 +40,13 @@ def _public_text_is_redaction_safe(value: str) -> bool:
     return _PUBLIC_TEXT_CREDENTIAL_PATTERN.search(value) is None and _MACHINE_PATH_PATTERN.search(value) is None
 
 
-def _contains_byte_string(value: object, active_container_ids: set[int] | None = None) -> bool:
+def _contains_byte_string(
+    value: object,
+    active_container_ids: set[int] | None = None,
+    depth: int = 0,
+) -> bool:
+    if depth > _MAX_SAFETY_INPUT_NESTING_DEPTH:
+        raise ValueError("safety public fields exceed the maximum JSON nesting depth")
     if isinstance(value, (bytes, bytearray)):
         return True
     if isinstance(value, Mapping | list | tuple | set | frozenset):
@@ -49,7 +57,7 @@ def _contains_byte_string(value: object, active_container_ids: set[int] | None =
         active_container_ids.add(container_id)
         try:
             values = value.values() if isinstance(value, Mapping) else value
-            return any(_contains_byte_string(item, active_container_ids) for item in values)
+            return any(_contains_byte_string(item, active_container_ids, depth + 1) for item in values)
         finally:
             active_container_ids.remove(container_id)
     return False
@@ -229,6 +237,8 @@ class PackageSafetyEvidenceReceipt(_SafetyContractModel):
     @classmethod
     def observed_at_must_be_a_string(cls, value: object) -> object:
         if not isinstance(value, str):
+            raise ValueError("safety observed_at must be an RFC3339 string")
+        if _RFC3339_DATETIME_PATTERN.fullmatch(value) is None:
             raise ValueError("safety observed_at must be an RFC3339 string")
         return value
 
