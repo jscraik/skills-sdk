@@ -18,7 +18,7 @@
             },
             {
               "not": {
-                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
               }
             }
           ],
@@ -72,7 +72,7 @@
             },
             {
               "not": {
-                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+                "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
               }
             }
           ],
@@ -91,7 +91,7 @@
               },
               {
                 "not": {
-                  "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+                  "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
                 }
               }
             ],
@@ -266,7 +266,7 @@
         },
         {
           "not": {
-            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
           }
         }
       ],
@@ -306,7 +306,7 @@
           },
           {
             "not": {
-              "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+              "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
             }
           }
         ],
@@ -337,7 +337,7 @@
         },
         {
           "not": {
-            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
           }
         }
       ],
@@ -377,7 +377,7 @@
         },
         {
           "not": {
-            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
           }
         }
       ],
@@ -394,7 +394,7 @@
         },
         {
           "not": {
-            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]"
+            "pattern": "(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|[A-Za-z]:[\\\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\\\/]|(?:^|[\\\\/])(?:\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?|%(?:HOME|USER|USERPROFILE)%|[Rr][Oo][Oo][Tt])(?:[\\\\/]|$)"
           }
         }
       ],

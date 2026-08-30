@@ -29,7 +29,9 @@ _MACHINE_PATH_PATTERN = re.compile(
     r"(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
     r"[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|"
     r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|"
-    r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]"
+    r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]|"
+    r"(?:^|[\\/])(?:\$(?:\{)?(?:HOME|USER|USERPROFILE)(?:\})?|%(?:HOME|USER|USERPROFILE)%|"
+    r"[Rr][Oo][Oo][Tt])(?:[\\/]|$)"
 )
 
 
@@ -121,8 +123,10 @@ class ProviderExecutionBlocker(_ProviderExecutionContractModel):
     @field_validator("code", mode="before")
     @classmethod
     def code_must_be_redaction_safe(cls, value: object) -> object:
-        if isinstance(value, str) and not _identity_is_public(value):
-            raise ValueError("provider execution blocker code must not contain credential-shaped values")
+        if isinstance(value, str):
+            _require_normalized_text(value, "blocker code")
+            if not _identity_is_public(value):
+                raise ValueError("provider execution blocker code must not contain credential-shaped values")
         return value
 
     @field_validator("evidence_refs")
@@ -155,8 +159,10 @@ class ProviderExecutionError(_ProviderExecutionContractModel):
     @field_validator("code", mode="before")
     @classmethod
     def code_must_be_redaction_safe(cls, value: object) -> object:
-        if isinstance(value, str) and not _identity_is_public(value):
-            raise ValueError("provider execution error code must not contain credential-shaped values")
+        if isinstance(value, str):
+            _require_normalized_text(value, "error code")
+            if not _identity_is_public(value):
+                raise ValueError("provider execution error code must not contain credential-shaped values")
         return value
 
     @field_validator("evidence_refs")
@@ -311,7 +317,9 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
     schema_version: Literal["provider-execution-result/v1"] = "provider-execution-result/v1"
     result_id: ExecutionId
     request_id: ExecutionId
-    request_sha256: Sha256
+    request_sha256: Sha256 = Field(
+        description="SHA-256 of canonical JSON from the validated provider execution request model"
+    )
     idempotency_key_sha256: Sha256
     candidate: PackageCandidateIdentity
     scenario_set_id: ExecutionId
@@ -437,6 +445,8 @@ class ProviderExecutionResult(_ProviderExecutionContractModel):
             raise ValueError("provider execution result requires a provider execution request")
         request = ProviderExecutionRequest.model_validate(request.model_dump(mode="json"))
         request_payload = request.model_dump(mode="json")
+        if request.status == "blocked" and self.status != "blocked":
+            raise ValueError("blocked provider execution request requires a blocked result")
         if self.request_sha256 != canonical_json_sha256(request_payload):
             raise ValueError("provider execution request digest must match the supplied request")
         if self.request_id != request.request_id:

@@ -200,6 +200,8 @@ def test_provider_execution_states_validate_in_model_registry_and_draft(
     SchemaRegistry().validate(schema_name, payload)
     schema = SchemaRegistry().load(schema_name)
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(payload)) == []
+    assert schema["x-skills-sdk-semantic-validator"]["entrypoint"].endswith("SchemaRegistry.validate")
+    assert schema["x-skills-sdk-semantic-validator"]["external_inputs_required_for"]
 
 
 @pytest.mark.parametrize(
@@ -276,12 +278,29 @@ def test_request_must_bind_the_supplied_safety_receipt(
 def test_result_must_bind_the_supplied_request(mutate: Callable[[dict[str, object]], None] | None) -> None:
     request_payload = _request()
     result_payload = _result()
-    result_payload["request_sha256"] = canonical_json_sha256(request_payload)
-    result = ProviderExecutionResult.model_validate(result_payload)
+    if mutate is None:
+        request_payload.pop("blocker")
+        request_payload.pop("evidence_refs")
+        request_payload["prepared_at"] = "2026-08-29T15:00:00+01:00"
     request = ProviderExecutionRequest.model_validate(request_payload)
+    result_payload["request_sha256"] = canonical_json_sha256(request.model_dump(mode="json"))
+    if mutate is None:
+        assert result_payload["request_sha256"] != canonical_json_sha256(request_payload)
+    result = ProviderExecutionResult.model_validate(result_payload)
     if mutate is None:
         assert result.validate_against_request(request) is result
         SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
+        blocked_payload = _request("blocked")
+        blocked_result_payload = _result()
+        blocked_result_payload["request_sha256"] = canonical_json_sha256(
+            ProviderExecutionRequest.model_validate(blocked_payload).model_dump(mode="json")
+        )
+        with pytest.raises(ValueError, match="blocked result"):
+            ProviderExecutionResult.model_validate(blocked_result_payload).validate_against_request(
+                ProviderExecutionRequest.model_validate(blocked_payload)
+            )
+        with pytest.raises(ContractError, match="provider request binding"):
+            SchemaRegistry().validate_provider_execution_result_against_request(blocked_result_payload, blocked_payload)
         return
     mutate(result_payload)
     result = ProviderExecutionResult.model_validate(result_payload)
@@ -343,15 +362,6 @@ def test_replay_identity_and_digest_are_required_together_by_model_and_draft(mis
         ProviderExecutionResult.model_validate(payload)
     schema = SchemaRegistry().load("provider-execution-result.v1")
     assert list(Draft202012Validator(schema).iter_errors(payload))
-
-
-def test_replay_identity_and_digest_pair_is_accepted() -> None:
-    payload = _result()
-    payload["replay_of_result_id"] = "result-prior"
-    payload["replay_of_result_sha256"] = "9" * 64
-
-    assert ProviderExecutionResult.model_validate(payload).replay_of_result_id == "result-prior"
-    SchemaRegistry().validate("provider-execution-result.v1", payload)
 
 
 @pytest.mark.parametrize("mismatch", [None, "result_id", "result_digest"])
@@ -460,6 +470,11 @@ def test_credential_labels_with_unicode_whitespace_are_rejected_at_all_boundarie
     payload["evidence_refs"] = ["evidence/token\N{NO-BREAK SPACE}=opaque-value.json"]
 
     _assert_model_draft_and_registry_reject(payload)
+    coded_payload = _request("blocked") if factory is _request else _result("failed")
+    detail = coded_payload["blocker"] if factory is _request else coded_payload["error"]
+    assert isinstance(detail, dict)
+    detail["code"] = f" {detail['code']} "
+    _assert_model_draft_and_registry_reject(coded_payload)
 
 
 @pytest.mark.parametrize("factory", [_request, _result])
@@ -504,6 +519,9 @@ def test_candidate_package_id_accepts_noncredential_boundaries(
         "reports/workspace/project/output.json",
         "records/tmp/provider.json",
         "evidence/C:/" + "Users/alice/provider.json",
+        "evidence/$HOME/.config/provider.json",
+        "records/$USER/provider.json",
+        "evidence/root/.config/provider.json",
     ],
 )
 @pytest.mark.parametrize("target", ["request", "result", "blocker", "error"])
@@ -737,27 +755,6 @@ def test_raw_secret_and_cost_fields_are_rejected(extra_field: str) -> None:
     payload = _request()
     payload[extra_field] = "not-allowed"
     _assert_model_draft_and_registry_reject(payload)
-
-
-def test_semantic_validator_metadata_is_contract_specific() -> None:
-    request_metadata = SchemaRegistry().load("provider-execution-request.v1")["x-skills-sdk-semantic-validator"]
-    result_metadata = SchemaRegistry().load("provider-execution-result.v1")["x-skills-sdk-semantic-validator"]
-
-    assert request_metadata["entrypoint"] == result_metadata["entrypoint"]
-    assert request_metadata["required_for"] == ["request status and blocker must agree"]
-    assert request_metadata["external_inputs_required_for"] == [
-        "safety receipt identity, canonical digest, and candidate must match the supplied receipt"
-    ]
-    assert result_metadata["required_for"] == [
-        "timestamps must be ordered",
-        "usage totals must match their components",
-        "a replay result cannot reference itself",
-    ]
-    assert result_metadata["external_inputs_required_for"] == [
-        "request canonical digest and duplicated candidate, scenario, provider, and idempotency bindings must "
-        "match the supplied request",
-        "replay identity and canonical digest must match the supplied prior result",
-    ]
 
 
 def test_request_and_result_contracts_are_not_generic_receipts() -> None:

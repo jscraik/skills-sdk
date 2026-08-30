@@ -15,7 +15,9 @@ _MACHINE_PATH_PATTERN = (
     r"(?:[fF][iI][lL][eE]:)?/+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
     r"[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|"
     r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS])/|"
-    r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]"
+    r"[A-Za-z]:[\\/]+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE])[\\/]|"
+    r"(?:^|[\\/])(?:\$(?:\{)?(?:HOME|USER|USERPROFILE)(?:\})?|%(?:HOME|USER|USERPROFILE)%|"
+    r"[Rr][Oo][Oo][Tt])(?:[\\/]|$)"
 )
 
 
