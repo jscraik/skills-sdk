@@ -86,6 +86,25 @@ package exports the inventory, risk, and evaluation contracts listed in its
   to require matching receipt ID, candidate, and canonical manifest digest.
   A raw upstream mapping is first validated through the `package-receipt/v2`
   JSON boundary before that binding is applied.
+- **Provider execution envelopes:** `ProviderExecutionRequest` records a
+  candidate-, scenario-, provider-, safety-receipt-, and input-digest-bound
+  request prepared for an external adapter. `ProviderExecutionResult` records
+  that adapter's `completed`, `failed`, `blocked`, or `indeterminate`
+  observation with output or evidence digests and typed blockers or errors.
+  Both contracts require `ProviderIdentityV2`, reject raw payload and
+  credential fields, and carry literal-false execution/privacy/cost claims.
+  A prepared request must bind supplied `reviewed_no_issue` package-safety
+  evidence; other safety states cannot authorize preparation. A bound result
+  cannot start before its request was prepared. These cross-envelope relations
+  require the supplied receipt or request and are enforced by the named
+  `SchemaRegistry` binding methods rather than standalone Draft validation.
+  Optional usage metadata is an adapter-reported unit count, not billing or
+  cost evidence. The SDK validates these envelopes but does not authorize or
+  perform provider execution, contact a network, read credentials, evaluate an
+  output, or establish provider truth. Replay provenance is optional, but when
+  non-null it binds both the prior result ID and the SHA-256 of that prior
+  result's complete canonical JSON envelope (UTF-8, keys sorted, compact
+  separators). A result cannot reference itself as its replay source.
 
 ## Schema validation
 
@@ -108,8 +127,8 @@ SchemaRegistry().validate("package-identity.v1", candidate.model_dump(mode="json
 The schema registry accepts only known schema names and raises `ContractError`
 for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
-manifest, provider identity, private-registry preparation, package-safety
-evidence, receipt, risk, security, scenario, and scorer schemas. The registered
+manifest, provider identity, provider execution, private-registry preparation,
+package-safety evidence, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake
@@ -121,7 +140,22 @@ corresponding Pydantic model explicitly (for example,
 Validation is read-only: it does not write receipts, contact providers, install
 packages, or publish to a registry.
 
-`parse_receipt` accepts only explicitly registered receipt wire versions:
+`ProviderExecutionRequest` and `ProviderExecutionResult` are registered schema
+families, not generic receipts. Their `schema_version` values therefore fail
+closed through `parse_receipt` and must be validated by model or
+`SchemaRegistry` name. Cross-envelope claims require the supplied objects:
+`validate_provider_execution_request_against_safety_evidence` binds the safety
+receipt identity, canonical digest, and candidate, while
+`validate_provider_execution_result_against_request` binds the request digest
+and duplicated request/result identities, and
+`validate_provider_execution_replay_against_prior_result` binds optional replay
+provenance to the supplied prior result. Standalone schema validation cannot
+establish those external-object relations. Cross-envelope digests use canonical
+JSON from the fully validated model's `model_dump(mode="json")`; they do not
+hash an adapter's non-canonical input spelling, omitted defaults, or timestamp
+offset representation. Replay digests apply that same rule to the validated
+prior result model. `parse_receipt` accepts only explicitly registered
+receipt wire versions:
 `receipt-base/v1`, package receipt v1/v2, evaluation receipt v1/v2, and
 `registry-preparation/v1`, plus `package-safety-evidence/v1`. A prepared
 registry artifact maps to the generic

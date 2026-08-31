@@ -38,6 +38,8 @@ SCHEMA_NAMES = frozenset(
         "evaluation-receipt.v2",
         "provider-identity.v1",
         "provider-identity.v2",
+        "provider-execution-request.v1",
+        "provider-execution-result.v1",
         "registry-identity.v1",
         "registry-preparation.v1",
         "registry-preparation-request.v1",
@@ -145,6 +147,73 @@ class SchemaRegistry:
                 tuple(str(item) for item in error.errors()) if isinstance(error, ValidationError) else (str(error),),
             ) from error
 
+    def validate_provider_execution_request_against_safety_evidence(
+        self,
+        payload: object,
+        safety_receipt: object,
+    ) -> None:
+        """Validate one provider request against its supplied safety receipt."""
+
+        self.validate("provider-execution-request.v1", payload)
+        self.validate("package-safety-evidence.v1", safety_receipt)
+        try:
+            from skills_sdk.models.provider_execution import ProviderExecutionRequest
+            from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
+
+            request = ProviderExecutionRequest.model_validate(payload)
+            safety = PackageSafetyEvidenceReceipt.model_validate(safety_receipt)
+            request.validate_against_package_safety_evidence(safety)
+        except (ValidationError, ValueError) as error:
+            raise ContractError(
+                "contract_validation_failed",
+                "provider-execution-request.v1 rejected the package safety evidence binding",
+                tuple(str(item) for item in error.errors()) if isinstance(error, ValidationError) else (str(error),),
+            ) from error
+
+    def validate_provider_execution_result_against_request(
+        self,
+        payload: object,
+        request_payload: object,
+    ) -> None:
+        """Validate one provider result against its supplied execution request."""
+
+        self.validate("provider-execution-result.v1", payload)
+        self.validate("provider-execution-request.v1", request_payload)
+        try:
+            from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
+
+            result = ProviderExecutionResult.model_validate(payload)
+            request = ProviderExecutionRequest.model_validate(request_payload)
+            result.validate_against_request(request)
+        except (ValidationError, ValueError) as error:
+            raise ContractError(
+                "contract_validation_failed",
+                "provider-execution-result.v1 rejected the provider request binding",
+                tuple(str(item) for item in error.errors()) if isinstance(error, ValidationError) else (str(error),),
+            ) from error
+
+    def validate_provider_execution_replay_against_prior_result(
+        self,
+        payload: object,
+        replayed_payload: object,
+    ) -> None:
+        """Validate replay provenance against one supplied prior result."""
+
+        self.validate("provider-execution-result.v1", payload)
+        self.validate("provider-execution-result.v1", replayed_payload)
+        try:
+            from skills_sdk.models.provider_execution import ProviderExecutionResult
+
+            result = ProviderExecutionResult.model_validate(payload)
+            replayed_result = ProviderExecutionResult.model_validate(replayed_payload)
+            result.validate_against_replayed_result(replayed_result)
+        except (ValidationError, ValueError) as error:
+            raise ContractError(
+                "contract_validation_failed",
+                "provider-execution-result.v1 rejected the replay provenance binding",
+                tuple(str(item) for item in error.errors()) if isinstance(error, ValidationError) else (str(error),),
+            ) from error
+
     @staticmethod
     def _validate_registered_model(name: str, payload: object) -> None:
         """Apply semantic invariants after structural schema validation."""
@@ -186,6 +255,14 @@ class SchemaRegistry:
             from skills_sdk.models.provider import ProviderIdentityV2
 
             model = ProviderIdentityV2
+        elif name == "provider-execution-request.v1":
+            from skills_sdk.models.provider_execution import ProviderExecutionRequest
+
+            model = ProviderExecutionRequest
+        elif name == "provider-execution-result.v1":
+            from skills_sdk.models.provider_execution import ProviderExecutionResult
+
+            model = ProviderExecutionResult
         elif name == "registry-identity.v1":
             from skills_sdk.models.registry import RegistryIdentity
 

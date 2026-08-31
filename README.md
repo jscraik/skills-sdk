@@ -58,6 +58,10 @@ anything, mutate a runtime, or publish to a registry.
   lacked sufficient metadata. Evidence references are portable and
   digest-bound; the receipt never emits a generic `safe` boolean or decides
   rights, admission, installation, runtime behavior, or publication.
+- Secret-free provider execution request and result envelopes for external
+  adapters. They bind one candidate, scenario case, provider identity, input or
+  output digests, and typed outcomes without carrying prompts, outputs,
+  credentials, costs, or a provider client.
 - Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
   names. The registry applies structural validation to those names and
   semantic invariants only for registered model families; other packaged
