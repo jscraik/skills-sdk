@@ -1,8 +1,8 @@
 # Python API
 
 The public API is the typed contract layer under `skills_sdk`. The top-level
-package exports the inventory, risk, and evaluation contracts listed in its
-`__all__`. Import family-specific contracts such as
+package exports the inventory, risk, evaluation, and provider execution
+contracts listed in its `__all__`. Import family-specific contracts such as
 `PackageCandidateIdentity`, `PackageManifest`, `PackageReceipt`,
 `PackageReceiptV2`, and
 `PackageHardeningReceipt` from
