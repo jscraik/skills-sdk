@@ -17,6 +17,7 @@ from skills_sdk.models.evaluation_v2 import (
     ScenarioObservationV2,
     ScenarioSetV2,
 )
+from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
 
 
@@ -45,4 +46,10 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
     )
 
 
-__all__ = ["evaluation_schema_models", "provider_execution_schema_models"]
+def runtime_lifecycle_schema_models() -> tuple[tuple[type[Any], str], ...]:
+    """Return intended runtime state and non-mutating planning schemas."""
+
+    return ((RuntimeLock, "runtime-lock.v1.schema.json"), (InstallPlan, "install-plan.v1.schema.json"))
+
+
+__all__ = ["evaluation_schema_models", "provider_execution_schema_models", "runtime_lifecycle_schema_models"]

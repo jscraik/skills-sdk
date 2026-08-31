@@ -34,6 +34,7 @@ from skills_sdk.models.inventory import (
     ValueDecision,
     ValueDecisionV2,
 )
+from skills_sdk.models.lifecycle import InstallPlan, RuntimeFile, RuntimeLock, RuntimeLockEntry, RuntimeTarget
 from skills_sdk.models.package import (
     IntakeChecks,
     IntakeDecision,
@@ -89,6 +90,7 @@ __all__ = [
     "EvaluationReceipt",
     "EvaluationReceiptV2",
     "FormatChecks",
+    "InstallPlan",
     "IntakeChecks",
     "IntakeDecision",
     "IntakeDecisionStatus",
@@ -141,6 +143,10 @@ __all__ = [
     "RiskClass",
     "RiskClassification",
     "RiskSensor",
+    "RuntimeFile",
+    "RuntimeLock",
+    "RuntimeLockEntry",
+    "RuntimeTarget",
     "RuntimeVisibility",
     "ScenarioCase",
     "ScenarioCaseResult",

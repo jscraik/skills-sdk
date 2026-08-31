@@ -37,6 +37,7 @@ MACHINE_PATH_SCHEMA_PATTERN = (
     r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|"
     r"(?:^|[^A-Za-z0-9])[A-Za-z]:"
 )
+RFC3339_DATETIME_SCHEMA_PATTERN = r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$"
 
 
 def append_package_safety_identity_constraints(
@@ -91,6 +92,7 @@ def append_package_safety_constraints(schema: dict[str, Any]) -> None:
     """Project JSON-Schema-expressible package safety state invariants."""
 
     properties = schema["properties"]
+    properties["observed_at"]["pattern"] = RFC3339_DATETIME_SCHEMA_PATTERN
     for field in ("evidence", "findings", "blockers"):
         properties[field]["uniqueItems"] = True
     schema["$defs"]["PackageSafetyFinding"]["properties"]["evidence_ids"]["uniqueItems"] = True
@@ -185,6 +187,7 @@ def append_package_safety_schema_constraints(schema: dict[str, Any], filename: s
 __all__ = [
     "MACHINE_PATH_SCHEMA_PATTERN",
     "PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN",
+    "RFC3339_DATETIME_SCHEMA_PATTERN",
     "SchemaModel",
     "append_package_safety_constraints",
     "append_package_safety_identity_constraints",

@@ -9,6 +9,12 @@ receipt data; inventory, intake, evaluation, risk, and security are
 caller-populated contract lanes. The core remains independent of a host
 repository, provider account, runtime installation, or registry.
 
+The Python API can deterministically prepare an intended runtime-lock
+transition with `plan_runtime_install`. The plan is portable and
+mutation-free: it does not resolve host paths, write a lock, install files,
+execute rollback, or prove discovery, activation, or runtime behavior. Those
+operations belong to a future host adapter and separate evidence contracts.
+
 > Thin Surfaces. Strong Guardrails. Progressive Disclosure. Durable Memory.
 > Professional Output.
 

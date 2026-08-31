@@ -1,0 +1,270 @@
+{
+  "$comment": "Validate cross-field lifecycle invariants with skills_sdk.core.schema_registry.SchemaRegistry.validate.",
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "RegistryIdentity": {
+      "additionalProperties": false,
+      "description": "Opaque, secret-free identity for one private registry namespace.",
+      "properties": {
+        "namespace": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Namespace",
+          "type": "string"
+        },
+        "registry_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Registry Id",
+          "type": "string"
+        },
+        "registry_kind": {
+          "const": "private",
+          "default": "private",
+          "title": "Registry Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "registry-identity/v1",
+          "default": "registry-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "registry_id",
+        "namespace"
+      ],
+      "title": "RegistryIdentity",
+      "type": "object"
+    },
+    "RuntimeFile": {
+      "additionalProperties": false,
+      "description": "Expected package-relative file identity in an intended projection.",
+      "properties": {
+        "path": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "title": "RuntimeFile",
+      "type": "object"
+    },
+    "RuntimeLockEntry": {
+      "additionalProperties": false,
+      "description": "One candidate-bound intended runtime package entry.",
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/RuntimeFile"
+          },
+          "minItems": 1,
+          "title": "Files",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "package_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Package Digest",
+          "type": "string"
+        },
+        "package_name": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Name",
+          "type": "string"
+        },
+        "package_receipt_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Receipt Id",
+          "type": "string"
+        },
+        "registry": {
+          "$ref": "#/$defs/RegistryIdentity"
+        },
+        "registry_preparation_receipt_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Registry Preparation Receipt Id",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/RuntimeTarget"
+        },
+        "version": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_name",
+        "version",
+        "candidate",
+        "package_digest",
+        "registry",
+        "package_receipt_id",
+        "registry_preparation_receipt_id",
+        "target",
+        "files"
+      ],
+      "title": "RuntimeLockEntry",
+      "type": "object"
+    },
+    "RuntimeTarget": {
+      "additionalProperties": false,
+      "description": "Logical destination resolved only by a future host adapter.",
+      "properties": {
+        "scope": {
+          "enum": [
+            "user",
+            "project"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "target_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Target Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "target_id"
+      ],
+      "title": "RuntimeTarget",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/runtime-lock.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Portable intended runtime state; a future host adapter owns persistence.",
+  "properties": {
+    "entries": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RuntimeLockEntry"
+      },
+      "title": "Entries",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema_version": {
+      "const": "runtime-lock/v1",
+      "default": "runtime-lock/v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "title": "RuntimeLock",
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "package name must match candidate package_id",
+      "runtime entries must be unique by logical target and package",
+      "runtime file paths must be unique within an entry"
+    ]
+  }
+}

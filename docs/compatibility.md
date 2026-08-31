@@ -132,6 +132,13 @@ SHA-256 of its complete canonical JSON envelope together; self-references fail s
 validation. Direct Draft validation enforces the all-or-none field shape, and
 `SchemaRegistry` applies the cross-field self-reference invariant.
 
+`runtime-lock/v1` and `install-plan/v1` are additive schema families. They are
+registered for structural and Pydantic semantic validation but are not generic
+receipts: generic receipt parsing must not reinterpret intended runtime state
+or a non-mutating plan as evidence that installation occurred. Later host
+adapter apply, rollback, discovery, activation, and outcome families must use
+new explicit schema versions rather than changing these v1 meanings.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,
