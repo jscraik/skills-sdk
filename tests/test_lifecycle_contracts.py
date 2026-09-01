@@ -85,6 +85,15 @@ def test_runtime_contracts_are_exported_and_registered() -> None:
     SchemaRegistry().validate("install-plan.v1", _planned_payload())
 
 
+def test_generated_lifecycle_schemas_declare_candidate_file_digest_semantics() -> None:
+    registry = SchemaRegistry()
+    lock_requirements = registry.load("runtime-lock.v1")["x-skills-sdk-semantic-validator"]["required_for"]
+    plan_requirements = registry.load("install-plan.v1")["x-skills-sdk-semantic-validator"]["required_for"]
+
+    assert "candidate content digest must match the runtime file inventory" in lock_requirements
+    assert "candidate content digest must match the proposed runtime file inventory" in plan_requirements
+
+
 @pytest.mark.parametrize(
     "removed", ["candidate", "package_digest", "operation", "proposed_lock_sha256", "proposed_entry"]
 )

@@ -57,6 +57,7 @@ def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) 
         schema["properties"]["entries"]["uniqueItems"] = True
         required_for = [
             "package name must match candidate package_id",
+            "candidate content digest must match the runtime file inventory",
             "runtime entries must be unique by logical target and package",
             "runtime file paths must be unique within an entry",
         ]
@@ -100,6 +101,7 @@ def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) 
             "plan id must bind the complete emitted plan identity",
             "no-change operations must preserve the current lock digest",
             "install and update operations must change the current lock digest",
+            "candidate content digest must match the proposed runtime file inventory",
             "runtime file paths must be unique within the proposed entry",
         ]
     schema["$comment"] = (

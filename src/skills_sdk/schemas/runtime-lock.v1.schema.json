@@ -287,6 +287,7 @@
     "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
     "required_for": [
       "package name must match candidate package_id",
+      "candidate content digest must match the runtime file inventory",
       "runtime entries must be unique by logical target and package",
       "runtime file paths must be unique within an entry"
     ]
