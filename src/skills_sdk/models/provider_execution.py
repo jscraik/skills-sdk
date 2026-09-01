@@ -8,6 +8,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import PortablePath, Sha256, _ContractModel
@@ -67,7 +68,11 @@ def _normalize_json_input(
     if depth > _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH:
         raise ValueError("provider execution input exceeds the maximum JSON nesting depth")
     if isinstance(value, BaseModel):
-        return _normalize_json_input(value.model_dump(mode="json"), active_container_ids, depth + 1)
+        try:
+            serialized = value.model_dump(mode="json", warnings="error")
+        except PydanticSerializationError as error:
+            raise ValueError("provider execution nested model contains invalid field values") from error
+        return _normalize_json_input(serialized, active_container_ids, depth + 1)
     if value is None or isinstance(value, (str, bool, int)):
         return value
     if isinstance(value, float):

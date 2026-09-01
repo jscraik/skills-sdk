@@ -711,6 +711,7 @@ def test_forged_provider_model_is_revalidated() -> None:
     _assert_forged_nested_model_rejected(payload, "provider", "provider-execution-request.v1", ProviderExecutionRequest)
 
 
+@pytest.mark.filterwarnings("error")
 def test_forged_usage_model_is_revalidated() -> None:
     payload = _result()
     payload["usage"] = ProviderUsageMetadata.model_construct(
@@ -729,6 +730,7 @@ def test_forged_blocker_model_is_revalidated() -> None:
     _assert_forged_nested_model_rejected(payload, "blocker", "provider-execution-request.v1", ProviderExecutionRequest)
 
 
+@pytest.mark.filterwarnings("error")
 def test_forged_error_model_is_revalidated() -> None:
     payload = _result("failed")
     payload["error"] = ProviderExecutionError.model_construct(
