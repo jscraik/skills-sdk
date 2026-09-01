@@ -52,9 +52,9 @@ def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) 
     """Apply Draft-expressible state rules and document semantic checks."""
 
     _append_public_text_constraints(schema)
+    schema["$defs"]["RuntimeLockEntry"]["properties"]["files"]["uniqueItems"] = True
     if filename == "runtime-lock.v1.schema.json":
         schema["properties"]["entries"]["uniqueItems"] = True
-        schema["$defs"]["RuntimeLockEntry"]["properties"]["files"]["uniqueItems"] = True
         required_for = [
             "package name must match candidate package_id",
             "runtime entries must be unique by logical target and package",
@@ -100,6 +100,7 @@ def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) 
             "plan id must bind the complete emitted plan identity",
             "no-change operations must preserve the current lock digest",
             "install and update operations must change the current lock digest",
+            "runtime file paths must be unique within the proposed entry",
         ]
     schema["$comment"] = (
         "Validate cross-field lifecycle invariants with skills_sdk.core.schema_registry.SchemaRegistry.validate."

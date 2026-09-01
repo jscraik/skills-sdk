@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Final, Protocol
 
 
 class SchemaModel(Protocol):
@@ -37,7 +37,11 @@ MACHINE_PATH_SCHEMA_PATTERN = (
     r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|"
     r"(?:^|[^A-Za-z0-9])[A-Za-z]:"
 )
-RFC3339_DATETIME_SCHEMA_PATTERN = r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$"
+RFC3339_DATETIME_SCHEMA_PATTERN: Final[str] = (
+    r"^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])[Tt]"
+    r"(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?"
+    r"(?:[Zz]|[+-](?:[01]\d|2[0-3]):[0-5]\d)$"
+)
 
 
 def append_package_safety_identity_constraints(

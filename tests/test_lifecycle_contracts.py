@@ -1,15 +1,24 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 
 import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
+from scripts.package_safety_schema import MACHINE_PATH_SCHEMA_PATTERN, PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models.lifecycle import InstallPlan, RuntimeFile, RuntimeLock, RuntimeLockEntry, RuntimeTarget
+from skills_sdk.models.lifecycle import (
+    InstallPlan,
+    RuntimeFile,
+    RuntimeLock,
+    RuntimeLockEntry,
+    RuntimeTarget,
+    lifecycle_text_is_public_safe,
+)
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.registry import RegistryIdentity, RegistryPreparationBlocker
 
@@ -162,6 +171,55 @@ def test_runtime_lock_rejects_duplicate_entries_and_files_across_boundaries() ->
     entry_payload["files"].append(deepcopy(entry_payload["files"][0]))
     with pytest.raises(ValidationError, match="file paths must be unique"):
         RuntimeLockEntry.model_validate(entry_payload)
+
+    plan_payload = _planned_payload()
+    proposed_entry = plan_payload["proposed_entry"]
+    assert isinstance(proposed_entry, dict)
+    proposed_files = proposed_entry["files"]
+    assert isinstance(proposed_files, list)
+    proposed_files.append(deepcopy(proposed_files[0]))
+    _bind_plan_id(plan_payload)
+    with pytest.raises(ValidationError, match="file paths must be unique"):
+        InstallPlan.model_validate(plan_payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("install-plan.v1", plan_payload)
+    assert list(Draft202012Validator(SchemaRegistry().load("install-plan.v1")).iter_errors(plan_payload))
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "runtime-package-v1",
+        "evidence/review.json",
+        "sk-live-secret",
+        "token=plainvalue",
+        "/" + "Users/alice/runtime.json",
+        "C" + ":\\Users\\alice\\runtime.json",
+    ],
+)
+def test_model_and_schema_public_text_patterns_remain_in_parity(value: str) -> None:
+    schema_safe = (
+        re.search(PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN, value) is None
+        and re.search(MACHINE_PATH_SCHEMA_PATTERN, value) is None
+    )
+    assert lifecycle_text_is_public_safe(value) is schema_safe
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    [
+        "2026-13-01T09:00:00Z",
+        "2026-08-32T09:00:00Z",
+        "2026-08-29T24:00:00Z",
+        "2026-08-29T09:60:00Z",
+        "2026-08-29T09:00:60Z",
+        "2026-08-29T09:00:00+24:00",
+    ],
+)
+def test_direct_draft_rejects_out_of_range_rfc3339_components(observed_at: str) -> None:
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    observed_at_schema = schema["properties"]["observed_at"]
+    assert list(Draft202012Validator(observed_at_schema).iter_errors(observed_at))
 
 
 @pytest.mark.parametrize(

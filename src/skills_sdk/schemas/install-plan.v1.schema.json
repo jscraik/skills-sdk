@@ -224,7 +224,8 @@
           },
           "minItems": 1,
           "title": "Files",
-          "type": "array"
+          "type": "array",
+          "uniqueItems": true
         },
         "package_digest": {
           "pattern": "^[0-9a-f]{64}$",
@@ -695,7 +696,8 @@
       "plan and entry must bind the same package and registry preparation receipts",
       "plan id must bind the complete emitted plan identity",
       "no-change operations must preserve the current lock digest",
-      "install and update operations must change the current lock digest"
+      "install and update operations must change the current lock digest",
+      "runtime file paths must be unique within the proposed entry"
     ]
   }
 }
