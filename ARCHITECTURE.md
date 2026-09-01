@@ -145,10 +145,11 @@ docstrings and the linked API or CLI guides.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The repository's dependency direction is
-  `CLI -> validation/packaging/evaluation/distribution/lifecycle -> models/core`;
-  provider clients, host-runtime adapters, registry clients, and publication
-  adapters remain external boundaries.
+- The executable command path is `CLI -> validation/packaging -> models/core`.
+  The Python API services follow
+  `evaluation/distribution/lifecycle -> models/core`; the reserved CLI routes
+  do not invoke them. Provider clients, host-runtime adapters, registry
+  clients, and publication adapters remain external boundaries.
 
 ## Architectural invariants
 
