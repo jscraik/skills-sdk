@@ -92,6 +92,63 @@ def test_schema_registry_applies_cross_field_plan_invariants() -> None:
         SchemaRegistry().validate("install-plan.v1", payload)
 
 
+def test_no_change_operation_requires_identical_lock_digests() -> None:
+    payload = _planned_payload()
+    payload["operation"] = "no_change"
+    _bind_plan_id(payload)
+
+    with pytest.raises(ValidationError, match="identical current and proposed"):
+        InstallPlan.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("install-plan.v1", payload)
+
+
+def test_install_operation_requires_distinct_lock_digests() -> None:
+    payload = _planned_payload()
+    payload["proposed_lock_sha256"] = payload["current_lock_sha256"]
+    _bind_plan_id(payload)
+
+    with pytest.raises(ValidationError, match="distinct current and proposed"):
+        InstallPlan.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("install-plan.v1", payload)
+
+
+@pytest.mark.parametrize(
+    ("model_name", "field", "unsafe_value"),
+    [
+        ("runtime-lock", "package_receipt_id", "sk-live-secret"),
+        ("runtime-lock", "registry_preparation_receipt_id", "ghp_leaked-token"),
+        ("install-plan", "package_receipt_id", "sk-live-secret"),
+        ("install-plan", "registry_preparation_receipt_id", "ghp_leaked-token"),
+        ("install-plan", "registry_input_receipt_id", "sk-live-secret"),
+    ],
+)
+def test_receipt_ids_reject_credential_shapes_across_boundaries(
+    model_name: str,
+    field: str,
+    unsafe_value: str,
+) -> None:
+    if model_name == "runtime-lock":
+        entry = _entry().model_dump(mode="json")
+        entry[field] = unsafe_value
+        payload = {"schema_version": "runtime-lock/v1", "entries": [entry]}
+        with pytest.raises(ValidationError, match="receipt identity"):
+            RuntimeLock.model_validate(payload)
+        schema_name = "runtime-lock.v1"
+    else:
+        payload = _planned_payload()
+        payload[field] = unsafe_value
+        _bind_plan_id(payload)
+        with pytest.raises(ValidationError, match="receipt identity"):
+            InstallPlan.model_validate(payload)
+        schema_name = "install-plan.v1"
+
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate(schema_name, payload)
+    assert list(Draft202012Validator(SchemaRegistry().load(schema_name)).iter_errors(payload))
+
+
 def test_runtime_lock_rejects_duplicate_entries_and_files_across_boundaries() -> None:
     lock_payload = RuntimeLock(entries=(_entry(),)).model_dump(mode="json")
     lock_payload["entries"].append(deepcopy(lock_payload["entries"][0]))

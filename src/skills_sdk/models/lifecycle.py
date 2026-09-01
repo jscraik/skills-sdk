@@ -101,6 +101,11 @@ class RuntimeLockEntry(_ContractModel):
     def package_identity_must_be_public_safe(cls, value: str) -> str:
         return _require_public_text(value, "runtime package identity")
 
+    @field_validator("package_receipt_id", "registry_preparation_receipt_id")
+    @classmethod
+    def receipt_identity_must_be_public_safe(cls, value: str) -> str:
+        return _require_public_text(value, "runtime receipt identity")
+
     @model_validator(mode="after")
     def identity_and_files_are_consistent(self) -> RuntimeLockEntry:
         if self.package_name != self.candidate.package_id:
@@ -153,6 +158,15 @@ class InstallPlan(_ContractModel):
     @classmethod
     def package_identity_must_be_public_safe(cls, value: str) -> str:
         return _require_public_text(value, "install plan package identity")
+
+    @field_validator(
+        "package_receipt_id",
+        "registry_preparation_receipt_id",
+        "registry_input_receipt_id",
+    )
+    @classmethod
+    def receipt_identity_must_be_public_safe(cls, value: str) -> str:
+        return _require_public_text(value, "install plan receipt identity")
 
     @field_validator("evidence")
     @classmethod
@@ -230,6 +244,10 @@ class InstallPlan(_ContractModel):
             raise ValueError("install plan and runtime entry must bind the same registry")
         if self.blocker is not None:
             raise ValueError("planned install cannot contain a blocker")
+        if self.operation == "no_change" and self.current_lock_sha256 != self.proposed_lock_sha256:
+            raise ValueError("no-change install plan requires identical current and proposed lock identities")
+        if self.operation in {"install", "update"} and self.current_lock_sha256 == self.proposed_lock_sha256:
+            raise ValueError("install or update plan requires distinct current and proposed lock identities")
 
 
 __all__ = [

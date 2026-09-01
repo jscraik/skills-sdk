@@ -25,6 +25,8 @@ def _append_public_text_constraints(schema: Any) -> None:
         elif title == "RuntimeLockEntry":
             for field in ("package_name", "version"):
                 properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
+            for field in ("package_receipt_id", "registry_preparation_receipt_id"):
+                properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
         elif title == "RegistryPreparationBlocker":
             properties["code"].setdefault("allOf", []).extend(_safe_text_constraints())
             properties["message"].setdefault("allOf", []).extend(_safe_text_constraints())
@@ -32,6 +34,12 @@ def _append_public_text_constraints(schema: Any) -> None:
         elif title == "InstallPlan":
             properties["evidence"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
             for field in ("package_name", "version"):
+                properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
+            for field in (
+                "package_receipt_id",
+                "registry_preparation_receipt_id",
+                "registry_input_receipt_id",
+            ):
                 properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
         for value in schema.values():
             _append_public_text_constraints(value)
@@ -90,6 +98,8 @@ def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) 
             "plan and entry must bind the same package name and version",
             "plan and entry must bind the same package and registry preparation receipts",
             "plan id must bind the complete emitted plan identity",
+            "no-change operations must preserve the current lock digest",
+            "install and update operations must change the current lock digest",
         ]
     schema["$comment"] = (
         "Validate cross-field lifecycle invariants with skills_sdk.core.schema_registry.SchemaRegistry.validate."

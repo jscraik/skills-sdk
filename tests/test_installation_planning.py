@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from skills_sdk.distribution import prepare_private_registry_candidate
 from skills_sdk.lifecycle import plan_runtime_install
 from skills_sdk.models.lifecycle import RuntimeLock, RuntimeTarget
@@ -113,6 +116,14 @@ def test_registry_blocker_with_unsafe_code_is_replaced_by_portable_blocker() -> 
     assert plan.status == "blocked"
     assert plan.blocker is not None
     assert plan.blocker.code == "installation_registry_blocker_not_portable"
+
+
+def test_planner_rejects_credential_shaped_persisted_receipt_identity() -> None:
+    package_receipt = _package_receipt().model_copy(update={"receipt_id": "sk-live-secret"})
+    registry_receipt = _registry_receipt(_package_receipt()).model_copy(update={"input_receipt_id": "sk-live-secret"})
+
+    with pytest.raises(ValidationError, match="receipt identity"):
+        _plan(package_receipt, registry_receipt, RuntimeLock())
 
 
 def test_planner_has_no_host_or_external_dependencies() -> None:
