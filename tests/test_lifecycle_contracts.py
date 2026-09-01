@@ -4,7 +4,7 @@ import re
 from copy import deepcopy
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 from pydantic import ValidationError
 
 from scripts.package_safety_schema import MACHINE_PATH_SCHEMA_PATTERN, PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN
@@ -220,6 +220,24 @@ def test_direct_draft_rejects_out_of_range_rfc3339_components(observed_at: str) 
     schema = SchemaRegistry().load("package-safety-evidence.v1")
     observed_at_schema = schema["properties"]["observed_at"]
     assert list(Draft202012Validator(observed_at_schema).iter_errors(observed_at))
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    [
+        "2026-02-30T09:00:00Z",
+        "2025-02-29T09:00:00Z",
+    ],
+)
+def test_direct_draft_format_checker_rejects_impossible_calendar_dates(observed_at: str) -> None:
+    schema = SchemaRegistry().load("package-safety-evidence.v1")
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    payload = {
+        "schema_version": "package-safety-evidence/v1",
+        "observed_at": observed_at,
+    }
+    errors = list(validator.iter_errors(payload))
+    assert any(error.validator == "format" and list(error.path) == ["observed_at"] for error in errors)
 
 
 @pytest.mark.parametrize(

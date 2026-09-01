@@ -148,7 +148,9 @@ they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake
 schemas are not registered with
 `SchemaRegistry`; when those families need structural validation, load their
-packaged JSON Schema resource with a Draft 2020-12 validator, then call the
+packaged JSON Schema resource with a Draft 2020-12 validator configured with
+`jsonschema.FormatChecker()` so `date-time` and other declared formats are
+asserted, then call the
 corresponding Pydantic model explicitly (for example,
 `PackageInventoryRecord.model_validate(payload)` for an inventory record).
 Validation is read-only: it does not write receipts, contact providers, install
