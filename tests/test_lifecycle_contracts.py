@@ -8,7 +8,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from pydantic import ValidationError
 
 from scripts.package_safety_schema import MACHINE_PATH_SCHEMA_PATTERN, PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN
-from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.lifecycle import (
@@ -24,18 +24,21 @@ from skills_sdk.models.registry import RegistryIdentity, RegistryPreparationBloc
 
 
 def _entry() -> RuntimeLockEntry:
+    files = (RuntimeFile(path="SKILL.md", sha256="c" * 64),)
     return RuntimeLockEntry(
         package_name="synthetic-skill",
         version="0.1.0",
         candidate=PackageCandidateIdentity(
-            package_id="synthetic-skill", source_revision="1" * 40, content_sha256="a" * 64
+            package_id="synthetic-skill",
+            source_revision="1" * 40,
+            content_sha256=candidate_content_sha256(files),
         ),
         package_digest="b" * 64,
         registry=RegistryIdentity(registry_id="private-registry", namespace="team"),
         package_receipt_id="package-receipt-1234",
         registry_preparation_receipt_id="registry-preparation-1234",
         target=RuntimeTarget(scope="project", target_id="project-runtime"),
-        files=(RuntimeFile(path="SKILL.md", sha256="c" * 64),),
+        files=files,
     )
 
 
@@ -184,6 +187,24 @@ def test_runtime_lock_rejects_duplicate_entries_and_files_across_boundaries() ->
     with pytest.raises(ContractError):
         SchemaRegistry().validate("install-plan.v1", plan_payload)
     assert list(Draft202012Validator(SchemaRegistry().load("install-plan.v1")).iter_errors(plan_payload))
+
+
+def test_runtime_lock_rejects_forged_file_inventory_across_model_and_registry() -> None:
+    payload = RuntimeLock(entries=(_entry(),)).model_dump(mode="json")
+    payload["entries"][0]["files"][0]["sha256"] = "f" * 64
+
+    with pytest.raises(ValidationError, match="candidate digest must match runtime files"):
+        RuntimeLock.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("runtime-lock.v1", payload)
+
+    plan_payload = _planned_payload()
+    plan_payload["proposed_entry"]["files"][0]["sha256"] = "f" * 64
+    _bind_plan_id(plan_payload)
+    with pytest.raises(ValidationError, match="candidate digest must match runtime files"):
+        InstallPlan.model_validate(plan_payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("install-plan.v1", plan_payload)
 
 
 @pytest.mark.parametrize(

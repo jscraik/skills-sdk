@@ -38,11 +38,15 @@ def _blocked_plan(
     blocker: RegistryPreparationBlocker,
 ) -> InstallPlan:
     current_digest = _lock_digest(current_lock)
+    candidate = package_receipt.candidate
+    package_name = candidate.package_id if candidate is not None else registry_receipt.package_name
+    version = package_receipt.manifest.version if package_receipt.manifest is not None else registry_receipt.version
+    package_digest = package_receipt.package_digest if package_receipt.status == "built" else None
     identity = {
-        "candidate": registry_receipt.candidate.model_dump(mode="json") if registry_receipt.candidate else None,
-        "package_name": registry_receipt.package_name,
-        "version": registry_receipt.version,
-        "package_digest": package_receipt.package_digest,
+        "candidate": candidate.model_dump(mode="json") if candidate else None,
+        "package_name": package_name,
+        "version": version,
+        "package_digest": package_digest,
         "package_receipt_id": package_receipt.receipt_id,
         "registry": registry_receipt.registry.model_dump(mode="json"),
         "registry_preparation_receipt_id": registry_receipt.receipt_id,
@@ -56,10 +60,10 @@ def _blocked_plan(
     }
     return InstallPlan(
         plan_id=_plan_id(identity),
-        candidate=registry_receipt.candidate,
-        package_name=registry_receipt.package_name,
-        version=registry_receipt.version,
-        package_digest=package_receipt.package_digest,
+        candidate=candidate,
+        package_name=package_name,
+        version=version,
+        package_digest=package_digest,
         package_receipt_id=package_receipt.receipt_id,
         status="blocked",
         target=target,

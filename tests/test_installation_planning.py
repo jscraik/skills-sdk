@@ -71,7 +71,9 @@ def test_install_plan_preserves_entry_order_and_reports_no_change() -> None:
     initial = _plan(package_receipt, registry_receipt, RuntimeLock())
     assert initial.proposed_entry is not None
     other_candidate = PackageCandidateIdentity(
-        package_id="other-skill", source_revision="4" * 40, content_sha256="e" * 64
+        package_id="other-skill",
+        source_revision="4" * 40,
+        content_sha256=initial.proposed_entry.candidate.content_sha256,
     )
     other_entry = initial.proposed_entry.model_copy(
         update={"package_name": "other-skill", "candidate": other_candidate}
@@ -116,6 +118,35 @@ def test_registry_blocker_with_unsafe_code_is_replaced_by_portable_blocker() -> 
     assert plan.status == "blocked"
     assert plan.blocker is not None
     assert plan.blocker.code == "installation_registry_blocker_not_portable"
+
+
+def test_blocked_plan_projects_resolved_package_identity_not_registry_fields() -> None:
+    package_receipt = _package_receipt()
+    blocker = RegistryPreparationBlocker(code="registry_policy_blocked", message="Blocked by policy")
+    unrelated_candidate = PackageCandidateIdentity(
+        package_id="other-skill", source_revision="4" * 40, content_sha256="e" * 64
+    )
+    registry_receipt = _registry_receipt(package_receipt).model_copy(
+        update={
+            "status": "blocked",
+            "candidate": unrelated_candidate,
+            "package_name": "other-skill",
+            "version": "9.9.9",
+            "package_digest": None,
+            "manifest_digest": None,
+            "hardening_receipt_sha256": None,
+            "blocker": blocker,
+            "blockers": (blocker,),
+        }
+    )
+
+    plan = _plan(package_receipt, registry_receipt, RuntimeLock())
+
+    assert plan.status == "blocked"
+    assert plan.candidate == package_receipt.candidate
+    assert plan.package_name == package_receipt.candidate.package_id
+    assert plan.version == package_receipt.manifest.version
+    assert plan.package_digest == package_receipt.package_digest
 
 
 def test_planner_rejects_credential_shaped_persisted_receipt_identity() -> None:

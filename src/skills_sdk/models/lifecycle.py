@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
-from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
@@ -113,6 +113,8 @@ class RuntimeLockEntry(_ContractModel):
         paths = tuple(item.path for item in self.files)
         if len(paths) != len(set(paths)):
             raise ValueError("runtime lock file paths must be unique")
+        if candidate_content_sha256(self.files) != self.candidate.content_sha256:
+            raise ValueError("runtime lock candidate digest must match runtime files")
         return self
 
 
@@ -187,6 +189,8 @@ class InstallPlan(_ContractModel):
             raise ValueError("blocked install plan cannot claim a proposed transition")
         elif self.blocker is None:
             raise ValueError("blocked install plan requires a blocker")
+        elif self.candidate is not None and self.package_name != self.candidate.package_id:
+            raise ValueError("blocked install plan package name must match candidate package_id")
         elif (
             not lifecycle_text_is_public_safe(self.blocker.code)
             or not lifecycle_text_is_public_safe(self.blocker.message)
