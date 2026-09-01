@@ -5,8 +5,10 @@ Agent Skills packages. It defines versioned contract models for caller-provided
 inventory, intake, evaluation, risk, and security data, and consumes package
 source only through read-only validation and, after a resolved identity and a
 passing validation, build candidate-bound manifest and receipt records.
-Provider execution, runtime projection, distribution, and publication remain
-outside the core package.
+The package also defines secret-free provider execution envelopes, prepares
+local private-registry receipts, and plans intended runtime-lock transitions.
+Provider calls, host apply or rollback, registry interaction, and publication
+remain outside the core package.
 
 This is a map of the stable seams that help a contributor decide where a
 change belongs. It is intentionally shorter than the implementation
@@ -34,6 +36,14 @@ operational contracts.
 - Changing package-safety evidence: start with
   `PackageSafetyEvidenceReceipt` in `src/skills_sdk/models/safety.py`; it
   validates adapter-supplied evidence and does not run a scanner or review.
+- Changing provider execution envelopes: start with
+  `ProviderExecutionRequest` and `ProviderExecutionResult` in
+  `src/skills_sdk/models/provider_execution.py`; external adapters still own
+  provider calls, credentials, and provider-result truth.
+- Changing runtime-lock planning: follow `plan_runtime_install` in
+  `src/skills_sdk/lifecycle/planning.py` and the versioned models in
+  `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
+  rollback, discovery, activation, and runtime-outcome evidence.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
@@ -71,8 +81,14 @@ Local candidate-bound proof
     +--> distribution/private_registry.py
     |    (local receipt composition only; no registry interaction)
     |
-    +--> provider, runtime, and publication adapters
-         (separate external lanes)
+    +--> models/provider_execution.py
+    |    (secret-free adapter envelopes only; no provider call)
+    |
+    +--> lifecycle/planning.py
+    |    (intended runtime-lock transition only; no host mutation)
+    |
+    +--> provider, host-runtime, registry, and publication adapters
+         (separate external action and evidence lanes)
 ```
 
 The CLI is an outer adapter over the implemented local services. `validate`
@@ -120,6 +136,9 @@ docstrings and the linked API or CLI guides.
   identity contracts into a local preparation receipt. It does not contain a
   registry client, credential boundary, filesystem writer, or publication
   operation.
+- `lifecycle` composes package and registry receipts with an existing logical
+  runtime lock to produce a deterministic intended transition. It does not
+  inspect a host, resolve installation paths, apply files, or execute rollback.
 - `cli` is the outermost process adapter. It imports the implemented services
   lazily, prints their versioned results, and maps a blocked result to the
   documented exit status.
@@ -127,8 +146,9 @@ docstrings and the linked API or CLI guides.
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
 - The repository's dependency direction is
-  `CLI -> validation/packaging/evaluation/distribution -> models/core`;
-  provider, runtime, and publication adapters remain external boundaries.
+  `CLI -> validation/packaging/evaluation/distribution/lifecycle -> models/core`;
+  provider clients, host-runtime adapters, registry clients, and publication
+  adapters remain external boundaries.
 
 ## Architectural invariants
 
