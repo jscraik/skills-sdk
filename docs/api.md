@@ -105,6 +105,20 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   non-null it binds both the prior result ID and the SHA-256 of that prior
   result's complete canonical JSON envelope (UTF-8, keys sorted, compact
   separators). A result cannot reference itself as its replay source.
+- **Runtime-lock planning:** `RuntimeLock` (`runtime-lock/v1`) describes
+  candidate-bound intended state for a logical user or project target. Each
+  entry binds package and candidate identity, version, package digest, registry
+  identity, package and preparation receipt IDs, and an ordered digest inventory
+  of portable relative files. `InstallPlan` (`install-plan/v1`) describes a
+  deterministic `install`, `update`, or `no_change` transition, or a typed
+  blocked result. The planner rejects a registry receipt whose
+  `input_receipt_id` does not identify the exact package receipt, carries the
+  current lock digest as its rollback identity, and always reports
+  `mutation_performed: false`. These contracts do not prove an apply attempt,
+  rollback, journal, race-safe host mutation, discovery, activation, or runtime
+  outcome. A future host adapter must emit those evidence families separately
+  without putting absolute paths, credentials, raw logs, or environment state
+  into portable core contracts.
 
 ## Schema validation
 
@@ -128,13 +142,15 @@ The schema registry accepts only known schema names and raises `ContractError`
 for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
 manifest, provider identity, provider execution, private-registry preparation,
-package-safety evidence, receipt, risk, security, scenario, and scorer schemas. The registered
+package-safety evidence, runtime lock, installation plan, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake
 schemas are not registered with
 `SchemaRegistry`; when those families need structural validation, load their
-packaged JSON Schema resource with a Draft 2020-12 validator, then call the
+packaged JSON Schema resource with a Draft 2020-12 validator configured with
+`jsonschema.FormatChecker()` so `date-time` and other declared formats are
+asserted, then call the
 corresponding Pydantic model explicitly (for example,
 `PackageInventoryRecord.model_validate(payload)` for an inventory record).
 Validation is read-only: it does not write receipts, contact providers, install
@@ -170,6 +186,11 @@ fails with the typed
 `unsupported_receipt_family` error instead of being interpreted through the
 generic base receipt schema. Missing or non-string versions fail with
 `invalid_receipt_schema_version`.
+
+`runtime-lock/v1` and `install-plan/v1` are registered for structural and
+Pydantic semantic validation but are not generic receipts: generic receipt
+parsing must not reinterpret intended runtime state or a non-mutating plan as
+evidence that installation occurred.
 
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test

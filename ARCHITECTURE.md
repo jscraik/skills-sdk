@@ -93,6 +93,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/validation/` | Read-only standalone-skill capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. | `SkillIR`, `read_frontmatter`, `validate_skill_package` |
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
 | `src/skills_sdk/evaluation/` | Pure deterministic scoring over externally produced, candidate-bound observations; no prompt, provider, package, or runtime execution. | `evaluate_scenario_set` in `deterministic.py` |
+| `src/skills_sdk/lifecycle/` | Pure planning of candidate-bound intended runtime-lock transitions; no installation, host inspection, rollback execution, or runtime mutation. | `plan_runtime_install` in `planning.py` |
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
 | `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied provider outcome observations; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
@@ -171,6 +172,11 @@ single module:
 - **Evidence lanes do not collapse.** A local validation or receipt proves
   only its local lane. It does not prove hosted checks, provider acceptance,
   runtime installation, registry publication, or installed behavior.
+- **Runtime planning is intended state only.** `RuntimeLock` and `InstallPlan`
+  bind package, registry, target, file, and digest identities while retaining
+  `mutation_performed: false`. A future host adapter owns apply and rollback
+  journals, race handling, installation results, discovery, activation, and
+  runtime-outcome evidence.
 
 ## Cross-cutting concerns
 

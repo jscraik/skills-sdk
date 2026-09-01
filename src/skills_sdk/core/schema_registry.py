@@ -43,6 +43,8 @@ SCHEMA_NAMES = frozenset(
         "registry-identity.v1",
         "registry-preparation.v1",
         "registry-preparation-request.v1",
+        "install-plan.v1",
+        "runtime-lock.v1",
         "scenario-case-result.v1",
         "scenario-case-result.v2",
         "scenario-observation.v1",
@@ -275,6 +277,14 @@ class SchemaRegistry:
             from skills_sdk.models.registry import RegistryPreparationRequest
 
             model = RegistryPreparationRequest
+        elif name == "install-plan.v1":
+            from skills_sdk.models.lifecycle import InstallPlan
+
+            model = InstallPlan
+        elif name == "runtime-lock.v1":
+            from skills_sdk.models.lifecycle import RuntimeLock
+
+            model = RuntimeLock
         elif name == "package-safety-evidence.v1":
             from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 

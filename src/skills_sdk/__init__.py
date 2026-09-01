@@ -2,9 +2,11 @@
 
 from skills_sdk.distribution import prepare_private_registry_candidate
 from skills_sdk.evaluation import evaluate_scenario_set, evaluate_scenario_set_v2
+from skills_sdk.lifecycle import plan_runtime_install
 from skills_sdk.models import (
     EvaluationReceipt,
     EvaluationReceiptV2,
+    InstallPlan,
     MantraAssessment,
     MantraStatus,
     PackageInventory,
@@ -30,6 +32,10 @@ from skills_sdk.models import (
     RegistryPreparationRequest,
     RegistryPreparationWarning,
     RiskClassification,
+    RuntimeFile,
+    RuntimeLock,
+    RuntimeLockEntry,
+    RuntimeTarget,
     ScenarioCaseResult,
     ScenarioCaseResultV2,
     ScenarioCaseV2,
@@ -48,6 +54,7 @@ __version__ = "0.1.0"
 __all__ = [
     "EvaluationReceipt",
     "EvaluationReceiptV2",
+    "InstallPlan",
     "MantraAssessment",
     "MantraStatus",
     "PackageInventory",
@@ -73,6 +80,10 @@ __all__ = [
     "RegistryPreparationRequest",
     "RegistryPreparationWarning",
     "RiskClassification",
+    "RuntimeFile",
+    "RuntimeLock",
+    "RuntimeLockEntry",
+    "RuntimeTarget",
     "ScenarioCaseResult",
     "ScenarioCaseResultV2",
     "ScenarioCaseV2",
@@ -87,5 +98,6 @@ __all__ = [
     "__version__",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
+    "plan_runtime_install",
     "prepare_private_registry_candidate",
 ]

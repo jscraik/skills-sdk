@@ -10,7 +10,12 @@ from typing import Any
 
 import package_safety_schema
 from provider_execution_schema import append_provider_execution_constraints
-from schema_model_groups import evaluation_schema_models, provider_execution_schema_models
+from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
+from schema_model_groups import (
+    evaluation_schema_models,
+    provider_execution_schema_models,
+    runtime_lifecycle_schema_models,
+)
 
 from skills_sdk.models.inventory import (
     PackageInventory,
@@ -727,6 +732,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_registry_preparation_constraints(schema)
     elif filename in {"provider-execution-request.v1.schema.json", "provider-execution-result.v1.schema.json"}:
         append_provider_execution_constraints(schema, filename)
+    elif filename in {"runtime-lock.v1.schema.json", "install-plan.v1.schema.json"}:
+        append_runtime_lifecycle_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = f"https://schemas.skills-sdk.dev/{filename}"
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"
@@ -764,6 +771,7 @@ def main() -> int:
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         *evaluation_schema_models(),
         *provider_execution_schema_models(),
+        *runtime_lifecycle_schema_models(),
         (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
         rendered = _render_schema(model, filename)
