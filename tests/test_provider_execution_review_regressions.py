@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import traceback
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import ValidationError, model_serializer
 
 from skills_sdk import ProviderExecutionRequest, ProviderExecutionResult, ProviderUsageMetadata
 from skills_sdk.core.digests import canonical_json_sha256
@@ -102,6 +103,47 @@ def test_top_level_result_revalidation_accepts_valid_json_form_updates(field: st
     revalidated = ProviderExecutionResult.model_validate(result.model_copy(update={field: value}))
 
     assert revalidated == result
+
+
+def test_top_level_result_serialization_error_drops_secret_bearing_exception_chain() -> None:
+    secret = "sk-live-do-not-leak"
+
+    class FailingSerializerResult(ProviderExecutionResult):
+        @model_serializer
+        def fail_serialization(self) -> dict[str, object]:
+            raise ValueError(secret)
+
+    result = FailingSerializerResult.model_validate(_fixture("result-accepted.json"))
+
+    with pytest.raises(ValidationError) as raised:
+        ProviderExecutionResult.model_validate(result)
+
+    error = raised.value
+    assert secret not in str(error)
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert secret not in "".join(traceback.format_exception(error))
+
+
+def test_nested_result_serialization_error_drops_secret_bearing_exception_chain() -> None:
+    secret = "sk-live-do-not-leak"
+
+    class FailingSerializerUsage(ProviderUsageMetadata):
+        @model_serializer
+        def fail_serialization(self) -> dict[str, object]:
+            raise ValueError(secret)
+
+    payload = _fixture("result-accepted.json")
+    payload["usage"] = FailingSerializerUsage.model_validate(payload["usage"])
+
+    with pytest.raises(ValidationError) as raised:
+        ProviderExecutionResult.model_validate(payload)
+
+    error = raised.value
+    assert secret not in str(error)
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert secret not in "".join(traceback.format_exception(error))
 
 
 def test_published_schemas_name_cross_envelope_semantic_requirements() -> None:
