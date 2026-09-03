@@ -196,7 +196,10 @@ offset representation. Replay digests apply that same rule to the validated
 prior result model. `parse_receipt` accepts only explicitly registered
 receipt wire versions:
 `receipt-base/v1`, package receipt v1/v2, evaluation receipt v1/v2, and
-`registry-preparation/v1`, plus `package-safety-evidence/v1`. A prepared
+`registry-preparation/v1`, `package-safety-evidence/v1`,
+`installation-result/v1`, `rollback-outcome/v1`,
+`discovery-observation/v1`, `activation-observation/v1`, and
+`runtime-outcome/v1`. A prepared
 registry artifact maps to the generic
 `pass` status while preserving `artifact_status="prepared"`; a blocked artifact
 remains blocked. Parsing validates the versioned registry schema and does not
