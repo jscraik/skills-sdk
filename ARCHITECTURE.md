@@ -44,35 +44,6 @@ operational contracts.
   `src/skills_sdk/lifecycle/planning.py` and the versioned models in
   `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
   rollback, discovery, activation, and runtime-outcome evidence.
-
-PR evidence for these two capability additions:
-
-- `mise exec -- uv run --frozen pytest -q tests/test_provider_execution_contracts.py tests/test_provider_execution_review_regressions.py`
-  — `pass`.
-- `mise exec -- uv run --frozen pytest -q tests/test_lifecycle_contracts.py tests/test_installation_planning.py`
-  — `pass`.
-- `mise exec -- uv run --frozen python scripts/generate_schemas.py --check`
-  — `pass`.
-- `bash scripts/validate-repository.sh` — `blocked`: the coding-task runtime
-  exits `89` with its Git-delivery guard before the wrapper starts its checks.
-  The nearest fallback is to run the schema, codestyle, test, build, and diff
-  components directly; the full test component remains blocked because two
-  repository-boundary tests invoke the same denied `git ls-files` operation.
-- Provider execution — `blocked`: the SDK has no provider client, account
-  credentials, or network execution adapter. The nearest fallback is the
-  provider model, generated-schema, and request/result binding proof above.
-- External registry interaction — `blocked`: the SDK has no registry client,
-  credentials, or mutation API. The nearest fallback is local
-  `prepare_private_registry_candidate` contract coverage.
-- Host-runtime apply and rollback — `blocked`: the SDK has no host adapter,
-  runtime discovery, or mutation surface. The nearest fallback is the
-  deterministic `plan_runtime_install` contract and focused tests above.
-- Tessl execution — `blocked`: the Tessl CLI routes are parse-only discovery
-  boundaries and no Tessl client or authentication boundary exists here. The
-  nearest fallback is CLI route coverage plus local registry preparation.
-- Publication — `blocked`: no publication adapter, target credentials, or
-  network publication operation exists in the SDK. The nearest fallback is
-  the candidate-bound package and private-registry preparation receipts.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
@@ -105,13 +76,14 @@ core/schema_registry.py + models/*
     |
     --> successful validation (`None`) after structural and applicable semantic checks, or ContractError
 
-Local candidate-bound proof
+Local candidate-bound contracts
     |
     +--> distribution/private_registry.py
     |    (local receipt composition only; no registry interaction)
     |
     +--> models/provider_execution.py
-    |    (secret-free adapter envelopes only; no provider call)
+    |    (locally validated envelopes for externally observed provider evidence;
+    |     no provider call or locally proved provider outcome)
     |
     +--> lifecycle/planning.py
     |    (intended runtime-lock transition only; no host mutation)
@@ -141,7 +113,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/lifecycle/` | Pure planning of candidate-bound intended runtime-lock transitions; no installation, host inspection, rollback execution, or runtime mutation. | `plan_runtime_install` in `planning.py` |
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
-| `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied provider outcome observations; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
+| `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
@@ -174,11 +146,16 @@ docstrings and the linked API or CLI guides.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The executable command path is `CLI -> validation/packaging -> models/core`.
-  The Python API services follow
+- The CLI service-invocation path is
+  `CLI -> validation/packaging -> models/core`: only `validate` and `build`
+  invoke those services, while reserved routes remain parse-only. This is not
+  the package import graph. Importing `skills_sdk.cli.main` first initializes
+  `skills_sdk/__init__.py`, whose public convenience exports eagerly import
+  evaluation, distribution, lifecycle, and their model dependencies. Those
+  Python API services otherwise follow
   `evaluation/distribution/lifecycle -> models/core`; the reserved CLI routes
-  do not invoke them. Provider clients, host-runtime adapters, registry
-  clients, and publication adapters remain external boundaries.
+  do not call them. Provider clients, host-runtime adapters, registry clients,
+  and publication adapters remain external boundaries.
 
 ## Architectural invariants
 
@@ -309,6 +286,32 @@ and wheel builds, and `git diff --check`. For an executable change, also run
 the exact CLI or Python path touched and record whether the result was `pass`,
 `fail`, or `blocked`; local evidence does not substitute for hosted, provider,
 runtime, or publication evidence.
+
+### Evidence for this architecture update
+
+The documentation-only capability-map update was checked with these exact
+repository commands:
+
+- `mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_repository_standards.py tests/test_skill_validation_architecture.py`
+  — `pass` (`84 passed`).
+- `bash scripts/validate-codestyle.sh` — `pass` (Ruff, MyPy, repository
+  standards, and Vale completed without findings).
+- `mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
+  `pass` (no generated-schema drift).
+- `bash scripts/validate-repository.sh` — `pass` (`926 passed`, `1 skipped`;
+  source distribution and wheel built successfully).
+- `git diff --check` — `pass`.
+
+External outcome lanes remain blocked rather than inferred from those local
+checks:
+
+| Lane | Outcome | Concrete reason | Nearest meaningful fallback |
+| --- | --- | --- | --- |
+| Provider | `blocked` | The repository contains envelopes, not a provider client, credentials, or an authorized provider call. | Provider execution model, schema, and adapter-boundary tests. |
+| Registry | `blocked` | Private-registry preparation performs no registry authentication, upload, or mutation. | Deterministic registry-preparation contract tests. |
+| Host runtime | `blocked` | Runtime lifecycle code plans transitions but has no host apply or rollback adapter. | Runtime-lock and installation-planning contract tests. |
+| Tessl | `blocked` | Tessl CLI routes are parse-only and no Tessl integration was executed. | CLI parser/help tests and candidate-bound local contract checks. |
+| Publication | `blocked` | Publication is external to the SDK and no destination or publication authority was supplied. | Local build, immutable receipt, and registry-preparation proof. |
 
 ## Further reading
 
