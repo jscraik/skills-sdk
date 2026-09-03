@@ -39,6 +39,9 @@ breaking contract change cannot remain compatible.
 - Add portable `runtime-lock/v1` and `install-plan/v1` contracts with
   deterministic, candidate-bound, mutation-free lifecycle planning and a
   typed blocker for unrelated registry input receipts.
+- Add separate adapter-supplied installation, rollback, discovery, activation,
+  and runtime-outcome evidence contracts with portable digest bindings and no
+  SDK-owned host mutation or runtime execution.
 - Package versioned JSON Schemas and a semantic `SchemaRegistry` validator.
 - Expose a boundary-only `skills-sdk` CLI with explicit lifecycle and Tessl
   preparation route names; no route publishes, installs, or mutates a runtime.

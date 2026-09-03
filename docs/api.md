@@ -119,6 +119,28 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   outcome. A future host adapter must emit those evidence families separately
   without putting absolute paths, credentials, raw logs, or environment state
   into portable core contracts.
+- **Runtime execution evidence:** `InstallationResult`, `RollbackJournal`,
+  `RollbackOutcome`, `DiscoveryObservation`, `ActivationObservation`, and
+  `RuntimeOutcomeReceipt` are additive, adapter-supplied v1 families. They bind
+  the exact candidate, package digest, plan, logical target, adapter identity,
+  timestamps, and digest-only evidence while keeping installation, rollback,
+  discovery, activation, and runtime outcome distinct. Explicit
+  `validate_against_*` methods prove cross-receipt equality; standalone Draft
+  validation remains structural for those cross-object relations. The SDK does
+  not resolve host paths, copy files, invoke a runtime, activate a skill, or
+  claim evaluation quality, safety, cost, persistence, or usability.
+  Every receipt-shaped runtime observation requires its literal `lane` field;
+  omission fails through Pydantic, `SchemaRegistry`, and generic receipt
+  parsing rather than reaching an untyped mapping lookup.
+  Optional provider-result and evaluation-receipt references are not proof by
+  presence alone: callers must use `validate_against_provider_result` and
+  `validate_against_evaluation_receipt` to verify the referenced ID, canonical
+  digest, and candidate identity.
+  `InstallationResult.operation` preserves the planned `install`, `update`, or
+  `no_change` transition in the standalone observation. Pydantic and
+  `SchemaRegistry` enforce its lock-digest and mutation semantics; Draft
+  2020-12 enforces the operation-to-mutation rule, while equality between lock
+  digest fields remains a semantic check.
 
 ## Schema validation
 
@@ -142,7 +164,8 @@ The schema registry accepts only known schema names and raises `ContractError`
 for an
 unknown schema or invalid payload. It adds Pydantic semantic checks for
 manifest, provider identity, provider execution, private-registry preparation,
-package-safety evidence, runtime lock, installation plan, receipt, risk, security, scenario, and scorer schemas. The registered
+package-safety evidence, runtime lock, installation plan, runtime execution
+evidence, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
 skill-identity, plugin-identity, source, owner, normalized-package, and intake

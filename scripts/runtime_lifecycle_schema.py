@@ -14,6 +14,14 @@ def _safe_text_constraints() -> tuple[dict[str, Any], ...]:
     )
 
 
+def _extend_text_constraints(property_schema: dict[str, Any]) -> None:
+    for branch in property_schema.get("anyOf", []):
+        if branch.get("type") == "string":
+            branch.setdefault("allOf", []).extend(_safe_text_constraints())
+            return
+    property_schema.setdefault("allOf", []).extend(_safe_text_constraints())
+
+
 def _append_public_text_constraints(schema: Any) -> None:
     if isinstance(schema, dict):
         title = schema.get("title")
@@ -32,15 +40,58 @@ def _append_public_text_constraints(schema: Any) -> None:
             properties["message"].setdefault("allOf", []).extend(_safe_text_constraints())
             properties["evidence_refs"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
         elif title == "InstallPlan":
-            properties["evidence"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
+            if "evidence" in properties:
+                properties["evidence"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
             for field in ("package_name", "version"):
-                properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
+                if field in properties:
+                    properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
             for field in (
                 "package_receipt_id",
                 "registry_preparation_receipt_id",
                 "registry_input_receipt_id",
             ):
+                if field in properties:
+                    properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
+        elif title == "RuntimeAdapterIdentity":
+            for field in ("adapter_id", "adapter_version"):
                 properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
+        elif title == "RuntimeEvidenceBlocker":
+            for field in ("code", "message"):
+                properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
+            properties["evidence_refs"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
+        elif title == "MutationRaceEvidence":
+            properties["evidence_refs"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
+        elif title == "RollbackJournalEntry":
+            properties["path"].setdefault("allOf", []).extend(_safe_text_constraints())
+            properties["evidence_refs"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
+        elif title in {
+            "InstallationResult",
+            "RollbackJournal",
+            "RollbackOutcome",
+            "DiscoveryObservation",
+            "ActivationObservation",
+            "RuntimeOutcomeReceipt",
+        }:
+            for field in ("package_name", "version", "plan_id"):
+                if field in properties:
+                    properties[field].setdefault("allOf", []).extend(_safe_text_constraints())
+            if "evidence" in properties:
+                properties["evidence"]["items"].setdefault("allOf", []).extend(_safe_text_constraints())
+            for field in (
+                "receipt_id",
+                "journal_id",
+                "installation_result_id",
+                "method_id",
+                "discovery_receipt_id",
+                "mechanism_id",
+                "deactivation_id",
+                "activation_receipt_id",
+                "invocation_id",
+                "provider_result_id",
+                "evaluation_receipt_id",
+            ):
+                if field in properties:
+                    _extend_text_constraints(properties[field])
         for value in schema.values():
             _append_public_text_constraints(value)
     elif isinstance(schema, list):
@@ -48,11 +99,183 @@ def _append_public_text_constraints(schema: Any) -> None:
             _append_public_text_constraints(value)
 
 
+def _append_runtime_evidence_constraints(schema: dict[str, Any], filename: str) -> None:
+    properties = schema["properties"]
+    properties["evidence"]["uniqueItems"] = True
+    for definition in schema.get("$defs", {}).values():
+        if not isinstance(definition, dict):
+            continue
+        definition_properties = definition.get("properties", {})
+        for field in ("evidence", "evidence_refs"):
+            if field in definition_properties:
+                definition_properties[field]["uniqueItems"] = True
+    state_rules: dict[str, list[dict[str, Any]]] = {
+        "installation-result.v1.schema.json": [
+            {
+                "if": {"properties": {"operation": {"const": "no_change"}}, "required": ["operation"]},
+                "then": {"properties": {"mutation_performed": {"const": False}}},
+                "else": {
+                    "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]},
+                    "then": {"properties": {"mutation_performed": {"const": True}}},
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]},
+                "then": {
+                    "required": ["resulting_lock_sha256"],
+                    "properties": {
+                        "blocker": {"type": "null"},
+                        "race": {"type": "null"},
+                        "resulting_lock_sha256": {"type": "string"},
+                    },
+                },
+            },
+            {
+                "if": {"properties": {"status": {"enum": ["failed", "indeterminate"]}}, "required": ["status"]},
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {"blocker": {"$ref": "#/$defs/RuntimeEvidenceBlocker"}},
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {
+                        "blocker": {"$ref": "#/$defs/RuntimeEvidenceBlocker"},
+                        "mutation_performed": {"const": False},
+                        "resulting_lock_sha256": {"type": "null"},
+                    },
+                },
+            },
+        ],
+        "rollback-outcome.v1.schema.json": [
+            {
+                "if": {"properties": {"status": {"const": "rolled_back"}}, "required": ["status"]},
+                "then": {
+                    "required": ["resulting_lock_sha256"],
+                    "properties": {
+                        "blocker": {"type": "null"},
+                        "mutation_performed": {"const": True},
+                        "race": {"type": "null"},
+                        "resulting_lock_sha256": {"type": "string"},
+                    },
+                },
+            },
+            {
+                "if": {
+                    "properties": {"status": {"enum": ["rollback_failed", "indeterminate"]}},
+                    "required": ["status"],
+                },
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {"blocker": {"$ref": "#/$defs/RuntimeEvidenceBlocker"}},
+                },
+            },
+            {
+                "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {
+                        "blocker": {"$ref": "#/$defs/RuntimeEvidenceBlocker"},
+                        "mutation_performed": {"const": False},
+                        "resulting_lock_sha256": {"type": "null"},
+                    },
+                },
+            },
+        ],
+        "discovery-observation.v1.schema.json": [
+            {
+                "if": {"properties": {"status": {"const": "discovered"}}, "required": ["status"]},
+                "then": {"properties": {"blocker": {"type": "null"}}},
+            },
+            {
+                "if": {
+                    "properties": {"status": {"enum": ["not_discovered", "blocked", "indeterminate"]}},
+                    "required": ["status"],
+                },
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {"blocker": {"$ref": "#/$defs/RuntimeEvidenceBlocker"}},
+                },
+            },
+        ],
+        "activation-observation.v1.schema.json": [
+            {
+                "if": {"properties": {"status": {"const": "active"}}, "required": ["status"]},
+                "then": {"properties": {"blocker": {"type": "null"}}},
+            },
+            {
+                "if": {
+                    "properties": {"status": {"enum": ["inactive", "blocked", "indeterminate"]}},
+                    "required": ["status"],
+                },
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {"blocker": {"$ref": "#/$defs/RuntimeEvidenceBlocker"}},
+                },
+            },
+            {
+                "if": {"properties": {"mutation_performed": {"const": True}}, "required": ["mutation_performed"]},
+                "then": {"required": ["deactivation_id"], "properties": {"deactivation_id": {"type": "string"}}},
+            },
+        ],
+        "runtime-outcome.v1.schema.json": [
+            {
+                "if": {"properties": {"status": {"const": "completed"}}, "required": ["status"]},
+                "then": {
+                    "required": ["output_sha256"],
+                    "properties": {"blocker": {"type": "null"}, "output_sha256": {"type": "string"}},
+                },
+            },
+            {
+                "if": {
+                    "properties": {"status": {"enum": ["failed", "blocked", "indeterminate"]}},
+                    "required": ["status"],
+                },
+                "then": {
+                    "required": ["blocker"],
+                    "properties": {"blocker": {"$ref": "#/$defs/RuntimeEvidenceBlocker"}},
+                },
+            },
+        ],
+    }
+    if filename == "rollback-journal.v1.schema.json":
+        properties["entries"]["uniqueItems"] = True
+    if filename == "runtime-outcome.v1.schema.json":
+        schema["dependentRequired"] = {
+            "provider_result_id": ["provider_result_sha256"],
+            "provider_result_sha256": ["provider_result_id"],
+            "evaluation_receipt_id": ["evaluation_receipt_sha256"],
+            "evaluation_receipt_sha256": ["evaluation_receipt_id"],
+        }
+    rules = [*schema.get("allOf", []), *state_rules.get(filename, [])]
+    if rules:
+        schema["allOf"] = rules
+    schema["$comment"] = (
+        "Validate cross-object candidate, plan, journal, discovery, activation, and outcome bindings with "
+        "the explicit model validation methods; standard JSON Schema validates one payload structurally."
+    )
+    schema["x-skills-sdk-semantic-validator"] = {
+        "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+        "required_for": [
+            "candidate and package identity must match",
+            "status fields must match blocker, mutation, and digest evidence",
+            "installation operation must match lock transition digest equality",
+            "rolled-back outcome requires every bound rollback journal entry to be applied",
+            "evidence paths must be portable and unique",
+            "upstream receipt equality requires the explicit validate_against method",
+        ],
+    }
+
+
 def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) -> None:
     """Apply Draft-expressible state rules and document semantic checks."""
 
     _append_public_text_constraints(schema)
-    schema["$defs"]["RuntimeLockEntry"]["properties"]["files"]["uniqueItems"] = True
+    runtime_lock_entry = schema.get("$defs", {}).get("RuntimeLockEntry")
+    if runtime_lock_entry is not None:
+        runtime_lock_entry["properties"]["files"]["uniqueItems"] = True
     if filename == "runtime-lock.v1.schema.json":
         schema["properties"]["entries"]["uniqueItems"] = True
         required_for = [
@@ -61,7 +284,7 @@ def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) 
             "runtime entries must be unique by logical target and package",
             "runtime file paths must be unique within an entry",
         ]
-    else:
+    elif filename == "install-plan.v1.schema.json":
         properties = schema["properties"]
         properties["evidence"]["uniqueItems"] = True
         schema["allOf"] = [
@@ -104,6 +327,9 @@ def append_runtime_lifecycle_constraints(schema: dict[str, Any], filename: str) 
             "candidate content digest must match the proposed runtime file inventory",
             "runtime file paths must be unique within the proposed entry",
         ]
+    else:
+        _append_runtime_evidence_constraints(schema, filename)
+        return
     schema["$comment"] = (
         "Validate cross-field lifecycle invariants with skills_sdk.core.schema_registry.SchemaRegistry.validate."
     )

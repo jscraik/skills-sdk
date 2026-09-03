@@ -44,6 +44,12 @@ SCHEMA_NAMES = frozenset(
         "registry-preparation.v1",
         "registry-preparation-request.v1",
         "install-plan.v1",
+        "installation-result.v1",
+        "rollback-journal.v1",
+        "rollback-outcome.v1",
+        "discovery-observation.v1",
+        "activation-observation.v1",
+        "runtime-outcome.v1",
         "runtime-lock.v1",
         "scenario-case-result.v1",
         "scenario-case-result.v2",
@@ -285,6 +291,30 @@ class SchemaRegistry:
             from skills_sdk.models.lifecycle import RuntimeLock
 
             model = RuntimeLock
+        elif name == "installation-result.v1":
+            from skills_sdk.models.runtime_evidence import InstallationResult
+
+            model = InstallationResult
+        elif name == "rollback-journal.v1":
+            from skills_sdk.models.runtime_evidence import RollbackJournal
+
+            model = RollbackJournal
+        elif name == "rollback-outcome.v1":
+            from skills_sdk.models.runtime_evidence import RollbackOutcome
+
+            model = RollbackOutcome
+        elif name == "discovery-observation.v1":
+            from skills_sdk.models.runtime_evidence import DiscoveryObservation
+
+            model = DiscoveryObservation
+        elif name == "activation-observation.v1":
+            from skills_sdk.models.runtime_evidence import ActivationObservation
+
+            model = ActivationObservation
+        elif name == "runtime-outcome.v1":
+            from skills_sdk.models.runtime_evidence import RuntimeOutcomeReceipt
+
+            model = RuntimeOutcomeReceipt
         elif name == "package-safety-evidence.v1":
             from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 

@@ -19,6 +19,14 @@ from skills_sdk.models.evaluation_v2 import (
 )
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
+from skills_sdk.models.runtime_evidence import (
+    ActivationObservation,
+    DiscoveryObservation,
+    InstallationResult,
+    RollbackJournal,
+    RollbackOutcome,
+    RuntimeOutcomeReceipt,
+)
 
 
 def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
@@ -47,9 +55,18 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
 
 
 def runtime_lifecycle_schema_models() -> tuple[tuple[type[Any], str], ...]:
-    """Return intended runtime state and non-mutating planning schemas."""
+    """Return planning and adapter-supplied runtime evidence schemas."""
 
-    return ((RuntimeLock, "runtime-lock.v1.schema.json"), (InstallPlan, "install-plan.v1.schema.json"))
+    return (
+        (RuntimeLock, "runtime-lock.v1.schema.json"),
+        (InstallPlan, "install-plan.v1.schema.json"),
+        (InstallationResult, "installation-result.v1.schema.json"),
+        (RollbackJournal, "rollback-journal.v1.schema.json"),
+        (RollbackOutcome, "rollback-outcome.v1.schema.json"),
+        (DiscoveryObservation, "discovery-observation.v1.schema.json"),
+        (ActivationObservation, "activation-observation.v1.schema.json"),
+        (RuntimeOutcomeReceipt, "runtime-outcome.v1.schema.json"),
+    )
 
 
 __all__ = ["evaluation_schema_models", "provider_execution_schema_models", "runtime_lifecycle_schema_models"]
