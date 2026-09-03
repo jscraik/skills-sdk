@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
+from pydantic import AwareDatetime, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.paths import require_portable_relative_path
@@ -44,6 +45,8 @@ def _require_unique_paths(values: tuple[str, ...], field: str) -> tuple[str, ...
 
 
 def _require_rfc3339(value: object, field: str) -> object:
+    if isinstance(value, datetime):
+        return value
     if not isinstance(value, str) or _RFC3339_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field} must be an RFC3339 string")
     return value
@@ -53,7 +56,11 @@ def _model_sha256(value: _ContractModel) -> str:
     return canonical_json_sha256(value.model_dump(mode="json"))
 
 
-class RuntimeAdapterIdentity(_ContractModel):
+class _RuntimeEvidenceContractModel(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
+
+class RuntimeAdapterIdentity(_RuntimeEvidenceContractModel):
     """Secret-free identity for an external host-runtime adapter."""
 
     adapter_id: RuntimeEvidenceIdentifier
@@ -65,7 +72,7 @@ class RuntimeAdapterIdentity(_ContractModel):
         return _require_public_text(value, "runtime adapter identity")
 
 
-class RuntimeEvidenceBlocker(_ContractModel):
+class RuntimeEvidenceBlocker(_RuntimeEvidenceContractModel):
     """Typed public blocker without raw logs, credentials, or host paths."""
 
     code: BlockerCode
@@ -84,7 +91,7 @@ class RuntimeEvidenceBlocker(_ContractModel):
         return _require_unique_paths(values, "runtime blocker evidence refs")
 
 
-class MutationRaceEvidence(_ContractModel):
+class MutationRaceEvidence(_RuntimeEvidenceContractModel):
     """Digest-only observation that expected and observed host state diverged."""
 
     expected_lock_sha256: Sha256
@@ -109,7 +116,7 @@ class MutationRaceEvidence(_ContractModel):
         return self
 
 
-class _CandidateBoundRuntimeEvidence(_ContractModel):
+class _CandidateBoundRuntimeEvidence(_RuntimeEvidenceContractModel):
     candidate: PackageCandidateIdentity
     package_name: RuntimeIdentifier
     version: NonEmptyText
@@ -213,7 +220,7 @@ class InstallationResult(_CandidateBoundRuntimeEvidence):
             raise ValueError("installation race must bind the plan current lock")
 
 
-class RollbackJournalEntry(_ContractModel):
+class RollbackJournalEntry(_RuntimeEvidenceContractModel):
     """One portable, ordered adapter observation in a rollback journal."""
 
     sequence: int = Field(ge=0)

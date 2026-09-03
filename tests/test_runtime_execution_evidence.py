@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from skills_sdk.models.runtime_evidence import (
     RollbackJournal,
     RollbackJournalEntry,
     RollbackOutcome,
+    RuntimeEvidenceBlocker,
     RuntimeOutcomeReceipt,
 )
 
@@ -340,6 +342,28 @@ def test_mutation_race_requires_distinct_lock_digests() -> None:
             detected_at=NOW,
             evidence_refs=("evidence/race.json",),
         )
+
+
+def test_installation_revalidates_forged_nested_blocker() -> None:
+    fixture = Path(__file__).parent / "fixtures/runtime-evidence/rejected-machine-path.json"
+    unsafe_path = json.loads(fixture.read_text(encoding="utf-8"))["evidence"][0]
+    payload = _installation(_plan()).model_dump(mode="json")
+    blocker = RuntimeEvidenceBlocker.model_construct(
+        code="runtime_blocked",
+        category="runtime",
+        message=f"Blocked at {unsafe_path}",
+        evidence_refs=("evidence/runtime-blocker.json",),
+    )
+    payload.update(status="blocked", mutation_performed=False, resulting_lock_sha256=None, blocker=blocker)
+
+    with pytest.raises(ValidationError, match="machine-path"):
+        InstallationResult.model_validate(payload)
+
+
+def test_runtime_evidence_accepts_native_aware_datetime() -> None:
+    payload = _installation(_plan()).model_dump(mode="json")
+    payload["observed_at"] = datetime(2026, 9, 2, 9, tzinfo=UTC)
+    assert InstallationResult.model_validate(payload).observed_at == payload["observed_at"]
 
 
 def test_mutation_race_expected_digest_binds_the_upstream_lock() -> None:
