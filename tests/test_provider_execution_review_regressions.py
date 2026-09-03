@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import traceback
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError, model_serializer
 
-from skills_sdk import ProviderExecutionRequest, ProviderExecutionResult
+from skills_sdk import ProviderExecutionRequest, ProviderExecutionResult, ProviderUsageMetadata
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -71,6 +73,79 @@ def test_result_cannot_start_before_bound_request_preparation() -> None:
         result.validate_against_request(request)
     with pytest.raises(ContractError, match="provider request binding"):
         SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
+
+
+@pytest.mark.filterwarnings("error")
+def test_forged_top_level_result_model_fails_without_serializer_warning() -> None:
+    result = ProviderExecutionResult.model_validate(_fixture("result-accepted.json"))
+    forged_usage = ProviderUsageMetadata.model_construct(
+        unit_kind="tokens", input_units="3", output_units=2, total_units=5
+    )
+
+    with pytest.raises(ValidationError):
+        ProviderExecutionResult.model_validate(result.model_copy(update={"usage": forged_usage}))
+
+
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (
+            "usage",
+            {"unit_kind": "tokens", "input_units": 3, "output_units": 2, "total_units": 5},
+        ),
+        ("started_at", "2026-08-29T14:01:00Z"),
+    ],
+)
+def test_top_level_result_revalidation_accepts_valid_json_form_updates(field: str, value: object) -> None:
+    result = ProviderExecutionResult.model_validate(_fixture("result-accepted.json"))
+
+    revalidated = ProviderExecutionResult.model_validate(result.model_copy(update={field: value}))
+
+    assert revalidated == result
+
+
+def test_top_level_result_serialization_error_drops_secret_bearing_exception_chain() -> None:
+    secret = "sk-live-do-not-leak"
+
+    class FailingSerializerResult(ProviderExecutionResult):
+        @model_serializer
+        def fail_serialization(self) -> dict[str, object]:
+            raise ValueError(secret)
+
+    result = FailingSerializerResult.model_validate(_fixture("result-accepted.json"))
+
+    with pytest.raises(ValidationError) as raised:
+        ProviderExecutionResult.model_validate(result)
+
+    error = raised.value
+    assert secret not in str(error)
+    assert secret not in repr(error.errors(include_url=False))
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert secret not in "".join(traceback.format_exception(error))
+
+
+def test_nested_result_serialization_error_drops_secret_bearing_exception_chain() -> None:
+    secret = "sk-live-do-not-leak"
+
+    class FailingSerializerUsage(ProviderUsageMetadata):
+        @model_serializer
+        def fail_serialization(self) -> dict[str, object]:
+            raise ValueError(secret)
+
+    payload = _fixture("result-accepted.json")
+    payload["usage"] = FailingSerializerUsage.model_validate(payload["usage"])
+
+    with pytest.raises(ValidationError) as raised:
+        ProviderExecutionResult.model_validate(payload)
+
+    error = raised.value
+    assert secret not in str(error)
+    assert secret not in repr(error.errors(include_url=False))
+    assert error.__cause__ is None
+    assert error.__context__ is None
+    assert secret not in "".join(traceback.format_exception(error))
 
 
 def test_published_schemas_name_cross_envelope_semantic_requirements() -> None:
