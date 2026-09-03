@@ -7,7 +7,17 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import PortablePath, Sha256, _ContractModel
@@ -20,6 +30,7 @@ if TYPE_CHECKING:
 
 ExecutionId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")]
 _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH = 100
+_SERIALIZATION_FAILED = object()
 _CREDENTIAL_PATTERN = re.compile(
     r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
     r"(?:^|[^A-Za-z0-9])(?:aiza|akia|bearer|ghp_|github_pat_|hf_|sk-|xoxb-|xoxp-|"
@@ -46,6 +57,13 @@ def _candidate_is_public(candidate: PackageCandidateIdentity) -> bool:
     return _identity_is_public(candidate.package_id)
 
 
+def _model_json_or_failure(value: BaseModel) -> object:
+    try:
+        return value.model_dump(mode="json", warnings="none")
+    except PydanticSerializationError:
+        return _SERIALIZATION_FAILED
+
+
 def _require_normalized_text(value: object, field_group: str) -> object:
     if isinstance(value, str) and value != value.strip():
         raise ValueError(f"provider execution {field_group} must already be normalized")
@@ -67,7 +85,10 @@ def _normalize_json_input(
     if depth > _MAX_PROVIDER_EXECUTION_INPUT_NESTING_DEPTH:
         raise ValueError("provider execution input exceeds the maximum JSON nesting depth")
     if isinstance(value, BaseModel):
-        return _normalize_json_input(value.model_dump(mode="json"), active_container_ids, depth + 1)
+        serialized = _model_json_or_failure(value)
+        if serialized is _SERIALIZATION_FAILED:
+            raise ValueError("provider execution nested model contains invalid field values") from None
+        return _normalize_json_input(serialized, active_container_ids, depth + 1)
     if value is None or isinstance(value, (str, bool, int)):
         return value
     if isinstance(value, float):
@@ -107,7 +128,13 @@ class _ProviderExecutionContractModel(_ContractModel):
         """Revalidate exact model instances through their strict JSON representation."""
 
         if isinstance(obj, cls):
-            obj = obj.model_dump(mode="json")
+            obj = _model_json_or_failure(obj)
+            if obj is _SERIALIZATION_FAILED:
+                validation_error = ValueError("provider execution model contains invalid field values")
+                raise ValidationError.from_exception_data(
+                    cls.__name__,
+                    [{"type": "value_error", "loc": (), "input": None, "ctx": {"error": validation_error}}],
+                ) from None
         return super().model_validate(obj, **kwargs)
 
     @model_validator(mode="before")
