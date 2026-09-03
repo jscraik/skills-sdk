@@ -128,6 +128,13 @@ class _CandidateBoundRuntimeEvidence(_RuntimeEvidenceContractModel):
     observed_at: AwareDatetime
     evidence: tuple[PortablePath, ...] = Field(min_length=1)
 
+    @field_validator("candidate", "target", mode="before")
+    @classmethod
+    def nested_identity_must_be_revalidated(cls, value: object) -> object:
+        if isinstance(value, _ContractModel):
+            return value.model_dump(mode="python")
+        return value
+
     @field_validator("package_name", "version", "plan_id")
     @classmethod
     def identity_must_be_public_safe(cls, value: str) -> str:
