@@ -120,6 +120,7 @@ def test_top_level_result_serialization_error_drops_secret_bearing_exception_cha
 
     error = raised.value
     assert secret not in str(error)
+    assert secret not in repr(error.errors(include_url=False))
     assert error.__cause__ is None
     assert error.__context__ is None
     assert secret not in "".join(traceback.format_exception(error))
@@ -141,6 +142,7 @@ def test_nested_result_serialization_error_drops_secret_bearing_exception_chain(
 
     error = raised.value
     assert secret not in str(error)
+    assert secret not in repr(error.errors(include_url=False))
     assert error.__cause__ is None
     assert error.__context__ is None
     assert secret not in "".join(traceback.format_exception(error))
