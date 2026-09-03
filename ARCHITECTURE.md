@@ -44,6 +44,35 @@ operational contracts.
   `src/skills_sdk/lifecycle/planning.py` and the versioned models in
   `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
   rollback, discovery, activation, and runtime-outcome evidence.
+
+PR evidence for these two capability additions:
+
+- `mise exec -- uv run --frozen pytest -q tests/test_provider_execution_contracts.py tests/test_provider_execution_review_regressions.py`
+  — `pass`.
+- `mise exec -- uv run --frozen pytest -q tests/test_lifecycle_contracts.py tests/test_installation_planning.py`
+  — `pass`.
+- `mise exec -- uv run --frozen python scripts/generate_schemas.py --check`
+  — `pass`.
+- `bash scripts/validate-repository.sh` — `blocked`: the coding-task runtime
+  exits `89` with its Git-delivery guard before the wrapper starts its checks.
+  The nearest fallback is to run the schema, codestyle, test, build, and diff
+  components directly; the full test component remains blocked because two
+  repository-boundary tests invoke the same denied `git ls-files` operation.
+- Provider execution — `blocked`: the SDK has no provider client, account
+  credentials, or network execution adapter. The nearest fallback is the
+  provider model, generated-schema, and request/result binding proof above.
+- External registry interaction — `blocked`: the SDK has no registry client,
+  credentials, or mutation API. The nearest fallback is local
+  `prepare_private_registry_candidate` contract coverage.
+- Host-runtime apply and rollback — `blocked`: the SDK has no host adapter,
+  runtime discovery, or mutation surface. The nearest fallback is the
+  deterministic `plan_runtime_install` contract and focused tests above.
+- Tessl execution — `blocked`: the Tessl CLI routes are parse-only discovery
+  boundaries and no Tessl client or authentication boundary exists here. The
+  nearest fallback is CLI route coverage plus local registry preparation.
+- Publication — `blocked`: no publication adapter, target credentials, or
+  network publication operation exists in the SDK. The nearest fallback is
+  the candidate-bound package and private-registry preparation receipts.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
