@@ -61,7 +61,7 @@ def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> No
         "mise exec -- uv run --frozen python scripts/generate_schemas.py --check",
         "bash scripts/validate-repository.sh",
         "git diff --check",
-        "git verify-commit HEAD",
+        "git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb",
     )
     for command in expected_commands:
         assert f"`{command}`" in architecture

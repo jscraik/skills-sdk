@@ -301,8 +301,8 @@ repository commands:
 - `bash scripts/validate-repository.sh` — `pass` (`926 passed`, `1 skipped`;
   source distribution and wheel built successfully).
 - `git diff --check` — `pass`.
-- `git verify-commit HEAD` — `pass` (good native ED25519 signature for the
-  exact reconciliation commit).
+- `git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb` — `pass`
+  (good native ED25519 signature for the exact reconciliation commit).
 
 External outcome lanes remain blocked rather than inferred from those local
 checks:
