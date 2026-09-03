@@ -85,6 +85,25 @@ def test_forged_top_level_result_model_fails_without_serializer_warning() -> Non
         ProviderExecutionResult.model_validate(result.model_copy(update={"usage": forged_usage}))
 
 
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (
+            "usage",
+            {"unit_kind": "tokens", "input_units": 3, "output_units": 2, "total_units": 5},
+        ),
+        ("started_at", "2026-08-29T14:01:00Z"),
+    ],
+)
+def test_top_level_result_revalidation_accepts_valid_json_form_updates(field: str, value: object) -> None:
+    result = ProviderExecutionResult.model_validate(_fixture("result-accepted.json"))
+
+    revalidated = ProviderExecutionResult.model_validate(result.model_copy(update={field: value}))
+
+    assert revalidated == result
+
+
 def test_published_schemas_name_cross_envelope_semantic_requirements() -> None:
     registry = SchemaRegistry()
     request_requirements = registry.load("provider-execution-request.v1")["x-skills-sdk-semantic-validator"][

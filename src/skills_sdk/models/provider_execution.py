@@ -78,7 +78,7 @@ def _normalize_json_input(
         raise ValueError("provider execution input exceeds the maximum JSON nesting depth")
     if isinstance(value, BaseModel):
         try:
-            serialized = value.model_dump(mode="json", warnings="error")
+            serialized = value.model_dump(mode="json", warnings="none")
         except PydanticSerializationError as error:
             raise ValueError("provider execution nested model contains invalid field values") from error
         return _normalize_json_input(serialized, active_container_ids, depth + 1)
@@ -122,7 +122,7 @@ class _ProviderExecutionContractModel(_ContractModel):
 
         if isinstance(obj, cls):
             try:
-                obj = obj.model_dump(mode="json", warnings="error")
+                obj = obj.model_dump(mode="json", warnings="none")
             except PydanticSerializationError as error:
                 validation_error = ValueError("provider execution model contains invalid field values")
                 raise ValidationError.from_exception_data(
