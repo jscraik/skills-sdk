@@ -140,9 +140,10 @@ docstrings and the linked API or CLI guides.
 - `lifecycle` composes package and registry receipts with an existing logical
   runtime lock to produce a deterministic intended transition. It does not
   inspect a host, resolve installation paths, apply files, or execute rollback.
-- `cli` is the outermost process adapter. It imports the implemented services
-  lazily, prints their versioned results, and maps a blocked result to the
-  documented exit status.
+- `cli` is the outermost process adapter. During `main()` dispatch, the
+  `validate` and `build` routes import their validation and packaging services
+  lazily, print versioned results, and map a blocked result to the documented
+  exit status.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
