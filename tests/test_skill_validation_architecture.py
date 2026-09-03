@@ -49,15 +49,32 @@ def test_architecture_distinguishes_cli_invocation_from_package_imports() -> Non
 
 
 def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> None:
-    architecture = " ".join((REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").split())
+    architecture_source = (REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    architecture = " ".join(architecture_source.split())
     api = " ".join((REPOSITORY_ROOT / "docs" / "api.md").read_text(encoding="utf-8").split())
 
     assert "exact repository commands" in architecture
-    for status in ("`pass`", "`fail`", "`blocked`"):
-        assert status in architecture
+    expected_commands = (
+        "mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py "
+        "tests/test_repository_standards.py tests/test_skill_validation_architecture.py",
+        "bash scripts/validate-codestyle.sh",
+        "mise exec -- uv run --frozen python scripts/generate_schemas.py --check",
+        "bash scripts/validate-repository.sh",
+        "git diff --check",
+        "git verify-commit HEAD",
+    )
+    for command in expected_commands:
+        assert f"`{command}`" in architecture
+
     for lane in ("Provider", "Registry", "Host runtime", "Tessl", "Publication"):
-        assert f"| {lane} | `blocked` |" in architecture
-    assert "nearest meaningful fallback" in architecture
+        row = next(line for line in architecture_source.splitlines() if line.startswith(f"| {lane} |"))
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        assert cells[1] == "`blocked`"
+        assert cells[2]
+        assert cells[3]
+
+    assert "`pass`" in architecture
+    assert "`fail`" in architecture
     assert "externally observed" in api
     assert "locally validates this evidence envelope" in api
     assert "does not prove" in api
