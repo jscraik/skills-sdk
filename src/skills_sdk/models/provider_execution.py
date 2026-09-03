@@ -7,7 +7,16 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.paths import require_portable_relative_path
@@ -112,7 +121,14 @@ class _ProviderExecutionContractModel(_ContractModel):
         """Revalidate exact model instances through their strict JSON representation."""
 
         if isinstance(obj, cls):
-            obj = obj.model_dump(mode="json")
+            try:
+                obj = obj.model_dump(mode="json", warnings="error")
+            except PydanticSerializationError as error:
+                validation_error = ValueError("provider execution model contains invalid field values")
+                raise ValidationError.from_exception_data(
+                    cls.__name__,
+                    [{"type": "value_error", "loc": (), "input": None, "ctx": {"error": validation_error}}],
+                ) from error
         return super().model_validate(obj, **kwargs)
 
     @model_validator(mode="before")

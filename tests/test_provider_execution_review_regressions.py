@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
-from skills_sdk import ProviderExecutionRequest, ProviderExecutionResult
+from skills_sdk import ProviderExecutionRequest, ProviderExecutionResult, ProviderUsageMetadata
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -71,6 +72,17 @@ def test_result_cannot_start_before_bound_request_preparation() -> None:
         result.validate_against_request(request)
     with pytest.raises(ContractError, match="provider request binding"):
         SchemaRegistry().validate_provider_execution_result_against_request(result_payload, request_payload)
+
+
+@pytest.mark.filterwarnings("error")
+def test_forged_top_level_result_model_fails_without_serializer_warning() -> None:
+    result = ProviderExecutionResult.model_validate(_fixture("result-accepted.json"))
+    forged_usage = ProviderUsageMetadata.model_construct(
+        unit_kind="tokens", input_units="3", output_units=2, total_units=5
+    )
+
+    with pytest.raises(ValidationError):
+        ProviderExecutionResult.model_validate(result.model_copy(update={"usage": forged_usage}))
 
 
 def test_published_schemas_name_cross_envelope_semantic_requirements() -> None:
