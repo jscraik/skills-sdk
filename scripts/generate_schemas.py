@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import package_safety_schema
+from package_archive_schema import append_package_archive_constraints
 from provider_execution_schema import append_provider_execution_constraints
 from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
 from schema_model_groups import (
@@ -723,6 +724,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_evaluation_receipt_constraints(schema, filename)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
+    elif filename == "package-archive-verification.v1.schema.json":
+        append_package_archive_constraints(schema)
     elif filename == "registry-preparation.v1.schema.json":
         _append_registry_preparation_constraints(schema)
     elif filename in {"provider-execution-request.v1.schema.json", "provider-execution-result.v1.schema.json"}:

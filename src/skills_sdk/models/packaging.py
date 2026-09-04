@@ -168,6 +168,7 @@ class PackageReceiptV2(PackageReceipt):
 class PackageArchiveVerificationPolicy(_ContractModel):
     """Resource bounds for read-only portable archive verification."""
 
+    max_archive_bytes: int = Field(default=25 * 1024 * 1024, ge=1)
     max_entry_count: int = Field(default=500, ge=1)
     max_total_uncompressed_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
 
@@ -215,7 +216,7 @@ class PackageArchiveVerificationReceipt(_ContractModel):
         else:
             if self.blocker is None:
                 raise ValueError("blocked archive verification requires a blocker")
-            if any((self.candidate, self.package_digest, self.manifest, self.verified_files)):
+            if any((self.archive_sha256, self.candidate, self.package_digest, self.manifest, self.verified_files)):
                 raise ValueError("blocked archive verification cannot claim package proof")
         return self
 

@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import struct
 from collections.abc import Callable
 from pathlib import Path
+from unittest.mock import MagicMock
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 import pytest
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
@@ -14,13 +18,16 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import (
+    PackageArchiveVerificationPolicy,
+    PackageArchiveVerificationReceipt,
     PackageFileRole,
     PackageManifest,
     PackageManifestFile,
     PackageManifestProvenance,
+    PackageReceiptBlocker,
     PackageReceiptV2,
 )
-from skills_sdk.packaging import verify_package_archive
+from skills_sdk.packaging import archive_verification, verify_package_archive
 
 
 def _sha(data: bytes) -> str:
@@ -120,6 +127,28 @@ def _inject_nul_into_payload_name(path: Path) -> None:
     path.write_bytes(data)
 
 
+def _set_member_uncompressed_size(path: Path, member_name: str, size: int) -> None:
+    data = bytearray(path.read_bytes())
+    encoded_name = member_name.encode()
+    for signature, name_offset, size_offset in ((b"PK\x03\x04", 30, 22), (b"PK\x01\x02", 46, 24)):
+        offset = 0
+        while (offset := data.find(signature, offset)) >= 0:
+            length_offset = offset + (26 if signature == b"PK\x03\x04" else 28)
+            name_length = struct.unpack_from("<H", data, length_offset)[0]
+            if bytes(data[offset + name_offset : offset + name_offset + name_length]) == encoded_name:
+                struct.pack_into("<I", data, offset + size_offset, size)
+            offset += len(signature)
+    path.write_bytes(data)
+
+
+def _set_eocd_entry_count(path: Path, count: int) -> None:
+    data = bytearray(path.read_bytes())
+    offset = data.rfind(b"PK\x05\x06")
+    assert offset >= 0
+    struct.pack_into("<HH", data, offset + 8, count, count)
+    path.write_bytes(data)
+
+
 def test_accepts_canonical_archive_and_receipt(tmp_path: Path) -> None:
     path = tmp_path / "package.zip"
     manifest = _archive(path)
@@ -153,7 +182,12 @@ def test_accepts_canonical_archive_and_receipt(tmp_path: Path) -> None:
 )
 def test_rejects_unsafe_archive_shapes(tmp_path: Path, name: str, writer: Callable[[Path], object], code: str) -> None:
     path = tmp_path / f"{name}.zip"
-    writer(path)
+    if name in {"duplicate", "duplicate_manifest"}:
+        with pytest.warns(UserWarning, match="Duplicate name:") as warnings:
+            writer(path)
+        assert len(warnings) == 1
+    else:
+        writer(path)
     assert _blocker_code(path) == code
 
 
@@ -214,11 +248,127 @@ def test_rejects_archive_digest_and_receipt_mismatch(tmp_path: Path) -> None:
     other = _manifest({"README.md": b"other"})
     assert _blocker_code(path, expected_package_receipt=_receipt(other)) == "archive_receipt_mismatch"
     mismatched_candidate = receipt.model_copy(update={"candidate": other.candidate})
-    assert _blocker_code(path, expected_package_receipt=mismatched_candidate) == "archive_receipt_mismatch"
+    assert _blocker_code(path, expected_package_receipt=mismatched_candidate) == "archive_receipt_invalid"
     mismatched_manifest = receipt.model_copy(update={"manifest": other})
-    assert _blocker_code(path, expected_package_receipt=mismatched_manifest) == "archive_receipt_mismatch"
+    assert _blocker_code(path, expected_package_receipt=mismatched_manifest) == "archive_receipt_invalid"
     mismatched_digest = receipt.model_copy(update={"package_digest": "f" * 64})
-    assert _blocker_code(path, expected_package_receipt=mismatched_digest) == "archive_package_digest_mismatch"
+    assert _blocker_code(path, expected_package_receipt=mismatched_digest) == "archive_receipt_invalid"
+    invalid = receipt.model_copy(update={"mutation_performed": True})
+    assert _blocker_code(path, expected_package_receipt=invalid) == "archive_receipt_invalid"
+    invalid = receipt.model_copy(update={"included_files": ()})
+    assert _blocker_code(path, expected_package_receipt=invalid) == "archive_receipt_invalid"
+    invalid = receipt.model_copy(update={"blocker": PackageReceiptBlocker(code="invalid", message="invalid")})
+    assert _blocker_code(path, expected_package_receipt=invalid) == "archive_receipt_invalid"
+    invalid = PackageReceiptV2.model_construct(**{**receipt.__dict__, "mutation_performed": True})
+    assert _blocker_code(path, expected_package_receipt=invalid) == "archive_receipt_invalid"
+
+
+def test_rejects_archive_over_raw_byte_limit(tmp_path: Path) -> None:
+    path = tmp_path / "package.zip"
+    _archive(path)
+    size = path.stat().st_size
+    accepted = verify_package_archive(path, policy=PackageArchiveVerificationPolicy(max_archive_bytes=size))
+    assert accepted.status == "pass"
+    blocker = _blocker_code(path, policy=PackageArchiveVerificationPolicy(max_archive_bytes=size - 1))
+    assert blocker == "archive_invalid_zip"
+
+
+def test_rejects_entry_count_before_zipfile_construction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "package.zip"
+    _write_entries(path, [("one", b""), ("two", b"")])
+    _set_eocd_entry_count(path, 1)
+
+    def unexpected_zipfile(*args: object, **kwargs: object) -> None:
+        raise AssertionError("ZipFile must not parse an out-of-policy central directory")
+
+    monkeypatch.setattr(archive_verification, "ZipFile", unexpected_zipfile)
+    policy = PackageArchiveVerificationPolicy(max_entry_count=1)
+    assert _blocker_code(path, policy=policy) == "archive_invalid_zip"
+
+
+def test_rejects_short_decompressed_payload(tmp_path: Path) -> None:
+    path = tmp_path / "package.zip"
+    payload = b"A"
+    manifest = _manifest({"payload": payload})
+    record = manifest.files[0].model_copy(update={"size_bytes": 9})
+    forged = manifest.model_copy(
+        update={
+            "files": (record,),
+            "candidate": manifest.candidate.model_copy(update={"content_sha256": candidate_content_sha256((record,))}),
+        }
+    )
+    _archive(path, payloads={"payload": payload}, manifest=forged)
+    _set_member_uncompressed_size(path, "payload", 9)
+    assert _blocker_code(path) == "archive_payload_size_mismatch"
+
+
+def test_rejects_fifo_without_blocking(tmp_path: Path) -> None:
+    path = tmp_path / "package.fifo"
+    os.mkfifo(path)
+    assert _blocker_code(path) == "archive_not_regular_file"
+
+
+@pytest.mark.parametrize("stage", ["fstat", "fdopen", "read"])
+def test_snapshot_io_failure_is_typed_and_closes_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage: str
+) -> None:
+    path = tmp_path / "package.zip"
+    _archive(path)
+    descriptors: list[int] = []
+    original_open = os.open
+
+    def tracked_open(*args: object, **kwargs: object) -> int:
+        descriptor = original_open(*args, **kwargs)
+        descriptors.append(descriptor)
+        return descriptor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(archive_verification.os, "open", tracked_open)
+        failure = MagicMock(side_effect=OSError("injected snapshot failure"))
+        if stage == "read":
+            stream = MagicMock()
+            stream.__enter__.return_value = stream
+            stream.read = failure
+            patch.setattr(archive_verification.os, "fdopen", MagicMock(return_value=stream))
+        else:
+            patch.setattr(archive_verification.os, stage, failure)
+        assert _blocker_code(path) == "archive_unreadable"
+    assert len(descriptors) == 1
+    with pytest.raises(OSError):
+        os.fstat(descriptors[0])
+
+
+def test_unserializable_forged_receipt_returns_typed_blocker(tmp_path: Path) -> None:
+    path = tmp_path / "package.zip"
+    receipt = _receipt(_archive(path))
+    forged = receipt.model_copy(update={"receipt_id": object()})
+    assert _blocker_code(path, expected_package_receipt=forged) == "archive_receipt_invalid"
+
+
+def test_rejects_duplicate_manifest_object_members(tmp_path: Path) -> None:
+    path = tmp_path / "package.zip"
+    manifest = _manifest({"SKILL.md": b"# Example\n"})
+    payload = json.dumps(manifest.model_dump(mode="json"))
+    duplicated = payload.replace('{"schema_version":', '{"schema_version":"package-manifest/v1","schema_version":', 1)
+    _write_entries(path, [("package-manifest.json", duplicated.encode()), ("SKILL.md", b"# Example\n")])
+    assert _blocker_code(path) == "archive_manifest_invalid"
+
+
+def test_rejects_duplicate_nested_manifest_members(tmp_path: Path) -> None:
+    path = tmp_path / "package.zip"
+    manifest = _manifest({"SKILL.md": b"# Example\n"})
+    payload = json.dumps(manifest.model_dump(mode="json"))
+    duplicated = payload.replace('{"schema_version": "package-candidate/v1",', '{"package_id":"other",', 1)
+    _write_entries(path, [("package-manifest.json", duplicated.encode()), ("SKILL.md", b"# Example\n")])
+    assert _blocker_code(path) == "archive_manifest_invalid"
+
+
+def test_archive_contracts_are_exported_from_model_facade() -> None:
+    from skills_sdk.models import PackageArchiveVerificationPolicy as FacadePolicy
+    from skills_sdk.models import PackageArchiveVerificationReceipt as FacadeReceipt
+
+    assert FacadePolicy is PackageArchiveVerificationPolicy
+    assert FacadeReceipt is PackageArchiveVerificationReceipt
 
 
 def test_rejects_contract_invalid_manifest(tmp_path: Path) -> None:
@@ -238,6 +388,29 @@ def test_receipt_model_and_registry_reject_forged_pass(tmp_path: Path) -> None:
         type(result).model_validate(payload)
     with pytest.raises(ContractError, match="rejected the payload"):
         SchemaRegistry().validate("package-archive-verification.v1", payload)
+
+
+def test_draft_schema_enforces_receipt_states_and_unique_paths(tmp_path: Path) -> None:
+    schema_path = Path(__file__).parents[1] / "src/skills_sdk/schemas/package-archive-verification.v1.schema.json"
+    validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
+    path = tmp_path / "package.zip"
+    _archive(path)
+    passed = verify_package_archive(path).model_dump(mode="json")
+    blocked = verify_package_archive(tmp_path / "missing.zip").model_dump(mode="json")
+    validator.validate(passed)
+    validator.validate(blocked)
+    for invalid in ({"status": "pass"}, {"status": "blocked"}):
+        assert list(validator.iter_errors(invalid))
+    duplicated = {**passed, "verified_files": [passed["verified_files"][0]] * 2}
+    assert list(validator.iter_errors(duplicated))
+    for field in ("archive_sha256", "candidate", "package_digest", "manifest"):
+        assert list(validator.iter_errors({**passed, field: None}))
+    assert list(validator.iter_errors({**passed, "verified_files": []}))
+    assert list(validator.iter_errors({**passed, "blocker": blocked["blocker"]}))
+    assert list(validator.iter_errors({**blocked, "blocker": None}))
+    for field in ("archive_sha256", "candidate", "package_digest", "manifest"):
+        assert list(validator.iter_errors({**blocked, field: passed[field]}))
+    assert list(validator.iter_errors({**blocked, "verified_files": passed["verified_files"]}))
 
 
 def test_rejects_encrypted_entry_with_typed_blocker(tmp_path: Path) -> None:
@@ -260,6 +433,15 @@ def test_receipt_model_and_registry_reject_blocked_pass_proof(tmp_path: Path) ->
         type(passed).model_validate(payload)
     with pytest.raises(ContractError, match="rejected the payload"):
         SchemaRegistry().validate("package-archive-verification.v1", payload)
+    digest_payload = verify_package_archive(tmp_path / "missing.zip").model_dump(mode="json")
+    digest_payload["archive_sha256"] = "a" * 64
+    with pytest.raises(ValidationError, match="cannot claim package proof"):
+        PackageArchiveVerificationReceipt.model_validate(digest_payload)
+    with pytest.raises(ContractError, match="rejected the payload"):
+        SchemaRegistry().validate("package-archive-verification.v1", digest_payload)
+    schema_path = Path(__file__).parents[1] / "src/skills_sdk/schemas/package-archive-verification.v1.schema.json"
+    validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
+    assert list(validator.iter_errors(digest_payload))
 
 
 def test_rejects_raw_nul_entry_name(tmp_path: Path) -> None:
