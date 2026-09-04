@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from skills_sdk.models.packaging import (
+    PackageArchiveVerificationPolicy,
+    PackageArchiveVerificationReceipt,
     PackageHardeningPolicy,
     PackageHardeningReceipt,
     PackageReceipt,
@@ -49,4 +51,23 @@ def harden_skill_package(
     return _harden_skill_package(package_receipt, policy=policy)
 
 
-__all__ = ["build_skill_package", "harden_skill_package"]
+def verify_package_archive(
+    archive_path: Path,
+    *,
+    expected_archive_sha256: str | None = None,
+    expected_package_receipt: PackageReceiptV2 | None = None,
+    policy: PackageArchiveVerificationPolicy | None = None,
+) -> PackageArchiveVerificationReceipt:
+    """Load archive verification lazily to preserve import boundaries."""
+
+    from skills_sdk.packaging.archive_verification import verify_package_archive as _verify
+
+    return _verify(
+        archive_path,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_package_receipt=expected_package_receipt,
+        policy=policy,
+    )
+
+
+__all__ = ["build_skill_package", "harden_skill_package", "verify_package_archive"]
