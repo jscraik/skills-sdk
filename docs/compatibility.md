@@ -139,6 +139,31 @@ or a non-mutating plan as evidence that installation occurred. Later host
 adapter apply, rollback, discovery, activation, and outcome families must use
 new explicit schema versions rather than changing these v1 meanings.
 
+The additive `installation-result/v1`, `rollback-journal/v1`,
+`rollback-outcome/v1`, `discovery-observation/v1`,
+`activation-observation/v1`, and `runtime-outcome/v1` families record distinct
+adapter observations without changing runtime-lock or install-plan semantics.
+Generic receipt parsing recognizes only the five receipt-shaped result and
+observation families; rollback journals remain typed supporting evidence.
+Draft 2020-12 enforces structural, state, public-text, and portable-path rules.
+Cross-object equality and digest binding require the named Pydantic
+`validate_against_*` method and are declared in schema semantic-validator
+metadata rather than being silently approximated.
+Optional provider-result and evaluation-receipt pairs in `runtime-outcome/v1`
+likewise require their dedicated `validate_against_*` methods; pair completeness
+is structural metadata, not proof that the referenced object was supplied.
+Installation results include the planned operation so standalone consumers
+cannot interpret a mutating `no_change` observation as successful evidence.
+Digest equality across sibling fields remains part of Pydantic and registry
+semantic validation because Draft 2020-12 cannot compare arbitrary values.
+The five generic-receipt families require their version-specific `lane` on the
+wire. Rollback outcome mutation state must match whether the bound journal has
+an applied mutation for every status. `rollback_failed` and `indeterminate`
+may therefore truthfully report either mutation state, but only when it agrees
+with the journal; `blocked` remains non-mutating and `rolled_back` requires an
+applied mutation with every journal entry applied. Generic parsing keeps a
+rolled-back outcome blocked because rollback is not an installed success.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

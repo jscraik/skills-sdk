@@ -77,6 +77,18 @@ from skills_sdk.models.registry import (
     RegistryPreparationWarning,
 )
 from skills_sdk.models.risk import RiskClassification, RiskSensor, SecurityFinding, SecurityScreeningResult
+from skills_sdk.models.runtime_evidence import (
+    ActivationObservation,
+    DiscoveryObservation,
+    InstallationResult,
+    MutationRaceEvidence,
+    RollbackJournal,
+    RollbackJournalEntry,
+    RollbackOutcome,
+    RuntimeAdapterIdentity,
+    RuntimeEvidenceBlocker,
+    RuntimeOutcomeReceipt,
+)
 from skills_sdk.models.safety import (
     PackageSafetyBlocker,
     PackageSafetyEvidenceReceipt,
@@ -87,16 +99,20 @@ from skills_sdk.models.safety import (
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 __all__ = [
+    "ActivationObservation",
+    "DiscoveryObservation",
     "EvaluationReceipt",
     "EvaluationReceiptV2",
     "FormatChecks",
     "InstallPlan",
+    "InstallationResult",
     "IntakeChecks",
     "IntakeDecision",
     "IntakeDecisionStatus",
     "MantraAssessment",
     "MantraPrinciple",
     "MantraStatus",
+    "MutationRaceEvidence",
     "NormalizedPackage",
     "OwnershipState",
     "PackageCandidateIdentity",
@@ -143,9 +159,15 @@ __all__ = [
     "RiskClass",
     "RiskClassification",
     "RiskSensor",
+    "RollbackJournal",
+    "RollbackJournalEntry",
+    "RollbackOutcome",
+    "RuntimeAdapterIdentity",
+    "RuntimeEvidenceBlocker",
     "RuntimeFile",
     "RuntimeLock",
     "RuntimeLockEntry",
+    "RuntimeOutcomeReceipt",
     "RuntimeTarget",
     "RuntimeVisibility",
     "ScenarioCase",
