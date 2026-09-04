@@ -165,6 +165,61 @@ class PackageReceiptV2(PackageReceipt):
         return self
 
 
+class PackageArchiveVerificationPolicy(_ContractModel):
+    """Resource bounds for read-only portable archive verification."""
+
+    max_entry_count: int = Field(default=500, ge=1)
+    max_total_uncompressed_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
+
+
+class PackageArchiveVerificationReceipt(_ContractModel):
+    """Typed proof that an immutable package archive matches its manifest."""
+
+    schema_version: Literal["package-archive-verification/v1"] = "package-archive-verification/v1"
+    status: Literal["pass", "blocked"]
+    archive_sha256: Sha256 | None = None
+    candidate: PackageCandidateIdentity | None = None
+    package_digest: Sha256 | None = None
+    manifest: PackageManifest | None = None
+    verified_files: tuple[PortablePath, ...] = ()
+    blocker: PackageReceiptBlocker | None = None
+    mutation_performed: Literal[False] = False
+    network_used: Literal[False] = False
+    archive_extracted: Literal[False] = False
+
+    @field_validator("verified_files")
+    @classmethod
+    def verified_paths_must_be_unique_and_portable(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        if len(values) != len(set(values)):
+            raise ValueError("verified archive paths must be unique")
+        for value in values:
+            require_portable_relative_path(value)
+        return values
+
+    @model_validator(mode="after")
+    def status_matches_proof(self) -> PackageArchiveVerificationReceipt:
+        if self.status == "pass":
+            if None in (self.archive_sha256, self.candidate, self.package_digest, self.manifest):
+                raise ValueError("passing archive verification requires complete digest and manifest proof")
+            if self.blocker is not None:
+                raise ValueError("passing archive verification cannot contain a blocker")
+            assert self.manifest is not None
+            if self.candidate != self.manifest.candidate:
+                raise ValueError("archive verification candidate must match the manifest")
+            if self.candidate.content_sha256 != candidate_content_sha256(self.manifest.files):
+                raise ValueError("archive verification candidate digest must match manifest files")
+            if self.package_digest != canonical_json_sha256(self.manifest.model_dump(mode="json")):
+                raise ValueError("archive verification package digest must match the canonical manifest")
+            if set(self.verified_files) != {item.path for item in self.manifest.files}:
+                raise ValueError("passing archive verification must verify every manifest file")
+        else:
+            if self.blocker is None:
+                raise ValueError("blocked archive verification requires a blocker")
+            if any((self.candidate, self.package_digest, self.manifest, self.verified_files)):
+                raise ValueError("blocked archive verification cannot claim package proof")
+        return self
+
+
 class PackageHardeningPolicy(_ContractModel):
     """Portable, explicit package-hardening limits."""
 
@@ -237,6 +292,8 @@ class PackageHardeningReceipt(_ContractModel):
 
 
 __all__ = [
+    "PackageArchiveVerificationPolicy",
+    "PackageArchiveVerificationReceipt",
     "PackageFileRole",
     "PackageHardeningCheck",
     "PackageHardeningPolicy",
