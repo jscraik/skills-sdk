@@ -86,8 +86,13 @@ class SkillPackageIntakeReceipt(_ContractModel):
 
     @model_validator(mode="after")
     def proof_is_candidate_bound(self) -> SkillPackageIntakeReceipt:
+        paths = tuple(item.path for item in self.validation.files)
+        if paths != tuple(sorted(paths)):
+            raise ValueError("intake validation files must be sorted by path")
         if self.candidate != self.validation.candidate:
             raise ValueError("intake receipt candidate must match validation")
+        if self.candidate is not None and self.decision is None:
+            raise ValueError("resolved intake candidate requires a decision")
         if self.candidate is not None and self.candidate.content_sha256 != candidate_content_sha256(
             self.validation.files
         ):
@@ -107,6 +112,8 @@ class SkillPackageIntakeReceipt(_ContractModel):
             assert self.normalized_package is not None
             if self.normalized_package.lifecycle is not PackageLifecycleState.NORMALIZED:
                 raise ValueError("normalized intake requires the normalized package lifecycle")
+            if self.normalized_package.dependencies:
+                raise ValueError("normalized intake cannot assert dependency metadata")
             if self.source.package_id != self.candidate.package_id:
                 raise ValueError("intake source must bind the candidate package")
             if self.source.provenance.revision != self.candidate.source_revision:

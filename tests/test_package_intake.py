@@ -10,14 +10,41 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
+from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.intake import intake_skill_package
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.package import IntakeChecks, IntakeDecisionStatus, PackageOwner, PackageSourceKind
+from skills_sdk.models.packaging import PackageManifestFile
 from skills_sdk.validation import SkillValidationPolicy
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "synthetic-skill"
+
+
+@pytest.mark.parametrize("attack", ("order", "dependencies", "decision"))
+def test_intake_rejects_unproved_serialized_metadata(attack: str) -> None:
+    root = Path("pyproject.toml") if attack == "decision" else FIXTURE_ROOT
+    payload = intake_skill_package(root, _context()).model_dump(mode="json")
+    if attack == "order":
+        files = payload["validation"]["files"]
+        files.append({**files[0], "path": "z-extra.md"})
+        files.reverse()
+        digest = candidate_content_sha256(PackageManifestFile.model_validate(item) for item in files)
+        payload = json.loads(json.dumps(payload).replace(payload["candidate"]["content_sha256"], digest))
+        message = "intake validation files must be sorted by path"
+    elif attack == "dependencies":
+        payload["normalized_package"]["dependencies"] = ["unproved-package"]
+        message = "normalized intake cannot assert dependency metadata"
+    else:
+        assert payload["candidate"] is not None
+        payload["decision"] = None
+        message = "resolved intake candidate requires a decision"
+    with pytest.raises(ValidationError, match=message):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed") as error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert message in str(error.value.details)
 
 
 def _owner() -> PackageOwner:
