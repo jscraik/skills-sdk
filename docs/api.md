@@ -217,7 +217,7 @@ the contract's format; production callers must supply the actual source revision
 The service is always read-only, so it needs no dry-run flag or filesystem
 rollback. It does not copy, execute, install, or publish the package. Validate
 serialized intake receipts with
-`SchemaRegistry().validate("skill-package-intake.v1", payload)` to enforce
+`SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))` to enforce
 structural and model-level bindings. The context schema is registered as
 `skill-package-intake-context.v1`; neither family is supported by the generic
 `parse_receipt` function.
@@ -248,7 +248,7 @@ package-safety evidence, runtime lock, installation plan, runtime execution
 evidence, receipt, risk, security, scenario, and scorer schemas. The registered
 `package-identity.v1` and inventory schemas receive structural validation only;
 they do not receive model-level semantic checks. The packaged candidate,
-skill-identity, plugin-identity, source, owner, normalized-package, and intake
+skill-identity, plugin-identity, source, owner, normalized-package, and legacy `intake-decision.v1`
 schemas are not registered with
 `SchemaRegistry`; when those families need structural validation, load their
 packaged JSON Schema resource with a Draft 2020-12 validator configured with
@@ -256,8 +256,7 @@ packaged JSON Schema resource with a Draft 2020-12 validator configured with
 asserted, then call the
 corresponding Pydantic model explicitly (for example,
 `PackageInventoryRecord.model_validate(payload)` for an inventory record).
-Here, unregistered intake schemas refers to the historical
-`intake-decision.v1` contract; the new `skill-package-intake.v1` and
+The new `skill-package-intake.v1` and
 `skill-package-intake-context.v1` families are registered as described above.
 Validation is read-only: it does not write receipts, contact providers, install
 packages, or publish to a registry.

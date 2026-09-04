@@ -75,6 +75,27 @@ def test_normalization_preserves_non_admit_owner_decision() -> None:
     assert receipt.normalized_package is not None
 
 
+@pytest.mark.parametrize("boundary", ("model", "registry"))
+@pytest.mark.parametrize("forgery", ("digest", "lifecycle"))
+def test_intake_rejects_forged_content_and_lifecycle(boundary: str, forgery: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    payload = receipt.model_dump(mode="json")
+    if forgery == "digest":
+        digest = payload["candidate"]["content_sha256"]
+        payload = json.loads(json.dumps(payload).replace(digest, "f" * 64))
+        message = "intake candidate digest must match validation files"
+    else:
+        payload["normalized_package"]["lifecycle"] = "admitted"
+        message = "normalized intake requires the normalized package lifecycle"
+    if boundary == "model":
+        with pytest.raises(ValidationError, match=message):
+            SkillPackageIntakeReceipt.model_validate(payload)
+    else:
+        with pytest.raises(ContractError, match="contract_validation_failed") as error:
+            SchemaRegistry().validate("skill-package-intake.v1", payload)
+        assert message in str(error.value.details)
+
+
 def test_hard_check_failure_is_not_masked_by_owner_decision() -> None:
     checks = IntakeChecks(identity=True, provenance=False, rights=True, owner_unchanged=False)
     receipt = intake_skill_package(FIXTURE_ROOT, _context(checks=checks))
@@ -115,6 +136,44 @@ def test_invalid_source_returns_typed_blocker(tmp_path: Path) -> None:
     assert receipt.blocker.code == "invalid_package_root"
     assert receipt.normalized_package is None
     SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize(
+    ("identity", "provenance", "rights", "owner_unchanged"),
+    tuple(product((False, True), repeat=4)),
+)
+def test_structural_blocker_preserves_caller_checks(
+    identity: bool, provenance: bool, rights: bool, owner_unchanged: bool
+) -> None:
+    checks = IntakeChecks(identity=identity, provenance=provenance, rights=rights, owner_unchanged=owner_unchanged)
+    receipt = intake_skill_package(Path("pyproject.toml"), _context(checks=checks))
+    assert receipt.status == "blocked"
+    assert receipt.decision is not None
+    assert receipt.decision.decision is IntakeDecisionStatus.BLOCK
+    assert receipt.decision.checks == checks
+    check_blockers = tuple(
+        code
+        for passed, code in (
+            (identity, "identity_unconfirmed"),
+            (provenance, "provenance_unconfirmed"),
+            (rights, "rights_unconfirmed"),
+            (owner_unchanged, "owner_decision_required"),
+        )
+        if not passed
+    )
+    assert receipt.decision.blocker_codes == ("invalid_package_root", *check_blockers)
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+def test_structural_blocker_rejects_changed_caller_checks() -> None:
+    receipt = intake_skill_package(Path("pyproject.toml"), _context())
+    payload = receipt.model_dump(mode="json")
+    payload["decision"]["checks"]["identity"] = False
+    payload["decision"]["blocker_codes"].append("identity_unconfirmed")
+    with pytest.raises(ValidationError, match="must preserve context checks"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
 
 
 def test_context_rejects_archive_until_archive_service_is_composed() -> None:

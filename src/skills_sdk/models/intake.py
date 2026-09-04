@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import field_validator, model_validator
 
+from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import GitRevision, NonEmptyText, PortablePath, _ContractModel
 from skills_sdk.models.package import (
@@ -14,6 +15,7 @@ from skills_sdk.models.package import (
     IntakeDecisionStatus,
     NormalizedPackage,
     PackageCandidateIdentity,
+    PackageLifecycleState,
     PackageOwner,
     PackageSource,
     PackageSourceKind,
@@ -39,7 +41,7 @@ def build_intake_decision(
 
     check_blockers = tuple(code for field, code in _CHECK_BLOCKERS.items() if not getattr(checks, field))
     blocker_codes = tuple(dict.fromkeys((*additional_blocker_codes, *check_blockers)))
-    if not (checks.identity and checks.provenance and checks.rights):
+    if additional_blocker_codes or not (checks.identity and checks.provenance and checks.rights):
         status = IntakeDecisionStatus.BLOCK
     elif not checks.owner_unchanged:
         status = IntakeDecisionStatus.NEEDS_OWNER_DECISION
@@ -86,6 +88,10 @@ class SkillPackageIntakeReceipt(_ContractModel):
     def proof_is_candidate_bound(self) -> SkillPackageIntakeReceipt:
         if self.candidate != self.validation.candidate:
             raise ValueError("intake receipt candidate must match validation")
+        if self.candidate is not None and self.candidate.content_sha256 != candidate_content_sha256(
+            self.validation.files
+        ):
+            raise ValueError("intake candidate digest must match validation files")
         if self.candidate is not None and self.context.source_revision != self.candidate.source_revision:
             raise ValueError("intake context revision must match the candidate")
         if self.status == "normalized":
@@ -99,6 +105,8 @@ class SkillPackageIntakeReceipt(_ContractModel):
             assert self.source is not None
             assert self.decision is not None
             assert self.normalized_package is not None
+            if self.normalized_package.lifecycle is not PackageLifecycleState.NORMALIZED:
+                raise ValueError("normalized intake requires the normalized package lifecycle")
             if self.source.package_id != self.candidate.package_id:
                 raise ValueError("intake source must bind the candidate package")
             if self.source.provenance.revision != self.candidate.source_revision:
@@ -146,9 +154,9 @@ class SkillPackageIntakeReceipt(_ContractModel):
             if self.decision is not None:
                 if self.decision.candidate != self.candidate:
                     raise ValueError("blocked intake decision must bind the candidate")
-                expected_checks = self.context.checks.model_copy(update={"identity": False})
+                expected_checks = self.context.checks
                 if self.decision.checks != expected_checks:
-                    raise ValueError("blocked intake decision must preserve context checks with failed identity")
+                    raise ValueError("blocked intake decision must preserve context checks")
                 expected_decision = build_intake_decision(
                     self.candidate,
                     expected_checks,

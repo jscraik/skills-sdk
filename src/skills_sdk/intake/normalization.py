@@ -29,10 +29,9 @@ def intake_skill_package(
         first = next(finding for finding in validation.findings if finding.severity is ValidationSeverity.BLOCKER)
         decision = None
         if validation.candidate is not None:
-            checks = context.checks.model_copy(update={"identity": False})
             decision = build_intake_decision(
                 validation.candidate,
-                checks,
+                context.checks,
                 additional_blocker_codes=(first.code,),
             )
         return SkillPackageIntakeReceipt(
