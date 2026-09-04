@@ -10,7 +10,7 @@ from skills_sdk import __version__
 
 COMMAND_HELP = {
     "inventory": "inspect a read-only source inventory",
-    "intake": "validate a copy-first package intake decision",
+    "intake": "reserved read-only package intake and normalization contract",
     "validate": "run package contract validation",
     "build": "build an immutable package candidate",
     "eval": "run candidate-bound evaluation lanes",

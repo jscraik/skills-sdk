@@ -16,7 +16,14 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   mantra assessment.
 - **Intake and package identity:** `PackageCandidateIdentity`, `SkillIdentity`,
   `PluginIdentity`, `PackageSource`, `PackageOwner`, `IntakeDecision`, and
-  `NormalizedPackage`.
+  `NormalizedPackage`. Use `intake_skill_package` with a
+  `SkillPackageIntakeContext` to structurally validate and normalize a local
+  standalone-skill directory. The service derives candidate-bound provenance
+  from the validated bytes and preserves the caller's explicit identity,
+  provenance, rights, and owner-continuity checks in a
+  `SkillPackageIntakeReceipt`. It does not copy source, execute package code,
+  access a network, establish ownership or rights truth, or admit a package to
+  Foundry. Archive intake remains a separate composition boundary.
 - **Packaging:** `PackageManifest`, `PackageManifestFile`, `PackageReceipt`,
   `PackageReceiptV2`,
   `PackageHardeningPolicy`, and `PackageHardeningReceipt` with typed blockers,
@@ -144,6 +151,77 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   2020-12 enforces the operation-to-mutation rule, while equality between lock
   digest fields remains a semantic check.
 
+## Read-only intake
+
+Run this example from the repository root with the pinned environment:
+
+```bash
+mise exec -- uv run --frozen python - <<'PY'
+from pathlib import Path
+
+from pydantic import ValidationError
+
+from skills_sdk.intake import intake_skill_package
+from skills_sdk.models import SkillPackageIntakeContext
+
+# Synthetic fixture assertions: replace these with the caller's real evidence.
+payload = {
+    "source_repository": "jscraik/skills-sdk",
+    "source_revision": "1" * 40,
+    "source_path": "tests/fixtures/synthetic-skill",
+    "source_kind": "git",
+    "owner": {
+        "owner": "sdk-tests",
+        "maintainer": "sdk-tests",
+        "ownership_state": "canonical",
+        "rights": {
+            "basis": "authored",
+            "license": "Apache-2.0",
+            "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md",
+        },
+    },
+    "checks": {
+        "identity": True,
+        "provenance": True,
+        "rights": True,
+        "owner_unchanged": True,
+    },
+}
+context = SkillPackageIntakeContext.model_validate(payload)
+for package_root in (Path(context.source_path), Path("pyproject.toml")):
+    receipt = intake_skill_package(package_root, context)
+    if receipt.status == "normalized":
+        print("normalized:", receipt.candidate.package_id)
+        print("decision:", receipt.decision.decision.value)
+    else:
+        print("blocked:", receipt.blocker.code)
+        for finding in receipt.validation.findings:
+            print(finding.code, finding.evidence_refs)
+
+# Invalid context fails before the service runs; it produces no receipt.
+try:
+    SkillPackageIntakeContext.model_validate({**payload, "source_revision": "invalid"})
+except ValidationError:
+    print("invalid context: ValidationError")
+PY
+```
+
+The fixture directory produces `normalized`; the regular file
+`pyproject.toml` produces a typed package-root blocker. Invalid context raises
+`pydantic.ValidationError` before package inspection. A normalized receipt
+can still contain a `block` or `needs_owner_decision` decision when supplied
+checks are false: normalization does not establish admission or rights truth.
+Inspect both status and decision. The synthetic revision above demonstrates
+the contract's format; production callers must supply the actual source revision.
+
+The service is always read-only, so it needs no dry-run flag or filesystem
+rollback. It does not copy, execute, install, or publish the package. Validate
+serialized intake receipts with
+`SchemaRegistry().validate("skill-package-intake.v1", payload)` to enforce
+structural and model-level bindings. The context schema is registered as
+`skill-package-intake-context.v1`; neither family is supported by the generic
+`parse_receipt` function.
+
 ## Schema validation
 
 Use `SchemaRegistry` for packaged JSON Schema structural validation. It also
@@ -178,6 +256,9 @@ packaged JSON Schema resource with a Draft 2020-12 validator configured with
 asserted, then call the
 corresponding Pydantic model explicitly (for example,
 `PackageInventoryRecord.model_validate(payload)` for an inventory record).
+Here, unregistered intake schemas refers to the historical
+`intake-decision.v1` contract; the new `skill-package-intake.v1` and
+`skill-package-intake-context.v1` families are registered as described above.
 Validation is read-only: it does not write receipts, contact providers, install
 packages, or publish to a registry.
 
