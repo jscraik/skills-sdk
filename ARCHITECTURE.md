@@ -5,8 +5,10 @@ Agent Skills packages. It defines versioned contract models for caller-provided
 inventory, intake, evaluation, risk, and security data, and consumes package
 source only through read-only validation and, after a resolved identity and a
 passing validation, build candidate-bound manifest and receipt records.
-Provider execution, runtime projection, distribution, and publication remain
-outside the core package.
+The package also defines secret-free provider execution envelopes, prepares
+local private-registry receipts, and plans intended runtime-lock transitions.
+Provider calls, host apply or rollback, registry interaction, and publication
+remain outside the core package.
 
 This is a map of the stable seams that help a contributor decide where a
 change belongs. It is intentionally shorter than the implementation
@@ -34,6 +36,14 @@ operational contracts.
 - Changing package-safety evidence: start with
   `PackageSafetyEvidenceReceipt` in `src/skills_sdk/models/safety.py`; it
   validates adapter-supplied evidence and does not run a scanner or review.
+- Changing provider execution envelopes: start with
+  `ProviderExecutionRequest` and `ProviderExecutionResult` in
+  `src/skills_sdk/models/provider_execution.py`; external adapters still own
+  provider calls, credentials, and provider-result truth.
+- Changing runtime-lock planning: follow `plan_runtime_install` in
+  `src/skills_sdk/lifecycle/planning.py` and the versioned models in
+  `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
+  rollback, discovery, activation, and runtime-outcome evidence.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
@@ -66,13 +76,20 @@ core/schema_registry.py + models/*
     |
     --> successful validation (`None`) after structural and applicable semantic checks, or ContractError
 
-Local candidate-bound proof
+Local candidate-bound contracts
     |
     +--> distribution/private_registry.py
     |    (local receipt composition only; no registry interaction)
     |
-    +--> provider, runtime, and publication adapters
-         (separate external lanes)
+    +--> models/provider_execution.py
+    |    (locally validated envelopes for externally observed provider evidence;
+    |     no provider call or locally proved provider outcome)
+    |
+    +--> lifecycle/planning.py
+    |    (intended runtime-lock transition only; no host mutation)
+    |
+    +--> provider, host-runtime, registry, and publication adapters
+         (separate external action and evidence lanes)
 ```
 
 The CLI is an outer adapter over the implemented local services. `validate`
@@ -96,7 +113,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/lifecycle/` | Pure planning of candidate-bound intended runtime-lock transitions; no installation, host inspection, rollback execution, or runtime mutation. | `plan_runtime_install` in `planning.py` |
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
-| `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied provider outcome observations; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
+| `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
@@ -120,15 +137,26 @@ docstrings and the linked API or CLI guides.
   identity contracts into a local preparation receipt. It does not contain a
   registry client, credential boundary, filesystem writer, or publication
   operation.
-- `cli` is the outermost process adapter. It imports the implemented services
-  lazily, prints their versioned results, and maps a blocked result to the
-  documented exit status.
+- `lifecycle` composes package and registry receipts with an existing logical
+  runtime lock to produce a deterministic intended transition. It does not
+  inspect a host, resolve installation paths, apply files, or execute rollback.
+- `cli` is the outermost process adapter. During `main()` dispatch, the
+  `validate` and `build` routes import their validation and packaging services
+  lazily, print versioned results, and map a blocked result to the documented
+  exit status.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The repository's dependency direction is
-  `CLI -> validation/packaging/evaluation/distribution -> models/core`;
-  provider, runtime, and publication adapters remain external boundaries.
+- The CLI service-invocation path is
+  `CLI -> validation/packaging -> models/core`: only `validate` and `build`
+  invoke those services, while reserved routes remain parse-only. This is not
+  the package import graph. Importing `skills_sdk.cli.main` first initializes
+  `skills_sdk/__init__.py`, whose public convenience exports eagerly import
+  evaluation, distribution, lifecycle, and their model dependencies. Those
+  Python API services otherwise follow
+  `evaluation/distribution/lifecycle -> models/core`; the reserved CLI routes
+  do not call them. Provider clients, host-runtime adapters, registry clients,
+  and publication adapters remain external boundaries.
 
 ## Architectural invariants
 
@@ -259,6 +287,34 @@ and wheel builds, and `git diff --check`. For an executable change, also run
 the exact CLI or Python path touched and record whether the result was `pass`,
 `fail`, or `blocked`; local evidence does not substitute for hosted, provider,
 runtime, or publication evidence.
+
+### Evidence for this architecture update
+
+The documentation-only capability-map update was checked with these exact
+repository commands:
+
+- `mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_repository_standards.py tests/test_skill_validation_architecture.py`
+  — `pass` (`84 passed`).
+- `bash scripts/validate-codestyle.sh` — `pass` (Ruff, MyPy, repository
+  standards, and Vale completed without findings).
+- `mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
+  `pass` (no generated-schema drift).
+- `bash scripts/validate-repository.sh` — `pass` (`926 passed`, `1 skipped`;
+  source distribution and wheel built successfully).
+- `git diff --check` — `pass`.
+- `git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb` — `pass`
+  (good native ED25519 signature for the exact reconciliation commit).
+
+External outcome lanes remain blocked rather than inferred from those local
+checks:
+
+| Lane | Outcome | Concrete reason | Nearest meaningful fallback |
+| --- | --- | --- | --- |
+| Provider | `blocked` | The repository contains envelopes, not a provider client, credentials, or an authorized provider call. | Provider execution model, schema, and adapter-boundary tests. |
+| Registry | `blocked` | Private-registry preparation performs no registry authentication, upload, or mutation. | Deterministic registry-preparation contract tests. |
+| Host runtime | `blocked` | Runtime lifecycle code plans transitions but has no host apply or rollback adapter. | Runtime-lock and installation-planning contract tests. |
+| Tessl | `blocked` | Tessl CLI routes are parse-only and no Tessl integration was executed. | CLI parser/help tests and candidate-bound local contract checks. |
+| Publication | `blocked` | Publication is external to the SDK and no destination or publication authority was supplied. | Local build, immutable receipt, and registry-preparation proof. |
 
 ## Further reading
 

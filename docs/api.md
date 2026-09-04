@@ -89,8 +89,10 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 - **Provider execution envelopes:** `ProviderExecutionRequest` records a
   candidate-, scenario-, provider-, safety-receipt-, and input-digest-bound
   request prepared for an external adapter. `ProviderExecutionResult` records
-  that adapter's `completed`, `failed`, `blocked`, or `indeterminate`
-  observation with output or evidence digests and typed blockers or errors.
+  that adapter's externally observed `completed`, `failed`, `blocked`, or
+  `indeterminate` result with output or evidence digests and typed blockers or
+  errors. The SDK locally validates this evidence envelope; it does not prove
+  that the external provider actually produced the reported outcome.
   Both contracts require `ProviderIdentityV2`, reject raw payload and
   credential fields, and carry literal-false execution/privacy/cost claims.
   A prepared request must bind supplied `reviewed_no_issue` package-safety
