@@ -59,6 +59,8 @@ SCHEMA_NAMES = frozenset(
         "scenario-set.v2",
         "scorer-profile.v1",
         "skill-package-validation.v1",
+        "skill-package-intake.v1",
+        "skill-package-intake-context.v1",
     }
 )
 
@@ -231,6 +233,14 @@ class SchemaRegistry:
             from skills_sdk.models.inventory import PackageInventoryRecordV2
 
             model = PackageInventoryRecordV2
+        elif name == "skill-package-intake.v1":
+            from skills_sdk.models.intake import SkillPackageIntakeReceipt
+
+            model = SkillPackageIntakeReceipt
+        elif name == "skill-package-intake-context.v1":
+            from skills_sdk.models.intake import SkillPackageIntakeContext
+
+            model = SkillPackageIntakeContext
         elif name == "package-inventory-set.v2":
             from skills_sdk.models.inventory import PackageInventoryV2
 

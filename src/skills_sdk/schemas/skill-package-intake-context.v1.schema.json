@@ -1,0 +1,166 @@
+{
+  "$defs": {
+    "IntakeChecks": {
+      "additionalProperties": false,
+      "description": "Boolean proof lanes required before canonical admission.",
+      "properties": {
+        "identity": {
+          "title": "Identity",
+          "type": "boolean"
+        },
+        "owner_unchanged": {
+          "title": "Owner Unchanged",
+          "type": "boolean"
+        },
+        "provenance": {
+          "title": "Provenance",
+          "type": "boolean"
+        },
+        "rights": {
+          "title": "Rights",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "identity",
+        "provenance",
+        "rights",
+        "owner_unchanged"
+      ],
+      "title": "IntakeChecks",
+      "type": "object"
+    },
+    "OwnershipState": {
+      "description": "Ownership posture at intake; it is not a runtime state.",
+      "enum": [
+        "canonical",
+        "transitional",
+        "external"
+      ],
+      "title": "OwnershipState",
+      "type": "string"
+    },
+    "PackageOwner": {
+      "additionalProperties": false,
+      "description": "Canonical ownership and rights evidence for one package candidate.",
+      "properties": {
+        "maintainer": {
+          "minLength": 1,
+          "title": "Maintainer",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ownership_state": {
+          "$ref": "#/$defs/OwnershipState"
+        },
+        "rights": {
+          "$ref": "#/$defs/RightsStatus"
+        },
+        "schema_version": {
+          "const": "package-owner/v1",
+          "default": "package-owner/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "maintainer",
+        "ownership_state",
+        "rights"
+      ],
+      "title": "PackageOwner",
+      "type": "object"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/skill-package-intake-context.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Caller-supplied source and admission evidence for portable intake.",
+  "properties": {
+    "checks": {
+      "$ref": "#/$defs/IntakeChecks"
+    },
+    "owner": {
+      "$ref": "#/$defs/PackageOwner"
+    },
+    "schema_version": {
+      "const": "skill-package-intake-context/v1",
+      "default": "skill-package-intake-context/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_kind": {
+      "enum": [
+        "git",
+        "external",
+        "local"
+      ],
+      "title": "Source Kind",
+      "type": "string"
+    },
+    "source_path": {
+      "minLength": 1,
+      "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+      "title": "Source Path",
+      "type": "string"
+    },
+    "source_repository": {
+      "minLength": 1,
+      "title": "Source Repository",
+      "type": "string"
+    },
+    "source_revision": {
+      "pattern": "^[0-9a-f]{40}$",
+      "title": "Source Revision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_repository",
+    "source_revision",
+    "source_path",
+    "source_kind",
+    "owner",
+    "checks"
+  ],
+  "title": "SkillPackageIntakeContext",
+  "type": "object"
+}

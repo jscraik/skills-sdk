@@ -15,6 +15,7 @@ from skills_sdk.models.evaluation_v2 import (
     ScenarioObservationV2,
     ScenarioSetV2,
 )
+from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt, build_intake_decision
 from skills_sdk.models.inventory import (
     FormatChecks,
     MantraAssessment,
@@ -183,9 +184,12 @@ __all__ = [
     "SecurityScreeningResult",
     "SkillIdentity",
     "SkillPackageFinding",
+    "SkillPackageIntakeContext",
+    "SkillPackageIntakeReceipt",
     "SkillPackageValidation",
     "SourceProvenance",
     "ValidationSeverity",
     "ValueDecision",
     "ValueDecisionV2",
+    "build_intake_decision",
 ]

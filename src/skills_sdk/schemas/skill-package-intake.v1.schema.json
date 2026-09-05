@@ -1,0 +1,783 @@
+{
+  "$defs": {
+    "IntakeChecks": {
+      "additionalProperties": false,
+      "description": "Boolean proof lanes required before canonical admission.",
+      "properties": {
+        "identity": {
+          "title": "Identity",
+          "type": "boolean"
+        },
+        "owner_unchanged": {
+          "title": "Owner Unchanged",
+          "type": "boolean"
+        },
+        "provenance": {
+          "title": "Provenance",
+          "type": "boolean"
+        },
+        "rights": {
+          "title": "Rights",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "identity",
+        "provenance",
+        "rights",
+        "owner_unchanged"
+      ],
+      "title": "IntakeChecks",
+      "type": "object"
+    },
+    "IntakeDecision": {
+      "additionalProperties": false,
+      "description": "Candidate-bound admission result with typed, explicit blockers.",
+      "properties": {
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "checks": {
+          "$ref": "#/$defs/IntakeChecks"
+        },
+        "decision": {
+          "$ref": "#/$defs/IntakeDecisionStatus"
+        },
+        "schema_version": {
+          "const": "intake-decision/v1",
+          "default": "intake-decision/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "decision",
+        "checks"
+      ],
+      "title": "IntakeDecision",
+      "type": "object"
+    },
+    "IntakeDecisionStatus": {
+      "description": "Explicit intake result with no implicit waiver path.",
+      "enum": [
+        "admit",
+        "block",
+        "reject",
+        "needs_owner_decision"
+      ],
+      "title": "IntakeDecisionStatus",
+      "type": "string"
+    },
+    "NormalizedPackage": {
+      "additionalProperties": false,
+      "description": "Portable normalized package before provider or runtime projection.",
+      "properties": {
+        "dependencies": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "identity": {
+          "discriminator": {
+            "mapping": {
+              "plugin": "#/$defs/PluginIdentity",
+              "skill": "#/$defs/SkillIdentity"
+            },
+            "propertyName": "package_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SkillIdentity"
+            },
+            {
+              "$ref": "#/$defs/PluginIdentity"
+            }
+          ],
+          "title": "Identity"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/PackageLifecycleState",
+          "default": "normalized"
+        },
+        "owner": {
+          "$ref": "#/$defs/PackageOwner"
+        },
+        "package_type": {
+          "$ref": "#/$defs/PackageType"
+        },
+        "schema_version": {
+          "const": "normalized-package/v1",
+          "default": "normalized-package/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/PackageSource"
+        }
+      },
+      "required": [
+        "package_type",
+        "identity",
+        "source",
+        "owner"
+      ],
+      "title": "NormalizedPackage",
+      "type": "object"
+    },
+    "OwnershipState": {
+      "description": "Ownership posture at intake; it is not a runtime state.",
+      "enum": [
+        "canonical",
+        "transitional",
+        "external"
+      ],
+      "title": "OwnershipState",
+      "type": "string"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageFileRole": {
+      "description": "The portable role of a file included in a package manifest.",
+      "enum": [
+        "skill_md",
+        "readme",
+        "reference",
+        "script",
+        "asset",
+        "eval"
+      ],
+      "title": "PackageFileRole",
+      "type": "string"
+    },
+    "PackageLifecycleState": {
+      "description": "Portable lifecycle state for a normalized package candidate.",
+      "enum": [
+        "discovered",
+        "normalized",
+        "admitted",
+        "blocked",
+        "retired"
+      ],
+      "title": "PackageLifecycleState",
+      "type": "string"
+    },
+    "PackageManifestFile": {
+      "additionalProperties": false,
+      "description": "One immutable file entry in a package manifest.",
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/PackageFileRole"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "role"
+      ],
+      "title": "PackageManifestFile",
+      "type": "object"
+    },
+    "PackageOwner": {
+      "additionalProperties": false,
+      "description": "Canonical ownership and rights evidence for one package candidate.",
+      "properties": {
+        "maintainer": {
+          "minLength": 1,
+          "title": "Maintainer",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ownership_state": {
+          "$ref": "#/$defs/OwnershipState"
+        },
+        "rights": {
+          "$ref": "#/$defs/RightsStatus"
+        },
+        "schema_version": {
+          "const": "package-owner/v1",
+          "default": "package-owner/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "maintainer",
+        "ownership_state",
+        "rights"
+      ],
+      "title": "PackageOwner",
+      "type": "object"
+    },
+    "PackageReceiptBlocker": {
+      "additionalProperties": false,
+      "description": "Stable typed blocker details for a package proof receipt.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageReceiptBlocker",
+      "type": "object"
+    },
+    "PackageSource": {
+      "additionalProperties": false,
+      "description": "Source identity preserved before a package is normalized.",
+      "properties": {
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceProvenance"
+        },
+        "schema_version": {
+          "const": "package-source/v1",
+          "default": "package-source/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_kind": {
+          "$ref": "#/$defs/PackageSourceKind"
+        }
+      },
+      "required": [
+        "package_id",
+        "provenance",
+        "source_kind"
+      ],
+      "title": "PackageSource",
+      "type": "object"
+    },
+    "PackageSourceKind": {
+      "description": "How a package source was obtained before normalization.",
+      "enum": [
+        "git",
+        "archive",
+        "external",
+        "local"
+      ],
+      "title": "PackageSourceKind",
+      "type": "string"
+    },
+    "PackageType": {
+      "description": "Canonical package categories admitted by the Foundry.",
+      "enum": [
+        "skill",
+        "plugin"
+      ],
+      "title": "PackageType",
+      "type": "string"
+    },
+    "PluginIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Plugins identity, independent of a client adapter.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "plugin",
+          "default": "plugin",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "plugin-identity/v1",
+          "default": "plugin-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "PluginIdentity",
+      "type": "object"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    },
+    "SkillIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Skills identity, independent of runtime installation.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "skill",
+          "default": "skill",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "skill-identity/v1",
+          "default": "skill-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "SkillIdentity",
+      "type": "object"
+    },
+    "SkillPackageFinding": {
+      "additionalProperties": false,
+      "description": "One stable, evidence-bound standalone-skill finding.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "title": "SkillPackageFinding",
+      "type": "object"
+    },
+    "SkillPackageIntakeContext": {
+      "additionalProperties": false,
+      "description": "Caller-supplied source and admission evidence for portable intake.",
+      "properties": {
+        "checks": {
+          "$ref": "#/$defs/IntakeChecks"
+        },
+        "owner": {
+          "$ref": "#/$defs/PackageOwner"
+        },
+        "schema_version": {
+          "const": "skill-package-intake-context/v1",
+          "default": "skill-package-intake-context/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_kind": {
+          "enum": [
+            "git",
+            "external",
+            "local"
+          ],
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "source_path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Source Path",
+          "type": "string"
+        },
+        "source_repository": {
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_repository",
+        "source_revision",
+        "source_path",
+        "source_kind",
+        "owner",
+        "checks"
+      ],
+      "title": "SkillPackageIntakeContext",
+      "type": "object"
+    },
+    "SkillPackageValidation": {
+      "additionalProperties": false,
+      "description": "Read-only structural result for one standalone skill candidate.",
+      "properties": {
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "files": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageManifestFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SkillPackageFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "skill-package-validation/v1",
+          "default": "skill-package-validation/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SkillPackageValidation",
+      "type": "object"
+    },
+    "SourceProvenance": {
+      "additionalProperties": false,
+      "description": "Immutable source identity retained for an inventory candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "path",
+        "content_sha256"
+      ],
+      "title": "SourceProvenance",
+      "type": "object"
+    },
+    "ValidationSeverity": {
+      "description": "Whether a finding blocks immutable candidate construction.",
+      "enum": [
+        "warning",
+        "blocker"
+      ],
+      "title": "ValidationSeverity",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/skill-package-intake.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Read-only structural intake and normalization result for one skill.",
+  "properties": {
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageReceiptBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "context": {
+      "$ref": "#/$defs/SkillPackageIntakeContext"
+    },
+    "decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IntakeDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "execution_performed": {
+      "const": false,
+      "default": false,
+      "title": "Execution Performed",
+      "type": "boolean"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "network_used": {
+      "const": false,
+      "default": false,
+      "title": "Network Used",
+      "type": "boolean"
+    },
+    "normalized_package": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NormalizedPackage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema_version": {
+      "const": "skill-package-intake/v1",
+      "default": "skill-package-intake/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageSource"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "status": {
+      "enum": [
+        "normalized",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "validation": {
+      "$ref": "#/$defs/SkillPackageValidation"
+    }
+  },
+  "required": [
+    "status",
+    "context",
+    "validation"
+  ],
+  "title": "SkillPackageIntakeReceipt",
+  "type": "object"
+}

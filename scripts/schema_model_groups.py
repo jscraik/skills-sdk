@@ -17,7 +17,14 @@ from skills_sdk.models.evaluation_v2 import (
     ScenarioObservationV2,
     ScenarioSetV2,
 )
+from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
+from skills_sdk.models.packaging import (
+    PackageHardeningReceipt,
+    PackageManifest,
+    PackageReceipt,
+    PackageReceiptV2,
+)
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
 from skills_sdk.models.runtime_evidence import (
     ActivationObservation,
@@ -54,6 +61,26 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
     )
 
 
+def intake_schema_models() -> tuple[tuple[type[Any], str], ...]:
+    """Return executable intake receipt schemas."""
+
+    return (
+        (SkillPackageIntakeContext, "skill-package-intake-context.v1.schema.json"),
+        (SkillPackageIntakeReceipt, "skill-package-intake.v1.schema.json"),
+    )
+
+
+def packaging_schema_models() -> tuple[tuple[type[Any], str], ...]:
+    """Return package manifest and receipt schemas in dependency order."""
+
+    return (
+        (PackageManifest, "package-manifest.v1.schema.json"),
+        (PackageReceipt, "package-receipt.v1.schema.json"),
+        (PackageReceiptV2, "package-receipt.v2.schema.json"),
+        (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
+    )
+
+
 def runtime_lifecycle_schema_models() -> tuple[tuple[type[Any], str], ...]:
     """Return planning and adapter-supplied runtime evidence schemas."""
 
@@ -69,4 +96,10 @@ def runtime_lifecycle_schema_models() -> tuple[tuple[type[Any], str], ...]:
     )
 
 
-__all__ = ["evaluation_schema_models", "provider_execution_schema_models", "runtime_lifecycle_schema_models"]
+__all__ = [
+    "evaluation_schema_models",
+    "intake_schema_models",
+    "packaging_schema_models",
+    "provider_execution_schema_models",
+    "runtime_lifecycle_schema_models",
+]
