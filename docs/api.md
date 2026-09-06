@@ -10,6 +10,21 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 ## Contract families
 
+- **Archive verification:** import `verify_package_archive` from
+  `skills_sdk.packaging`, and `PackageArchiveVerificationPolicy` and
+  `PackageArchiveVerificationReceipt` from `skills_sdk.models`.
+  `verify_package_archive(path, expected_archive_sha256=..., expected_package_receipt=...)`
+  reads a bounded ZIP snapshot without extraction or mutation and returns
+  `package-archive-verification/v1` with `pass` or a typed `blocked` result.
+  A pass binds observed payload sizes and digests to the manifest and candidate;
+  optional expectations compare the archive digest and a built package receipt v2.
+  Only stored and DEFLATE entries are supported. Unsupported compression and
+  malformed ZIP streams return `archive_invalid_zip` before unsafe expansion.
+  Use `SchemaRegistry().validate("package-archive-verification.v1", payload)`
+  for structural and semantic validation. This additive result intentionally
+  remains outside `parse_receipt`, which returns `unsupported_receipt_family`;
+  it does not establish provider, runtime, or publication evidence.
+
 - **Inventory:** `PackageInventory`, `PackageInventoryRecord`,
   `PackageInventoryV2`, `PackageInventoryRecordV2`, `ValueDecision`,
   `ValueDecisionV2`, source provenance, rights, ownership, disposition, and

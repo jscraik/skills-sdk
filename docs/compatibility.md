@@ -24,6 +24,25 @@ in scope.
 
 ## Contract policy
 
+`package-archive-verification/v1` is an additive, read-only verification
+result. It binds ZIP payloads to their manifest and candidate, with optional
+archive-digest and package-receipt/v2 comparisons; it does not establish
+installation or publication. Stored and DEFLATE entries are supported;
+BZIP2, LZMA, and other methods are rejected before payload reads to preserve
+bounded decompression. Malformed ZIP data returns typed blockers.
+Manifest bytes must match the advertised length and satisfy the packaged
+manifest schema before model conversion. Local and central compression headers
+must agree. Fixed-size reads support large integer policy limits without
+passing those limits directly to platform-sized read arguments.
+EOCD-like bytes in ZIP comments are handled after locating a unique nonempty
+central directory; competing nonempty directories fail closed. Only the
+in-memory parser view omits the comment; the archive digest
+still covers all original bytes, and the source archive is not changed.
+Validate this family with `PackageArchiveVerificationReceipt` or
+`SchemaRegistry` using `package-archive-verification.v1`. The generic
+`parse_receipt` dispatcher intentionally returns `unsupported_receipt_family`
+for it. Existing package-receipt/v1 and v2 parsing is unchanged.
+
 Every versioned Pydantic model carries a `schema_version` where the contract
 defines one. The `package-identity.v1`, `package-source.v1`, and
 `package-owner.v1` JSON schemas intentionally accept the bare wire shape

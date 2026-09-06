@@ -51,6 +51,8 @@ from skills_sdk.models.package import (
     SkillIdentity,
 )
 from skills_sdk.models.packaging import (
+    PackageArchiveVerificationPolicy,
+    PackageArchiveVerificationReceipt,
     PackageFileRole,
     PackageHardeningCheck,
     PackageHardeningPolicy,
@@ -116,6 +118,8 @@ __all__ = [
     "MutationRaceEvidence",
     "NormalizedPackage",
     "OwnershipState",
+    "PackageArchiveVerificationPolicy",
+    "PackageArchiveVerificationReceipt",
     "PackageCandidateIdentity",
     "PackageDisposition",
     "PackageFileRole",

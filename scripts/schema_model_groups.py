@@ -20,6 +20,7 @@ from skills_sdk.models.evaluation_v2 import (
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
 from skills_sdk.models.packaging import (
+    PackageArchiveVerificationReceipt,
     PackageHardeningReceipt,
     PackageManifest,
     PackageReceipt,
@@ -77,6 +78,7 @@ def packaging_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (PackageManifest, "package-manifest.v1.schema.json"),
         (PackageReceipt, "package-receipt.v1.schema.json"),
         (PackageReceiptV2, "package-receipt.v2.schema.json"),
+        (PackageArchiveVerificationReceipt, "package-archive-verification.v1.schema.json"),
         (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
     )
 
