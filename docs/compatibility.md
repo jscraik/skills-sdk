@@ -59,6 +59,13 @@ original inputs. Blocked receipts with a retained validation identity must bind
 that identity to their candidate. These intake-local invariants do not change
 the shared package, check, or validation contracts.
 
+Intake receipt construction revalidates nested typed evidence, including
+models inside mappings or sequences, just as it validates raw payloads.
+Preconstructed shared models do not bypass their field constraints at this
+receipt boundary; shared model configuration remains unchanged.
+Evidence sequences use lists or tuples. Other iterable inputs, including
+iterators and deques, are rejected rather than passed to nested coercion.
+
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still
 blocked. The corresponding `v1` models and schemas remain unchanged and reject

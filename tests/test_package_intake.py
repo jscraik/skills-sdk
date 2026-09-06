@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 import tracemalloc
-from collections import UserDict
+from collections import UserDict, deque
 from itertools import product
 from pathlib import Path
 
@@ -19,6 +19,7 @@ from skills_sdk.intake import intake_skill_package
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.package import IntakeChecks, IntakeDecisionStatus, PackageOwner, PackageSourceKind
 from skills_sdk.models.packaging import PackageManifestFile
+from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.packaging import build_skill_package
 from skills_sdk.validation import SkillValidationPolicy
 
@@ -87,6 +88,73 @@ def test_blocked_validation_identity_is_candidate_bound() -> None:
         SkillPackageIntakeReceipt.model_validate(payload)
     with pytest.raises(ContractError):
         SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize("wrapper", ["typed", "mapping"])
+@pytest.mark.parametrize("path", ["SKILL.md", "/example/private/evidence"])
+def test_intake_revalidates_typed_validation_findings(wrapper: str, path: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    finding = SkillPackageFinding(code="synthetic_warning", severity=ValidationSeverity.WARNING, message="Synthetic")
+    finding = finding.model_copy(update={"evidence_refs": (path,)})
+    validation = receipt.validation.model_copy(update={"findings": (finding,)})
+    payload = dict(receipt)
+    payload["validation"] = validation if wrapper == "typed" else UserDict({**dict(validation), "findings": (finding,)})
+    raw = receipt.model_dump(mode="json")
+    raw["validation"] = validation.model_dump(mode="json")
+    if path == "SKILL.md":
+        assert SkillPackageIntakeReceipt.model_validate(payload).validation.findings == (finding,)
+        SkillPackageIntakeReceipt.model_validate(raw)
+        SchemaRegistry().validate("skill-package-intake.v1", raw)
+    else:
+        with pytest.raises(ValidationError):
+            SkillPackageIntakeReceipt.model_validate(payload)
+        with pytest.raises(ValidationError):
+            SkillPackageIntakeReceipt.model_validate(raw)
+        with pytest.raises(ContractError):
+            SchemaRegistry().validate("skill-package-intake.v1", raw)
+
+
+@pytest.mark.parametrize(
+    "field", ["context", "candidate", "validation", "source", "decision", "normalized_package", "blocker"]
+)
+def test_intake_revalidates_each_typed_receipt_field(field: str) -> None:
+    policy = SkillValidationPolicy(max_entrypoint_lines=1) if field == "blocker" else None
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(), policy=policy)
+    payload = dict(receipt)
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    if field == "blocker":
+        payload[field] = receipt.blocker.model_copy(update={"evidence_refs": ("/example/private/evidence",)})
+        finding = receipt.validation.findings[0].model_copy(update={"evidence_refs": ("/example/private/evidence",)})
+        payload["validation"] = receipt.validation.model_copy(update={"findings": (finding,)})
+    else:
+        payload[field] = payload[field].model_copy(update={"schema_version": "invalid"})
+        if field == "candidate":
+            payload["validation"] = receipt.validation.model_copy(update={"candidate": payload[field]})
+            payload["decision"] = receipt.decision.model_copy(update={"candidate": payload[field]})
+        elif field == "source":
+            payload["normalized_package"] = receipt.normalized_package.model_copy(update={"source": payload[field]})
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    raw = {
+        key: value.model_dump(mode="json") if hasattr(value, "model_dump") else value for key, value in payload.items()
+    }
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeReceipt.model_validate(raw)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", raw)
+
+
+@pytest.mark.parametrize("container", ["deque", "iterator"])
+@pytest.mark.parametrize("path", ["SKILL.md", "/example/private/evidence"])
+def test_intake_rejects_noncanonical_evidence_sequences(container: str, path: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    finding = SkillPackageFinding(code="synthetic_warning", severity=ValidationSeverity.WARNING, message="Synthetic")
+    finding = finding.model_copy(update={"evidence_refs": (path,)})
+    findings = deque([finding]) if container == "deque" else iter([finding])
+    payload = dict(receipt)
+    payload["validation"] = {**dict(receipt.validation), "findings": findings}
+    with pytest.raises(ValidationError, match="sequences must be lists or tuples"):
+        SkillPackageIntakeReceipt.model_validate(payload)
 
 
 @pytest.mark.parametrize("value", [1, 0, "yes", "false", None])

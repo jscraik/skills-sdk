@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Literal
 
 from pydantic import field_validator, model_validator
@@ -31,6 +31,19 @@ _CHECK_BLOCKERS = {
     "rights": "rights_unconfirmed",
     "owner_unchanged": "owner_decision_required",
 }
+
+
+def _intake_evidence_data(value: object) -> object:
+    """Expose nested typed evidence to the intake field validators again."""
+    if isinstance(value, _ContractModel):
+        return _intake_evidence_data(value.model_dump(mode="python"))
+    if isinstance(value, Mapping):
+        return {key: _intake_evidence_data(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return tuple(_intake_evidence_data(item) for item in value)
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        raise ValueError("intake evidence sequences must be lists or tuples")
+    return value
 
 
 def build_intake_decision(
@@ -104,12 +117,12 @@ class SkillPackageIntakeReceipt(_ContractModel):
     network_used: Literal[False] = False
     execution_performed: Literal[False] = False
 
-    @field_validator("context", mode="before")
+    @field_validator(
+        "context", "candidate", "validation", "source", "decision", "normalized_package", "blocker", mode="before"
+    )
     @classmethod
-    def context_must_be_revalidated(cls, value: object) -> object:
-        if isinstance(value, SkillPackageIntakeContext):
-            return value.model_dump(mode="python")
-        return value
+    def evidence_must_be_revalidated(cls, value: object) -> object:
+        return _intake_evidence_data(value)
 
     @field_validator("decision", mode="before")
     @classmethod
