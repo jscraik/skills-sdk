@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 import tracemalloc
+from collections import UserDict
 from itertools import product
 from pathlib import Path
 
@@ -73,6 +74,135 @@ def _context(*, checks: IntakeChecks | None = None) -> SkillPackageIntakeContext
         owner=_owner(),
         checks=checks or IntakeChecks(identity=True, provenance=True, rights=True, owner_unchanged=True),
     )
+
+
+def test_blocked_validation_identity_is_candidate_bound() -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(), policy=SkillValidationPolicy(max_entrypoint_lines=1))
+    payload = receipt.model_dump(mode="json")
+    assert receipt.status == "blocked" and receipt.candidate is not None
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+    payload["validation"]["identity"].update(package_id="different-package", name="different-package")
+    with pytest.raises(ValidationError, match="validation identity must match"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize("value", [1, 0, "yes", "false", None])
+@pytest.mark.parametrize("field", ["identity", "provenance", "rights", "owner_unchanged"])
+def test_intake_checks_reject_coercion(value: object, field: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.intake import normalization
+
+    context = _context()
+    payload = context.model_dump(mode="json")
+    payload["checks"][field] = value
+    with pytest.raises(ValidationError, match="actual booleans"):
+        SkillPackageIntakeContext.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake-context.v1", payload)
+
+    def unexpected_inspection(*args: object, **kwargs: object) -> None:
+        pytest.fail("invalid checks reached package inspection")
+
+    monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    forged = context.model_copy(update={"checks": IntakeChecks.model_construct(**payload["checks"])})
+    with pytest.raises(ValidationError, match="actual booleans"):
+        intake_skill_package(FIXTURE_ROOT, forged)
+
+
+@pytest.mark.parametrize("location", ["context", "decision"])
+def test_serialized_intake_receipt_checks_reject_coercion(location: str) -> None:
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="json")
+    payload[location]["checks"]["rights"] = "yes"
+    with pytest.raises(ValidationError, match="actual booleans"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize("field", ["source_repository", "checks"])
+def test_blocked_receipt_revalidates_forged_typed_context(field: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(), policy=SkillValidationPolicy(max_entrypoint_lines=1))
+    payload = receipt.model_dump(mode="python")
+    value = (
+        "https://example-user:FAKE_TOKEN@example.invalid/repo"
+        if field == "source_repository"
+        else {
+            "identity": True,
+            "provenance": True,
+            "rights": "yes",
+            "owner_unchanged": True,
+        }
+    )
+    payload["context"] = receipt.context.model_copy(update={field: value})
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeReceipt.model_validate(payload)
+
+
+@pytest.mark.parametrize("location", ["context", "decision"])
+def test_intake_checks_reject_mapping_coercion(location: str) -> None:
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="python")
+    payload[location]["checks"] = UserDict({**payload[location]["checks"], "rights": "yes"})
+    payload[location] = UserDict(payload[location])
+    with pytest.raises(ValidationError, match="actual booleans"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    if location == "context":
+        with pytest.raises(ValidationError, match="actual booleans"):
+            SkillPackageIntakeContext.model_validate(payload[location])
+
+
+def test_prevalidated_shared_checks_preserve_their_current_values() -> None:
+    checks = IntakeChecks.model_validate({"identity": 1, "provenance": "yes", "rights": True, "owner_unchanged": False})
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(checks=checks))
+    assert receipt.context.checks == checks
+    assert receipt.decision.decision is IntakeDecisionStatus.NEEDS_OWNER_DECISION
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize(
+    "locator",
+    [
+        "https://example-user:FAKE_TOKEN@example.invalid/repo",
+        "/example/local/checkout",
+        "C:\\example\\checkout",
+        "../checkout",
+        "owner/repo?token=FAKE_TOKEN",
+        "owner/repo#fragment",
+    ],
+)
+def test_intake_repository_rejects_sensitive_locators(locator: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.intake import normalization
+
+    context = _context()
+    payload = context.model_dump(mode="json")
+    payload["source_repository"] = locator
+    with pytest.raises(ValidationError, match="owner/repository slug"):
+        SkillPackageIntakeContext.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake-context.v1", payload)
+    receipt_payload = intake_skill_package(FIXTURE_ROOT, context).model_dump(mode="json")
+    receipt_payload["context"]["source_repository"] = locator
+    with pytest.raises(ValidationError, match="owner/repository slug"):
+        SkillPackageIntakeReceipt.model_validate(receipt_payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", receipt_payload)
+
+    def unexpected_inspection(*args: object, **kwargs: object) -> None:
+        pytest.fail("invalid locator reached package inspection")
+
+    monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    with pytest.raises(ValidationError, match="owner/repository slug"):
+        intake_skill_package(FIXTURE_ROOT, context.model_copy(update={"source_repository": locator}))
+
+
+@pytest.mark.parametrize("locator", ["jscraik/skills-sdk", "Example-Team/repo.name_2"])
+def test_intake_repository_preserves_portable_slug(locator: str) -> None:
+    payload = _context().model_dump(mode="json")
+    payload["source_repository"] = locator
+    receipt = intake_skill_package(FIXTURE_ROOT, SkillPackageIntakeContext.model_validate(payload))
+    assert receipt.source.provenance.repository == locator
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
 
 
 def test_intake_normalizes_validated_skill_without_mutation() -> None:

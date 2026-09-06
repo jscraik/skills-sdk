@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from typing import Literal
 
 from pydantic import field_validator, model_validator
@@ -61,6 +63,24 @@ class SkillPackageIntakeContext(_ContractModel):
     owner: PackageOwner
     checks: IntakeChecks
 
+    @field_validator("source_repository")
+    @classmethod
+    def repository_must_be_portable(cls, value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+            raise ValueError("intake repository must be a credential-free owner/repository slug")
+        return value
+
+    @field_validator("checks", mode="before")
+    @classmethod
+    def checks_must_be_booleans(cls, value: object) -> object:
+        if isinstance(value, IntakeChecks):
+            value = value.model_dump(mode="python")
+        if isinstance(value, Mapping):
+            for field in _CHECK_BLOCKERS:
+                if field in value and type(value[field]) is not bool:
+                    raise ValueError("intake checks must contain actual booleans")
+        return value
+
     @field_validator("source_path")
     @classmethod
     def source_path_must_be_portable(cls, value: str) -> str:
@@ -84,6 +104,22 @@ class SkillPackageIntakeReceipt(_ContractModel):
     network_used: Literal[False] = False
     execution_performed: Literal[False] = False
 
+    @field_validator("context", mode="before")
+    @classmethod
+    def context_must_be_revalidated(cls, value: object) -> object:
+        if isinstance(value, SkillPackageIntakeContext):
+            return value.model_dump(mode="python")
+        return value
+
+    @field_validator("decision", mode="before")
+    @classmethod
+    def decision_checks_must_be_booleans(cls, value: object) -> object:
+        if isinstance(value, IntakeDecision):
+            value = value.model_dump(mode="python")
+        if isinstance(value, Mapping) and "checks" in value:
+            SkillPackageIntakeContext.checks_must_be_booleans(value["checks"])
+        return value
+
     @model_validator(mode="after")
     def proof_is_candidate_bound(self) -> SkillPackageIntakeReceipt:
         paths = tuple(item.path for item in self.validation.files)
@@ -91,6 +127,12 @@ class SkillPackageIntakeReceipt(_ContractModel):
             raise ValueError("intake validation files must be sorted by path")
         if self.candidate != self.validation.candidate:
             raise ValueError("intake receipt candidate must match validation")
+        if (
+            self.candidate is not None
+            and self.validation.identity is not None
+            and self.validation.identity.package_id != self.candidate.package_id
+        ):
+            raise ValueError("intake validation identity must match the candidate")
         if self.candidate is not None and self.decision is None:
             raise ValueError("resolved intake candidate requires a decision")
         if self.candidate is not None and self.candidate.content_sha256 != candidate_content_sha256(

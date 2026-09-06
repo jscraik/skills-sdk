@@ -153,6 +153,13 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 ## Read-only intake
 
+`source_repository` accepts a credential-free `owner/repository` slug, not a
+URL or a local checkout path. Raw intake checks must be actual booleans.
+Existing `IntakeChecks` instances are accepted using their current boolean
+values; any coercion performed before intake cannot be recovered. Pass raw
+data to `SkillPackageIntakeContext.model_validate` to enforce this boundary
+before coercion. Shared package models retain their existing behavior.
+
 Run this example from the repository root with the pinned environment:
 
 ```bash

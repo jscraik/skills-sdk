@@ -52,6 +52,13 @@ Use the intake models or registry directly; normalization is not admission,
 installation, or publication evidence. Existing supported generic receipts
 retain their dispatch behavior.
 
+Intake rejects repository locators outside the documented `owner/repository`
+slug form and rejects non-boolean raw checks before coercion. Prevalidated
+shared check models retain their current values; intake cannot recover their
+original inputs. Blocked receipts with a retained validation identity must bind
+that identity to their candidate. These intake-local invariants do not change
+the shared package, check, or validation contracts.
+
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still
 blocked. The corresponding `v1` models and schemas remain unchanged and reject
