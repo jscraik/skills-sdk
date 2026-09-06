@@ -7,10 +7,11 @@ import json
 import os
 import stat
 import struct
+import zlib
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO
-from zipfile import BadZipFile, ZipFile, ZipInfo
+from zipfile import ZIP_DEFLATED, ZIP_STORED, BadZipFile, ZipFile, ZipInfo
 
 from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
@@ -106,7 +107,8 @@ def _preflight_central_directory(snapshot: bytes, policy: PackageArchiveVerifica
 
 def _read_manifest(archive: ZipFile, info: ZipInfo) -> PackageManifest | None:
     try:
-        payload = json.loads(archive.read(info), object_pairs_hook=_reject_duplicate_keys)
+        with archive.open(info) as stream:
+            payload = json.loads(stream.read(info.file_size + 1), object_pairs_hook=_reject_duplicate_keys)
         return PackageManifest.model_validate(payload)
     except (KeyError, UnicodeDecodeError, json.JSONDecodeError, ValidationError, ValueError):
         return None
@@ -130,6 +132,8 @@ def _validate_entries(
             return None, _blocked(code, "archive entry path is duplicated", (path,))
         if info.flag_bits & 0x1:
             return None, _blocked("archive_unreadable", "encrypted archive entries are not supported", (path,))
+        if info.compress_type not in (ZIP_STORED, ZIP_DEFLATED):
+            return None, _blocked("archive_invalid_zip", "archive compression method is not supported", (path,))
         if _is_symlink(info):
             return None, _blocked("archive_symlink_forbidden", "archive symlink entries are forbidden", (path,))
         entries[path] = info
@@ -254,7 +258,7 @@ def verify_package_archive(
                     return failure
         except RuntimeError:
             return _blocked("archive_unreadable", "package archive contains an unreadable entry")
-        except (BadZipFile, OSError):
+        except (BadZipFile, OSError, EOFError, UnicodeDecodeError, zlib.error):
             return _blocked("archive_invalid_zip", "package archive is not a readable ZIP")
     assert package_digest is not None
     return PackageArchiveVerificationReceipt(
