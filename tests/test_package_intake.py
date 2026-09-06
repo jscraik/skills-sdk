@@ -14,14 +14,14 @@ from pydantic import ValidationError
 from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import parse_receipt
-from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.core.schema_registry import MAX_JSON_NESTING_DEPTH, SchemaRegistry
 from skills_sdk.intake import intake_skill_package
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.package import IntakeChecks, IntakeDecisionStatus, PackageOwner, PackageSourceKind
 from skills_sdk.models.packaging import PackageManifestFile
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.packaging import build_skill_package
-from skills_sdk.validation import SkillValidationPolicy
+from skills_sdk.validation import SkillValidationPolicy, validate_skill_package
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "synthetic-skill"
 
@@ -88,6 +88,96 @@ def test_blocked_validation_identity_is_candidate_bound() -> None:
         SkillPackageIntakeReceipt.model_validate(payload)
     with pytest.raises(ContractError):
         SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+def test_blocked_intake_cannot_erase_resolved_candidate(tmp_path: Path) -> None:
+    root = tmp_path / "missing"
+    receipt = intake_skill_package(root, _context())
+    assert receipt.status == "blocked" and receipt.candidate is not None and receipt.decision is not None
+    payload = receipt.model_dump(mode="json")
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+    payload["candidate"] = payload["validation"]["candidate"] = payload["decision"] = None
+    with pytest.raises(ValidationError, match="must retain its resolved candidate"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    unresolved = validate_skill_package(root, source_revision="invalid")
+    assert unresolved.candidate is None
+    SchemaRegistry().validate("skill-package-validation.v1", unresolved.model_dump(mode="json"))
+    with pytest.raises(ValidationError):
+        intake_skill_package(root, _context().model_copy(update={"source_revision": "invalid"}))
+
+
+def _malformed_evidence(kind: str) -> object:
+    if kind == "cycle":
+        mapping: dict[str, object] = {}
+        mapping["loop"] = mapping
+        return mapping
+    if kind == "list_cycle":
+        sequence: list[object] = []
+        sequence.append(sequence)
+        return sequence
+    nested: object = "leaf"
+    for _ in range(MAX_JSON_NESTING_DEPTH + 2):
+        nested = {"child": nested}
+    return nested
+
+
+@pytest.mark.parametrize(
+    "field", ["context", "candidate", "validation", "source", "decision", "normalized_package", "blocker"]
+)
+@pytest.mark.parametrize("kind", ["cycle", "list_cycle", "deep"])
+def test_intake_receipt_bounds_nested_evidence(field: str, kind: str) -> None:
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="python")
+    payload[field] = _malformed_evidence(kind)
+    message = "nesting depth" if kind == "deep" else "cyclic containers"
+    with pytest.raises(ValidationError, match=message):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert error.value.code == "invalid_json_value"
+
+
+@pytest.mark.parametrize("kind", ["cycle", "list_cycle", "deep"])
+def test_intake_service_bounds_forged_typed_context(kind: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.intake import normalization
+
+    payload = _context().model_dump(mode="python")
+    payload["owner"] = _context().owner.model_copy(update={"owner": _malformed_evidence(kind)})
+    message = "nesting depth" if kind == "deep" else "cyclic containers"
+    with pytest.raises(ValidationError, match=message):
+        SkillPackageIntakeContext.model_validate(payload)
+
+    def unexpected_inspection(*args: object, **kwargs: object) -> None:
+        pytest.fail("malformed evidence reached package inspection")
+
+    monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    with pytest.raises(ValidationError, match=message):
+        intake_skill_package(FIXTURE_ROOT, _context().model_copy(update={"owner": payload["owner"]}))
+
+
+def test_intake_allows_shared_evidence_without_cycles() -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    payload = receipt.model_dump(mode="python")
+    payload["normalized_package"]["source"] = payload["source"]
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize("overflow", [False, True])
+def test_intake_depth_boundary_matches_registry(overflow: bool) -> None:
+    nested: object = "leaf"
+    for _ in range(MAX_JSON_NESTING_DEPTH - 1 + int(overflow)):
+        nested = {"child": nested}
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="python")
+    payload["validation"] = nested
+    with pytest.raises(ValidationError) as model_error:
+        SkillPackageIntakeReceipt.model_validate(payload)
+    assert ("nesting depth" in str(model_error.value)) is overflow
+    with pytest.raises(ContractError) as registry_error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert registry_error.value.code == ("invalid_json_value" if overflow else "contract_validation_failed")
 
 
 @pytest.mark.parametrize("wrapper", ["typed", "mapping"])

@@ -65,6 +65,11 @@ Preconstructed shared models do not bypass their field constraints at this
 receipt boundary; shared model configuration remains unchanged.
 Evidence sequences use lists or tuples. Other iterable inputs, including
 iterators and deques, are rejected rather than passed to nested coercion.
+Cycles and nesting beyond the registry's 100-level JSON boundary fail validation;
+repeated references without cycles remain valid. Intake always requires a
+valid source revision, so even blocked intake retains its resolved candidate
+and decision. Shared validation may still return an unresolved candidate for
+an invalid revision; such a result cannot become an intake receipt.
 
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still

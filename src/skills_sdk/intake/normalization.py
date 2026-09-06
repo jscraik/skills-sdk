@@ -23,7 +23,7 @@ def intake_skill_package(
 ) -> SkillPackageIntakeReceipt:
     """Validate and normalize one package without copying, executing, or admitting it."""
 
-    context = SkillPackageIntakeContext.model_validate(context.model_dump(mode="python"))
+    context = SkillPackageIntakeContext.model_validate(dict(context))
     validation = validate_skill_package(package_root, source_revision=context.source_revision, policy=policy)
     if validation.status == "blocked":
         first = next(finding for finding in validation.findings if finding.severity is ValidationSeverity.BLOCKER)

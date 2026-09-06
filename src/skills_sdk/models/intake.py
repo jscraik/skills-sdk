@@ -10,6 +10,7 @@ from pydantic import field_validator, model_validator
 
 from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.schema_registry import MAX_JSON_NESTING_DEPTH
 from skills_sdk.models.inventory import GitRevision, NonEmptyText, PortablePath, _ContractModel
 from skills_sdk.models.package import (
     IntakeChecks,
@@ -33,14 +34,23 @@ _CHECK_BLOCKERS = {
 }
 
 
-def _intake_evidence_data(value: object) -> object:
+def _intake_evidence_data(value: object, active: set[int] | None = None, depth: int = 0) -> object:
     """Expose nested typed evidence to the intake field validators again."""
-    if isinstance(value, _ContractModel):
-        return _intake_evidence_data(value.model_dump(mode="python"))
-    if isinstance(value, Mapping):
-        return {key: _intake_evidence_data(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return tuple(_intake_evidence_data(item) for item in value)
+    if depth > MAX_JSON_NESTING_DEPTH:
+        raise ValueError("intake evidence exceeds the maximum JSON nesting depth")
+    if isinstance(value, (_ContractModel, Mapping, list, tuple)):
+        active = active if active is not None else set()
+        identity = id(value)
+        if identity in active:
+            raise ValueError("intake evidence cannot contain cyclic containers")
+        active.add(identity)
+        try:
+            if isinstance(value, (_ContractModel, Mapping)):
+                items = dict(value) if isinstance(value, _ContractModel) else value
+                return {key: _intake_evidence_data(item, active, depth + 1) for key, item in items.items()}
+            return tuple(_intake_evidence_data(item, active, depth + 1) for item in value)
+        finally:
+            active.remove(identity)
     if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
         raise ValueError("intake evidence sequences must be lists or tuples")
     return value
@@ -75,6 +85,11 @@ class SkillPackageIntakeContext(_ContractModel):
     source_kind: Literal[PackageSourceKind.GIT, PackageSourceKind.EXTERNAL, PackageSourceKind.LOCAL]
     owner: PackageOwner
     checks: IntakeChecks
+
+    @model_validator(mode="before")
+    @classmethod
+    def evidence_must_be_bounded(cls, value: object) -> object:
+        return _intake_evidence_data(value)
 
     @field_validator("source_repository")
     @classmethod
@@ -122,19 +137,21 @@ class SkillPackageIntakeReceipt(_ContractModel):
     )
     @classmethod
     def evidence_must_be_revalidated(cls, value: object) -> object:
-        return _intake_evidence_data(value)
+        return _intake_evidence_data(value, depth=1)
 
     @field_validator("decision", mode="before")
     @classmethod
     def decision_checks_must_be_booleans(cls, value: object) -> object:
         if isinstance(value, IntakeDecision):
-            value = value.model_dump(mode="python")
+            value = dict(value)
         if isinstance(value, Mapping) and "checks" in value:
             SkillPackageIntakeContext.checks_must_be_booleans(value["checks"])
         return value
 
     @model_validator(mode="after")
     def proof_is_candidate_bound(self) -> SkillPackageIntakeReceipt:
+        if self.candidate is None:
+            raise ValueError("intake receipt must retain its resolved candidate")
         paths = tuple(item.path for item in self.validation.files)
         if paths != tuple(sorted(paths)):
             raise ValueError("intake validation files must be sorted by path")
