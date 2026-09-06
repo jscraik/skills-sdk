@@ -119,7 +119,31 @@
       "$ref": "#/$defs/IntakeChecks"
     },
     "owner": {
-      "$ref": "#/$defs/PackageOwner"
+      "$ref": "#/$defs/PackageOwner",
+      "properties": {
+        "maintainer": {
+          "not": {
+            "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+          },
+          "type": "string"
+        },
+        "owner": {
+          "not": {
+            "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+          },
+          "type": "string"
+        },
+        "rights": {
+          "properties": {
+            "license": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            }
+          }
+        }
+      }
     },
     "schema_version": {
       "const": "skill-package-intake-context/v1",

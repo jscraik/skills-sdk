@@ -32,6 +32,53 @@
     },
     "IntakeDecision": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "blocker_codes": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "blocker_codes"
+            ]
+          },
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "admit"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "blocker_codes": {
+                "maxItems": 0
+              },
+              "checks": {
+                "properties": {
+                  "identity": {
+                    "const": true
+                  },
+                  "owner_unchanged": {
+                    "const": true
+                  },
+                  "provenance": {
+                    "const": true
+                  },
+                  "rights": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
       "description": "Candidate-bound admission result with typed, explicit blockers.",
       "properties": {
         "blocker_codes": {
@@ -80,6 +127,54 @@
     },
     "NormalizedPackage": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "package_type": {
+                "const": "skill"
+              }
+            },
+            "required": [
+              "package_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "package_type": {
+                    "const": "skill"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "package_type": {
+                "const": "plugin"
+              }
+            },
+            "required": [
+              "package_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "package_type": {
+                    "const": "plugin"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
       "description": "Portable normalized package before provider or runtime projection.",
       "properties": {
         "dependencies": {
@@ -515,7 +610,31 @@
           "$ref": "#/$defs/IntakeChecks"
         },
         "owner": {
-          "$ref": "#/$defs/PackageOwner"
+          "$ref": "#/$defs/PackageOwner",
+          "properties": {
+            "maintainer": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "owner": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "rights": {
+              "properties": {
+                "license": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                }
+              }
+            }
+          }
         },
         "schema_version": {
           "const": "skill-package-intake-context/v1",
@@ -746,7 +865,35 @@
           "type": "null"
         }
       ],
-      "default": null
+      "default": null,
+      "properties": {
+        "owner": {
+          "properties": {
+            "maintainer": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "owner": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "rights": {
+              "properties": {
+                "license": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "schema_version": {
       "const": "skill-package-intake/v1",
@@ -783,5 +930,13 @@
     "validation"
   ],
   "title": "SkillPackageIntakeReceipt",
-  "type": "object"
+  "type": "object",
+  "x-skills-sdk-semantic-validation": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "candidate, source, context, decision and normalized package identities must agree",
+      "candidate content digest must match the sorted validation files",
+      "decision and blocker must match their persisted validation and admission evidence"
+    ]
+  }
 }

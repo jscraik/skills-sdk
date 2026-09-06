@@ -175,6 +175,15 @@ values; any coercion performed before intake cannot be recovered. Pass raw
 data to `SkillPackageIntakeContext.model_validate` to enforce this boundary
 before coercion. Shared package models retain their existing behavior.
 
+Intake owner, maintainer, and license fields require public strings without
+machine paths or credential-shaped text. This screening also applies to
+serialized receipts and typed inputs; it does not establish that arbitrary
+text contains no private information. Ordinary names, SPDX expressions, and
+credential-free public license URLs remain accepted. The generated intake
+schema rejects inconsistent admission checks and package types. Candidate
+bindings, content digests, and evidence-derived decisions still require
+`SchemaRegistry.validate`, as identified by its semantic-validation metadata.
+
 Run this example from the repository root with the pinned environment:
 
 ```bash

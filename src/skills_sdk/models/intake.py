@@ -33,6 +33,24 @@ _CHECK_BLOCKERS = {
     "owner_unchanged": "owner_decision_required",
 }
 _REPOSITORY_SLUG_PATTERN = r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*"
+_OWNER_PRIVATE_PATTERN = (
+    r"(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|"
+    r"[bB][eE][aA][rR][eE][rR]\s+\S+|"
+    r"[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|"
+    r"(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|"
+    r"[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\"']?\s*[:=])|"
+    r"-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\s]*@|"
+    r"[fF][iI][lL][eE]://|(?:^|[\s(=:\"'])(?:/(?!/)[^\s]|[A-Za-z]:[\\/])|\\\\|"
+    r"~[\\/]|\$(?:\{)?(?:HOME|USER|USERPROFILE)(?:\})?[\\/]|%(?:HOME|USER|USERPROFILE)%[\\/]"
+)
+_OWNER_TEXT_SCHEMA = {"type": "string", "not": {"pattern": _OWNER_PRIVATE_PATTERN}}
+_OWNER_PUBLIC_SCHEMA = {
+    "properties": {
+        "owner": _OWNER_TEXT_SCHEMA,
+        "maintainer": _OWNER_TEXT_SCHEMA,
+        "rights": {"properties": {"license": _OWNER_TEXT_SCHEMA}},
+    }
+}
 
 
 def _intake_evidence_data(value: object, active: set[int] | None = None, depth: int = 0) -> object:
@@ -78,6 +96,19 @@ def build_intake_decision(
     return IntakeDecision(candidate=candidate, decision=status, checks=checks, blocker_codes=blocker_codes)
 
 
+def _public_owner_metadata(value: object) -> object:
+    value = _intake_evidence_data(value)
+    if isinstance(value, Mapping):
+        fields = [value[key] for key in ("owner", "maintainer") if key in value]
+        rights = value.get("rights")
+        if isinstance(rights, Mapping) and "license" in rights:
+            fields.append(rights["license"])
+        for text in fields:
+            if not isinstance(text, str) or re.search(_OWNER_PRIVATE_PATTERN, text):
+                raise ValueError("intake owner metadata must be public text without machine paths or credential shapes")
+    return value
+
+
 class SkillPackageIntakeContext(_ContractModel):
     """Caller-supplied source and admission evidence for portable intake."""
 
@@ -90,13 +121,18 @@ class SkillPackageIntakeContext(_ContractModel):
     source_revision: GitRevision
     source_path: PortablePath
     source_kind: Literal[PackageSourceKind.GIT, PackageSourceKind.EXTERNAL, PackageSourceKind.LOCAL]
-    owner: PackageOwner
+    owner: PackageOwner = Field(json_schema_extra=_OWNER_PUBLIC_SCHEMA)
     checks: IntakeChecks
 
     @model_validator(mode="before")
     @classmethod
     def evidence_must_be_bounded(cls, value: object) -> object:
         return _intake_evidence_data(value)
+
+    @field_validator("owner", mode="before")
+    @classmethod
+    def owner_must_be_public(cls, value: object) -> object:
+        return _public_owner_metadata(value)
 
     @field_validator("source_repository", mode="before")
     @classmethod
@@ -135,11 +171,21 @@ class SkillPackageIntakeReceipt(_ContractModel):
     validation: SkillPackageValidation
     source: PackageSource | None = None
     decision: IntakeDecision | None = None
-    normalized_package: NormalizedPackage | None = None
+    normalized_package: NormalizedPackage | None = Field(
+        default=None, json_schema_extra={"properties": {"owner": _OWNER_PUBLIC_SCHEMA}}
+    )
     blocker: PackageReceiptBlocker | None = None
     mutation_performed: Literal[False] = False
     network_used: Literal[False] = False
     execution_performed: Literal[False] = False
+
+    @field_validator("normalized_package", mode="before")
+    @classmethod
+    def normalized_owner_must_be_public(cls, value: object) -> object:
+        value = _intake_evidence_data(value, depth=1)
+        if isinstance(value, Mapping) and "owner" in value:
+            _public_owner_metadata(value["owner"])
+        return value
 
     @field_validator(
         "context", "candidate", "validation", "source", "decision", "normalized_package", "blocker", mode="before"
