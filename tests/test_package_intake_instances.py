@@ -102,3 +102,27 @@ def test_decision_helper_preserves_valid_typed_neighbors(owner_unchanged: bool) 
         IntakeDecisionStatus.ADMIT if owner_unchanged else IntakeDecisionStatus.NEEDS_OWNER_DECISION
     )
     assert IntakeDecision.model_validate(decision.model_dump(mode="json")) == decision
+
+
+@pytest.mark.parametrize(
+    "locator",
+    [
+        "owner/repo\n",
+        " owner/repo",
+        "owner/repo ",
+        "owner/repo\t",
+        "\towner/repo",
+        "owner/repo\r",
+        b"owner/repo",
+        1,
+        None,
+    ],
+)
+def test_repository_raw_values_are_not_normalized(locator: object) -> None:
+    context = _context()
+    payload = context.model_dump(mode="json")
+    payload["source_repository"] = locator
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeContext.model_validate(payload)
+    with pytest.raises(ValidationError):
+        intake_skill_package(FIXTURE_ROOT, context.model_copy(update={"source_repository": locator}))

@@ -98,10 +98,10 @@ class SkillPackageIntakeContext(_ContractModel):
     def evidence_must_be_bounded(cls, value: object) -> object:
         return _intake_evidence_data(value)
 
-    @field_validator("source_repository")
+    @field_validator("source_repository", mode="before")
     @classmethod
-    def repository_must_be_portable(cls, value: str) -> str:
-        if re.fullmatch(_REPOSITORY_SLUG_PATTERN, value) is None:
+    def repository_must_be_portable(cls, value: object) -> str:
+        if not isinstance(value, str) or re.fullmatch(_REPOSITORY_SLUG_PATTERN, value) is None:
             raise ValueError("intake repository must be a credential-free owner/repository slug")
         return value
 

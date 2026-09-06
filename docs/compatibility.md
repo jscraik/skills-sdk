@@ -76,6 +76,8 @@ The generated intake schemas enforce the same repository slug grammar,
 including rejection of trailing newlines. `build_intake_decision` revalidates
 typed candidate and check inputs before projecting a decision; forged shared
 instances cannot bypass the intake boundary or coerce non-boolean checks.
+Repository slugs are checked before whitespace stripping or byte decoding;
+direct model and service callers cannot normalize invalid raw locators.
 
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still
