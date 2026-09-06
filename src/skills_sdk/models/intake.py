@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable, Mapping
 from typing import Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import ConfigDict, field_validator, model_validator
 
 from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.paths import require_portable_relative_path
@@ -78,6 +78,8 @@ def build_intake_decision(
 class SkillPackageIntakeContext(_ContractModel):
     """Caller-supplied source and admission evidence for portable intake."""
 
+    model_config = ConfigDict(revalidate_instances="always")
+
     schema_version: Literal["skill-package-intake-context/v1"] = "skill-package-intake-context/v1"
     source_repository: NonEmptyText
     source_revision: GitRevision
@@ -118,6 +120,8 @@ class SkillPackageIntakeContext(_ContractModel):
 
 class SkillPackageIntakeReceipt(_ContractModel):
     """Read-only structural intake and normalization result for one skill."""
+
+    model_config = ConfigDict(revalidate_instances="always")
 
     schema_version: Literal["skill-package-intake/v1"] = "skill-package-intake/v1"
     status: Literal["normalized", "blocked"]

@@ -70,6 +70,8 @@ repeated references without cycles remain valid. Intake always requires a
 valid source revision, so even blocked intake retains its resolved candidate
 and decision. Shared validation may still return an unresolved candidate for
 an invalid revision; such a result cannot become an intake receipt.
+Top-level intake context and receipt instances are revalidated on entry too;
+passing a preconstructed instance does not bypass these intake constraints.
 
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still

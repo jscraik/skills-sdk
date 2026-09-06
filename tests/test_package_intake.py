@@ -128,12 +128,15 @@ def _malformed_evidence(kind: str) -> object:
     "field", ["context", "candidate", "validation", "source", "decision", "normalized_package", "blocker"]
 )
 @pytest.mark.parametrize("kind", ["cycle", "list_cycle", "deep"])
-def test_intake_receipt_bounds_nested_evidence(field: str, kind: str) -> None:
+@pytest.mark.parametrize("ingress", ["mapping", "instance"])
+def test_intake_receipt_bounds_nested_evidence(field: str, kind: str, ingress: str) -> None:
     payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="python")
     payload[field] = _malformed_evidence(kind)
     message = "nesting depth" if kind == "deep" else "cyclic containers"
     with pytest.raises(ValidationError, match=message):
-        SkillPackageIntakeReceipt.model_validate(payload)
+        SkillPackageIntakeReceipt.model_validate(
+            payload if ingress == "mapping" else SkillPackageIntakeReceipt.model_construct(**payload)
+        )
     with pytest.raises(ContractError) as error:
         SchemaRegistry().validate("skill-package-intake.v1", payload)
     assert error.value.code == "invalid_json_value"
@@ -153,8 +156,11 @@ def test_intake_service_bounds_forged_typed_context(kind: str, monkeypatch: pyte
         pytest.fail("malformed evidence reached package inspection")
 
     monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    forged = _context().model_copy(update={"owner": payload["owner"]})
     with pytest.raises(ValidationError, match=message):
-        intake_skill_package(FIXTURE_ROOT, _context().model_copy(update={"owner": payload["owner"]}))
+        SkillPackageIntakeContext.model_validate(forged)
+    with pytest.raises(ValidationError, match=message):
+        intake_skill_package(FIXTURE_ROOT, forged)
 
 
 def test_intake_allows_shared_evidence_without_cycles() -> None:
@@ -207,7 +213,8 @@ def test_intake_revalidates_typed_validation_findings(wrapper: str, path: str) -
 @pytest.mark.parametrize(
     "field", ["context", "candidate", "validation", "source", "decision", "normalized_package", "blocker"]
 )
-def test_intake_revalidates_each_typed_receipt_field(field: str) -> None:
+@pytest.mark.parametrize("ingress", ["mapping", "instance"])
+def test_intake_revalidates_each_typed_receipt_field(field: str, ingress: str) -> None:
     policy = SkillValidationPolicy(max_entrypoint_lines=1) if field == "blocker" else None
     receipt = intake_skill_package(FIXTURE_ROOT, _context(), policy=policy)
     payload = dict(receipt)
@@ -224,7 +231,9 @@ def test_intake_revalidates_each_typed_receipt_field(field: str) -> None:
         elif field == "source":
             payload["normalized_package"] = receipt.normalized_package.model_copy(update={"source": payload[field]})
     with pytest.raises(ValidationError):
-        SkillPackageIntakeReceipt.model_validate(payload)
+        SkillPackageIntakeReceipt.model_validate(
+            payload if ingress == "mapping" else SkillPackageIntakeReceipt.model_construct(**payload)
+        )
     raw = {
         key: value.model_dump(mode="json") if hasattr(value, "model_dump") else value for key, value in payload.items()
     }
