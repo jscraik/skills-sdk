@@ -17,7 +17,9 @@ from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.inventory import Sha256
 from skills_sdk.models.packaging import (
     PackageArchiveVerificationPolicy,
@@ -75,9 +77,7 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]
     return result
 
 
-def _preflight_central_directory(snapshot: bytes, policy: PackageArchiveVerificationPolicy) -> bool:
-    search_start = max(0, len(snapshot) - _EOCD_SIZE - _MAX_ZIP_COMMENT_BYTES)
-    offset = snapshot.rfind(_EOCD_SIGNATURE, search_start)
+def _valid_central_directory_at(snapshot: bytes, policy: PackageArchiveVerificationPolicy, offset: int) -> bool:
     if offset < 0 or offset + _EOCD_SIZE > len(snapshot):
         return False
     disk, central_disk, disk_entries, total_entries, size, directory_offset, comment_size = struct.unpack_from(
@@ -105,17 +105,48 @@ def _preflight_central_directory(snapshot: bytes, policy: PackageArchiveVerifica
     return cursor == offset and observed_entries == total_entries
 
 
+def _preflight_central_directory(snapshot: bytes, policy: PackageArchiveVerificationPolicy) -> int | None:
+    search_start = max(0, len(snapshot) - _EOCD_SIZE - _MAX_ZIP_COMMENT_BYTES)
+    offset = snapshot.rfind(_EOCD_SIGNATURE, search_start)
+    nonempty_offset = None
+    empty_offset = None
+    while offset >= search_start:
+        if _valid_central_directory_at(snapshot, policy, offset):
+            if struct.unpack_from("<H", snapshot, offset + 10)[0]:
+                if nonempty_offset is not None:
+                    return None
+                nonempty_offset = offset
+            else:
+                empty_offset = offset
+        offset = snapshot.rfind(_EOCD_SIGNATURE, search_start, offset)
+    return nonempty_offset if nonempty_offset is not None else empty_offset
+
+
 def _read_manifest(archive: ZipFile, info: ZipInfo) -> PackageManifest | None:
     try:
         with archive.open(info) as stream:
-            payload = json.loads(stream.read(info.file_size + 1), object_pairs_hook=_reject_duplicate_keys)
+            data = _read_bounded_bytes(stream, info.file_size)
+        if len(data) != info.file_size:
+            return None
+        payload = json.loads(data, object_pairs_hook=_reject_duplicate_keys)
+        SchemaRegistry().validate("package-manifest.v1", payload)
         return PackageManifest.model_validate(payload)
-    except (KeyError, UnicodeDecodeError, json.JSONDecodeError, ValidationError, ValueError):
+    except (ContractError, KeyError, UnicodeDecodeError, json.JSONDecodeError, ValidationError, ValueError):
         return None
 
 
+def _local_compression_matches(snapshot: bytes, info: ZipInfo) -> bool:
+    offset = info.header_offset
+    return (
+        offset >= 0
+        and offset + 30 <= len(snapshot)
+        and snapshot[offset : offset + 4] == b"PK\x03\x04"
+        and struct.unpack_from("<H", snapshot, offset + 8)[0] == info.compress_type
+    )
+
+
 def _validate_entries(
-    infos: list[ZipInfo], policy: PackageArchiveVerificationPolicy
+    infos: list[ZipInfo], policy: PackageArchiveVerificationPolicy, snapshot: bytes
 ) -> tuple[dict[str, ZipInfo] | None, PackageArchiveVerificationReceipt | None]:
     if (
         len(infos) > policy.max_entry_count
@@ -134,6 +165,8 @@ def _validate_entries(
             return None, _blocked("archive_unreadable", "encrypted archive entries are not supported", (path,))
         if info.compress_type not in (ZIP_STORED, ZIP_DEFLATED):
             return None, _blocked("archive_invalid_zip", "archive compression method is not supported", (path,))
+        if not _local_compression_matches(snapshot, info):
+            return None, _blocked("archive_invalid_zip", "archive compression headers disagree", (path,))
         if _is_symlink(info):
             return None, _blocked("archive_symlink_forbidden", "archive symlink entries are forbidden", (path,))
         entries[path] = info
@@ -191,6 +224,16 @@ def _verify_bindings(
     return package_digest, None
 
 
+def _read_bounded_bytes(stream: BinaryIO, limit: int) -> bytes:
+    with BytesIO() as data:
+        while data.tell() <= limit:
+            chunk = stream.read(min(1024 * 1024, limit - data.tell() + 1))
+            if not chunk:
+                break
+            data.write(chunk)
+        return data.getvalue()
+
+
 def _read_snapshot(
     archive_path: Path, policy: PackageArchiveVerificationPolicy
 ) -> bytes | PackageArchiveVerificationReceipt:
@@ -200,7 +243,7 @@ def _read_snapshot(
         return _blocked("archive_missing", "package archive does not exist")
     except IsADirectoryError:
         return _blocked("archive_not_regular_file", "package archive is not a regular file")
-    except OSError:
+    except (OSError, ValueError):
         return _blocked("archive_unreadable", "package archive cannot be read")
     try:
         metadata = os.fstat(descriptor)
@@ -209,7 +252,7 @@ def _read_snapshot(
         if metadata.st_size > policy.max_archive_bytes:
             return _blocked("archive_invalid_zip", "archive exceeds configured verification bounds")
         with os.fdopen(descriptor, "rb", closefd=False) as archive_stream:
-            return archive_stream.read(policy.max_archive_bytes + 1)
+            return _read_bounded_bytes(archive_stream, policy.max_archive_bytes)
     except OSError:
         return _blocked("archive_unreadable", "package archive cannot be read")
     finally:
@@ -232,14 +275,21 @@ def verify_package_archive(
     with BytesIO(snapshot) as archive_stream:
         if len(snapshot) > active_policy.max_archive_bytes:
             return _blocked("archive_invalid_zip", "archive exceeds configured verification bounds")
-        if not _preflight_central_directory(snapshot, active_policy):
+        eocd_offset = _preflight_central_directory(snapshot, active_policy)
+        if eocd_offset is None:
             return _blocked("archive_invalid_zip", "archive central directory violates verification bounds")
         archive_digest = hashlib.sha256(snapshot).hexdigest()
         if expected_archive_sha256 is not None and archive_digest != expected_archive_sha256:
             return _blocked("archive_digest_mismatch", "archive digest does not match the expected digest")
+        # Keep the original digest; exclude only the validated comment from the
+        # stdlib parser's EOCD search, which otherwise trusts its last signature.
+        archive_stream.seek(eocd_offset + _EOCD_SIZE - 2)
+        archive_stream.write(b"\x00\x00")
+        archive_stream.truncate()
+        archive_stream.seek(0)
         try:
             with ZipFile(archive_stream) as archive:
-                entries, failure = _validate_entries(archive.infolist(), active_policy)
+                entries, failure = _validate_entries(archive.infolist(), active_policy, snapshot)
                 if failure is not None:
                     return failure
                 assert entries is not None
