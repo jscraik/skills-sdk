@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import Any
 
 import package_safety_schema
+from package_archive_schema import append_package_archive_constraints
 from provider_execution_schema import append_provider_execution_constraints
 from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
 from schema_model_groups import (
     evaluation_schema_models,
+    packaging_schema_models,
     provider_execution_schema_models,
     runtime_lifecycle_schema_models,
 )
@@ -31,12 +33,6 @@ from skills_sdk.models.package import (
     PackageSource,
     PluginIdentity,
     SkillIdentity,
-)
-from skills_sdk.models.packaging import (
-    PackageHardeningReceipt,
-    PackageManifest,
-    PackageReceipt,
-    PackageReceiptV2,
 )
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
 from skills_sdk.models.registry import (
@@ -728,6 +724,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_evaluation_receipt_constraints(schema, filename)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
+    elif filename == "package-archive-verification.v1.schema.json":
+        append_package_archive_constraints(schema)
     elif filename == "registry-preparation.v1.schema.json":
         _append_registry_preparation_constraints(schema)
     elif filename in {"provider-execution-request.v1.schema.json", "provider-execution-result.v1.schema.json"}:
@@ -766,10 +764,7 @@ def main() -> int:
         (PackageOwner, "package-owner.v1.schema.json"),
         (IntakeDecision, "intake-decision.v1.schema.json"),
         (NormalizedPackage, "normalized-package.v1.schema.json"),
-        (PackageManifest, "package-manifest.v1.schema.json"),
-        (PackageReceipt, "package-receipt.v1.schema.json"),
-        (PackageReceiptV2, "package-receipt.v2.schema.json"),
-        (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
+        *packaging_schema_models(),
         (ProviderIdentity, "provider-identity.v1.schema.json"),
         (ProviderIdentityV2, "provider-identity.v2.schema.json"),
         (RegistryIdentity, "registry-identity.v1.schema.json"),
