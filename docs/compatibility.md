@@ -72,6 +72,10 @@ and decision. Shared validation may still return an unresolved candidate for
 an invalid revision; such a result cannot become an intake receipt.
 Top-level intake context and receipt instances are revalidated on entry too;
 passing a preconstructed instance does not bypass these intake constraints.
+The generated intake schemas enforce the same repository slug grammar,
+including rejection of trailing newlines. `build_intake_decision` revalidates
+typed candidate and check inputs before projecting a decision; forged shared
+instances cannot bypass the intake boundary or coerce non-boolean checks.
 
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still

@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable, Mapping
 from typing import Literal
 
-from pydantic import ConfigDict, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.paths import require_portable_relative_path
@@ -32,6 +32,7 @@ _CHECK_BLOCKERS = {
     "rights": "rights_unconfirmed",
     "owner_unchanged": "owner_decision_required",
 }
+_REPOSITORY_SLUG_PATTERN = r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*"
 
 
 def _intake_evidence_data(value: object, active: set[int] | None = None, depth: int = 0) -> object:
@@ -64,6 +65,8 @@ def build_intake_decision(
 ) -> IntakeDecision:
     """Project an intake decision deterministically from its persisted evidence."""
 
+    candidate = PackageCandidateIdentity.model_validate(_intake_evidence_data(candidate))
+    checks = IntakeChecks.model_validate(_intake_evidence_data(checks), strict=True)
     check_blockers = tuple(code for field, code in _CHECK_BLOCKERS.items() if not getattr(checks, field))
     blocker_codes = tuple(dict.fromkeys((*additional_blocker_codes, *check_blockers)))
     if additional_blocker_codes or not (checks.identity and checks.provenance and checks.rights):
@@ -81,7 +84,9 @@ class SkillPackageIntakeContext(_ContractModel):
     model_config = ConfigDict(revalidate_instances="always")
 
     schema_version: Literal["skill-package-intake-context/v1"] = "skill-package-intake-context/v1"
-    source_repository: NonEmptyText
+    source_repository: NonEmptyText = Field(
+        json_schema_extra={"pattern": f"^{_REPOSITORY_SLUG_PATTERN}$", "not": {"pattern": r"[\r\n]"}}
+    )
     source_revision: GitRevision
     source_path: PortablePath
     source_kind: Literal[PackageSourceKind.GIT, PackageSourceKind.EXTERNAL, PackageSourceKind.LOCAL]
@@ -96,7 +101,7 @@ class SkillPackageIntakeContext(_ContractModel):
     @field_validator("source_repository")
     @classmethod
     def repository_must_be_portable(cls, value: str) -> str:
-        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*", value) is None:
+        if re.fullmatch(_REPOSITORY_SLUG_PATTERN, value) is None:
             raise ValueError("intake repository must be a credential-free owner/repository slug")
         return value
 

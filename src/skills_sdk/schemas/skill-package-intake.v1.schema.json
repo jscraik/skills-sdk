@@ -540,6 +540,10 @@
         },
         "source_repository": {
           "minLength": 1,
+          "not": {
+            "pattern": "[\\r\\n]"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$",
           "title": "Source Repository",
           "type": "string"
         },
