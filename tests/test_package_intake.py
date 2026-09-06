@@ -12,11 +12,13 @@ from pydantic import ValidationError
 
 from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.errors import ContractError
+from skills_sdk.core.receipts import parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.intake import intake_skill_package
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.package import IntakeChecks, IntakeDecisionStatus, PackageOwner, PackageSourceKind
 from skills_sdk.models.packaging import PackageManifestFile
+from skills_sdk.packaging import build_skill_package
 from skills_sdk.validation import SkillValidationPolicy
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "synthetic-skill"
@@ -102,6 +104,32 @@ def test_normalization_preserves_non_admit_owner_decision() -> None:
     assert receipt.normalized_package is not None
 
 
+@pytest.mark.parametrize("kind", ("context", "normalized", "blocked"))
+def test_generic_parser_rejects_intake_contracts(tmp_path: Path, kind: str) -> None:
+    context = _context()
+    if kind == "context":
+        payload = context.model_dump(mode="json")
+        schema = "skill-package-intake-context.v1"
+    else:
+        root = FIXTURE_ROOT if kind == "normalized" else tmp_path / "missing"
+        receipt = intake_skill_package(root, context)
+        assert receipt.status == kind
+        payload = receipt.model_dump(mode="json")
+        schema = "skill-package-intake.v1"
+    SchemaRegistry().validate(schema, payload)
+    with pytest.raises(ContractError) as error:
+        parse_receipt(payload)
+    assert error.value.code == "unsupported_receipt_family"
+
+
+def test_generic_parser_still_accepts_package_build_receipt() -> None:
+    receipt = build_skill_package(FIXTURE_ROOT, source_revision="1" * 40)
+    assert receipt.status == "built"
+    parsed = parse_receipt(receipt.model_dump(mode="json"))
+    assert parsed.artifact_status == "built"
+    assert parsed.candidate.package_id == receipt.candidate.package_id
+
+
 @pytest.mark.parametrize("boundary", ("model", "registry"))
 @pytest.mark.parametrize("forgery", ("digest", "lifecycle"))
 def test_intake_rejects_forged_content_and_lifecycle(boundary: str, forgery: str) -> None:
@@ -163,6 +191,20 @@ def test_invalid_source_returns_typed_blocker(tmp_path: Path) -> None:
     assert receipt.blocker.code == "invalid_package_root"
     assert receipt.normalized_package is None
     SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+def test_blocked_receipt_requires_its_primary_blocker(tmp_path: Path) -> None:
+    receipt = intake_skill_package(tmp_path / "missing", _context())
+    payload = receipt.model_dump(mode="json")
+    assert payload["blocker"] is not None
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+    payload["blocker"] = None
+    with pytest.raises(ValidationError, match="blocker must match the primary validation blocker"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed") as error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert "blocker must match the primary validation blocker" in str(error.value.details)
 
 
 @pytest.mark.parametrize(

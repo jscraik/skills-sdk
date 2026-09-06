@@ -152,8 +152,6 @@ class SkillPackageIntakeReceipt(_ContractModel):
             )
             if self.blocker != expected_blocker:
                 raise ValueError("intake blocker must match the primary validation blocker")
-            if self.blocker is None:
-                raise ValueError("blocked intake requires a blocker")
             if self.normalized_package is not None or self.source is not None:
                 raise ValueError("blocked intake cannot claim normalized package proof")
             if self.decision is not None and self.decision.decision is IntakeDecisionStatus.ADMIT:

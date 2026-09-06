@@ -41,6 +41,17 @@ values, semantic invariants, or schema meaning requires a new schema version,
 updated fixtures, and a compatibility note. Tests and the generated schemas
 are the executable compatibility proof.
 
+`skill-package-intake/v1` and `skill-package-intake-context/v1` are additive
+contracts for read-only normalization and its caller-supplied context. They
+do not reinterpret existing package, intake-decision, or receipt families.
+`SchemaRegistry` validates them using `skill-package-intake.v1` and
+`skill-package-intake-context.v1`, including their model-level invariants.
+Neither belongs to generic `parse_receipt` dispatch: context payloads and both
+normalized and blocked intake receipts fail with `unsupported_receipt_family`.
+Use the intake models or registry directly; normalization is not admission,
+installation, or publication evidence. Existing supported generic receipts
+retain their dispatch behavior.
+
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still
 blocked. The corresponding `v1` models and schemas remain unchanged and reject
