@@ -1,0 +1,790 @@
+from __future__ import annotations
+
+import json
+import time
+import tracemalloc
+from collections import UserDict, deque
+from itertools import product
+from pathlib import Path
+
+import pytest
+from jsonschema import Draft202012Validator
+from pydantic import ValidationError
+
+from skills_sdk.core.digests import candidate_content_sha256
+from skills_sdk.core.errors import ContractError
+from skills_sdk.core.receipts import parse_receipt
+from skills_sdk.core.schema_registry import MAX_JSON_NESTING_DEPTH, SchemaRegistry
+from skills_sdk.intake import intake_skill_package
+from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
+from skills_sdk.models.package import IntakeChecks, IntakeDecisionStatus, PackageOwner, PackageSourceKind
+from skills_sdk.models.packaging import PackageManifestFile
+from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
+from skills_sdk.packaging import build_skill_package
+from skills_sdk.validation import SkillValidationPolicy, validate_skill_package
+
+FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "synthetic-skill"
+
+
+@pytest.mark.parametrize("attack", ("order", "dependencies", "decision"))
+def test_intake_rejects_unproved_serialized_metadata(attack: str) -> None:
+    root = Path("pyproject.toml") if attack == "decision" else FIXTURE_ROOT
+    payload = intake_skill_package(root, _context()).model_dump(mode="json")
+    if attack == "order":
+        files = payload["validation"]["files"]
+        files.append({**files[0], "path": "z-extra.md"})
+        files.reverse()
+        digest = candidate_content_sha256(PackageManifestFile.model_validate(item) for item in files)
+        payload = json.loads(json.dumps(payload).replace(payload["candidate"]["content_sha256"], digest))
+        message = "intake validation files must be sorted by path"
+    elif attack == "dependencies":
+        payload["normalized_package"]["dependencies"] = ["unproved-package"]
+        message = "normalized intake cannot assert dependency metadata"
+    else:
+        assert payload["candidate"] is not None
+        payload["decision"] = None
+        message = "resolved intake candidate requires a decision"
+    with pytest.raises(ValidationError, match=message):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed") as error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert message in str(error.value.details)
+
+
+def _owner() -> PackageOwner:
+    return PackageOwner.model_validate(
+        {
+            "owner": "sdk-tests",
+            "maintainer": "sdk-tests",
+            "ownership_state": "canonical",
+            "rights": {
+                "basis": "authored",
+                "license": "Apache-2.0",
+                "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md",
+            },
+        }
+    )
+
+
+def _context(*, checks: IntakeChecks | None = None) -> SkillPackageIntakeContext:
+    return SkillPackageIntakeContext(
+        source_repository="jscraik/skills-sdk",
+        source_revision="1" * 40,
+        source_path="tests/fixtures/synthetic-skill",
+        source_kind=PackageSourceKind.GIT,
+        owner=_owner(),
+        checks=checks or IntakeChecks(identity=True, provenance=True, rights=True, owner_unchanged=True),
+    )
+
+
+def test_blocked_validation_identity_is_candidate_bound() -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(), policy=SkillValidationPolicy(max_entrypoint_lines=1))
+    payload = receipt.model_dump(mode="json")
+    assert receipt.status == "blocked" and receipt.candidate is not None
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+    payload["validation"]["identity"].update(package_id="different-package", name="different-package")
+    with pytest.raises(ValidationError, match="validation identity must match"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+def test_blocked_intake_cannot_erase_resolved_candidate(tmp_path: Path) -> None:
+    root = tmp_path / "missing"
+    receipt = intake_skill_package(root, _context())
+    assert receipt.status == "blocked" and receipt.candidate is not None and receipt.decision is not None
+    payload = receipt.model_dump(mode="json")
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+    payload["candidate"] = payload["validation"]["candidate"] = payload["decision"] = None
+    with pytest.raises(ValidationError, match="must retain its resolved candidate"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    unresolved = validate_skill_package(root, source_revision="invalid")
+    assert unresolved.candidate is None
+    SchemaRegistry().validate("skill-package-validation.v1", unresolved.model_dump(mode="json"))
+    with pytest.raises(ValidationError):
+        intake_skill_package(root, _context().model_copy(update={"source_revision": "invalid"}))
+
+
+def _malformed_evidence(kind: str) -> object:
+    if kind == "cycle":
+        mapping: dict[str, object] = {}
+        mapping["loop"] = mapping
+        return mapping
+    if kind == "list_cycle":
+        sequence: list[object] = []
+        sequence.append(sequence)
+        return sequence
+    nested: object = "leaf"
+    for _ in range(MAX_JSON_NESTING_DEPTH + 2):
+        nested = {"child": nested}
+    return nested
+
+
+@pytest.mark.parametrize(
+    "field", ["context", "candidate", "validation", "source", "decision", "normalized_package", "blocker"]
+)
+@pytest.mark.parametrize("kind", ["cycle", "list_cycle", "deep"])
+@pytest.mark.parametrize("ingress", ["mapping", "instance"])
+def test_intake_receipt_bounds_nested_evidence(field: str, kind: str, ingress: str) -> None:
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="python")
+    payload[field] = _malformed_evidence(kind)
+    message = "nesting depth" if kind == "deep" else "cyclic containers"
+    with pytest.raises(ValidationError, match=message):
+        SkillPackageIntakeReceipt.model_validate(
+            payload if ingress == "mapping" else SkillPackageIntakeReceipt.model_construct(**payload)
+        )
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert error.value.code == "invalid_json_value"
+
+
+@pytest.mark.parametrize("kind", ["cycle", "list_cycle", "deep"])
+def test_intake_service_bounds_forged_typed_context(kind: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.intake import normalization
+
+    payload = _context().model_dump(mode="python")
+    payload["owner"] = _context().owner.model_copy(update={"owner": _malformed_evidence(kind)})
+    message = "nesting depth" if kind == "deep" else "cyclic containers"
+    with pytest.raises(ValidationError, match=message):
+        SkillPackageIntakeContext.model_validate(payload)
+
+    def unexpected_inspection(*args: object, **kwargs: object) -> None:
+        pytest.fail("malformed evidence reached package inspection")
+
+    monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    forged = _context().model_copy(update={"owner": payload["owner"]})
+    with pytest.raises(ValidationError, match=message):
+        SkillPackageIntakeContext.model_validate(forged)
+    with pytest.raises(ValidationError, match=message):
+        intake_skill_package(FIXTURE_ROOT, forged)
+
+
+def test_intake_allows_shared_evidence_without_cycles() -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    payload = receipt.model_dump(mode="python")
+    payload["normalized_package"]["source"] = payload["source"]
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize("overflow", [False, True])
+def test_intake_depth_boundary_matches_registry(overflow: bool) -> None:
+    nested: object = "leaf"
+    for _ in range(MAX_JSON_NESTING_DEPTH - 1 + int(overflow)):
+        nested = {"child": nested}
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="python")
+    payload["validation"] = nested
+    with pytest.raises(ValidationError) as model_error:
+        SkillPackageIntakeReceipt.model_validate(payload)
+    assert ("nesting depth" in str(model_error.value)) is overflow
+    with pytest.raises(ContractError) as registry_error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert registry_error.value.code == ("invalid_json_value" if overflow else "contract_validation_failed")
+
+
+@pytest.mark.parametrize("wrapper", ["typed", "mapping"])
+@pytest.mark.parametrize("path", ["SKILL.md", "/example/private/evidence"])
+def test_intake_revalidates_typed_validation_findings(wrapper: str, path: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    finding = SkillPackageFinding(code="synthetic_warning", severity=ValidationSeverity.WARNING, message="Synthetic")
+    finding = finding.model_copy(update={"evidence_refs": (path,)})
+    validation = receipt.validation.model_copy(update={"findings": (finding,)})
+    payload = dict(receipt)
+    payload["validation"] = validation if wrapper == "typed" else UserDict({**dict(validation), "findings": (finding,)})
+    raw = receipt.model_dump(mode="json")
+    raw["validation"] = validation.model_dump(mode="json")
+    if path == "SKILL.md":
+        assert SkillPackageIntakeReceipt.model_validate(payload).validation.findings == (finding,)
+        SkillPackageIntakeReceipt.model_validate(raw)
+        SchemaRegistry().validate("skill-package-intake.v1", raw)
+    else:
+        with pytest.raises(ValidationError):
+            SkillPackageIntakeReceipt.model_validate(payload)
+        with pytest.raises(ValidationError):
+            SkillPackageIntakeReceipt.model_validate(raw)
+        with pytest.raises(ContractError):
+            SchemaRegistry().validate("skill-package-intake.v1", raw)
+
+
+@pytest.mark.parametrize(
+    "field", ["context", "candidate", "validation", "source", "decision", "normalized_package", "blocker"]
+)
+@pytest.mark.parametrize("ingress", ["mapping", "instance"])
+def test_intake_revalidates_each_typed_receipt_field(field: str, ingress: str) -> None:
+    policy = SkillValidationPolicy(max_entrypoint_lines=1) if field == "blocker" else None
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(), policy=policy)
+    payload = dict(receipt)
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    if field == "blocker":
+        payload[field] = receipt.blocker.model_copy(update={"evidence_refs": ("/example/private/evidence",)})
+        finding = receipt.validation.findings[0].model_copy(update={"evidence_refs": ("/example/private/evidence",)})
+        payload["validation"] = receipt.validation.model_copy(update={"findings": (finding,)})
+    else:
+        payload[field] = payload[field].model_copy(update={"schema_version": "invalid"})
+        if field == "candidate":
+            payload["validation"] = receipt.validation.model_copy(update={"candidate": payload[field]})
+            payload["decision"] = receipt.decision.model_copy(update={"candidate": payload[field]})
+        elif field == "source":
+            payload["normalized_package"] = receipt.normalized_package.model_copy(update={"source": payload[field]})
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeReceipt.model_validate(
+            payload if ingress == "mapping" else SkillPackageIntakeReceipt.model_construct(**payload)
+        )
+    raw = {
+        key: value.model_dump(mode="json") if hasattr(value, "model_dump") else value for key, value in payload.items()
+    }
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeReceipt.model_validate(raw)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", raw)
+
+
+@pytest.mark.parametrize("container", ["deque", "iterator"])
+@pytest.mark.parametrize("path", ["SKILL.md", "/example/private/evidence"])
+def test_intake_rejects_noncanonical_evidence_sequences(container: str, path: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    finding = SkillPackageFinding(code="synthetic_warning", severity=ValidationSeverity.WARNING, message="Synthetic")
+    finding = finding.model_copy(update={"evidence_refs": (path,)})
+    findings = deque([finding]) if container == "deque" else iter([finding])
+    payload = dict(receipt)
+    payload["validation"] = {**dict(receipt.validation), "findings": findings}
+    with pytest.raises(ValidationError, match="sequences must be lists or tuples"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+
+
+@pytest.mark.parametrize("value", [1, 0, "yes", "false", None])
+@pytest.mark.parametrize("field", ["identity", "provenance", "rights", "owner_unchanged"])
+def test_intake_checks_reject_coercion(value: object, field: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.intake import normalization
+
+    context = _context()
+    payload = context.model_dump(mode="json")
+    payload["checks"][field] = value
+    with pytest.raises(ValidationError, match="actual booleans"):
+        SkillPackageIntakeContext.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake-context.v1", payload)
+
+    def unexpected_inspection(*args: object, **kwargs: object) -> None:
+        pytest.fail("invalid checks reached package inspection")
+
+    monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    forged = context.model_copy(update={"checks": IntakeChecks.model_construct(**payload["checks"])})
+    with pytest.raises(ValidationError, match="actual booleans"):
+        intake_skill_package(FIXTURE_ROOT, forged)
+
+
+@pytest.mark.parametrize("location", ["context", "decision"])
+def test_serialized_intake_receipt_checks_reject_coercion(location: str) -> None:
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="json")
+    payload[location]["checks"]["rights"] = "yes"
+    with pytest.raises(ValidationError, match="actual booleans"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize("field", ["source_repository", "checks"])
+def test_blocked_receipt_revalidates_forged_typed_context(field: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(), policy=SkillValidationPolicy(max_entrypoint_lines=1))
+    payload = receipt.model_dump(mode="python")
+    value = (
+        "https://example-user:FAKE_TOKEN@example.invalid/repo"
+        if field == "source_repository"
+        else {
+            "identity": True,
+            "provenance": True,
+            "rights": "yes",
+            "owner_unchanged": True,
+        }
+    )
+    payload["context"] = receipt.context.model_copy(update={field: value})
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeReceipt.model_validate(payload)
+
+
+@pytest.mark.parametrize("location", ["context", "decision"])
+def test_intake_checks_reject_mapping_coercion(location: str) -> None:
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="python")
+    payload[location]["checks"] = UserDict({**payload[location]["checks"], "rights": "yes"})
+    payload[location] = UserDict(payload[location])
+    with pytest.raises(ValidationError, match="actual booleans"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    if location == "context":
+        with pytest.raises(ValidationError, match="actual booleans"):
+            SkillPackageIntakeContext.model_validate(payload[location])
+
+
+def test_prevalidated_shared_checks_preserve_their_current_values() -> None:
+    checks = IntakeChecks.model_validate({"identity": 1, "provenance": "yes", "rights": True, "owner_unchanged": False})
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(checks=checks))
+    assert receipt.context.checks == checks
+    assert receipt.decision.decision is IntakeDecisionStatus.NEEDS_OWNER_DECISION
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize(
+    "locator",
+    [
+        "https://example-user:FAKE_TOKEN@example.invalid/repo",
+        "/example/local/checkout",
+        "C:\\example\\checkout",
+        "../checkout",
+        "owner/repo?token=FAKE_TOKEN",
+        "owner/repo#fragment",
+    ],
+)
+def test_intake_repository_rejects_sensitive_locators(locator: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.intake import normalization
+
+    context = _context()
+    payload = context.model_dump(mode="json")
+    payload["source_repository"] = locator
+    with pytest.raises(ValidationError, match="owner/repository slug"):
+        SkillPackageIntakeContext.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake-context.v1", payload)
+    receipt_payload = intake_skill_package(FIXTURE_ROOT, context).model_dump(mode="json")
+    receipt_payload["context"]["source_repository"] = locator
+    with pytest.raises(ValidationError, match="owner/repository slug"):
+        SkillPackageIntakeReceipt.model_validate(receipt_payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake.v1", receipt_payload)
+
+    def unexpected_inspection(*args: object, **kwargs: object) -> None:
+        pytest.fail("invalid locator reached package inspection")
+
+    monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    with pytest.raises(ValidationError, match="owner/repository slug"):
+        intake_skill_package(FIXTURE_ROOT, context.model_copy(update={"source_repository": locator}))
+
+
+@pytest.mark.parametrize("locator", ["jscraik/skills-sdk", "Example-Team/repo.name_2"])
+def test_intake_repository_preserves_portable_slug(locator: str) -> None:
+    payload = _context().model_dump(mode="json")
+    payload["source_repository"] = locator
+    receipt = intake_skill_package(FIXTURE_ROOT, SkillPackageIntakeContext.model_validate(payload))
+    assert receipt.source.provenance.repository == locator
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+def test_intake_normalizes_validated_skill_without_mutation() -> None:
+    before = {path.relative_to(FIXTURE_ROOT): path.read_bytes() for path in FIXTURE_ROOT.rglob("*") if path.is_file()}
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    after = {path.relative_to(FIXTURE_ROOT): path.read_bytes() for path in FIXTURE_ROOT.rglob("*") if path.is_file()}
+
+    assert receipt.status == "normalized"
+    assert receipt.decision is not None
+    assert receipt.decision.decision is IntakeDecisionStatus.ADMIT
+    assert receipt.normalized_package is not None
+    assert receipt.candidate is not None
+    assert receipt.normalized_package.source.provenance.content_sha256 == receipt.candidate.content_sha256
+    assert receipt.mutation_performed is False
+    assert receipt.network_used is False
+    assert receipt.execution_performed is False
+    assert after == before
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+def test_normalization_preserves_non_admit_owner_decision() -> None:
+    checks = IntakeChecks(identity=True, provenance=True, rights=True, owner_unchanged=False)
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(checks=checks))
+
+    assert receipt.status == "normalized"
+    assert receipt.decision is not None
+    assert receipt.decision.decision is IntakeDecisionStatus.NEEDS_OWNER_DECISION
+    assert receipt.decision.blocker_codes == ("owner_decision_required",)
+    assert receipt.normalized_package is not None
+
+
+@pytest.mark.parametrize("kind", ("context", "normalized", "blocked"))
+def test_generic_parser_rejects_intake_contracts(tmp_path: Path, kind: str) -> None:
+    context = _context()
+    if kind == "context":
+        payload = context.model_dump(mode="json")
+        schema = "skill-package-intake-context.v1"
+    else:
+        root = FIXTURE_ROOT if kind == "normalized" else tmp_path / "missing"
+        receipt = intake_skill_package(root, context)
+        assert receipt.status == kind
+        payload = receipt.model_dump(mode="json")
+        schema = "skill-package-intake.v1"
+    SchemaRegistry().validate(schema, payload)
+    with pytest.raises(ContractError) as error:
+        parse_receipt(payload)
+    assert error.value.code == "unsupported_receipt_family"
+
+
+def test_generic_parser_still_accepts_package_build_receipt() -> None:
+    receipt = build_skill_package(FIXTURE_ROOT, source_revision="1" * 40)
+    assert receipt.status == "built"
+    parsed = parse_receipt(receipt.model_dump(mode="json"))
+    assert parsed.artifact_status == "built"
+    assert parsed.candidate.package_id == receipt.candidate.package_id
+
+
+@pytest.mark.parametrize("boundary", ("model", "registry"))
+@pytest.mark.parametrize("forgery", ("digest", "lifecycle"))
+def test_intake_rejects_forged_content_and_lifecycle(boundary: str, forgery: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    payload = receipt.model_dump(mode="json")
+    if forgery == "digest":
+        digest = payload["candidate"]["content_sha256"]
+        payload = json.loads(json.dumps(payload).replace(digest, "f" * 64))
+        message = "intake candidate digest must match validation files"
+    else:
+        payload["normalized_package"]["lifecycle"] = "admitted"
+        message = "normalized intake requires the normalized package lifecycle"
+    if boundary == "model":
+        with pytest.raises(ValidationError, match=message):
+            SkillPackageIntakeReceipt.model_validate(payload)
+    else:
+        with pytest.raises(ContractError, match="contract_validation_failed") as error:
+            SchemaRegistry().validate("skill-package-intake.v1", payload)
+        assert message in str(error.value.details)
+
+
+def test_hard_check_failure_is_not_masked_by_owner_decision() -> None:
+    checks = IntakeChecks(identity=True, provenance=False, rights=True, owner_unchanged=False)
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(checks=checks))
+
+    assert receipt.decision is not None
+    assert receipt.decision.decision is IntakeDecisionStatus.BLOCK
+    assert receipt.decision.blocker_codes == ("provenance_unconfirmed", "owner_decision_required")
+
+
+@pytest.mark.parametrize(
+    ("identity", "provenance", "rights", "owner_unchanged"),
+    tuple(product((False, True), repeat=4)),
+)
+def test_intake_decision_truth_table(identity: bool, provenance: bool, rights: bool, owner_unchanged: bool) -> None:
+    checks = IntakeChecks(
+        identity=identity,
+        provenance=provenance,
+        rights=rights,
+        owner_unchanged=owner_unchanged,
+    )
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(checks=checks))
+    assert receipt.decision is not None
+    expected = (
+        IntakeDecisionStatus.BLOCK
+        if not (identity and provenance and rights)
+        else IntakeDecisionStatus.NEEDS_OWNER_DECISION
+        if not owner_unchanged
+        else IntakeDecisionStatus.ADMIT
+    )
+    assert receipt.decision.decision is expected
+
+
+def test_invalid_source_returns_typed_blocker(tmp_path: Path) -> None:
+    receipt = intake_skill_package(tmp_path / "missing", _context())
+
+    assert receipt.status == "blocked"
+    assert receipt.blocker is not None
+    assert receipt.blocker.code == "invalid_package_root"
+    assert receipt.normalized_package is None
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+def test_blocked_receipt_requires_its_primary_blocker(tmp_path: Path) -> None:
+    receipt = intake_skill_package(tmp_path / "missing", _context())
+    payload = receipt.model_dump(mode="json")
+    assert payload["blocker"] is not None
+    assert SkillPackageIntakeReceipt.model_validate(payload) == receipt
+    SchemaRegistry().validate("skill-package-intake.v1", payload)
+    payload["blocker"] = None
+    with pytest.raises(ValidationError, match="blocker must match the primary validation blocker"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed") as error:
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+    assert "blocker must match the primary validation blocker" in str(error.value.details)
+
+
+@pytest.mark.parametrize(
+    ("identity", "provenance", "rights", "owner_unchanged"),
+    tuple(product((False, True), repeat=4)),
+)
+def test_structural_blocker_preserves_caller_checks(
+    identity: bool, provenance: bool, rights: bool, owner_unchanged: bool
+) -> None:
+    checks = IntakeChecks(identity=identity, provenance=provenance, rights=rights, owner_unchanged=owner_unchanged)
+    receipt = intake_skill_package(Path("pyproject.toml"), _context(checks=checks))
+    assert receipt.status == "blocked"
+    assert receipt.decision is not None
+    assert receipt.decision.decision is IntakeDecisionStatus.BLOCK
+    assert receipt.decision.checks == checks
+    check_blockers = tuple(
+        code
+        for passed, code in (
+            (identity, "identity_unconfirmed"),
+            (provenance, "provenance_unconfirmed"),
+            (rights, "rights_unconfirmed"),
+            (owner_unchanged, "owner_decision_required"),
+        )
+        if not passed
+    )
+    assert receipt.decision.blocker_codes == ("invalid_package_root", *check_blockers)
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+def test_structural_blocker_rejects_changed_caller_checks() -> None:
+    receipt = intake_skill_package(Path("pyproject.toml"), _context())
+    payload = receipt.model_dump(mode="json")
+    payload["decision"]["checks"]["identity"] = False
+    payload["decision"]["blocker_codes"].append("identity_unconfirmed")
+    with pytest.raises(ValidationError, match="must preserve context checks"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+def test_context_rejects_archive_until_archive_service_is_composed() -> None:
+    SchemaRegistry().validate("skill-package-intake-context.v1", _context().model_dump(mode="json"))
+    payload = _context().model_dump(mode="json")
+    payload["source_kind"] = "archive"
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeContext.model_validate(payload)
+
+
+@pytest.mark.parametrize("field", ["candidate", "source", "decision", "normalized_package"])
+def test_receipt_and_registry_reject_forged_normalized_binding(field: str) -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    payload = receipt.model_dump(mode="json")
+    if field == "candidate":
+        payload[field]["content_sha256"] = "f" * 64
+    elif field == "source":
+        payload[field]["provenance"]["content_sha256"] = "f" * 64
+    elif field == "decision":
+        payload[field]["candidate"]["content_sha256"] = "f" * 64
+    else:
+        payload[field]["source"]["provenance"]["content_sha256"] = "f" * 64
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="rejected the payload"):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+def test_receipt_rejects_forged_normalized_identity() -> None:
+    receipt = intake_skill_package(FIXTURE_ROOT, _context())
+    payload = receipt.model_dump(mode="json")
+    payload["normalized_package"]["identity"]["version"] = "forged"
+    with pytest.raises(ValidationError, match="identity must match validation"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="rejected the payload"):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+def test_blocked_receipt_rejects_forged_decision_candidate(tmp_path: Path) -> None:
+    source = tmp_path / "invalid-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("not frontmatter", encoding="utf-8")
+    context = _context().model_copy(update={"source_path": "invalid-skill"})
+    receipt = intake_skill_package(source, context)
+    assert receipt.decision is not None
+    payload = receipt.model_dump(mode="json")
+    payload["decision"]["candidate"]["content_sha256"] = "f" * 64
+    with pytest.raises(ValidationError, match="decision must bind"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="rejected the payload"):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize(
+    ("decision", "blocker_codes"),
+    [
+        ("needs_owner_decision", ["owner_decision_required"]),
+        ("block", ["rights_unconfirmed"]),
+    ],
+)
+def test_receipt_rejects_forged_decision_projection(decision: str, blocker_codes: list[str]) -> None:
+    checks = IntakeChecks(identity=True, provenance=False, rights=True, owner_unchanged=True)
+    receipt = intake_skill_package(FIXTURE_ROOT, _context(checks=checks))
+    payload = receipt.model_dump(mode="json")
+    payload["decision"]["decision"] = decision
+    payload["decision"]["blocker_codes"] = blocker_codes
+    with pytest.raises(ValidationError, match="decision must match"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="rejected the payload"):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+@pytest.mark.parametrize("field", ["code", "message", "evidence_refs"])
+def test_blocked_receipt_rejects_forged_primary_blocker(tmp_path: Path, field: str) -> None:
+    source = tmp_path / "invalid-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("not frontmatter", encoding="utf-8")
+    context = _context().model_copy(update={"source_path": "invalid-skill"})
+    receipt = intake_skill_package(source, context)
+    payload = receipt.model_dump(mode="json")
+    payload["blocker"][field] = ["forged"] if field == "evidence_refs" else "forged"
+    with pytest.raises(ValidationError, match="blocker must match"):
+        SkillPackageIntakeReceipt.model_validate(payload)
+    with pytest.raises(ContractError, match="rejected the payload"):
+        SchemaRegistry().validate("skill-package-intake.v1", payload)
+
+
+def test_receipt_schema_is_draft_2020_12() -> None:
+    schema = SchemaRegistry().load("skill-package-intake.v1")
+    assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert json.dumps(schema, sort_keys=True)
+
+
+@pytest.mark.parametrize("kind", ["git", "local", "external"])
+def test_allowed_source_kinds_are_metadata_not_transports(kind: str) -> None:
+    payload = _context().model_dump(mode="json")
+    payload["source_kind"] = kind
+    context = SkillPackageIntakeContext.model_validate(payload)
+    SchemaRegistry().validate("skill-package-intake-context.v1", payload)
+    receipt = intake_skill_package(FIXTURE_ROOT, context)
+    assert receipt.status == "normalized"
+    assert receipt.source.source_kind.value == kind
+    assert receipt.network_used is False
+    SchemaRegistry().validate("skill-package-intake.v1", receipt.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source_kind", "archive"),
+        ("source_revision", "invalid"),
+        ("source_path", "../escape"),
+        ("source_repository", ""),
+        ("owner", {}),
+    ],
+)
+def test_invalid_context_model_and_registry(field: str, value: object) -> None:
+    payload = _context().model_dump(mode="json")
+    payload[field] = value
+    with pytest.raises(ValidationError):
+        SkillPackageIntakeContext.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("skill-package-intake-context.v1", payload)
+
+
+def test_direct_schema_shape_is_not_candidate_binding_proof() -> None:
+    registry = SchemaRegistry()
+    validator = Draft202012Validator(registry.load("skill-package-intake.v1"))
+    payload = intake_skill_package(FIXTURE_ROOT, _context()).model_dump(mode="json")
+    validator.validate(payload)
+    payload["candidate"]["content_sha256"] = "f" * 64
+    validator.validate(payload)  # Cross-object equality requires the registered model.
+    with pytest.raises(ContractError):
+        registry.validate("skill-package-intake.v1", payload)
+    payload["status"] = "unknown"
+    assert not validator.is_valid(payload)
+
+
+def test_policy_passthrough_and_read_only_retry() -> None:
+    before = {p.relative_to(FIXTURE_ROOT): p.read_bytes() for p in FIXTURE_ROOT.rglob("*") if p.is_file()}
+    blocked = intake_skill_package(FIXTURE_ROOT, _context(), policy=SkillValidationPolicy(max_entrypoint_lines=1))
+    assert blocked.status == "blocked"
+    assert blocked.blocker.code == "entrypoint_line_budget_exceeded"
+    assert blocked.normalized_package is None
+    success = intake_skill_package(FIXTURE_ROOT, _context())
+    repeated = intake_skill_package(FIXTURE_ROOT, _context())
+    assert success.status == "normalized"
+    assert success == repeated
+    after = {p.relative_to(FIXTURE_ROOT): p.read_bytes() for p in FIXTURE_ROOT.rglob("*") if p.is_file()}
+    assert before == after
+
+
+def test_invalid_source_can_be_corrected_and_retried(tmp_path: Path) -> None:
+    tmp_path = tmp_path / "recovered"
+    tmp_path.mkdir()
+    entrypoint = tmp_path / "SKILL.md"
+    entrypoint.write_text("invalid frontmatter", encoding="utf-8")
+    blocked = intake_skill_package(tmp_path, _context())
+    assert blocked.status == "blocked"
+    assert entrypoint.read_text() == "invalid frontmatter"
+    entrypoint.write_text("---\nname: recovered\ndescription: Recovery fixture.\n---\n", encoding="utf-8")
+    before = entrypoint.read_bytes()
+    success = intake_skill_package(tmp_path, _context())
+    assert success.status == "normalized"
+    assert intake_skill_package(tmp_path, _context()) == success
+    assert entrypoint.read_bytes() == before
+
+
+@pytest.mark.parametrize("construction", ["copy", "construct"])
+@pytest.mark.parametrize("field", ["source_kind", "source_revision", "source_path"])
+def test_forged_context_is_rejected_before_source_inspection(
+    monkeypatch: pytest.MonkeyPatch,
+    construction: str,
+    field: str,
+) -> None:
+    from skills_sdk.intake import normalization
+
+    value = {"source_kind": "archive", "source_revision": "invalid", "source_path": "../escape"}[field]
+    context = _context()
+    forged = (
+        context.model_copy(update={field: value})
+        if construction == "copy"
+        else SkillPackageIntakeContext.model_construct(**{**context.__dict__, field: value})
+    )
+
+    def unexpected_inspection(*args: object, **kwargs: object) -> None:
+        pytest.fail("invalid context reached package inspection")
+
+    monkeypatch.setattr(normalization, "validate_skill_package", unexpected_inspection)
+    with pytest.raises(ValidationError):
+        intake_skill_package(FIXTURE_ROOT, forged)
+
+
+@pytest.mark.parametrize("case", ["entries", "single_file", "total_bytes", "entrypoint"])
+def test_small_resource_characterization(tmp_path: Path, case: str) -> None:
+    """Observe proposed measurement points, without enforcing future limits."""
+    root = tmp_path / "synthetic-skill"
+    root.mkdir()
+    entrypoint = root / "SKILL.md"
+    entrypoint.write_bytes((FIXTURE_ROOT / "SKILL.md").read_bytes())
+    if case == "entrypoint":
+        entrypoint.write_bytes(entrypoint.read_bytes().ljust(256 * 1024 + 1, b" "))
+    else:
+        count, size = {"entries": (250, 0), "single_file": (1, 1024 * 1024 + 1), "total_bytes": (5, 1024 * 1024)}[case]
+        for index in range(count):
+            (root / f"asset-{index}.txt").write_bytes(b"x" * size)
+    before = {p.name: p.stat().st_size for p in root.iterdir()}
+    results = []
+    observations = []
+    for _ in range(2):
+        owns_tracing = not tracemalloc.is_tracing()
+        if owns_tracing:
+            tracemalloc.start()
+        started = time.perf_counter()
+        try:
+            result = intake_skill_package(root, _context())
+            elapsed = time.perf_counter() - started
+            peak = tracemalloc.get_traced_memory()[1] if owns_tracing else None
+        finally:
+            if owns_tracing:
+                tracemalloc.stop()
+        results.append(result)
+        observations.append({"seconds": elapsed, "python_peak_bytes": peak})
+    assert results[0] == results[1]
+    assert results[0].status == "normalized"
+    assert before == {p.name: p.stat().st_size for p in root.iterdir()}
+    print(
+        json.dumps(
+            {"case": case, "entries": len(before), "bytes": sum(before.values()), "observations": observations},
+            sort_keys=True,
+        )
+    )
+
+
+def test_characterization_preserves_existing_tracing(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    owns_tracing = not tracemalloc.is_tracing()
+    if owns_tracing:
+        tracemalloc.start()
+    try:
+        retained = bytearray(1024)
+        test_small_resource_characterization(tmp_path, "single_file")
+        assert tracemalloc.is_tracing()
+        assert tracemalloc.get_object_traceback(retained) is not None
+        report = json.loads(capsys.readouterr().out)
+        assert all(item["python_peak_bytes"] is None for item in report["observations"])
+    finally:
+        if owns_tracing:
+            tracemalloc.stop()

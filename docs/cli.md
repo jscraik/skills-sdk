@@ -40,6 +40,11 @@ discovery boundaries while their deeper implementations are built in separate,
 candidate-bound lanes:
 
 - `inventory` is read-only source-inventory intent.
+- `intake` is reserved and parse-only. `skills-sdk intake --help` describes
+  the boundary; `skills-sdk intake` exits `0` without output or a receipt.
+  It does not call the Python intake service and accepts no package inputs,
+  `--json`, or `--robot` options. Use the [Python intake example](api.md#read-only-intake)
+  for validation and normalization. Neither surface copies or admits a package.
 - `eval` and `package` name reserved local contract lanes and do not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.

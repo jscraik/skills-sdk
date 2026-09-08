@@ -70,7 +70,7 @@ def test_public_docs_distinguish_wire_shapes_from_semantic_registry_checks() -> 
     assert "`package-identity.v1` and inventory schemas receive structural validation only" in api_compact
     assert (
         "packaged candidate, skill-identity, plugin-identity, source, owner, "
-        "normalized-package, and intake schemas are not registered with"
+        "normalized-package, and legacy `intake-decision.v1` schemas are not registered with"
     ) in api_compact
     assert (
         "`package-identity.v1`, `package-source.v1`, and\n`package-owner.v1` JSON schemas intentionally accept"

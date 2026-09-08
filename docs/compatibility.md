@@ -60,6 +60,44 @@ values, semantic invariants, or schema meaning requires a new schema version,
 updated fixtures, and a compatibility note. Tests and the generated schemas
 are the executable compatibility proof.
 
+`skill-package-intake/v1` and `skill-package-intake-context/v1` are additive
+contracts for read-only normalization and its caller-supplied context. They
+do not reinterpret existing package, intake-decision, or receipt families.
+`SchemaRegistry` validates them using `skill-package-intake.v1` and
+`skill-package-intake-context.v1`, including their model-level invariants.
+Neither belongs to generic `parse_receipt` dispatch: context payloads and both
+normalized and blocked intake receipts fail with `unsupported_receipt_family`.
+Use the intake models or registry directly; normalization is not admission,
+installation, or publication evidence. Existing supported generic receipts
+retain their dispatch behavior.
+
+Intake rejects repository locators outside the documented `owner/repository`
+slug form and rejects non-boolean raw checks before coercion. Prevalidated
+shared check models retain their current values; intake cannot recover their
+original inputs. Blocked receipts with a retained validation identity must bind
+that identity to their candidate. These intake-local invariants do not change
+the shared package, check, or validation contracts.
+
+Intake receipt construction revalidates nested typed evidence, including
+models inside mappings or sequences, just as it validates raw payloads.
+Preconstructed shared models do not bypass their field constraints at this
+receipt boundary; shared model configuration remains unchanged.
+Evidence sequences use lists or tuples. Other iterable inputs, including
+iterators and deques, are rejected rather than passed to nested coercion.
+Cycles and nesting beyond the registry's 100-level JSON boundary fail validation;
+repeated references without cycles remain valid. Intake always requires a
+valid source revision, so even blocked intake retains its resolved candidate
+and decision. Shared validation may still return an unresolved candidate for
+an invalid revision; such a result cannot become an intake receipt.
+Top-level intake context and receipt instances are revalidated on entry too;
+passing a preconstructed instance does not bypass these intake constraints.
+The generated intake schemas enforce the same repository slug grammar,
+including rejection of trailing newlines. `build_intake_decision` revalidates
+typed candidate and check inputs before projecting a decision; forged shared
+instances cannot bypass the intake boundary or coerce non-boolean checks.
+Repository slugs are checked before whitespace stripping or byte decoding;
+direct model and service callers cannot normalize invalid raw locators.
+
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still
 blocked. The corresponding `v1` models and schemas remain unchanged and reject

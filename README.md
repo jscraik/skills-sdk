@@ -47,6 +47,11 @@ anything, mutate a runtime, or publish to a registry.
   inventory, evaluation scenarios, scorer profiles, observations, case results
   and receipts, risk and security, validation, manifests, and packaging
   receipts.
+- Read-only standalone-skill intake and normalization through
+  `intake_skill_package`. The service reuses structural package validation,
+  binds source provenance to the resulting candidate, and preserves
+  caller-supplied ownership, rights, and admission checks without establishing
+  their real-world truth or performing Foundry admission.
 - Deterministic, non-executing evaluation of externally produced observations,
   with explicit blockers for unsupported oracles, incomplete calibration, and
   candidate or scenario-set identity drift.

@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Any
 
 import package_safety_schema
+from intake_schema import append_intake_constraints
 from package_archive_schema import append_package_archive_constraints
 from provider_execution_schema import append_provider_execution_constraints
 from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
 from schema_model_groups import (
     evaluation_schema_models,
+    intake_schema_models,
     packaging_schema_models,
     provider_execution_schema_models,
     runtime_lifecycle_schema_models,
@@ -724,6 +726,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_evaluation_receipt_constraints(schema, filename)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
+    elif filename == "skill-package-intake.v1.schema.json":
+        append_intake_constraints(schema)
     elif filename == "package-archive-verification.v1.schema.json":
         append_package_archive_constraints(schema)
     elif filename == "registry-preparation.v1.schema.json":
@@ -774,6 +778,7 @@ def main() -> int:
         (RiskClassification, "risk-classification.v1.schema.json"),
         (SecurityScreeningResult, "security-screening.v1.schema.json"),
         *evaluation_schema_models(),
+        *intake_schema_models(),
         *provider_execution_schema_models(),
         *runtime_lifecycle_schema_models(),
         (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
