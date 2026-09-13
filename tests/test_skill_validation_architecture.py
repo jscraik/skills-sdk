@@ -87,8 +87,10 @@ def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> No
 def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
     template = (REPOSITORY_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+    ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
     assert "From the checkout root:" in readme
     assert "Run commands from the repository checkout root" in template
+    assert "Run the checkout-scoped commands below from the repository checkout root" in ubiquitous
     assert (
         'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
         "pytest tests/test_repository_standards.py -q"

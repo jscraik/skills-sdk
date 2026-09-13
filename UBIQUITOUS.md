@@ -204,6 +204,9 @@ _Avoid_: build, runtime projection, source admission
 
 ## Prompt Translations
 
+Run the checkout-scoped commands below from the repository checkout root so
+`$PWD/.mise.toml` and relative paths resolve to this checkout.
+
 | User phrase | Canonical action |
 | --- | --- |
 | “Validate this skill” | Run `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate <package-root> --source-revision <40-lowercase-hex> --json --robot`; for an invocation that reaches the validator, treat exit `0` as a passing result and exit `2` as a typed blocker. Argparse also uses exit `2` for malformed invocations before a versioned result exists. |
