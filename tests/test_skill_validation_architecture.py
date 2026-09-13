@@ -57,10 +57,12 @@ def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> No
 
     assert "exact repository commands" in architecture
     expected_commands = (
-        "mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py "
+        'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
+        "pytest tests/test_public_repository_boundary.py "
         "tests/test_repository_standards.py tests/test_skill_validation_architecture.py",
         "bash scripts/validate-codestyle.sh",
-        "mise exec -- uv run --frozen python scripts/generate_schemas.py --check",
+        'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
+        "python scripts/generate_schemas.py --check",
         "bash scripts/validate-repository.sh",
         "git diff --check",
         "git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb",
