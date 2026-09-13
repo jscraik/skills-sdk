@@ -52,8 +52,10 @@ readiness and security claims while allowing truthful negated or scoped claims,
 and enforces the project name in reader-facing prose. The rules
 lint Markdown, MDX, AsciiDoc, and reStructuredText while leaving code spans and
 blocks to their language-specific tools. The current repository is the clean
-baseline: there are no exclusions, inline suppressions, or imported Foundry and
-Agent-Skills vocabularies.
+baseline: there are no exclusions, inline suppressions, imported Foundry or
+Agent-Skills rule packages, or active code dependencies on those repositories.
+Intentional migration and historical provenance terms remain reader-facing SDK
+documentation.
 
 ## Pull-request contract provenance
 
@@ -67,7 +69,7 @@ The SDK owns the destination contract and its portable controls:
 | `.github/PULL_REQUEST_TEMPLATE.md` | adapted for this repository | Preserve SDK contract, schema, provider, runtime, distribution, and compatibility boundaries; add exact readiness and guarded-refresh evidence fields. |
 | PR-body contract validator and focused tests | portable and required | Validate exact section/field/checklist order, non-empty required values, replayable command outcomes, explicit pending checklist states, and stale-template rejection. |
 | Create/update readiness receipts | already equivalent external control | Use the projected receipt gate bound to branch, head, base, scope digest, hosted checks, reviews, and threads; do not duplicate that state machine in SDK core. |
-| Guarded PR-body refresh | already equivalent external control | Use the projected body-only helper after update readiness; raw broader PR editing is outside the SDK workflow. |
+| Guarded PR-body refresh | already equivalent external control | Normally use the projected body-only helper after update readiness. When invalid metadata prevents that receipt, use its bounded `--repair --dry-run` preflight and apply only the verified body through the same helper. Raw broader PR editing is outside the SDK workflow. |
 | Hosted template gate | adapted for this repository | The existing `validate` check loads the validator and template from the trusted base. The first validator PR has one explicit candidate bootstrap because its base cannot contain the new validator. |
 | Agent-Skills release modes, Linear fields, Node/harness gates, and package commands | not migrated by this PR-control extraction | Move lifecycle behavior that belongs to the canonical workflow into SDK-owned contracts and entrypoints; retire repository-specific policy instead of importing it as a dependency. |
 

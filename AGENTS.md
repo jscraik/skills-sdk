@@ -4,11 +4,14 @@ schema_version: 1
 
 # Skills SDK agent guidance
 
-Skills SDK is the public, portable implementation of package authoring,
-validation, security, evaluation, receipt, and handoff contracts for Agent
-Skills. It is a contract library and local tooling surface, not a package
-Foundry, runtime installer, provider client, distribution registry, or
-publication service.
+Skills SDK is the public, portable contract library and local tooling surface
+for Agent Skills. It currently implements package validation and build routes
+plus versioned security, evaluation, receipt, provider, distribution, and
+lifecycle contracts described in the repository documentation. It is the
+canonical destination for authoring and handoff tooling, but those executable
+routes remain incomplete and must not be assumed from the destination policy.
+It is not a package Foundry, runtime installer, provider client, distribution
+registry, or publication service.
 
 ## Scope and boundaries
 
