@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import ast
+import os
+import shlex
+import subprocess
 from pathlib import Path
 
 SDK_ROOT = Path(__file__).resolve().parents[1] / "src" / "skills_sdk"
@@ -95,3 +98,32 @@ def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
         'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
         "pytest tests/test_repository_standards.py -q"
     ) in template
+
+
+def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute() -> None:
+    trust_prefix = 'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- '
+    cli_prefix = trust_prefix + "uv run --frozen "
+    readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+    ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
+    quick_start = readme.split("## Quick start", 1)[1].split("## ", 1)[0]
+    readme_commands = [line for line in quick_start.splitlines() if line.startswith("MISE_TRUSTED_CONFIG_PATHS=")]
+    prompt_commands = [fragment.split("`", 1)[0] for fragment in ubiquitous.split("`" + cli_prefix)[1:]]
+
+    assert readme_commands
+    assert prompt_commands
+    assert all(command.startswith(trust_prefix) for command in readme_commands)
+    assert len(prompt_commands) == 3
+
+    version_command = next(command for command in readme_commands if command.endswith("skills-sdk --version"))
+    environment = os.environ.copy()
+    environment["MISE_TRUSTED_CONFIG_PATHS"] = str(REPOSITORY_ROOT / ".mise.toml")
+    completed = subprocess.run(
+        shlex.split(version_command.split(" ", 1)[1]),
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip()
