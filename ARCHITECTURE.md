@@ -10,6 +10,56 @@ local private-registry receipts, and plans intended runtime-lock transitions.
 Provider calls, host apply or rollback, registry interaction, and publication
 remain outside the core package.
 
+## Product ownership and migration
+
+Skills SDK is the canonical home for reusable skill creation, validation,
+hardening, evaluation, repair, evidence, and handoff tooling. Skills Foundry is
+the destination for retained packages that pass the applicable admission
+workflow. Agent-Skills is only a migration source while those two destinations
+are separated; new lifecycle behavior must not be added there when it belongs
+in the SDK.
+
+Moving a stage means moving its executable behavior, versioned contracts,
+tests, fixtures, schemas, documentation, and evidence production together. A
+wrapper that imports or shells into Agent-Skills is not a completed migration.
+The repository may preserve historical provenance, but normal development,
+validation, release, and consumer paths must work without an Agent-Skills
+checkout.
+
+Agent-Skills can be retired after all of these conditions are true:
+
+1. SDK-owned lifecycle stages run independently through documented public
+   entrypoints and return candidate-bound results or typed blockers.
+2. Model/provider execution remains behind explicit adapters while evaluation
+   and judging contracts, observations, receipts, and handoff evidence remain
+   portable SDK surfaces.
+3. Foundry admission and package retention consume SDK contracts without
+   owning or duplicating lifecycle logic.
+4. Repository-wide searches and clean-room tests show no active Agent-Skills
+   imports, subprocess calls, filesystem assumptions, or required fixtures.
+5. Every former Agent-Skills command and document has a verified SDK/Foundry
+   replacement or an explicit retirement decision.
+
+Use the public SDK entrypoints named in `docs/cli.md` and `docs/api.md`, then run
+`bash scripts/validate-repository.sh` as the canonical repository gate. Record
+each retirement condition as `pass` only when its required evidence exists and
+the relevant command exits zero, `fail` when an assertion or contract check
+exits non-zero, and `blocked` when the exact route cannot run; a blocked record
+must name the blocker and nearest meaningful fallback. A partial or fallback
+result never counts as a retirement pass.
+
+Retain candidate-bound receipts and results as external evidence references,
+not generated repository artifacts. Retain repository proof in the pull request
+and hosted check run for the exact commit:
+
+| Retirement condition | Required retained evidence |
+| --- | --- |
+| Independent SDK lifecycle entrypoints | Exact CLI/API commands, typed result or blocker families, focused tests, and the passing canonical repository-gate run. |
+| Portable evaluation and judging | Candidate and scenario identities, provider request/result references, observations, evaluation receipt, and handoff evidence with matching digests. |
+| Foundry separation | Foundry admission/retention consumer proof against released SDK contracts, plus dependency inspection showing no duplicated lifecycle implementation. |
+| No active Agent-Skills dependency | Clean-room SDK and Foundry runs plus repository-search output covering imports, subprocess calls, filesystem paths, and fixtures. |
+| Replacement or retirement coverage | A reviewed inventory mapping every former command and document to its SDK/Foundry entrypoint and proof, or to an explicit retirement decision. |
+
 This is a map of the stable seams that help a contributor decide where a
 change belongs. It is intentionally shorter than the implementation
 documentation: use the [README](README.md) for the reader-facing route, the

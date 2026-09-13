@@ -41,6 +41,23 @@ boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
 anything, mutate a runtime, or publish to a registry.
 
+Skills SDK is the canonical destination for the skill lifecycle workflow:
+authoring and intake guidance, validation and security checks, scenario design,
+model-backed evaluation and judging contracts, evidence review, repair, and
+handoff. Agent-Skills is a transitional migration source and must not become a
+runtime, test, documentation, or release dependency. Skills Foundry owns the
+retained skill packages admitted by that workflow; it does not own the
+lifecycle tooling.
+
+The migration is complete only when the SDK provides independently usable
+routes and proof for those lifecycle stages, Foundry can retain the resulting
+packages without importing Agent-Skills, and every remaining Agent-Skills
+consumer has moved or been explicitly retired. Until then, the unimplemented
+CLI names above remain honest discovery boundaries rather than claims that the
+workflow has already moved. [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
+required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
+decision.
+
 ## What the SDK guarantees
 
 - Typed Pydantic contracts for package identity, source and ownership, intake,
