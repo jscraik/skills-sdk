@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
 SDK_ROOT = Path(__file__).resolve().parents[1] / "src" / "skills_sdk"
@@ -39,15 +41,28 @@ def test_validation_service_does_not_depend_on_packaging_service() -> None:
     assert violations == []
 
 
-def test_architecture_distinguishes_cli_invocation_from_package_imports() -> None:
-    architecture = " ".join((REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").split())
-
-    assert "CLI service-invocation path" in architecture
-    assert "only `validate` and `build`" in architecture
-    assert "During `main()` dispatch" in architecture
-    assert "routes import their validation and packaging services lazily" in architecture
-    assert "This is not the package import graph" in architecture
-    assert "public convenience exports eagerly import" in architecture
+def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                [
+                    "import sys",
+                    "from skills_sdk.cli.main import main",
+                    "for route in ('inventory', 'intake', 'eval', 'package', 'project', 'verify'):",
+                    "    assert main([route]) == 0",
+                    "assert 'skills_sdk.host.entrypoint' not in sys.modules",
+                ]
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
 
 
 def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> None:

@@ -143,9 +143,12 @@ Local candidate-bound contracts
 ```
 
 The CLI is an outer adapter over the implemented local services. `validate`
-and `build` execute the two local paths above; the other lifecycle names are
-parseable discovery boundaries and do not perform provider, installation,
-runtime, or publication work.
+and `build` execute the two local paths above. `compare-copy` performs two
+read-only validations and compares captured files. `maintain-entrypoint`
+checks an existing host entrypoint and permits a digest-bound replacement
+only with explicit `--apply`. Other lifecycle names remain parseable discovery
+boundaries. See [Runtime copy integration](docs/runtime-copy-integration.md)
+for maintenance authority, backup, platform, and concurrency limitations.
 
 ## Code map
 
@@ -167,6 +170,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
 | `src/skills_sdk/models/runtime_evidence.py` | Candidate-bound adapter observations for installation, rollback, discovery, activation, and runtime outcome; no host path resolution, filesystem mutation, activation, or runtime invocation. | `InstallationResult`, `RuntimeOutcomeReceipt` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
+| `src/skills_sdk/host/` | Explicit, digest-bound maintenance of an existing entrypoint with retained backups; no package installation or workflow execution. | `EntrypointRequest`, `check_entrypoint`, `repair_entrypoint` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
 | `tests/` | Contract, fixture, CLI, import-boundary, and validation-architecture proof. | `test_skill_package_validation.py`, `test_skill_validation_architecture.py`, `test_public_repository_boundary.py` |
 | `docs/` | Reader-facing API, CLI, compatibility, and first-run detail. | `docs/agent-entrypoint.md`, `docs/api.md`, `docs/cli.md`, `docs/compatibility.md` |
@@ -199,9 +203,13 @@ docstrings and the linked API or CLI guides.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The CLI service-invocation path is
-  `CLI -> validation/packaging -> models/core`: only `validate` and `build`
-  invoke those services, while reserved routes remain parse-only. This is not
+- Host maintenance depends on read-only validation helpers, never the reverse.
+  It accepts local paths outside portable receipt contracts and does not
+  implement the package-installation or runtime-lock planning protocols.
+- The package CLI service-invocation path is
+  `CLI -> validation/packaging -> models/core`; `compare-copy` also composes
+  validation, while `maintain-entrypoint` invokes the explicit host adapter.
+  Reserved routes remain parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
   `skills_sdk/__init__.py`, whose public convenience exports eagerly import
   evaluation, distribution, lifecycle, and their model dependencies. Those
@@ -215,7 +223,7 @@ docstrings and the linked API or CLI guides.
 These are the absences and relationships that are easy to miss when reading a
 single module:
 
-- **Local operations are read-only.** `validate_skill_package` and
+- **Package validation and build are read-only.** `validate_skill_package` and
   `build_skill_package` do not execute package code, write receipts into the
   package, create archives, install anything, or publish anything. Successful
   and blocked results carry `mutation_performed: false`.
