@@ -36,11 +36,12 @@ publication service.
 ## Working language and discovery
 
 - Use [`UBIQUITOUS.md`](UBIQUITOUS.md) as the canonical project vocabulary.
-  Map overloaded phrases such as “build”, “publish”, “install”, “candidate”,
-  and “receipt” through it before changing code or documentation.
+  Consult it when ambiguous public-contract terms such as “build”, “publish”,
+  “install”, “candidate”, or “receipt” affect the requested action or meaning.
 - Use [`ARCHITECTURE.md`](ARCHITECTURE.md) for the bird's-eye code map,
-  dependency boundaries, and architectural invariants before changing a
-  module or public workflow.
+  dependency boundaries, and architectural invariants when changing module
+  responsibilities, dependencies, or a public workflow. A typo repair or local
+  implementation fix does not by itself require an architecture read.
 - Read [`CODESTYLE.md`](CODESTYLE.md) before technical edits and
   [`CONTRIBUTING.md`](CONTRIBUTING.md) before commit or pull-request work.
 - Use [`docs/agent-entrypoint.md`](docs/agent-entrypoint.md) for the short
