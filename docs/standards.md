@@ -55,11 +55,12 @@ blocks to their language-specific tools. The current repository is the clean
 baseline: there are no exclusions, inline suppressions, or imported Foundry and
 Agent-Skills vocabularies.
 
-## Pull-request contract inheritance
+## Pull-request contract provenance
 
-Agent-Skills `origin/main` at
-`b3478dc42363b0fb0f3551cc271dd845a6c636ff` supplies the comparison evidence.
-The SDK owns the destination contract and applies only portable controls:
+The initial comparison used Agent-Skills `origin/main` at
+`b3478dc42363b0fb0f3551cc271dd845a6c636ff` as historical extraction evidence.
+That revision is not an upstream dependency or continuing inheritance source.
+The SDK owns the destination contract and its portable controls:
 
 | Source control | SDK disposition | SDK mechanism |
 | --- | --- | --- |
@@ -68,7 +69,7 @@ The SDK owns the destination contract and applies only portable controls:
 | Create/update readiness receipts | already equivalent external control | Use the projected receipt gate bound to branch, head, base, scope digest, hosted checks, reviews, and threads; do not duplicate that state machine in SDK core. |
 | Guarded PR-body refresh | already equivalent external control | Use the projected body-only helper after update readiness; raw broader PR editing is outside the SDK workflow. |
 | Hosted template gate | adapted for this repository | The existing `validate` check loads the validator and template from the trusted base. The first validator PR has one explicit candidate bootstrap because its base cannot contain the new validator. |
-| Agent-Skills release modes, Linear fields, Node/harness gates, and package commands | inapplicable | These are Agent-Skills repository policy or non-Python toolchains and are not portable SDK contract requirements. |
+| Agent-Skills release modes, Linear fields, Node/harness gates, and package commands | not migrated by this PR-control extraction | Move lifecycle behavior that belongs to the canonical workflow into SDK-owned contracts and entrypoints; retire repository-specific policy instead of importing it as a dependency. |
 
 The aggregate repository gate executes the focused validator regressions through
 the full pytest suite and statically requires the trusted-base hosted wiring.
