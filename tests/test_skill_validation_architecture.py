@@ -82,3 +82,11 @@ def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> No
     assert "externally observed" in api
     assert "locally validates this evidence envelope" in api
     assert "does not prove" in api
+
+
+def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
+    template = (REPOSITORY_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
+    assert (
+        'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
+        "pytest tests/test_repository_standards.py -q"
+    ) in template

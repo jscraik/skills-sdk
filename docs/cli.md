@@ -1,7 +1,7 @@
 # Command-line interface
 
-Install the pinned development environment and inspect the CLI through the
-managed `uv` entrypoint:
+From the repository checkout root, install the pinned development environment
+and inspect the CLI through the managed `uv` entrypoint:
 
 ```bash
 MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
