@@ -129,6 +129,27 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   non-null it binds both the prior result ID and the SHA-256 of that prior
   result's complete canonical JSON envelope (UTF-8, keys sorted, compact
   separators). A result cannot reference itself as its replay source.
+- **Offline provider-call orchestration:**
+  `skills_sdk.providers.execute_provider_call` accepts one revalidated prepared
+  `ProviderExecutionRequest`, its private digest-bound JSON input, and one
+  injected `TextProviderAdapter`. The adapter descriptor selects complete or
+  pull-driven stream mode and is restricted to injected, offline
+  `response_generation`; provider identity must match the request. The SDK
+  reads only the method selected by the descriptor. Each stream pull returns
+  either one `ProviderAdapterChunk` or `ProviderAdapterTerminal`, or a
+  `ProviderAdapterBatch` tuple. Batches must contain one to eight events by
+  default (never exceeding the configured buffer limit); a zero buffer limit
+  permits direct events only. A terminal event must be last in its batch. The
+  SDK applies the documented input, metadata, nesting, output, chunk, event,
+  deadline, and cleanup limits with zero retries. A successful
+  `ProviderCallOutcome` keeps complete text private and exposes only a
+  `provider-call-result/v1` public result containing digests, counts, redacted
+  terminal evidence, adapter-reported usage and cost observations, and its
+  request-bound `ProviderExecutionResult`. Known failures become typed terminal
+  outcomes; invalid caller or adapter contracts raise `ContractError`.
+  Cancellation remains cancellation after bounded cleanup. This service does
+  not discover adapters, read credentials, contact a network, evaluate output,
+  or establish external provider truth.
 - **Runtime-lock planning:** `RuntimeLock` (`runtime-lock/v1`) describes
   candidate-bound intended state for a logical user or project target. Each
   entry binds package and candidate identity, version, package digest, registry
@@ -292,8 +313,9 @@ The new `skill-package-intake.v1` and
 Validation is read-only: it does not write receipts, contact providers, install
 packages, or publish to a registry.
 
-`ProviderExecutionRequest` and `ProviderExecutionResult` are registered schema
-families, not generic receipts. Their `schema_version` values therefore fail
+`ProviderExecutionRequest`, `ProviderExecutionResult`,
+`TextProviderAdapterDescriptor`, and `ProviderCallPublicResult` are registered
+schema families, not generic receipts. Their `schema_version` values therefore fail
 closed through `parse_receipt` and must be validated by model or
 `SchemaRegistry` name. Cross-envelope claims require the supplied objects:
 `validate_provider_execution_request_against_safety_evidence` binds the safety

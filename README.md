@@ -90,6 +90,10 @@ decision.
   adapters. They bind one candidate, scenario case, provider identity, input or
   output digests, and typed outcomes without carrying prompts, outputs,
   credentials, costs, or a provider client.
+- Bounded offline provider-call orchestration through one injected adapter.
+  The service supports complete and pull-driven text modes, keeps raw input and
+  output private, emits compact typed evidence, and performs no discovery,
+  credential access, network transport, or automatic retry.
 - Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
   names. The registry applies structural validation to those names and
   semantic invariants only for registered model families; other packaged
@@ -103,11 +107,12 @@ decision.
 - A prompt-free CLI contract with JSON output and stable exit behavior for the
   implemented commands.
 
-The SDK does not own canonical package source, provider execution, runtime
-projection or installation, Tessl or other registry publication, or installed
-behavior. Those are separate lanes and must supply their own evidence for the
-same candidate identity. See [`docs/compatibility.md`](docs/compatibility.md)
-for the compatibility policy and evidence boundary.
+The SDK does not own canonical package source, real-provider transport or
+credentials, runtime projection or installation, Tessl or other registry
+publication, or installed behavior. Those are separate lanes and must supply
+their own evidence for the same candidate identity. See
+[`docs/compatibility.md`](docs/compatibility.md) for the compatibility policy
+and evidence boundary.
 
 ## Quick start
 

@@ -22,6 +22,8 @@ from skills_sdk.models import (
     PackageSafetyEvidenceReference,
     PackageSafetyFinding,
     PackageSafetyReviewer,
+    ProviderCallPublicResult,
+    ProviderCostObservation,
     ProviderExecutionBlocker,
     ProviderExecutionError,
     ProviderExecutionRequest,
@@ -55,9 +57,11 @@ from skills_sdk.models import (
     ScenarioSetV2,
     ScorerProfile,
     SecurityScreeningResult,
+    TextProviderAdapterDescriptor,
     ValueDecision,
     ValueDecisionV2,
 )
+from skills_sdk.providers import execute_provider_call
 
 __version__ = "0.1.0"
 
@@ -80,6 +84,8 @@ __all__ = [
     "PackageSafetyEvidenceReference",
     "PackageSafetyFinding",
     "PackageSafetyReviewer",
+    "ProviderCallPublicResult",
+    "ProviderCostObservation",
     "ProviderExecutionBlocker",
     "ProviderExecutionError",
     "ProviderExecutionRequest",
@@ -113,11 +119,13 @@ __all__ = [
     "ScenarioSetV2",
     "ScorerProfile",
     "SecurityScreeningResult",
+    "TextProviderAdapterDescriptor",
     "ValueDecision",
     "ValueDecisionV2",
     "__version__",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
+    "execute_provider_call",
     "plan_runtime_install",
     "prepare_private_registry_candidate",
 ]
