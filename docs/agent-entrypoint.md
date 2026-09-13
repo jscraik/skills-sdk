@@ -10,14 +10,14 @@ For a new checkout or missing pinned tools, prepare the environment:
 
 ```bash
 MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
-mise exec -- uv sync --frozen
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
 ```
 
 Reuse a prepared environment. For CLI discovery, run only the help needed:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk --help
-mise exec -- uv run --frozen skills-sdk inventory --help
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk inventory --help
 ```
 
 For focused checks while editing, run `bash scripts/validate-codestyle.sh`.

@@ -136,7 +136,7 @@ registry mutation, a packaged reference adapter, release, and remote promotion.
 - Limit each streaming text chunk to 16 KiB, total output to 1 MiB, and the
   stream to 4,096 events.
 - Permit one in-flight adapter pull and buffer at most eight validated events.
-- Apply a 30-second overall deadline and five-second idle deadline through an
+- Apply a 30-second overall deadline and five-second idle deadline through a
   caller-injected SDK clock. The provider adapter cannot supply or replace the
   timeout scheduler. Cleanup gets one bounded second.
 - Perform zero automatic retries in this pilot. Preserve retry classification
@@ -190,8 +190,8 @@ offline adapters. Acceptance requires all of the following:
 Run and record these exact commands on the completed candidate:
 
 ```bash
-mise exec -- uv run --frozen pytest tests/test_provider_call.py tests/test_provider_call_adapter_boundaries.py tests/test_provider_call_typing.py tests/test_provider_execution_contracts.py tests/test_provider_execution_review_regressions.py tests/test_public_repository_boundary.py
-mise exec -- uv run --frozen python scripts/generate_schemas.py --check
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_provider_call.py tests/test_provider_call_adapter_boundaries.py tests/test_provider_call_typing.py tests/test_provider_execution_contracts.py tests/test_provider_execution_review_regressions.py tests/test_public_repository_boundary.py
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check
 bash scripts/validate-repository.sh
 ```
 
@@ -205,7 +205,7 @@ its nineteenth owned path. On the frozen implementation bytes:
 - Schema generation check passed with exit `0`.
 - `bash scripts/validate-codestyle.sh` passed formatting, Ruff, MyPy,
   repository standards, and documentation checks.
-- Independent review returned `NO_FINDINGS` after reproducing the deadline,
+- The original independent review returned `NO_FINDINGS` after reproducing the deadline,
   cancellation, redaction, malformed-event, buffering, digest, selected-mode,
   and static adapter-typing boundaries.
 - `bash scripts/validate-repository.sh` passed 1,442 tests with one skip in
@@ -214,14 +214,21 @@ its nineteenth owned path. On the frozen implementation bytes:
   unchanged after the aggregate gate.
 
 The preserved implementation commit
-`1ceeb54ff8a1c8be0589a32b28c4a70b560dcde8` was replayed without source
-changes onto current `origin/main` at
-`f5ebdbde687265e58033403f8a0cfb9debc54abe`. The only merge conflict was the
-expected add/delete history for this acceptance record, which was retained.
-On that current-main integration candidate, the same focused command passed
-281 tests, the generated-schema check passed, and
-`bash scripts/validate-repository.sh` passed 1,442 tests with one skip and
-built the source distribution and wheel.
+`1ceeb54ff8a1c8be0589a32b28c4a70b560dcde8` supplied the replay provenance for
+current `origin/main` at `f5ebdbde687265e58033403f8a0cfb9debc54abe`.
+Independent compatibility review then found that the provider adapter owned
+the scheduler intended to enforce SDK deadlines. The repaired implementation
+commit `665b035` moves scheduling to a caller-injected SDK clock and adds a
+regression proving an adapter-supplied bypass clock cannot disable the overall
+deadline. The exact PR #29 documentation contract was then integrated locally;
+the containing commit is the final candidate for this evidence block.
+
+On that final candidate, the focused provider and architecture suite passed,
+the generated-schema check passed, and `bash scripts/validate-repository.sh`
+passed 1,443 tests with one skip and built the source distribution and wheel.
+Final independent re-review confirmed the deadline bypass was closed and
+treated the pending intake commit `ff02000` as a future overlap rather than a
+present dependency.
 
 This is local macOS offline conformance evidence only. It does not establish
 the selected `ubuntu-latest` hosted job, real-provider behavior, a packaged

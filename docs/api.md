@@ -208,7 +208,7 @@ bindings, content digests, and evidence-derived decisions still require
 Run this example from the repository root with the pinned environment:
 
 ```bash
-mise exec -- uv run --frozen python - <<'PY'
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python - <<'PY'
 from pathlib import Path
 
 from pydantic import ValidationError
