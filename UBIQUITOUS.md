@@ -181,7 +181,8 @@ _Avoid_: build, runtime projection, source admission
   **Publication lane**, but it does not establish that downstream state.
 - **Skills SDK** owns reusable lifecycle contracts and tooling; **Skills
   Foundry** owns retained packages; **Agent-Skills migration source** is retired
-  only after both destinations pass their documented independence evidence.
+  only after both destinations pass their documented independence evidence and
+  required behavior has replacement-or-retirement coverage.
 
 ## Flagged Ambiguities
 
