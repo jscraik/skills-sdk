@@ -40,6 +40,26 @@ Agent-Skills can be retired after all of these conditions are true:
 5. Every former Agent-Skills command and document has a verified SDK/Foundry
    replacement or an explicit retirement decision.
 
+Use the public SDK entrypoints named in `docs/cli.md` and `docs/api.md`, then run
+`bash scripts/validate-repository.sh` as the canonical repository gate. Record
+each retirement condition as `pass` only when its required evidence exists and
+the relevant command exits zero, `fail` when an assertion or contract check
+exits non-zero, and `blocked` when the exact route cannot run; a blocked record
+must name the blocker and nearest meaningful fallback. A partial or fallback
+result never counts as a retirement pass.
+
+Retain candidate-bound receipts and results as external evidence references,
+not generated repository artifacts. Retain repository proof in the pull request
+and hosted check run for the exact commit:
+
+| Retirement condition | Required retained evidence |
+| --- | --- |
+| Independent SDK lifecycle entrypoints | Exact CLI/API commands, typed result or blocker families, focused tests, and the passing canonical repository-gate run. |
+| Portable evaluation and judging | Candidate and scenario identities, provider request/result references, observations, evaluation receipt, and handoff evidence with matching digests. |
+| Foundry separation | Foundry admission/retention consumer proof against released SDK contracts, plus dependency inspection showing no duplicated lifecycle implementation. |
+| No active Agent-Skills dependency | Clean-room SDK and Foundry runs plus repository-search output covering imports, subprocess calls, filesystem paths, and fixtures. |
+| Replacement or retirement coverage | A reviewed inventory mapping every former command and document to its SDK/Foundry entrypoint and proof, or to an explicit retirement decision. |
+
 This is a map of the stable seams that help a contributor decide where a
 change belongs. It is intentionally shorter than the implementation
 documentation: use the [README](README.md) for the reader-facing route, the

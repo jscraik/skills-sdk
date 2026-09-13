@@ -54,7 +54,9 @@ routes and proof for those lifecycle stages, Foundry can retain the resulting
 packages without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
 CLI names above remain honest discovery boundaries rather than claims that the
-workflow has already moved.
+workflow has already moved. [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
+required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
+decision.
 
 ## What the SDK guarantees
 
