@@ -76,6 +76,10 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
         return
     package_id = result.candidate.package_id if result.candidate is not None else "unresolved-candidate"
     print(f"{command}: {result.status} ({package_id})")
+    if command == "intake" and result.decision is not None:
+        print(f"  decision: {result.decision.decision.value}")
+        for code in result.decision.blocker_codes:
+            print(f"  decision_blocker: {code}")
     for finding in _human_findings(command, result):
         references = ", ".join(finding.evidence_refs)
         suffix = f" [{references}]" if references else ""
@@ -102,10 +106,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         try:
             context = SkillPackageIntakeContext.model_validate_json(arguments.context.read_text(encoding="utf-8"))
-        except (OSError, ValueError, ValidationError) as error:
-            parser.error(f"invalid intake context: {error}")
+        except (OSError, ValueError, ValidationError):
+            parser.error("invalid intake context")
         intake_result = intake_skill_package(arguments.package_root, context, policy=policy)
-        successful = intake_result.status == "normalized"
+        successful = (
+            intake_result.status == "normalized"
+            and intake_result.decision is not None
+            and intake_result.decision.decision.value == "admit"
+        )
         _print_result(arguments.command, intake_result, json_output=arguments.json_output)
     elif arguments.command == "validate":
         from skills_sdk.validation import validate_skill_package

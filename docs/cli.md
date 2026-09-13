@@ -27,8 +27,10 @@ mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision
 ```
 
 All three commands are non-interactive and non-mutating. For an invocation that
-reaches a service, exit `0` means intake normalized, validation passed, or a receipt was built;
-exit `2` means a structured blocker was returned. Malformed invocations are
+reaches a service, exit `0` means intake normalized with an `admit` decision,
+validation passed, or a receipt was built. Exit `2` means a blocked receipt or
+a normalized non-admit intake decision was returned. Intake decision blocker
+codes remain visible in both JSON and human output. Malformed invocations are
 rejected by `argparse` with exit `2` before a versioned result exists.
 `intake` reads a `skill-package-intake-context/v1` JSON file and returns
 `skill-package-intake/v1`; `validate` returns `skill-package-validation/v1`; a successful `build` returns

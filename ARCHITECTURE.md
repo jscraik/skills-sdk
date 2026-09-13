@@ -142,8 +142,8 @@ Local candidate-bound contracts
          (separate external action and evidence lanes)
 ```
 
-The CLI is an outer adapter over the implemented local services. `validate`
-and `build` execute the two local paths above; the other lifecycle names are
+The CLI is an outer adapter over the implemented local services. `intake`,
+`validate`, and `build` execute the three local paths above; the other lifecycle names are
 parseable discovery boundaries and do not perform provider, installation,
 runtime, or publication work.
 
@@ -193,14 +193,14 @@ docstrings and the linked API or CLI guides.
   runtime lock to produce a deterministic intended transition. It does not
   inspect a host, resolve installation paths, apply files, or execute rollback.
 - `cli` is the outermost process adapter. During `main()` dispatch, the
-  `validate` and `build` routes import their validation and packaging services
-  lazily, print versioned results, and map a blocked result to the documented
-  exit status.
+  `intake`, `validate`, and `build` routes import their intake, validation, and packaging services
+  lazily, print versioned results, and map blocked results and normalized
+  non-admit intake decisions to the documented exit status.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
 - The CLI service-invocation path is
-  `CLI -> validation/packaging -> models/core`: only `validate` and `build`
+  `CLI -> intake/validation/packaging -> models/core`: only `intake`, `validate`, and `build`
   invoke those services, while reserved routes remain parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
   `skills_sdk/__init__.py`, whose public convenience exports eagerly import

@@ -10,7 +10,7 @@ from skills_sdk.cli.main import main
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "synthetic-skill"
 
 
-def _write_context(path: Path) -> None:
+def _write_context(path: Path, *, owner_unchanged: bool = True) -> None:
     path.write_text(
         json.dumps(
             {
@@ -30,7 +30,12 @@ def _write_context(path: Path) -> None:
                         "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md",
                     },
                 },
-                "checks": {"identity": True, "provenance": True, "rights": True, "owner_unchanged": True},
+                "checks": {
+                    "identity": True,
+                    "provenance": True,
+                    "rights": True,
+                    "owner_unchanged": owner_unchanged,
+                },
             }
         ),
         encoding="utf-8",
@@ -56,8 +61,33 @@ def test_intake_cli_preserves_typed_blocker(tmp_path: Path, capsys: pytest.Captu
     assert receipt["blocker"]["code"] == "entrypoint_line_budget_exceeded"
 
 
-def test_intake_cli_rejects_invalid_context(tmp_path: Path) -> None:
+def test_intake_cli_non_admit_decision_exits_two_and_is_visible(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     context = tmp_path / "context.json"
-    context.write_text("{}", encoding="utf-8")
+    _write_context(context, owner_unchanged=False)
+    assert main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"]) == 2
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["status"] == "normalized"
+    assert receipt["decision"]["decision"] == "needs_owner_decision"
+    assert receipt["decision"]["blocker_codes"] == ["owner_decision_required"]
+
+    assert main(["intake", str(FIXTURE_ROOT), "--context", str(context)]) == 2
+    output = capsys.readouterr().out
+    assert "decision: needs_owner_decision" in output
+    assert "decision_blocker: owner_decision_required" in output
+
+
+def test_intake_cli_rejects_invalid_context_without_echoing_input(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    context = tmp_path / "context.json"
+    secret = "sk-rejected-secret-material"
+    context.write_text(json.dumps({"source_repository": secret}), encoding="utf-8")
     with pytest.raises(SystemExit, match="2"):
         main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"])
+    captured = capsys.readouterr()
+    assert "invalid intake context" in captured.err
+    assert secret not in captured.err
