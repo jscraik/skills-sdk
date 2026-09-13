@@ -9,6 +9,19 @@ from pathlib import Path
 SDK_ROOT = Path(__file__).resolve().parents[1] / "src" / "skills_sdk"
 REPOSITORY_ROOT = SDK_ROOT.parents[1]
 FORBIDDEN_PREFIXES = ("ask", "tessl", "codex")
+TRUST_PREFIX = 'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- '
+
+
+def _quick_start_commands(markdown: str) -> list[str]:
+    quick_start = markdown.split("## Quick start", 1)[1].split("## ", 1)[0]
+    bash_block = quick_start.split("```bash", 1)[1].split("```", 1)[0]
+    return [line for line in bash_block.splitlines() if line]
+
+
+def _assert_checkout_trust_prefixes(markdown: str) -> None:
+    commands = _quick_start_commands(markdown)
+    assert commands
+    assert all(command.startswith(TRUST_PREFIX) for command in commands)
 
 
 def test_portable_sdk_does_not_import_transitional_or_provider_hosts() -> None:
@@ -101,18 +114,23 @@ def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
 
 
 def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute() -> None:
-    trust_prefix = 'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- '
-    cli_prefix = trust_prefix + "uv run --frozen "
+    cli_prefix = TRUST_PREFIX + "uv run --frozen "
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
     ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
-    quick_start = readme.split("## Quick start", 1)[1].split("## ", 1)[0]
-    readme_commands = [line for line in quick_start.splitlines() if line.startswith("MISE_TRUSTED_CONFIG_PATHS=")]
+    readme_commands = _quick_start_commands(readme)
     prompt_commands = [fragment.split("`", 1)[0] for fragment in ubiquitous.split("`" + cli_prefix)[1:]]
 
-    assert readme_commands
+    _assert_checkout_trust_prefixes(readme)
     assert prompt_commands
-    assert all(command.startswith(trust_prefix) for command in readme_commands)
     assert len(prompt_commands) == 3
+
+    broken_readme = readme.replace(TRUST_PREFIX + "uv sync --frozen", "uv sync --frozen", 1)
+    try:
+        _assert_checkout_trust_prefixes(broken_readme)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("Quick Start prefix regression was not detected")
 
     version_command = next(command for command in readme_commands if command.endswith("skills-sdk --version"))
     environment = os.environ.copy()
@@ -123,6 +141,7 @@ def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute(
         env=environment,
         capture_output=True,
         text=True,
+        timeout=30,
         check=False,
     )
     assert completed.returncode == 0, completed.stderr
