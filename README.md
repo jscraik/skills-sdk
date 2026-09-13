@@ -111,7 +111,7 @@ for the compatibility policy and evidence boundary.
 
 ## Quick start
 
-The supported development floor is Python `>=3.12,<3.13`. From a checkout:
+The supported development floor is Python `>=3.12,<3.13`. From the checkout root:
 
 ```bash
 MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen

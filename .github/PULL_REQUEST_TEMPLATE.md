@@ -33,7 +33,7 @@ absolute paths.
 ## Validation
 
 - Regression coverage:
-<!-- Add one evidence line for each command:
+<!-- Run commands from the repository checkout root. Add one evidence line for each command:
 - Command: `bash scripts/validate-repository.sh` -> pass
 - Command: `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_repository_standards.py -q` -> blocked (reason)
 -->
