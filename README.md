@@ -72,6 +72,8 @@ decision.
 - Deterministic, non-executing evaluation of externally produced observations,
   with explicit blockers for unsupported oracles, incomplete calibration, and
   candidate or scenario-set identity drift.
+- Candidate-bound, read-only scenario-definition quality assessment through
+  `skills-sdk eval scenario-quality`; it does not execute scenarios or providers.
 - An opt-in v2 evaluation family with secret-free provider identity binding,
   digest-only exact-match decisions, deterministic receipt identity, and
   generic receipt parsing. Existing v1 payloads and evaluator semantics remain

@@ -1,7 +1,10 @@
 """Portable lifecycle contracts and tooling for Agent Skills packages."""
 
 from skills_sdk.distribution import prepare_private_registry_candidate
-from skills_sdk.evaluation import evaluate_scenario_set, evaluate_scenario_set_v2
+from skills_sdk.evaluation import (
+    evaluate_scenario_set,
+    evaluate_scenario_set_v2,
+)
 from skills_sdk.lifecycle import plan_runtime_install
 from skills_sdk.models import (
     ActivationObservation,
@@ -51,6 +54,8 @@ from skills_sdk.models import (
     ScenarioCaseV2,
     ScenarioObservation,
     ScenarioObservationV2,
+    ScenarioQualityFinding,
+    ScenarioQualityReceipt,
     ScenarioSet,
     ScenarioSetV2,
     ScorerProfile,
@@ -60,6 +65,18 @@ from skills_sdk.models import (
 )
 
 __version__ = "0.1.0"
+
+
+def __getattr__(name: str) -> object:
+    if name in {"ScenarioQualityPolicy", "assess_scenario_quality"}:
+        from skills_sdk.evaluation.quality import ScenarioQualityPolicy, assess_scenario_quality
+
+        return {
+            "ScenarioQualityPolicy": ScenarioQualityPolicy,
+            "assess_scenario_quality": assess_scenario_quality,
+        }[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "ActivationObservation",
@@ -109,6 +126,9 @@ __all__ = [
     "ScenarioCaseV2",
     "ScenarioObservation",
     "ScenarioObservationV2",
+    "ScenarioQualityFinding",
+    "ScenarioQualityPolicy",
+    "ScenarioQualityReceipt",
     "ScenarioSet",
     "ScenarioSetV2",
     "ScorerProfile",
@@ -116,6 +136,7 @@ __all__ = [
     "ValueDecision",
     "ValueDecisionV2",
     "__version__",
+    "assess_scenario_quality",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "plan_runtime_install",

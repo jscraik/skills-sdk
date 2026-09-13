@@ -23,6 +23,7 @@ Use `mise exec -- uv run --frozen skills-sdk <route> --help` for a short route d
 ```bash
 mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
 mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
+mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision <40-lowercase-hex> --json --robot
 ```
 
 Both commands are non-interactive and non-mutating. For an invocation that
@@ -45,7 +46,9 @@ candidate-bound lanes:
   It does not call the Python intake service and accepts no package inputs,
   `--json`, or `--robot` options. Use the [Python intake example](api.md#read-only-intake)
   for validation and normalization. Neither surface copies or admits a package.
-- `eval` and `package` name reserved local contract lanes and do not execute.
+- `eval scenario-quality` performs read-only package-local definition checks;
+  other evaluation execution remains outside this command.
+- `package` names a reserved local contract lane and does not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.
 - `tessl prepare` and `tessl verify` name preparation and verification only;
