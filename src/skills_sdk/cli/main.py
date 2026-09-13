@@ -10,7 +10,7 @@ from skills_sdk import __version__
 
 COMMAND_HELP = {
     "inventory": "inspect a read-only source inventory",
-    "intake": "reserved read-only package intake and normalization contract",
+    "intake": "run read-only package intake and normalization",
     "validate": "run package contract validation",
     "build": "build an immutable package candidate",
     "eval": "run candidate-bound evaluation lanes",
@@ -29,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
     for name, help_text in COMMAND_HELP.items():
-        if name in {"validate", "build"}:
+        if name in {"intake", "validate", "build"}:
             continue
         commands.add_parser(name, help=help_text, description=help_text)
     for name in ("validate", "build"):
@@ -40,6 +40,15 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--max-reference-depth", type=int)
         command.add_argument("--json", action="store_true", dest="json_output")
         command.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    intake = commands.add_parser("intake", help=COMMAND_HELP["intake"], description=COMMAND_HELP["intake"])
+    intake.add_argument("package_root", type=Path)
+    intake.add_argument(
+        "--context", type=Path, required=True, help="path to a skill-package-intake-context/v1 JSON file"
+    )
+    intake.add_argument("--max-entrypoint-lines", type=int)
+    intake.add_argument("--max-reference-depth", type=int)
+    intake.add_argument("--json", action="store_true", dest="json_output")
+    intake.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     tessl = commands.add_parser(
         "tessl",
         help="prepare or verify a Tessl candidate without publishing",
@@ -75,8 +84,9 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
-    arguments = build_parser().parse_args(argv)
-    if arguments.command not in {"validate", "build"}:
+    parser = build_parser()
+    arguments = parser.parse_args(argv)
+    if arguments.command not in {"intake", "validate", "build"}:
         return 0
     from skills_sdk.validation import SkillValidationPolicy
 
@@ -84,7 +94,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         max_entrypoint_lines=arguments.max_entrypoint_lines,
         max_reference_depth=arguments.max_reference_depth,
     )
-    if arguments.command == "validate":
+    if arguments.command == "intake":
+        from pydantic import ValidationError
+
+        from skills_sdk.intake import intake_skill_package
+        from skills_sdk.models.intake import SkillPackageIntakeContext
+
+        try:
+            context = SkillPackageIntakeContext.model_validate_json(arguments.context.read_text(encoding="utf-8"))
+        except (OSError, ValueError, ValidationError) as error:
+            parser.error(f"invalid intake context: {error}")
+        intake_result = intake_skill_package(arguments.package_root, context, policy=policy)
+        successful = intake_result.status == "normalized"
+        _print_result(arguments.command, intake_result, json_output=arguments.json_output)
+    elif arguments.command == "validate":
         from skills_sdk.validation import validate_skill_package
 
         validation_result = validate_skill_package(

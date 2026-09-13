@@ -34,8 +34,8 @@ operations belong to a future host adapter and separate evidence contracts.
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `validate` and `build`. The other
-lifecycle names, including `inventory`, `intake`, `eval`, `package`,
+series. The implemented local commands are `intake`, `validate`, and `build`. The other
+lifecycle names, including `inventory`, `eval`, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
