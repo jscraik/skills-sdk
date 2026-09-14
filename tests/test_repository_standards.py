@@ -29,6 +29,7 @@ def _run_vale(source: Path) -> subprocess.CompletedProcess[str]:
     if mise is None:
         pytest.fail("mise is a mandatory repository tool; install the pinned toolchain before testing")
     environment = os.environ.copy()
+    environment["MISE_CEILING_PATHS"] = str(REPOSITORY_ROOT)
     environment["MISE_TRUSTED_CONFIG_PATHS"] = str(REPOSITORY_ROOT / ".mise.toml")
     return subprocess.run(
         [mise, "exec", "--", "vale", "--config", str(REPOSITORY_ROOT / ".vale.ini"), str(source)],
@@ -232,6 +233,8 @@ def test_mypy_file_level_suppression_is_rejected(tmp_path: Path, directive: str)
 
 
 def test_validation_wrappers_use_repository_pinned_mise_toolchain() -> None:
+    source = Path(__file__).read_text(encoding="utf-8")
+    assert 'environment["MISE_CEILING_PATHS"] = str(REPOSITORY_ROOT)' in source
     for relative in ("scripts/validate-codestyle.sh", "scripts/validate-repository.sh"):
         script = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
         assert 'MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"' in script
