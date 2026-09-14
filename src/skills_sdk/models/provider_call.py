@@ -57,10 +57,15 @@ class ProviderCostObservation(_ProviderCallModel):
     observed_at: AwareDatetime
     claimed_by: Literal["adapter"] = "adapter"
 
+import re
+from decimal import Decimal, InvalidOperation
+
+_DECIMAL_STRING_PATTERN = re.compile(r"^(?:0|[1-9]\d*)(?:\.\d+)?$")
+
     @field_validator("amount", mode="before")
     @classmethod
     def amount_is_a_decimal_string(cls, value: object) -> object:
-        if not isinstance(value, str):
+        if not isinstance(value, str) or _DECIMAL_STRING_PATTERN.fullmatch(value) is None:
             raise ValueError("provider cost amount must be a decimal string")
         try:
             amount = Decimal(value)
