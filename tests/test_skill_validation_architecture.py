@@ -11,6 +11,7 @@ FORBIDDEN_PREFIXES = ("ask", "tessl", "codex")
 
 
 def test_portable_sdk_does_not_import_transitional_or_provider_hosts() -> None:
+    """Verify portable SDK modules exclude transitional and provider hosts."""
     violations: list[str] = []
     for path in sorted(SDK_ROOT.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=path.as_posix())
@@ -27,6 +28,7 @@ def test_portable_sdk_does_not_import_transitional_or_provider_hosts() -> None:
 
 
 def test_validation_service_does_not_depend_on_packaging_service() -> None:
+    """Verify validation modules do not depend on the packaging service."""
     validation_root = SDK_ROOT / "validation"
     violations: list[str] = []
     for path in sorted(validation_root.rglob("*.py")):
@@ -42,6 +44,7 @@ def test_validation_service_does_not_depend_on_packaging_service() -> None:
 
 
 def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
+    """Verify parse-only CLI routes do not import the host mutation adapter."""
     result = subprocess.run(
         [
             sys.executable,
@@ -66,6 +69,7 @@ def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
 
 
 def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> None:
+    """Verify architecture records commands and separate evidence lanes."""
     architecture_source = (REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8")
     architecture = " ".join(architecture_source.split())
     api = " ".join((REPOSITORY_ROOT / "docs" / "api.md").read_text(encoding="utf-8").split())

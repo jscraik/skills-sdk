@@ -72,12 +72,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
+    """Return findings suitable for the human-readable command output."""
     if command == "validate":
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 
 
 def _print_result(command: str, result: Any, *, json_output: bool) -> None:
+    """Print a validation or build result in the requested output format."""
     if json_output:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
         return
@@ -90,6 +92,7 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
 
 
 def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
+    """Run the bounded host-maintenance command and return its exit status."""
     from skills_sdk.host.entrypoint import EntrypointRequest, check_entrypoint, repair_entrypoint
 
     try:

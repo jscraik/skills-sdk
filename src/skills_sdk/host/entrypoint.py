@@ -38,6 +38,7 @@ class CapturedFile:
 
 
 def _capture(parent: int, name: str) -> CapturedFile:
+    """Capture a bounded regular file without following symbolic links."""
     descriptor = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=parent)
     try:
         before = os.fstat(descriptor)
@@ -58,6 +59,7 @@ def _capture(parent: int, name: str) -> CapturedFile:
 
 
 def _source(request: EntrypointRequest, parent: int) -> CapturedFile:
+    """Capture and validate the selected maintained source file."""
     if request.source.name != request.target.name:
         raise ValueError("source and target must name the same existing file")
     if request.supporting_document:
@@ -102,6 +104,7 @@ def check_entrypoint(request: EntrypointRequest) -> str:
 
 
 def _write_stage(parent: int, name: str, source: CapturedFile, current: CapturedFile) -> int:
+    """Write and sync an exclusive staged replacement with the current mode."""
     mode = stat.S_IMODE(current.mode)
     descriptor = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode, dir_fd=parent)
     try:
@@ -120,6 +123,7 @@ def _write_stage(parent: int, name: str, source: CapturedFile, current: Captured
 
 
 def _remove_owned(parent: int, name: str, descriptor: int) -> None:
+    """Remove a path only when it still names the operation-owned inode."""
     try:
         observed = os.stat(name, dir_fd=parent, follow_symlinks=False)
     except FileNotFoundError:
@@ -131,6 +135,7 @@ def _remove_owned(parent: int, name: str, descriptor: int) -> None:
 
 
 def _verify_parents(request: EntrypointRequest, parents: tuple[int, int, int]) -> None:
+    """Verify that each request directory still has its captured identity."""
     for path, original in zip(
         (request.source.parent, request.target.parent, request.backup_root), parents, strict=True
     ):
@@ -144,6 +149,7 @@ def _verify_parents(request: EntrypointRequest, parents: tuple[int, int, int]) -
 
 
 def _publish(request: EntrypointRequest, parents: tuple[int, int, int], source: CapturedFile) -> str:
+    """Publish a staged replacement after backup and concurrency checks."""
     source_parent, target_parent, backup_parent = parents
     current = _capture(target_parent, request.target.name)
     if current.digest == source.digest:

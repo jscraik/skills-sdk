@@ -10,6 +10,7 @@ REVISION = "a" * 40
 
 
 def _package(parent: Path, description: str = "Inspect a bounded example.") -> Path:
+    """Create a minimal valid package beneath the selected parent."""
     root = parent / "example"
     root.mkdir(parents=True)
     (root / "SKILL.md").write_text(f"---\nname: example\ndescription: {description}\n---\n\n# Example\n")
@@ -17,6 +18,7 @@ def _package(parent: Path, description: str = "Inspect a bounded example.") -> P
 
 
 def test_real_cli_matches_identical_copies_without_writes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Verify identical copies pass without changing the runtime entrypoint."""
     source = _package(tmp_path / "source")
     runtime = _package(tmp_path / "runtime")
     before = (runtime / "SKILL.md").stat()
@@ -28,6 +30,7 @@ def test_real_cli_matches_identical_copies_without_writes(tmp_path: Path, capsys
 
 @pytest.mark.parametrize("change", ["content", "extra", "missing"])
 def test_real_cli_detects_all_file_differences(tmp_path: Path, capsys: pytest.CaptureFixture[str], change: str) -> None:
+    """Verify changed, extra, and missing files all produce drift."""
     source = _package(tmp_path / "source")
     runtime = _package(tmp_path / "runtime")
     (source / "guide.md").write_text("Expected content\n")
@@ -46,6 +49,7 @@ def test_real_cli_detects_all_file_differences(tmp_path: Path, capsys: pytest.Ca
 def test_real_cli_does_not_call_invalid_sources_a_match(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], invalid: str
 ) -> None:
+    """Verify invalid metadata, paths, and revisions produce a blocker."""
     source = _package(tmp_path / "source")
     runtime = _package(tmp_path / "runtime")
     revision = REVISION

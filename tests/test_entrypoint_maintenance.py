@@ -11,6 +11,7 @@ from skills_sdk.cli.main import main
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, list[str]]:
+    """Create maintained source, runtime target, backup root, and CLI arguments."""
     source = tmp_path / "source" / "example" / "SKILL.md"
     target = tmp_path / "runtime" / "example" / "SKILL.md"
     backup = tmp_path / "backups"
@@ -33,6 +34,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, list[str]]:
 
 
 def test_real_cli_preview_apply_backup_and_idempotence(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Verify preview, explicit repair, backup retention, and idempotence."""
     source, target, backup, args = _fixture(tmp_path)
     before = target.read_bytes()
     neighbor = target.parent / "guide.md"
@@ -53,6 +55,7 @@ def test_real_cli_preview_apply_backup_and_idempotence(tmp_path: Path, capsys: p
 
 @pytest.mark.parametrize("fault", ["source-drift", "target-drift", "malformed", "symlink", "lock", "missing"])
 def test_real_cli_refuses_unapproved_or_invalid_state(tmp_path: Path, fault: str) -> None:
+    """Verify maintenance refuses drift, malformed paths, locks, and absence."""
     source, target, backup, args = _fixture(tmp_path)
     if fault == "source-drift":
         source.write_text(source.read_text() + "Changed\n")
@@ -77,12 +80,14 @@ def test_real_cli_refuses_unapproved_or_invalid_state(tmp_path: Path, fault: str
 def test_publication_failure_preserves_current_and_recoverable_backup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Verify a publication failure preserves current bytes and the backup."""
     from skills_sdk.host import entrypoint
 
     _source, target, backup, args = _fixture(tmp_path)
     before = target.read_bytes()
 
     def refuse_replace(*_args: object, **_kwargs: object) -> None:
+        """Inject a publication failure."""
         raise OSError("injected publication failure")
 
     monkeypatch.setattr(entrypoint.os, "replace", refuse_replace)
@@ -93,12 +98,14 @@ def test_publication_failure_preserves_current_and_recoverable_backup(
 
 
 def test_writer_racing_publication_is_preserved_in_backup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify a racing writer's bytes remain recoverable in the backup."""
     from skills_sdk.host import entrypoint
 
     _source, target, backup, args = _fixture(tmp_path)
     replace = entrypoint.os.replace
 
     def racing_replace(*positional: object, **keywords: object) -> None:
+        """Inject a target write immediately before publication."""
         target.write_text("Concurrent writer bytes\n")
         replace(*positional, **keywords)
 
@@ -108,6 +115,7 @@ def test_writer_racing_publication_is_preserved_in_backup(tmp_path: Path, monkey
 
 
 def test_replaced_parent_is_not_reported_as_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify replacing the target parent prevents a completed result."""
     from skills_sdk.host import entrypoint
 
     _source, target, backup, args = _fixture(tmp_path)
@@ -115,6 +123,7 @@ def test_replaced_parent_is_not_reported_as_completed(tmp_path: Path, monkeypatc
     moved = target.parent.with_name("moved-example")
 
     def racing_replace(*positional: object, **keywords: object) -> None:
+        """Replace the target directory immediately before publication."""
         target.parent.rename(moved)
         target.parent.mkdir()
         target.write_text("Replacement directory writer\n")
@@ -128,6 +137,7 @@ def test_replaced_parent_is_not_reported_as_completed(tmp_path: Path, monkeypatc
 
 @pytest.mark.parametrize("mode", [0o600, 0o640, 0o750])
 def test_repair_preserves_target_permissions(tmp_path: Path, mode: int) -> None:
+    """Verify repair and backup retain the target permission bits."""
     _source, target, backup, args = _fixture(tmp_path)
     target.chmod(mode)
     assert main([*args, "--apply"]) == 0
@@ -136,6 +146,7 @@ def test_repair_preserves_target_permissions(tmp_path: Path, mode: int) -> None:
 
 
 def test_backup_sync_failure_prevents_publication(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify an unsynced backup prevents replacement publication."""
     from skills_sdk.host import entrypoint
 
     _source, target, backup, args = _fixture(tmp_path)
@@ -144,6 +155,7 @@ def test_backup_sync_failure_prevents_publication(tmp_path: Path, monkeypatch: p
     fsync = os.fsync
 
     def refuse_backup_sync(descriptor: int) -> None:
+        """Inject an fsync failure for the backup directory."""
         observed = os.fstat(descriptor)
         if (observed.st_dev, observed.st_ino) == backup_identity:
             raise OSError("injected backup durability failure")
@@ -162,6 +174,7 @@ def test_backup_sync_failure_prevents_publication(tmp_path: Path, monkeypatch: p
 def test_supporting_document_is_explicit_and_bounded(
     tmp_path: Path, filename: str, selected: bool, expected: int
 ) -> None:
+    """Verify supporting-document maintenance is explicit and Markdown-only."""
     source, target, backup, args = _fixture(tmp_path)
     original_entrypoint = target.read_bytes()
     document_source, document_target = source.with_name(filename), target.with_name(filename)
