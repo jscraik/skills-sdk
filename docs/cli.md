@@ -18,18 +18,22 @@ tessl prepare   tessl verify
 ```
 
 Use `mise exec -- uv run --frozen skills-sdk <route> --help` for a short route description. The
-`validate` and `build` routes are implemented local commands:
+`intake`, `validate`, and `build` routes are implemented local commands:
 
 ```bash
+mise exec -- uv run --frozen skills-sdk intake ./skills/example --context ./intake-context.json --json --robot
 mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
 mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
 ```
 
-Both commands are non-interactive and non-mutating. For an invocation that
-reaches a service, exit `0` means validation passed or a receipt was built;
-exit `2` means a structured blocker was returned. Malformed invocations are
+All three commands are non-interactive and non-mutating. For an invocation that
+reaches a service, exit `0` means intake normalized with an `admit` decision,
+validation passed, or a receipt was built. Exit `2` means a blocked receipt or
+a normalized non-admit intake decision was returned. Intake decision blocker
+codes remain visible in both JSON and human output. Malformed invocations are
 rejected by `argparse` with exit `2` before a versioned result exists.
-`validate` returns `skill-package-validation/v1`; a successful `build` returns
+`intake` reads a `skill-package-intake-context/v1` JSON file and returns
+`skill-package-intake/v1`; `validate` returns `skill-package-validation/v1`; a successful `build` returns
 a candidate-bound `package-receipt/v2` whose digest covers the canonical
 manifest, without writing into the package. The generic parser continues to
 accept `package-receipt/v1` for compatibility. A blocked build may have
@@ -40,11 +44,6 @@ discovery boundaries while their deeper implementations are built in separate,
 candidate-bound lanes:
 
 - `inventory` is read-only source-inventory intent.
-- `intake` is reserved and parse-only. `skills-sdk intake --help` describes
-  the boundary; `skills-sdk intake` exits `0` without output or a receipt.
-  It does not call the Python intake service and accepts no package inputs,
-  `--json`, or `--robot` options. Use the [Python intake example](api.md#read-only-intake)
-  for validation and normalization. Neither surface copies or admits a package.
 - `eval` and `package` name reserved local contract lanes and do not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.

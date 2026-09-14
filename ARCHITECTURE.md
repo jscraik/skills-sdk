@@ -101,9 +101,11 @@ operational contracts.
 
 ## Bird's-eye view
 
-There are two related local paths. A package path captures a filesystem view,
-validates its entrypoint and files, and then (only after a resolved identity and
-a pass) composes a candidate-bound manifest and receipt. A contract path
+There are three related local paths. A package path captures a filesystem view
+and validates its entrypoint and files. Intake combines that validation with a
+caller-supplied source and ownership context to produce a read-only normalized
+receipt. Build runs only after resolved identity and passing validation to
+compose a candidate-bound manifest and receipt. A contract path
 validates JSON-shaped payloads against packaged schemas and, for registered
 families, applies the corresponding Pydantic invariants.
 
@@ -114,6 +116,10 @@ Package source
 validation/skill_ir.py + validation/skill_package.py
     |
     +--> SkillPackageValidation (pass or typed blockers)
+    |
+    +--> intake/normalization.py + SkillPackageIntakeContext
+    |        |
+    |        +--> SkillPackageIntakeReceipt (normalized decision or typed blockers)
     |
     +--> packaging/manifest.py (only after validation passes)
              |
@@ -142,8 +148,8 @@ Local candidate-bound contracts
          (separate external action and evidence lanes)
 ```
 
-The CLI is an outer adapter over the implemented local services. `validate`
-and `build` execute the two local paths above; the other lifecycle names are
+The CLI is an outer adapter over the implemented local services. `intake`,
+`validate`, and `build` execute the three local paths above; the other lifecycle names are
 parseable discovery boundaries and do not perform provider, installation,
 runtime, or publication work.
 
@@ -193,14 +199,14 @@ docstrings and the linked API or CLI guides.
   runtime lock to produce a deterministic intended transition. It does not
   inspect a host, resolve installation paths, apply files, or execute rollback.
 - `cli` is the outermost process adapter. During `main()` dispatch, the
-  `validate` and `build` routes import their validation and packaging services
-  lazily, print versioned results, and map a blocked result to the documented
-  exit status.
+  `intake`, `validate`, and `build` routes import their intake, validation, and packaging services
+  lazily, print versioned results, and map blocked results and normalized
+  non-admit intake decisions to the documented exit status.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
 - The CLI service-invocation path is
-  `CLI -> validation/packaging -> models/core`: only `validate` and `build`
+  `CLI -> intake/validation/packaging -> models/core`: only `intake`, `validate`, and `build`
   invoke those services, while reserved routes remain parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
   `skills_sdk/__init__.py`, whose public convenience exports eagerly import
