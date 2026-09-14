@@ -10,11 +10,16 @@ from typing import Literal, TypeVar, cast
 
 import pytest
 from jsonschema import Draft202012Validator
+from pydantic import ValidationError
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models.provider_call import ProviderCostObservation, TextProviderAdapterDescriptor
+from skills_sdk.models.provider_call import (
+    ProviderCallPublicResult,
+    ProviderCostObservation,
+    TextProviderAdapterDescriptor,
+)
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderUsageMetadata
 from skills_sdk.providers import (
     ProviderAdapterBatch,
@@ -654,6 +659,19 @@ def test_generated_schemas_and_registry_validate_public_provider_call_models() -
     forged = outcome.public_result.model_copy(update={"retry_attempts": 1})
     with pytest.raises(ContractError, match="contract_validation_failed"):
         registry.validate("provider-call-result.v1", forged.model_dump(mode="json"))
+
+    for capabilities in ([], ["response_generation", "response_generation"]):
+        invalid_descriptor = {**descriptor_payload, "capabilities": capabilities}
+        with pytest.raises(ValidationError, match="capabilities"):
+            TextProviderAdapterDescriptor.model_validate(invalid_descriptor)
+        with pytest.raises(ContractError, match="contract_validation_failed"):
+            registry.validate("provider-call-adapter.v1", invalid_descriptor)
+
+    invalid_cleanup_result = {**result_payload, "cleanup_succeeded": None}
+    with pytest.raises(ValidationError, match="cleanup_succeeded"):
+        ProviderCallPublicResult.model_validate(invalid_cleanup_result)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        registry.validate("provider-call-result.v1", invalid_cleanup_result)
 
 
 def test_malformed_failure_and_naive_clock_fail_as_contract_errors() -> None:

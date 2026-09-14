@@ -22,6 +22,8 @@ from skills_sdk.models.inventory import Sha256, _ContractModel
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import ExecutionId, ProviderExecutionResult, ProviderUsageMetadata
 
+_DECIMAL_STRING_PATTERN = re.compile(r"^(?:0|[1-9]\d*)(?:\.\d+)?$")
+
 
 class _ProviderCallModel(_ContractModel):
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True, revalidate_instances="always")
@@ -33,7 +35,9 @@ class TextProviderAdapterDescriptor(_ProviderCallModel):
     schema_version: Literal["provider-call-adapter/v1"] = "provider-call-adapter/v1"
     provider: ProviderIdentityV2
     mode: Literal["complete", "stream"]
-    capabilities: tuple[Literal["response_generation"], ...] = ("response_generation",)
+    capabilities: tuple[Literal["response_generation"], ...] = Field(
+        default=("response_generation",), min_length=1, max_length=1
+    )
     discovery: Literal["injected"] = "injected"
     transport: Literal["offline"] = "offline"
     credentials_included: Literal[False] = False
@@ -61,9 +65,7 @@ class ProviderCostObservation(_ProviderCallModel):
     @field_validator("amount", mode="before")
     @classmethod
     def amount_is_a_decimal_string(cls, value: object) -> object:
-        if not isinstance(value, str):
-            raise ValueError("provider cost amount must be a decimal string")
-        if re.fullmatch(r"(?:0|[1-9]\d*)(?:\.\d+)?", value) is None:
+        if not isinstance(value, str) or _DECIMAL_STRING_PATTERN.fullmatch(value) is None:
             raise ValueError("provider cost amount must be a decimal string")
         try:
             amount = Decimal(value)
@@ -96,7 +98,7 @@ class ProviderCallPublicResult(_ProviderCallModel):
     max_buffered_events: int = Field(ge=0, le=8)
     retry_attempts: Literal[0] = 0
     cleanup_attempted: bool
-    cleanup_succeeded: bool | None
+    cleanup_succeeded: bool
     cleanup_error_code: Literal["cleanup_failed"] | None = None
     usage: ProviderUsageMetadata | None = None
     cost: ProviderCostObservation | None = None
@@ -133,7 +135,7 @@ class ProviderCallPublicResult(_ProviderCallModel):
     @field_validator("cleanup_attempted", "cleanup_succeeded", mode="before")
     @classmethod
     def cleanup_flags_are_json_booleans(cls, value: object) -> object:
-        if value is not None and type(value) is not bool:
+        if type(value) is not bool:
             raise ValueError("provider call cleanup flags must be JSON booleans")
         return value
 
@@ -141,7 +143,7 @@ class ProviderCallPublicResult(_ProviderCallModel):
     def result_is_consistent(self) -> ProviderCallPublicResult:
         if self.request_id != self.execution.request_id or self.status != self.execution.status:
             raise ValueError("provider call result must match its execution evidence")
-        if self.cleanup_attempted != (self.cleanup_succeeded is not None):
+        if not self.cleanup_attempted:
             raise ValueError("provider call cleanup result requires an attempted cleanup")
         if (self.cleanup_succeeded is False) != (self.cleanup_error_code == "cleanup_failed"):
             raise ValueError("provider call cleanup failure requires redacted diagnostic evidence")
