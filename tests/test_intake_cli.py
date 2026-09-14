@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,37 @@ def test_intake_cli_rejects_invalid_context_without_echoing_input(
     captured = capsys.readouterr()
     assert "invalid intake context" in captured.err
     assert secret not in captured.err
+
+
+def test_intake_cli_rejects_fifo_and_symlink_contexts_without_blocking(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fifo = tmp_path / "context.fifo"
+    os.mkfifo(fifo)
+    with pytest.raises(SystemExit, match="2"):
+        main(["intake", str(FIXTURE_ROOT), "--context", str(fifo), "--json"])
+    assert "invalid intake context" in capsys.readouterr().err
+
+    target = tmp_path / "context.json"
+    _write_context(target)
+    link = tmp_path / "context-link.json"
+    link.symlink_to(target)
+    with pytest.raises(SystemExit, match="2"):
+        main(["intake", str(FIXTURE_ROOT), "--context", str(link), "--json"])
+    assert "invalid intake context" in capsys.readouterr().err
+
+
+def test_intake_cli_validates_the_context_wire_shape_before_normalization(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    context = tmp_path / "context.json"
+    _write_context(context)
+    payload = json.loads(context.read_text(encoding="utf-8"))
+    payload["source_revision"] = f" {payload['source_revision']} "
+    context.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="2"):
+        main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"])
+    assert "invalid intake context" in capsys.readouterr().err

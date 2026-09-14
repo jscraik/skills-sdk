@@ -101,9 +101,11 @@ operational contracts.
 
 ## Bird's-eye view
 
-There are two related local paths. A package path captures a filesystem view,
-validates its entrypoint and files, and then (only after a resolved identity and
-a pass) composes a candidate-bound manifest and receipt. A contract path
+There are three related local paths. A package path captures a filesystem view
+and validates its entrypoint and files. Intake combines that validation with a
+caller-supplied source and ownership context to produce a read-only normalized
+receipt. Build runs only after resolved identity and passing validation to
+compose a candidate-bound manifest and receipt. A contract path
 validates JSON-shaped payloads against packaged schemas and, for registered
 families, applies the corresponding Pydantic invariants.
 
@@ -114,6 +116,10 @@ Package source
 validation/skill_ir.py + validation/skill_package.py
     |
     +--> SkillPackageValidation (pass or typed blockers)
+    |
+    +--> intake/normalization.py + SkillPackageIntakeContext
+    |        |
+    |        +--> SkillPackageIntake (normalized decision or typed blockers)
     |
     +--> packaging/manifest.py (only after validation passes)
              |

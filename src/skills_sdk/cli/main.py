@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,35 @@ COMMAND_HELP = {
     "project": "project a candidate into a selected runtime surface",
     "verify": "verify candidate-bound evidence",
 }
+_MAX_INTAKE_CONTEXT_BYTES = 1_048_576
+
+
+def _read_intake_context(path: Path) -> bytes:
+    """Read one bounded, regular, no-follow intake context file."""
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_INTAKE_CONTEXT_BYTES:
+            raise ValueError("invalid intake context file")
+        chunks: list[bytes] = []
+        captured = 0
+        while captured <= _MAX_INTAKE_CONTEXT_BYTES:
+            chunk = os.read(descriptor, min(65_536, _MAX_INTAKE_CONTEXT_BYTES + 1 - captured))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            captured += len(chunk)
+        payload = b"".join(chunks)
+        after = os.fstat(descriptor)
+        if len(payload) > _MAX_INTAKE_CONTEXT_BYTES or (
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ino,
+        ) != (after.st_size, after.st_mtime_ns, after.st_ino):
+            raise ValueError("invalid intake context file")
+        return payload
+    finally:
+        os.close(descriptor)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -101,12 +132,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "intake":
         from pydantic import ValidationError
 
+        from skills_sdk.core.errors import ContractError
+        from skills_sdk.core.schema_registry import SchemaRegistry
         from skills_sdk.intake import intake_skill_package
         from skills_sdk.models.intake import SkillPackageIntakeContext
 
         try:
-            context = SkillPackageIntakeContext.model_validate_json(arguments.context.read_text(encoding="utf-8"))
-        except (OSError, ValueError, ValidationError):
+            context_payload = json.loads(_read_intake_context(arguments.context).decode("utf-8"))
+            SchemaRegistry().validate("skill-package-intake-context.v1", context_payload)
+            context = SkillPackageIntakeContext.model_validate(context_payload)
+        except (ContractError, OSError, UnicodeDecodeError, ValueError, ValidationError):
             parser.error("invalid intake context")
         intake_result = intake_skill_package(arguments.package_root, context, policy=policy)
         successful = (
