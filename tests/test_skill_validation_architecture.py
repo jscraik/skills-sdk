@@ -13,18 +13,21 @@ TRUST_PREFIX = 'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- '
 
 
 def _quick_start_commands(markdown: str) -> list[str]:
+    """Return the non-empty commands from the Markdown quick-start block."""
     quick_start = markdown.split("## Quick start", 1)[1].split("## ", 1)[0]
     bash_block = quick_start.split("```bash", 1)[1].split("```", 1)[0]
     return [line for line in bash_block.splitlines() if line]
 
 
 def _assert_checkout_trust_prefixes(markdown: str) -> None:
+    """Assert that every quick-start command uses the checkout trust prefix."""
     commands = _quick_start_commands(markdown)
     assert commands
     assert all(command.startswith(TRUST_PREFIX) for command in commands)
 
 
 def test_portable_sdk_does_not_import_transitional_or_provider_hosts() -> None:
+    """Keep portable SDK modules independent of transitional provider hosts."""
     violations: list[str] = []
     for path in sorted(SDK_ROOT.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=path.as_posix())
@@ -41,6 +44,7 @@ def test_portable_sdk_does_not_import_transitional_or_provider_hosts() -> None:
 
 
 def test_validation_service_does_not_depend_on_packaging_service() -> None:
+    """Keep the validation service independent of the packaging service."""
     validation_root = SDK_ROOT / "validation"
     violations: list[str] = []
     for path in sorted(validation_root.rglob("*.py")):
@@ -56,6 +60,7 @@ def test_validation_service_does_not_depend_on_packaging_service() -> None:
 
 
 def test_architecture_distinguishes_cli_invocation_from_package_imports() -> None:
+    """Require architecture docs to distinguish CLI use from imports."""
     architecture = " ".join((REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").split())
 
     assert "CLI service-invocation path" in architecture
@@ -67,6 +72,7 @@ def test_architecture_distinguishes_cli_invocation_from_package_imports() -> Non
 
 
 def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> None:
+    """Require architecture docs to bind external outcomes to evidence lanes."""
     architecture_source = (REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8")
     architecture = " ".join(architecture_source.split())
     api = " ".join((REPOSITORY_ROOT / "docs" / "api.md").read_text(encoding="utf-8").split())
@@ -101,6 +107,7 @@ def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> No
 
 
 def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
+    """Require pull-request guidance to scope mise to the checkout."""
     template = (REPOSITORY_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
     ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
@@ -114,6 +121,7 @@ def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
 
 
 def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute() -> None:
+    """Require documented commands to trust the checkout and execute."""
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
     ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
     readme_commands = _quick_start_commands(readme)
