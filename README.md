@@ -4,9 +4,9 @@ Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines explicit, versioned contracts for inventory,
 intake, evaluation, risk, security, manifests, and receipts. Its local
 source-consuming services validate standalone packages and, after a candidate
-identity is resolved and validation passes, build candidate-bound manifest and
-receipt data; inventory, intake, evaluation, risk, and security are
-caller-populated contract lanes. The core remains independent of a host
+identity is resolved and validation passes, normalize intake context or build
+candidate-bound manifest and receipt data; inventory, evaluation, risk, and
+security remain caller-populated contract lanes. The core remains independent of a host
 repository, provider account, runtime installation, or registry.
 
 The Python API can deterministically prepare an intended runtime-lock

@@ -119,7 +119,7 @@ validation/skill_ir.py + validation/skill_package.py
     |
     +--> intake/normalization.py + SkillPackageIntakeContext
     |        |
-    |        +--> SkillPackageIntake (normalized decision or typed blockers)
+    |        +--> SkillPackageIntakeReceipt (normalized decision or typed blockers)
     |
     +--> packaging/manifest.py (only after validation passes)
              |

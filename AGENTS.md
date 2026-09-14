@@ -5,7 +5,7 @@ schema_version: 1
 # Skills SDK agent guidance
 
 Skills SDK is the public, portable contract library and local tooling surface
-for Agent Skills. It currently implements package validation and build routes
+for Agent Skills. It currently implements package intake, validation, and build routes
 plus versioned security, evaluation, receipt, provider, distribution, and
 lifecycle contracts described in the repository documentation. It is the
 canonical destination for authoring and handoff tooling, but those executable

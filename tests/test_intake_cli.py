@@ -114,6 +114,21 @@ def test_intake_cli_rejects_fifo_and_symlink_contexts_without_blocking(
     assert "invalid intake context" in capsys.readouterr().err
 
 
+def test_intake_cli_rejects_symlinked_context_ancestor(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    target = tmp_path / "target"
+    target.mkdir()
+    _write_context(target / "context.json")
+    link = tmp_path / "link"
+    link.symlink_to(target, target_is_directory=True)
+
+    with pytest.raises(SystemExit, match="2"):
+        main(["intake", str(FIXTURE_ROOT), "--context", str(link / "context.json"), "--json"])
+    assert "invalid intake context" in capsys.readouterr().err
+
+
 def test_intake_cli_validates_the_context_wire_shape_before_normalization(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -129,14 +144,28 @@ def test_intake_cli_validates_the_context_wire_shape_before_normalization(
     assert "invalid intake context" in capsys.readouterr().err
 
 
-def test_intake_cli_fails_closed_without_no_follow_support(
+@pytest.mark.parametrize("flag", ["O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK"])
+def test_intake_cli_fails_closed_without_safe_open_support(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
+    flag: str,
 ) -> None:
     context = tmp_path / "context.json"
     _write_context(context)
-    monkeypatch.setattr(main_module.os, "O_NOFOLLOW", 0)
+    monkeypatch.setattr(main_module.os, flag, 0)
+
+    with pytest.raises(SystemExit, match="2"):
+        main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"])
+    assert "invalid intake context" in capsys.readouterr().err
+
+
+def test_intake_cli_treats_decoder_recursion_as_invalid_context(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    context = tmp_path / "context.json"
+    context.write_text("[" * 10_000 + "]" * 10_000, encoding="utf-8")
 
     with pytest.raises(SystemExit, match="2"):
         main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"])

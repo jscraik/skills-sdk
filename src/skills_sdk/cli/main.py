@@ -23,12 +23,31 @@ COMMAND_HELP = {
 _MAX_INTAKE_CONTEXT_BYTES = 1_048_576
 
 
+def _open_intake_context(path: Path) -> int:
+    """Open a context file without following any path component."""
+    directory = getattr(os, "O_DIRECTORY", None)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    nonblock = getattr(os, "O_NONBLOCK", None)
+    if (
+        any(not isinstance(flag, int) or flag == 0 for flag in (directory, nofollow, nonblock))
+        or os.open not in os.supports_dir_fd
+    ):
+        raise OSError("safe descriptor-relative context reads are unavailable")
+    absolute = path.absolute()
+    parent = os.open(absolute.anchor, os.O_RDONLY | directory | nofollow)
+    try:
+        for component in absolute.parent.parts[1:]:
+            child = os.open(component, os.O_RDONLY | directory | nofollow, dir_fd=parent)
+            os.close(parent)
+            parent = child
+        return os.open(absolute.name, os.O_RDONLY | nonblock | nofollow, dir_fd=parent)
+    finally:
+        os.close(parent)
+
+
 def _read_intake_context(path: Path) -> bytes:
     """Read one bounded, regular, no-follow intake context file."""
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if not isinstance(nofollow, int) or nofollow == 0:
-        raise OSError("safe no-follow context reads are unavailable")
-    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | nofollow)
+    descriptor = _open_intake_context(path)
     try:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_INTAKE_CONTEXT_BYTES:
@@ -144,7 +163,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             context_payload = json.loads(_read_intake_context(arguments.context).decode("utf-8"))
             SchemaRegistry().validate("skill-package-intake-context.v1", context_payload)
             context = SkillPackageIntakeContext.model_validate(context_payload)
-        except (ContractError, OSError, UnicodeDecodeError, ValueError, ValidationError):
+        except (ContractError, OSError, RecursionError, UnicodeDecodeError, ValueError, ValidationError):
             parser.error("invalid intake context")
         intake_result = intake_skill_package(arguments.package_root, context, policy=policy)
         successful = (
