@@ -114,15 +114,15 @@ def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
 
 
 def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute() -> None:
-    cli_prefix = TRUST_PREFIX + "uv run --frozen "
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
     ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
     readme_commands = _quick_start_commands(readme)
-    prompt_commands = [fragment.split("`", 1)[0] for fragment in ubiquitous.split("`" + cli_prefix)[1:]]
+    prompt_commands = [command for command in ubiquitous.split("`")[1::2] if "mise exec" in command]
 
     _assert_checkout_trust_prefixes(readme)
     assert prompt_commands
     assert len(prompt_commands) == 3
+    assert all(command.startswith(TRUST_PREFIX) for command in prompt_commands)
 
     broken_readme = readme.replace(TRUST_PREFIX + "uv sync --frozen", "uv sync --frozen", 1)
     try:
