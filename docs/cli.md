@@ -26,8 +26,9 @@ mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision
 mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision <40-lowercase-hex> --json --robot
 ```
 
-Both commands are non-interactive and non-mutating. For an invocation that
-reaches a service, exit `0` means validation passed or a receipt was built;
+All three commands are non-interactive and non-mutating. For an invocation that
+reaches a service, exit `0` means validation passed, a receipt was built, or
+the `eval scenario-quality` assessment passed;
 exit `2` means a structured blocker was returned. Malformed invocations are
 rejected by `argparse` with exit `2` before a versioned result exists.
 `validate` returns `skill-package-validation/v1`; a successful `build` returns

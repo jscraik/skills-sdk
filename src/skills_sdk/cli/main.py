@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
-    if command == "validate":
+    if command in {"validate", "scenario-quality"}:
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 

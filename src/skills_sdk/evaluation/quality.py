@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -126,8 +127,10 @@ def _capture_evals(root: Path, expected_sha256: str) -> bytes:
     file_fd = -1
     try:
         refs_fd = os.open("references", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
-        file_fd = os.open("evals.yaml", os.O_RDONLY | os.O_NOFOLLOW, dir_fd=refs_fd)
+        file_fd = os.open("evals.yaml", os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=refs_fd)
         before = os.fstat(file_fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("invalid_evals_file_type")
         if before.st_size > _MAX_EVALS_BYTES:
             raise ValueError("evals_file_too_large")
         payload = os.read(file_fd, _MAX_EVALS_BYTES + 1)
@@ -264,7 +267,11 @@ def _blocked_validation_receipt(
     scenario_set_id: str | None,
 ) -> ScenarioQualityReceipt:
     primary = validation.findings[0]
-    finding = _finding(primary.code, primary.message)
+    finding = ScenarioQualityFinding(
+        code=primary.code,
+        message=primary.message,
+        evidence_refs=primary.evidence_refs,
+    )
     blocker = PackageReceiptBlocker(
         code=finding.code,
         message=finding.message,
@@ -327,7 +334,9 @@ def assess_scenario_quality(
             findings.append(_finding("invalid_evals_utf8", "evals.yaml must be UTF-8"))
         except ValueError as error:
             code = (
-                str(error) if str(error) in {"evals_file_too_large", "evals_source_changed"} else "invalid_evals_yaml"
+                str(error)
+                if str(error) in {"evals_file_too_large", "evals_source_changed", "invalid_evals_file_type"}
+                else "invalid_evals_yaml"
             )
             findings.append(_finding(code, f"evals.yaml could not be safely loaded: {type(error).__name__}"))
         except (OSError, TypeError, yaml.YAMLError) as error:
@@ -335,6 +344,9 @@ def assess_scenario_quality(
                 _finding("invalid_evals_yaml", f"evals.yaml could not be safely loaded: {type(error).__name__}")
             )
     cases = _document_cases(payload, validation.candidate.package_id, findings) if payload is not None else []
+    raw_ids = [case.get("id") for case in cases if isinstance(case, Mapping) and _text(case.get("id"))]
+    if len(raw_ids) != len(set(raw_ids)):
+        findings.append(_finding("duplicate_scenario_id", "scenario ids must be unique"))
     selected = cases
     scope: Literal["all", "release"] = "all"
     if scenario_set_id and isinstance(payload, Mapping):
@@ -346,23 +358,26 @@ def assess_scenario_quality(
                 if isinstance(item, Mapping) and item.get("id") == scenario_set_id:
                     groups = item.get("groups")
                     if isinstance(groups, Mapping):
-                        selected_ids = [
-                            str(value) for values in groups.values() if isinstance(values, list) for value in values
-                        ]
+                        group_values = list(groups.values())
+                        if all(
+                            isinstance(values, list) and all(_text(value) for value in values)
+                            for values in group_values
+                        ):
+                            selected_ids = [value for values in group_values for value in values]
                     break
         if not selected_ids:
             findings.append(_finding("invalid_scenario_set", "selected release scenario set is missing or empty"))
             selected = []
         else:
-            by_id = {str(case.get("id")): case for case in cases if isinstance(case, Mapping)}
+            by_id = {case["id"]: case for case in cases if isinstance(case, Mapping) and _text(case.get("id"))}
             unknown = [item for item in selected_ids if item not in by_id]
             if unknown:
                 findings.append(
                     _finding("unknown_scenario_id", f"release scenario set contains unknown ids: {', '.join(unknown)}")
                 )
             selected = [by_id[item] for item in selected_ids if item in by_id]
-    ids = [str(case.get("id")) for case in selected if isinstance(case, Mapping) and case.get("id")]
-    if len(ids) != len(set(ids)):
+    selected_ids = [case.get("id") for case in selected if isinstance(case, Mapping) and _text(case.get("id"))]
+    if len(selected_ids) != len(set(selected_ids)):
         findings.append(_finding("duplicate_scenario_id", "scenario ids must be unique"))
     for case in selected:
         findings.extend(_case_findings(case))

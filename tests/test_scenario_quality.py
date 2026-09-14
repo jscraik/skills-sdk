@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -152,6 +153,25 @@ def test_changed_candidate_snapshot_is_a_typed_blocker(tmp_path: Path, monkeypat
     assert result.findings[0].code == "evals_source_changed"
 
 
+def test_capture_rejects_fifo_without_blocking(tmp_path: Path) -> None:
+    root = tmp_path / "example"
+    references = root / "references"
+    references.mkdir(parents=True)
+    os.mkfifo(references / "evals.yaml")
+
+    with pytest.raises(ValueError, match="invalid_evals_file_type"):
+        quality_module._capture_evals(root, "0" * 64)
+
+
+def test_validation_blocker_preserves_upstream_evidence_refs(tmp_path: Path) -> None:
+    root = tmp_path / "missing"
+    result = assess_scenario_quality(root, source_revision=REVISION)
+
+    assert result.blocker is not None
+    assert result.findings[0].evidence_refs == result.blocker.evidence_refs
+    assert result.findings[0].evidence_refs != ("references/evals.yaml",)
+
+
 def test_untrusted_mapping_key_returns_a_typed_blocker_through_service_and_cli(tmp_path: Path) -> None:
     root = _skill(tmp_path / "example", {"cases": [_case()]})
     (root / "references/evals.yaml").write_text("? [a, b]\n: value\n", encoding="utf-8")
@@ -215,6 +235,42 @@ def test_release_selection_rejects_smoke_only_cases(tmp_path: Path) -> None:
     assert {finding.code for finding in result.findings} == {"release_case_not_eligible"}
 
 
+@pytest.mark.parametrize("groups", [{"all": "case-0"}, {"all": [1]}, ["case-0"]])
+def test_release_selector_rejects_malformed_groups_and_ids(tmp_path: Path, groups: object) -> None:
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [{"id": "release", "groups": groups}],
+        "cases": [_case("case-0")],
+    }
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload),
+        source_revision=REVISION,
+        scenario_set_id="release",
+    )
+
+    assert "invalid_scenario_set" in {finding.code for finding in result.findings}
+
+
+def test_release_selection_reports_duplicate_source_and_selector_ids(tmp_path: Path) -> None:
+    first = _case("duplicate", category="pressure")
+    second = _case("duplicate", category="edge")
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [{"id": "release", "groups": {"all": ["duplicate", "duplicate"]}}],
+        "cases": [first, second],
+    }
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload),
+        source_revision=REVISION,
+        scenario_set_id="release",
+        policy=ScenarioQualityPolicy(minimum_release_cases=0),
+    )
+
+    assert [finding.code for finding in result.findings].count("duplicate_scenario_id") == 2
+
+
 @pytest.mark.parametrize(
     ("schema_version", "skill_name", "code"),
     [("1.0", "example", "unsupported_evals_schema"), ("2.0", "other", "skill_name_mismatch")],
@@ -246,6 +302,23 @@ def test_cli_executes_real_json_route(tmp_path: Path) -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["schema_version"] == "scenario-quality/v1"
+
+
+def test_cli_human_output_prints_every_scenario_finding(tmp_path: Path) -> None:
+    case = _case()
+    case.pop("given")
+    case.pop("should")
+    root = _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [case]})
+    completed = subprocess.run(
+        ["skills-sdk", "eval", "scenario-quality", str(root), "--source-revision", REVISION, "--robot"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert completed.returncode == 2
+    assert completed.stdout.count("missing_scenario_field") == 2
 
 
 def test_cli_requires_an_eval_lane() -> None:

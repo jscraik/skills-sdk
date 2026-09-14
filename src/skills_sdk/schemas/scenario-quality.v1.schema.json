@@ -83,7 +83,7 @@
           "title": "Case Id"
         },
         "code": {
-          "minLength": 1,
+          "pattern": "^[a-z0-9_]+$",
           "title": "Code",
           "type": "string"
         },

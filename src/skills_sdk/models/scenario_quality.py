@@ -8,11 +8,11 @@ from pydantic import Field, model_validator
 
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
-from skills_sdk.models.packaging import PackageReceiptBlocker
+from skills_sdk.models.packaging import BlockerCode, PackageReceiptBlocker
 
 
 class ScenarioQualityFinding(_ContractModel):
-    code: NonEmptyText
+    code: BlockerCode
     message: NonEmptyText
     case_id: NonEmptyText | None = None
     evidence_refs: tuple[PortablePath, ...] = ()
