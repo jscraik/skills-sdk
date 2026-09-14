@@ -32,6 +32,22 @@ def build_parser() -> argparse.ArgumentParser:
         if name in {"validate", "build"}:
             continue
         commands.add_parser(name, help=help_text, description=help_text)
+    compare = commands.add_parser("compare-copy", help="compare validated source and runtime file bytes without writes")
+    compare.add_argument("source_root", type=Path)
+    compare.add_argument("runtime_root", type=Path)
+    compare.add_argument("--source-revision", required=True)
+    maintenance = commands.add_parser(
+        "maintain-entrypoint", help="check or repair an existing skill entrypoint or sibling document"
+    )
+    maintenance.add_argument("source", type=Path)
+    maintenance.add_argument("target", type=Path)
+    maintenance.add_argument("--backup-root", type=Path, required=True)
+    maintenance.add_argument("--expected-source", required=True)
+    maintenance.add_argument("--expected-current", required=True)
+    maintenance.add_argument(
+        "--supporting-document", action="store_true", help="maintain an existing sibling Markdown document"
+    )
+    maintenance.add_argument("--apply", action="store_true", help="apply the separately authorized repair")
     for name in ("validate", "build"):
         command = commands.add_parser(name, help=COMMAND_HELP[name], description=COMMAND_HELP[name])
         command.add_argument("package_root", type=Path)
@@ -56,12 +72,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
+    """Return findings suitable for the human-readable command output."""
     if command == "validate":
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 
 
 def _print_result(command: str, result: Any, *, json_output: bool) -> None:
+    """Print a validation or build result in the requested output format."""
     if json_output:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
         return
@@ -73,9 +91,43 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
         print(f"  {finding.code}: {finding.message}{suffix}")
 
 
+def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
+    """Run the bounded host-maintenance command and return its exit status."""
+    from skills_sdk.host.entrypoint import EntrypointRequest, check_entrypoint, repair_entrypoint
+
+    try:
+        request = EntrypointRequest(
+            source=arguments.source,
+            target=arguments.target,
+            backup_root=arguments.backup_root,
+            expected_source=arguments.expected_source,
+            expected_current=arguments.expected_current,
+            supporting_document=arguments.supporting_document,
+        )
+        result = repair_entrypoint(request) if arguments.apply else check_entrypoint(request)
+    except (OSError, ValueError) as exc:
+        print(f"maintain-entrypoint: blocked or indeterminate: {exc}")
+        return 2
+    print(f"maintain-entrypoint: {result}")
+    return 2 if result == "repairable" else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     arguments = build_parser().parse_args(argv)
+    if arguments.command == "maintain-entrypoint":
+        return _maintain_entrypoint(arguments)
+    if arguments.command == "compare-copy":
+        from skills_sdk.validation.runtime_copy import compare_runtime_copy
+
+        comparison = compare_runtime_copy(arguments.source_root, arguments.runtime_root, arguments.source_revision)
+        print(f"compare-copy: {comparison.status}")
+        for label, validation in (("source", comparison.source), ("runtime", comparison.runtime)):
+            for finding in validation.findings:
+                print(f"  {label}: {finding.code}: {finding.message}")
+        for path in comparison.different_paths:
+            print(f"  different: {path}")
+        return 0 if comparison.status == "pass" else 2
     if arguments.command not in {"validate", "build"}:
         return 0
     from skills_sdk.validation import SkillValidationPolicy
