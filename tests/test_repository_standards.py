@@ -235,6 +235,7 @@ def test_validation_wrappers_use_repository_pinned_mise_toolchain() -> None:
     for relative in ("scripts/validate-codestyle.sh", "scripts/validate-repository.sh"):
         script = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
         assert 'MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"' in script
+        assert 'MISE_CEILING_PATHS="$repo_root"' in script
         assert "mise exec -- uv run --frozen " in script
         assert not any(line.startswith("uv ") for line in script.splitlines())
     codestyle = (REPOSITORY_ROOT / "scripts/validate-codestyle.sh").read_text(encoding="utf-8")
