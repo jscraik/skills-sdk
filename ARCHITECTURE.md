@@ -5,10 +5,11 @@ Agent Skills packages. It defines versioned contract models for caller-provided
 inventory, intake, evaluation, risk, and security data, and consumes package
 source only through read-only validation and, after a resolved identity and a
 passing validation, build candidate-bound manifest and receipt records.
-The package also defines secret-free provider execution envelopes, prepares
+The package also defines secret-free provider execution envelopes and bounded
+offline orchestration through an injected adapter, prepares
 local private-registry receipts, and plans intended runtime-lock transitions.
-Provider calls, host apply or rollback, registry interaction, and publication
-remain outside the core package.
+Real-provider transports and credentials, host apply or rollback, registry
+interaction, and publication remain outside the core package.
 
 ## Product ownership and migration
 
@@ -90,6 +91,11 @@ operational contracts.
   `ProviderExecutionRequest` and `ProviderExecutionResult` in
   `src/skills_sdk/models/provider_execution.py`; external adapters still own
   provider calls, credentials, and provider-result truth.
+- Changing offline provider-call orchestration: start with
+  `execute_provider_call` in `src/skills_sdk/providers/call.py`, then follow its
+  additive contracts in `src/skills_sdk/models/provider_call.py`. Injected
+  adapters own transport and external truth; the SDK owns only bounded local
+  orchestration and public evidence.
 - Changing runtime-lock planning: follow `plan_runtime_install` in
   `src/skills_sdk/lifecycle/planning.py` and the versioned models in
   `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
@@ -133,7 +139,11 @@ Local candidate-bound contracts
     |
     +--> models/provider_execution.py
     |    (locally validated envelopes for externally observed provider evidence;
-    |     no provider call or locally proved provider outcome)
+    |     no external transport or locally proved provider outcome)
+    |
+    +--> providers/call.py
+    |    (bounded offline orchestration through one injected adapter;
+    |     no discovery, credentials, network transport, or provider truth)
     |
     +--> lifecycle/planning.py
     |    (intended runtime-lock transition only; no host mutation)
@@ -165,6 +175,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
 | `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
+| `src/skills_sdk/providers/` | Bounded offline complete and pull-stream orchestration through an injected adapter; no discovery, credentials, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter` |
 | `src/skills_sdk/models/runtime_evidence.py` | Candidate-bound adapter observations for installation, rollback, discovery, activation, and runtime outcome; no host path resolution, filesystem mutation, activation, or runtime invocation. | `InstallationResult`, `RuntimeOutcomeReceipt` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/schemas/` | Committed JSON Schema resources: generator-managed contracts plus hand-maintained `receipt-base.v1`, `blocker.v1`, and `package-identity.v1` resources, each covered by its applicable schema checks. | `scripts/generate_schemas.py`, `SchemaRegistry.load` |
@@ -277,7 +288,7 @@ its `--check` mode for the generated subset. The canonical focused route for
 the hand-maintained subset is:
 
 ```bash
-mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
 ```
 
 That route loads all three resources through `SchemaRegistry.load`, which
@@ -330,7 +341,7 @@ Use the pinned environment and the repository wrapper before a commit or pull
 request:
 
 ```bash
-mise exec -- uv sync --frozen
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
 bash scripts/validate-repository.sh
 ```
 
@@ -345,13 +356,13 @@ runtime, or publication evidence.
 The documentation-only capability-map update was checked with these exact
 repository commands:
 
-- `mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_repository_standards.py tests/test_skill_validation_architecture.py`
+- `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_repository_standards.py tests/test_skill_validation_architecture.py`
   — `pass` (`84 passed`).
 - `bash scripts/validate-codestyle.sh` — `pass` (Ruff, MyPy, repository
   standards, and Vale completed without findings).
-- `mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
+- `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
   `pass` (no generated-schema drift).
-- `bash scripts/validate-repository.sh` — `pass` (`926 passed`, `1 skipped`;
+- `bash scripts/validate-repository.sh` — `pass` (`1,443 passed`, `1 skipped`;
   source distribution and wheel built successfully).
 - `git diff --check` — `pass`.
 - `git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb` — `pass`
@@ -362,7 +373,7 @@ checks:
 
 | Lane | Outcome | Concrete reason | Nearest meaningful fallback |
 | --- | --- | --- | --- |
-| Provider | `blocked` | The repository contains envelopes, not a provider client, credentials, or an authorized provider call. | Provider execution model, schema, and adapter-boundary tests. |
+| Provider | `blocked` | The repository contains offline orchestration and envelopes, not a selected provider client, credentials, network transport, or an authorized real-provider call. | Provider-call conformance plus provider execution model and schema tests. |
 | Registry | `blocked` | Private-registry preparation performs no registry authentication, upload, or mutation. | Deterministic registry-preparation contract tests. |
 | Host runtime | `blocked` | Runtime lifecycle code plans transitions but has no host apply or rollback adapter. | Runtime-lock and installation-planning contract tests. |
 | Tessl | `blocked` | Tessl CLI routes are parse-only and no Tessl integration was executed. | CLI parser/help tests and candidate-bound local contract checks. |

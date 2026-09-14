@@ -41,6 +41,8 @@ SCHEMA_NAMES = frozenset(
         "provider-identity.v2",
         "provider-execution-request.v1",
         "provider-execution-result.v1",
+        "provider-call-adapter.v1",
+        "provider-call-result.v1",
         "registry-identity.v1",
         "registry-preparation.v1",
         "registry-preparation-request.v1",
@@ -286,6 +288,14 @@ class SchemaRegistry:
             from skills_sdk.models.provider_execution import ProviderExecutionResult
 
             model = ProviderExecutionResult
+        elif name == "provider-call-adapter.v1":
+            from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
+
+            model = TextProviderAdapterDescriptor
+        elif name == "provider-call-result.v1":
+            from skills_sdk.models.provider_call import ProviderCallPublicResult
+
+            model = ProviderCallPublicResult
         elif name == "registry-identity.v1":
             from skills_sdk.models.registry import RegistryIdentity
 
