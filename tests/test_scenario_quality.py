@@ -122,7 +122,7 @@ def test_release_policy_is_explicit_and_selector_scoped(tmp_path: Path) -> None:
     }
     root = _skill(tmp_path / "example", payload)
     assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="release").status == "pass"
-    with pytest.raises(ValueError, match="fixed portable 8/1/1"):
+    with pytest.raises(ValueError, match="fixed portable 5/8/10 and 1/1"):
         ScenarioQualityPolicy(minimum_release_cases=9)
     assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="missing").status == "blocked"
 
@@ -377,7 +377,9 @@ def test_deep_yaml_and_empty_selector_return_typed_blockers(tmp_path: Path) -> N
 def test_receipt_records_policy_and_enforces_state_scope_and_paths(tmp_path: Path) -> None:
     root = _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [_case()]})
     result = assess_scenario_quality(root, source_revision=REVISION)
-    assert result.effective_policy.minimum_release_cases == 8
+    assert result.effective_policy.minimum_release_cases == 5
+    assert result.effective_policy.target_release_cases == 8
+    assert result.effective_policy.maximum_release_cases == 10
     payload = result.model_dump(mode="json")
     for mutation in (
         lambda item: item.update({"scenario_count": 0}),
@@ -560,6 +562,11 @@ def test_release_policy_evidence_is_enforced_by_model_and_schema(tmp_path: Path)
     assert receipt["negative_or_edge_count"] == 1
     forged = dict(receipt)
     forged["scenario_count"] = 1
+    with pytest.raises(ValidationError):
+        ScenarioQualityReceipt.model_validate(forged)
+    assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v1")).iter_errors(forged))
+    forged = dict(receipt)
+    forged["scenario_count"] = 11
     with pytest.raises(ValidationError):
         ScenarioQualityReceipt.model_validate(forged)
     assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v1")).iter_errors(forged))

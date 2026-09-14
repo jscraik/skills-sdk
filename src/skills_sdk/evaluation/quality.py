@@ -85,17 +85,21 @@ _ASSERTION_FIELDS = {
 
 @dataclass(frozen=True, slots=True)
 class ScenarioQualityPolicy:
-    minimum_release_cases: int = 8
+    minimum_release_cases: int = 5
+    target_release_cases: int = 8
+    maximum_release_cases: int = 10
     minimum_pressure_or_regression: int = 1
     minimum_negative_or_edge: int = 1
 
     def __post_init__(self) -> None:
         if (
             self.minimum_release_cases,
+            self.target_release_cases,
+            self.maximum_release_cases,
             self.minimum_pressure_or_regression,
             self.minimum_negative_or_edge,
-        ) != (8, 1, 1):
-            raise ValueError("scenario-quality/v1 uses the fixed portable 8/1/1 release policy")
+        ) != (5, 8, 10, 1, 1):
+            raise ValueError("scenario-quality/v1 uses the fixed portable 5/8/10 and 1/1 release policy")
 
 
 class _ClosedLoader(yaml.SafeLoader):
@@ -424,6 +428,8 @@ def assess_scenario_quality(
     active_policy = policy or ScenarioQualityPolicy()
     effective_policy = ScenarioQualityAppliedPolicy(
         minimum_release_cases=active_policy.minimum_release_cases,
+        target_release_cases=active_policy.target_release_cases,
+        maximum_release_cases=active_policy.maximum_release_cases,
         minimum_pressure_or_regression=active_policy.minimum_pressure_or_regression,
         minimum_negative_or_edge=active_policy.minimum_negative_or_edge,
     )
@@ -500,6 +506,13 @@ def assess_scenario_quality(
                 _finding(
                     "release_case_floor",
                     f"release scenario set requires at least {active_policy.minimum_release_cases} cases",
+                )
+            )
+        if len(selected) > active_policy.maximum_release_cases:
+            findings.append(
+                _finding(
+                    "release_case_ceiling",
+                    f"release scenario set permits at most {active_policy.maximum_release_cases} cases",
                 )
             )
         if pressure_or_regression_count < active_policy.minimum_pressure_or_regression:

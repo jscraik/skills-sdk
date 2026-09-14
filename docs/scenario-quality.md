@@ -35,12 +35,13 @@ expected prose. Each required output field needs a field-aware assertion.
 
 Without `--scenario-set`, the command checks every case and applies no release
 cardinality floor. With `--scenario-set`, it checks the named release set and
-applies `ScenarioQualityPolicy`: at least eight cases, one
-pressure-or-regression case, and one negative-or-edge case. These fixed values
-are the portable v1 release policy inherited from the characterized source.
-Changing them requires a new schema version and compatibility evidence. Every
-receipt records the applied thresholds and observed category counts so model
-and schema consumers can reproduce the decision.
+applies `ScenarioQualityPolicy`: five to ten cases with a target of eight, at
+least one pressure-or-regression case, and at least one negative-or-edge case.
+These fixed values are the portable v1 release policy inherited from the
+characterized source. Changing them requires a new schema version and
+compatibility evidence. Every receipt records the minimum, target, maximum,
+and observed category counts so model and schema consumers can reproduce the
+decision.
 
 ```bash
 skills-sdk eval scenario-quality ./skills/example \

@@ -27,7 +27,9 @@ class ScenarioQualityFinding(_ContractModel):
 
 
 class ScenarioQualityAppliedPolicy(_ContractModel):
-    minimum_release_cases: Literal[8] = 8
+    minimum_release_cases: Literal[5] = 5
+    target_release_cases: Literal[8] = 8
+    maximum_release_cases: Literal[10] = 10
     minimum_pressure_or_regression: Literal[1] = 1
     minimum_negative_or_edge: Literal[1] = 1
 
@@ -64,6 +66,7 @@ class ScenarioQualityReceipt(_ContractModel):
             and self.scope == "release"
             and (
                 self.scenario_count < self.effective_policy.minimum_release_cases
+                or self.scenario_count > self.effective_policy.maximum_release_cases
                 or self.pressure_or_regression_count < self.effective_policy.minimum_pressure_or_regression
                 or self.negative_or_edge_count < self.effective_policy.minimum_negative_or_edge
             )

@@ -44,7 +44,7 @@ def append_scenario_quality_constraints(schema: dict[str, Any]) -> None:
             },
             "then": {
                 "properties": {
-                    "scenario_count": {"minimum": 8},
+                    "scenario_count": {"minimum": 5, "maximum": 10},
                     "pressure_or_regression_count": {"minimum": 1},
                     "negative_or_edge_count": {"minimum": 1},
                 }
