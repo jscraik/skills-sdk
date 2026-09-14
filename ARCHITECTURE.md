@@ -362,7 +362,7 @@ repository commands:
   standards, and Vale completed without findings).
 - `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
   `pass` (no generated-schema drift).
-- `bash scripts/validate-repository.sh` — `pass` (`926 passed`, `1 skipped`;
+- `bash scripts/validate-repository.sh` — `pass` (`1,443 passed`, `1 skipped`;
   source distribution and wheel built successfully).
 - `git diff --check` — `pass`.
 - `git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb` — `pass`

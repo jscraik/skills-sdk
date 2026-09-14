@@ -490,15 +490,8 @@
       "title": "Cleanup Error Code"
     },
     "cleanup_succeeded": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "title": "Cleanup Succeeded"
+      "title": "Cleanup Succeeded",
+      "type": "boolean"
     },
     "cost": {
       "anyOf": [

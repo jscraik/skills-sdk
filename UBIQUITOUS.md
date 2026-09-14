@@ -73,7 +73,8 @@ _Avoid_: tarball, installer, publication record
 **Receipt**:
 A versioned, immutable proof-lane result carrying status, evidence, and the
 candidate identity when it has been resolved. A `package-receipt/v1` can be
-`built` or `blocked`, and does not claim provider, runtime, or registry state.
+`built` or `blocked`, and does not claim provider, runtime, or registry state;
+provider-call public evidence is a separate result, not a package receipt.
 _Avoid_: deployment record, publication receipt, runtime health check
 
 **Structural schema validation**:
@@ -111,7 +112,9 @@ _Avoid_: installed package, provider artifact
 **Skills SDK**:
 The canonical owner and destination for portable skill lifecycle contracts and
 tooling: authoring, validation, hardening, evaluation, repair, evidence, and
-handoff. Only routes documented as implemented may be treated as executable;
+handoff. At the provider-call boundary, it owns bounded local orchestration and
+public evidence; the injected adapter owns real-provider transport and external
+truth. Only routes documented as implemented may be treated as executable;
 destination ownership does not prove that every migration stage is complete.
 _Avoid_: retained package collection, installed runtime, completed migration
 
@@ -147,9 +150,9 @@ client adapter that may consume it.
 _Avoid_: skill identity, installed plugin
 
 **Provider lane**:
-An adapter-specific interaction with an external provider or account. Provider
-execution and its receipts are outside the portable SDK core and require their
-own candidate-bound evidence.
+Bounded local orchestration through an injected adapter. The Skills SDK owns
+limits, cleanup, and public evidence; the adapter owns credentials,
+provider-specific payloads, real-provider transport, and external truth.
 _Avoid_: local validation, registry state
 
 **Runtime projection**:
