@@ -16,6 +16,7 @@ from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import ScenarioQualityPolicy, assess_scenario_quality
 from skills_sdk.evaluation import quality as quality_module
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding, ScenarioQualityReceipt
+from skills_sdk.validation import validate_skill_package
 
 REVISION = "1" * 40
 
@@ -181,13 +182,13 @@ def test_capture_reads_regular_files_until_eof(tmp_path: Path, monkeypatch: pyte
     assert quality_module._capture_evals(root, quality_module.hashlib.sha256(payload).hexdigest()) == payload
 
 
-def test_validation_blocker_preserves_upstream_evidence_refs(tmp_path: Path) -> None:
+def test_validation_finding_preserves_upstream_evidence_refs(tmp_path: Path) -> None:
     root = tmp_path / "missing"
+    validation = validate_skill_package(root, source_revision=REVISION)
     result = assess_scenario_quality(root, source_revision=REVISION)
 
-    assert result.blocker is not None
-    assert result.findings[0].evidence_refs == result.blocker.evidence_refs
-    assert result.findings[0].evidence_refs != ("references/evals.yaml",)
+    assert result.findings[0].evidence_refs == validation.findings[0].evidence_refs
+    assert "blocker" not in result.model_dump(mode="json")
 
 
 def test_untrusted_mapping_key_returns_a_typed_blocker_through_service_and_cli(tmp_path: Path) -> None:
@@ -309,6 +310,28 @@ def test_duplicate_release_set_identifiers_are_rejected(tmp_path: Path) -> None:
     assert "invalid_scenario_set" in {finding.code for finding in result.findings}
 
 
+def test_duplicate_unselected_release_set_identifiers_are_rejected(tmp_path: Path) -> None:
+    cases = [_case(f"case-{index}") for index in range(8)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    selected = {"id": "release", "groups": {"all": [case["id"] for case in cases]}}
+    duplicate = {"id": "other", "groups": {"all": [case["id"] for case in cases]}}
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [
+            selected,
+            duplicate,
+            {"id": "other", "groups": {"all": [case["id"] for case in cases]}},
+        ],
+        "cases": cases,
+    }
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload), source_revision=REVISION, scenario_set_id="release"
+    )
+    assert "invalid_scenario_set" in {finding.code for finding in result.findings}
+
+
 @pytest.mark.parametrize(
     ("field", "value", "code"),
     [
@@ -377,6 +400,11 @@ def test_published_schema_enforces_receipt_state_invariants(tmp_path: Path) -> N
     invalid = dict(payload)
     invalid["scenario_count"] = 0
     assert list(validator.iter_errors(invalid))
+    blocked = assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="missing").model_dump(mode="json")
+    blocked["findings"] = []
+    assert list(validator.iter_errors(blocked))
+    with pytest.raises(ValidationError):
+        ScenarioQualityReceipt.model_validate(blocked)
 
 
 @pytest.mark.parametrize(

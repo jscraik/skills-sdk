@@ -17,18 +17,14 @@ def append_scenario_quality_constraints(schema: dict[str, Any]) -> None:
                     "candidate": {"$ref": "#/$defs/PackageCandidateIdentity"},
                     "scenario_count": {"minimum": 1},
                     "findings": {"maxItems": 0},
-                    "blocker": {"type": "null"},
                 },
             },
         },
         {
             "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
             "then": {
-                "required": ["findings", "blocker"],
-                "properties": {
-                    "findings": {"minItems": 1},
-                    "blocker": {"$ref": "#/$defs/PackageReceiptBlocker"},
-                },
+                "required": ["findings"],
+                "properties": {"findings": {"minItems": 1}},
             },
         },
         {

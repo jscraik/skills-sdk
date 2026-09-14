@@ -12,7 +12,6 @@ from typing import Literal, cast
 
 import yaml
 
-from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.scenario_quality import (
     ScenarioQualityAppliedPolicy,
     ScenarioQualityFinding,
@@ -293,11 +292,6 @@ def _blocked_validation_receipt(
         message=primary.message,
         evidence_refs=primary.evidence_refs,
     )
-    blocker = PackageReceiptBlocker(
-        code=finding.code,
-        message=finding.message,
-        evidence_refs=finding.evidence_refs,
-    )
     return ScenarioQualityReceipt(
         candidate=validation.candidate,
         scenario_set_id=scenario_set_id,
@@ -306,7 +300,6 @@ def _blocked_validation_receipt(
         scenario_count=0,
         effective_policy=effective_policy,
         findings=(finding,),
-        blocker=blocker,
     )
 
 
@@ -356,6 +349,40 @@ def _load_evals_payload(
     return None
 
 
+def _release_sets(
+    payload: Mapping[object, object], findings: list[ScenarioQualityFinding]
+) -> list[Mapping[object, object]]:
+    raw_sets = payload.get("release_scenario_sets")
+    if raw_sets is None:
+        return []
+    if not isinstance(raw_sets, list):
+        findings.append(_finding("invalid_scenario_set", "release scenario sets must be a list"))
+        return []
+    valid_sets: list[Mapping[object, object]] = []
+    identifiers: list[str] = []
+    for item in raw_sets:
+        if not isinstance(item, Mapping) or not _text(item.get("id")):
+            findings.append(_finding("invalid_scenario_set", "release scenario set identifiers must be non-empty text"))
+            continue
+        groups = item.get("groups")
+        if (
+            not isinstance(groups, Mapping)
+            or not groups
+            or not all(
+                isinstance(values, list) and bool(values) and all(_text(value) for value in values)
+                for values in groups.values()
+            )
+        ):
+            findings.append(_finding("invalid_scenario_set", "release scenario set groups must contain text IDs"))
+            continue
+        identifiers.append(cast(str, item["id"]))
+        valid_sets.append(item)
+    if len(identifiers) != len(set(identifiers)):
+        findings.append(_finding("invalid_scenario_set", "release scenario set identifiers must be unique"))
+        return []
+    return valid_sets
+
+
 def assess_scenario_quality(
     package_root: Path,
     *,
@@ -384,26 +411,18 @@ def assess_scenario_quality(
     else:
         payload = _load_evals_payload(package_root, manifest.sha256, findings)
     cases = _document_cases(payload, validation.candidate.package_id, findings) if payload is not None else []
+    release_sets = _release_sets(payload, findings) if isinstance(payload, Mapping) else []
     raw_ids = [case.get("id") for case in cases if isinstance(case, Mapping) and _text(case.get("id"))]
     if len(raw_ids) != len(set(raw_ids)):
         findings.append(_finding("duplicate_scenario_id", "scenario ids must be unique"))
     selected = cases
     scope: Literal["all", "release"] = "release" if valid_scenario_set_id else "all"
     if valid_scenario_set_id and isinstance(payload, Mapping):
-        sets = payload.get("release_scenario_sets")
         selected_ids: list[str] | None = None
-        if isinstance(sets, list):
-            matching_sets = [
-                item for item in sets if isinstance(item, Mapping) and item.get("id") == valid_scenario_set_id
-            ]
-            if len(matching_sets) == 1:
-                groups = matching_sets[0].get("groups")
-                if isinstance(groups, Mapping):
-                    group_values = list(groups.values())
-                    if all(
-                        isinstance(values, list) and all(_text(value) for value in values) for values in group_values
-                    ):
-                        selected_ids = [value for values in group_values for value in values]
+        matching_sets = [item for item in release_sets if item.get("id") == valid_scenario_set_id]
+        if len(matching_sets) == 1:
+            groups = cast(Mapping[object, object], matching_sets[0]["groups"])
+            selected_ids = [cast(str, value) for values in groups.values() for value in cast(list[object], values)]
         if not selected_ids:
             findings.append(_finding("invalid_scenario_set", "selected release scenario set is missing or empty"))
             selected = []
@@ -455,14 +474,6 @@ def assess_scenario_quality(
                 _finding("release_negative_floor", "release scenario set requires negative or edge coverage")
             )
     findings.sort(key=lambda item: (item.case_id or "", item.code, item.message))
-    primary_blocker: PackageReceiptBlocker | None = None
-    if findings:
-        first = findings[0]
-        primary_blocker = PackageReceiptBlocker(
-            code=first.code,
-            message=first.message,
-            evidence_refs=first.evidence_refs,
-        )
     return ScenarioQualityReceipt(
         candidate=validation.candidate,
         scenario_set_id=valid_scenario_set_id,
@@ -471,7 +482,6 @@ def assess_scenario_quality(
         scenario_count=len(selected),
         effective_policy=effective_policy,
         findings=tuple(findings),
-        blocker=primary_blocker,
     )
 
 

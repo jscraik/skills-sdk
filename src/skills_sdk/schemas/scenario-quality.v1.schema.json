@@ -34,38 +34,6 @@
       "title": "PackageCandidateIdentity",
       "type": "object"
     },
-    "PackageReceiptBlocker": {
-      "additionalProperties": false,
-      "description": "Stable typed blocker details for a package proof receipt.",
-      "properties": {
-        "code": {
-          "pattern": "^[a-z0-9_]+$",
-          "title": "Code",
-          "type": "string"
-        },
-        "evidence_refs": {
-          "default": [],
-          "items": {
-            "minLength": 1,
-            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
-            "type": "string"
-          },
-          "title": "Evidence Refs",
-          "type": "array"
-        },
-        "message": {
-          "minLength": 1,
-          "title": "Message",
-          "type": "string"
-        }
-      },
-      "required": [
-        "code",
-        "message"
-      ],
-      "title": "PackageReceiptBlocker",
-      "type": "object"
-    },
     "ScenarioQualityAppliedPolicy": {
       "additionalProperties": false,
       "properties": {
@@ -155,9 +123,6 @@
       },
       "then": {
         "properties": {
-          "blocker": {
-            "type": "null"
-          },
           "candidate": {
             "$ref": "#/$defs/PackageCandidateIdentity"
           },
@@ -187,16 +152,12 @@
       },
       "then": {
         "properties": {
-          "blocker": {
-            "$ref": "#/$defs/PackageReceiptBlocker"
-          },
           "findings": {
             "minItems": 1
           }
         },
         "required": [
-          "findings",
-          "blocker"
+          "findings"
         ]
       }
     },
@@ -232,17 +193,6 @@
     }
   ],
   "properties": {
-    "blocker": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/PackageReceiptBlocker"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
-    },
     "candidate": {
       "anyOf": [
         {
