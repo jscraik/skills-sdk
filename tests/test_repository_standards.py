@@ -41,6 +41,24 @@ def _run_vale(source: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def test_run_vale_uses_repository_mise_boundary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    captured_environment: dict[str, str] = {}
+
+    def capture_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        environment = kwargs["env"]
+        assert isinstance(environment, dict)
+        captured_environment.update({str(key): str(value) for key, value in environment.items()})
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(shutil, "which", lambda executable: f"/tools/{executable}")
+    monkeypatch.setattr(subprocess, "run", capture_run)
+
+    _run_vale(tmp_path / "document.md")
+
+    assert captured_environment["MISE_CEILING_PATHS"] == str(REPOSITORY_ROOT)
+    assert captured_environment["MISE_TRUSTED_CONFIG_PATHS"] == str(REPOSITORY_ROOT / ".mise.toml")
+
+
 def test_repository_standards_cli_accepts_current_tree() -> None:
     result = subprocess.run(
         [sys.executable, "scripts/check_repository_standards.py"],
@@ -233,8 +251,6 @@ def test_mypy_file_level_suppression_is_rejected(tmp_path: Path, directive: str)
 
 
 def test_validation_wrappers_use_repository_pinned_mise_toolchain() -> None:
-    source = Path(__file__).read_text(encoding="utf-8")
-    assert 'environment["MISE_CEILING_PATHS"] = str(REPOSITORY_ROOT)' in source
     for relative in ("scripts/validate-codestyle.sh", "scripts/validate-repository.sh"):
         script = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
         assert 'MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"' in script
