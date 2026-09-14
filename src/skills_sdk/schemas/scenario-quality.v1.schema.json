@@ -38,26 +38,24 @@
       "additionalProperties": false,
       "properties": {
         "minimum_negative_or_edge": {
-          "minimum": 0,
+          "const": 1,
+          "default": 1,
           "title": "Minimum Negative Or Edge",
           "type": "integer"
         },
         "minimum_pressure_or_regression": {
-          "minimum": 0,
+          "const": 1,
+          "default": 1,
           "title": "Minimum Pressure Or Regression",
           "type": "integer"
         },
         "minimum_release_cases": {
-          "minimum": 0,
+          "const": 8,
+          "default": 8,
           "title": "Minimum Release Cases",
           "type": "integer"
         }
       },
-      "required": [
-        "minimum_release_cases",
-        "minimum_pressure_or_regression",
-        "minimum_negative_or_edge"
-      ],
       "title": "ScenarioQualityAppliedPolicy",
       "type": "object"
     },
@@ -183,12 +181,42 @@
         "properties": {
           "scenario_set_id": {
             "minLength": 1,
+            "pattern": ".*\\S.*",
             "type": "string"
           }
         },
         "required": [
           "scenario_set_id"
         ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "release"
+          },
+          "status": {
+            "const": "pass"
+          }
+        },
+        "required": [
+          "status",
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "negative_or_edge_count": {
+            "minimum": 1
+          },
+          "pressure_or_regression_count": {
+            "minimum": 1
+          },
+          "scenario_count": {
+            "minimum": 8
+          }
+        }
       }
     }
   ],
@@ -227,11 +255,23 @@
       "title": "Mutation Performed",
       "type": "boolean"
     },
+    "negative_or_edge_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Negative Or Edge Count",
+      "type": "integer"
+    },
     "network_used": {
       "const": false,
       "default": false,
       "title": "Network Used",
       "type": "boolean"
+    },
+    "pressure_or_regression_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Pressure Or Regression Count",
+      "type": "integer"
     },
     "scenario_count": {
       "minimum": 0,

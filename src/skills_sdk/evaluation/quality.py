@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -63,7 +64,7 @@ _ASSERTION_TYPES = {
     "text_field_absent",
     "must_not",
 }
-_FIELD_ASSERTIONS = {"text_field_equals", "text_field_in", "text_field_present", "text_field_absent"}
+_FIELD_ASSERTIONS = {"text_field_equals", "text_field_in", "text_field_present"}
 _ASSERTION_FIELDS = {
     "contains": {"type", "value"},
     "not_contains": {"type", "value"},
@@ -89,8 +90,12 @@ class ScenarioQualityPolicy:
     minimum_negative_or_edge: int = 1
 
     def __post_init__(self) -> None:
-        if min(self.minimum_release_cases, self.minimum_pressure_or_regression, self.minimum_negative_or_edge) < 0:
-            raise ValueError("scenario quality policy limits must be non-negative")
+        if (
+            self.minimum_release_cases,
+            self.minimum_pressure_or_regression,
+            self.minimum_negative_or_edge,
+        ) != (8, 1, 1):
+            raise ValueError("scenario-quality/v1 uses the fixed portable 8/1/1 release policy")
 
 
 class _ClosedLoader(yaml.SafeLoader):
@@ -185,7 +190,15 @@ def _assertion_valid(assertion: Mapping[object, object]) -> bool:
         "discovery_question",
         "must_not",
     }:
-        return _text(assertion.get("value"))
+        value = assertion.get("value")
+        if not _text(value):
+            return False
+        if assertion_type in {"regex", "not_regex"}:
+            try:
+                re.compile(cast(str, value))
+            except re.error:
+                return False
+        return True
     if assertion_type in {"skill_selected", "skill_not_selected"}:
         return _text(assertion.get("expected_skill"))
     if assertion_type == "text_field_equals":
@@ -213,7 +226,8 @@ def _assertion_valid(assertion: Mapping[object, object]) -> bool:
 def _case_findings(case: object) -> list[ScenarioQualityFinding]:
     if not isinstance(case, Mapping):
         return [_finding("invalid_scenario_case", "scenario cases must be mappings")]
-    case_id = str(case.get("id") or "") or None
+    raw_case_id = case.get("id")
+    case_id = cast(str, raw_case_id) if _text(raw_case_id) else None
     findings: list[ScenarioQualityFinding] = []
     unsupported = sorted(set(case) - _CASE_FIELDS)
     if unsupported:
@@ -225,6 +239,14 @@ def _case_findings(case: object) -> list[ScenarioQualityFinding]:
             findings.append(_finding("missing_scenario_field", f"scenario requires non-empty {field}", case_id))
     if case.get("realistic") is not True:
         findings.append(_finding("scenario_not_realistic", "scenario realistic must be true", case_id))
+    for field in ("name", "task", "actual_artifact", "expected_artifact"):
+        if field in case and not _text(case.get(field)):
+            findings.append(_finding("invalid_scenario_field", f"scenario {field} must be non-empty text", case_id))
+    for field in ("smoke_mode", "should_trigger", "prepend_skill"):
+        if field in case and not isinstance(case.get(field), bool):
+            findings.append(_finding("invalid_scenario_field", f"scenario {field} must be boolean", case_id))
+    if "claim_ids" in case and not _text_list(case.get("claim_ids")):
+        findings.append(_finding("invalid_scenario_field", "scenario claim_ids must contain text IDs", case_id))
     modes = case.get("eval_modes")
     if (
         not isinstance(modes, list)
@@ -286,11 +308,9 @@ def _blocked_validation_receipt(
     scenario_set_id: str | None,
     effective_policy: ScenarioQualityAppliedPolicy,
 ) -> ScenarioQualityReceipt:
-    primary = validation.findings[0]
-    finding = ScenarioQualityFinding(
-        code=primary.code,
-        message=primary.message,
-        evidence_refs=primary.evidence_refs,
+    findings = tuple(
+        ScenarioQualityFinding(code=item.code, message=item.message, evidence_refs=item.evidence_refs)
+        for item in validation.findings
     )
     return ScenarioQualityReceipt(
         candidate=validation.candidate,
@@ -299,7 +319,7 @@ def _blocked_validation_receipt(
         status="blocked",
         scenario_count=0,
         effective_policy=effective_policy,
-        findings=(finding,),
+        findings=findings,
     )
 
 
@@ -378,7 +398,15 @@ def _release_sets(
         ):
             findings.append(_finding("invalid_scenario_set", "release scenario set groups must contain text IDs"))
             continue
-        identifiers.append(cast(str, item["id"]))
+        identifier = cast(str, item["id"])
+        if identifier != identifier.strip():
+            findings.append(
+                _finding(
+                    "invalid_scenario_set", "release scenario set identifiers must not have surrounding whitespace"
+                )
+            )
+            continue
+        identifiers.append(identifier)
         valid_sets.append(item)
     if len(identifiers) != len(set(identifiers)):
         findings.append(_finding("invalid_scenario_set", "release scenario set identifiers must be unique"))
@@ -399,7 +427,9 @@ def assess_scenario_quality(
         minimum_pressure_or_regression=active_policy.minimum_pressure_or_regression,
         minimum_negative_or_edge=active_policy.minimum_negative_or_edge,
     )
-    selector_invalid = scenario_set_id is not None and not _text(scenario_set_id)
+    selector_invalid = scenario_set_id is not None and (
+        not _text(scenario_set_id) or scenario_set_id != scenario_set_id.strip()
+    )
     valid_scenario_set_id = scenario_set_id if not selector_invalid else None
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.candidate is None or validation.status == "blocked":
@@ -407,13 +437,16 @@ def assess_scenario_quality(
     manifest = next((item for item in validation.files if item.path == _EVALS_PATH), None)
     findings: list[ScenarioQualityFinding] = []
     payload: object = None
+    payload_loaded = False
     if selector_invalid:
         findings.append(_finding("invalid_scenario_set", "scenario set identifier must be non-empty text"))
     elif manifest is None:
         findings.append(_finding("missing_evals_yaml", "package requires references/evals.yaml"))
     else:
+        before_load_findings = len(findings)
         payload = _load_evals_payload(package_root, manifest.sha256, findings)
-    cases = _document_cases(payload, validation.candidate.package_id, findings) if payload is not None else []
+        payload_loaded = len(findings) == before_load_findings
+    cases = _document_cases(payload, validation.candidate.package_id, findings) if payload_loaded else []
     release_sets = _release_sets(payload, findings) if isinstance(payload, Mapping) else []
     raw_ids = [case.get("id") for case in cases if isinstance(case, Mapping) and _text(case.get("id"))]
     if len(raw_ids) != len(set(raw_ids)):
@@ -442,8 +475,12 @@ def assess_scenario_quality(
         findings.append(_finding("duplicate_scenario_id", "scenario ids must be unique"))
     for case in selected:
         findings.extend(_case_findings(case))
+    pressure_or_regression_count = 0
+    negative_or_edge_count = 0
     if scope == "release":
         categories = [str(case.get("category")) for case in selected if isinstance(case, Mapping)]
+        pressure_or_regression_count = sum(value in {"pressure", "regression"} for value in categories)
+        negative_or_edge_count = sum(value in {"negative", "edge"} for value in categories)
         for case in selected:
             modes = case.get("eval_modes") if isinstance(case, Mapping) else None
             if isinstance(case, Mapping) and (
@@ -465,14 +502,11 @@ def assess_scenario_quality(
                     f"release scenario set requires at least {active_policy.minimum_release_cases} cases",
                 )
             )
-        if (
-            sum(value in {"pressure", "regression"} for value in categories)
-            < active_policy.minimum_pressure_or_regression
-        ):
+        if pressure_or_regression_count < active_policy.minimum_pressure_or_regression:
             findings.append(
                 _finding("release_pressure_floor", "release scenario set requires pressure or regression coverage")
             )
-        if sum(value in {"negative", "edge"} for value in categories) < active_policy.minimum_negative_or_edge:
+        if negative_or_edge_count < active_policy.minimum_negative_or_edge:
             findings.append(
                 _finding("release_negative_floor", "release scenario set requires negative or edge coverage")
             )
@@ -483,6 +517,8 @@ def assess_scenario_quality(
         scope=scope,
         status="blocked" if findings else "pass",
         scenario_count=len(selected),
+        pressure_or_regression_count=pressure_or_regression_count,
+        negative_or_edge_count=negative_or_edge_count,
         effective_policy=effective_policy,
         findings=tuple(findings),
     )

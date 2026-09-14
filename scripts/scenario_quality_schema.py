@@ -31,11 +31,26 @@ def append_scenario_quality_constraints(schema: dict[str, Any]) -> None:
             "if": {"properties": {"scope": {"const": "release"}}, "required": ["scope"]},
             "then": {
                 "required": ["scenario_set_id"],
-                "properties": {"scenario_set_id": {"type": "string", "minLength": 1}},
+                "properties": {"scenario_set_id": {"type": "string", "minLength": 1, "pattern": r".*\S.*"}},
             },
             "else": {"properties": {"scenario_set_id": {"type": "null"}}},
         },
     ]
+    schema["allOf"].append(
+        {
+            "if": {
+                "properties": {"status": {"const": "pass"}, "scope": {"const": "release"}},
+                "required": ["status", "scope"],
+            },
+            "then": {
+                "properties": {
+                    "scenario_count": {"minimum": 8},
+                    "pressure_or_regression_count": {"minimum": 1},
+                    "negative_or_edge_count": {"minimum": 1},
+                }
+            },
+        }
+    )
 
 
 __all__ = ["append_scenario_quality_constraints"]

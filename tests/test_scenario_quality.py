@@ -12,6 +12,8 @@ import yaml
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
+from skills_sdk.core.errors import ContractError
+from skills_sdk.core.receipts import parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import ScenarioQualityPolicy, assess_scenario_quality
 from skills_sdk.evaluation import quality as quality_module
@@ -120,13 +122,8 @@ def test_release_policy_is_explicit_and_selector_scoped(tmp_path: Path) -> None:
     }
     root = _skill(tmp_path / "example", payload)
     assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="release").status == "pass"
-    blocked = assess_scenario_quality(
-        root,
-        source_revision=REVISION,
-        scenario_set_id="release",
-        policy=ScenarioQualityPolicy(minimum_release_cases=9),
-    )
-    assert {finding.code for finding in blocked.findings} == {"release_case_floor"}
+    with pytest.raises(ValueError, match="fixed portable 8/1/1"):
+        ScenarioQualityPolicy(minimum_release_cases=9)
     assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="missing").status == "blocked"
 
 
@@ -284,7 +281,6 @@ def test_release_selection_reports_duplicate_source_and_selector_ids(tmp_path: P
         _skill(tmp_path / "example", payload),
         source_revision=REVISION,
         scenario_set_id="release",
-        policy=ScenarioQualityPolicy(minimum_release_cases=0),
     )
 
     assert [finding.code for finding in result.findings].count("duplicate_scenario_id") == 2
@@ -380,16 +376,8 @@ def test_deep_yaml_and_empty_selector_return_typed_blockers(tmp_path: Path) -> N
 
 def test_receipt_records_policy_and_enforces_state_scope_and_paths(tmp_path: Path) -> None:
     root = _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [_case()]})
-    result = assess_scenario_quality(
-        root,
-        source_revision=REVISION,
-        policy=ScenarioQualityPolicy(
-            minimum_release_cases=0,
-            minimum_pressure_or_regression=0,
-            minimum_negative_or_edge=0,
-        ),
-    )
-    assert result.effective_policy.minimum_release_cases == 0
+    result = assess_scenario_quality(root, source_revision=REVISION)
+    assert result.effective_policy.minimum_release_cases == 8
     payload = result.model_dump(mode="json")
     for mutation in (
         lambda item: item.update({"scenario_count": 0}),
@@ -483,3 +471,114 @@ def test_cli_requires_an_eval_lane() -> None:
     )
     assert completed.returncode == 2
     assert "required" in completed.stderr
+
+
+def test_absence_assertion_does_not_prove_required_output_field(tmp_path: Path) -> None:
+    case = _case()
+    case["output_contract"] = {"required_fields": ["outcome"]}
+    case["acceptance"] = [{"type": "text_field_absent", "field": "outcome"}]
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [case]}),
+        source_revision=REVISION,
+    )
+    assert "missing_field_assertion" in {finding.code for finding in result.findings}
+
+
+@pytest.mark.parametrize("assertion_type", ["regex", "not_regex"])
+def test_invalid_regular_expression_is_typed(tmp_path: Path, assertion_type: str) -> None:
+    case = _case()
+    case["acceptance"] = [{"type": assertion_type, "value": "["}]
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [case]}),
+        source_revision=REVISION,
+    )
+    assert "invalid_acceptance_assertion" in {finding.code for finding in result.findings}
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("name", {}), ("task", []), ("should_trigger", []), ("prepend_skill", "true"), ("claim_ids", [{}])],
+)
+def test_optional_case_fields_validate_their_shapes(tmp_path: Path, field: str, value: object) -> None:
+    case = _case()
+    case[field] = value
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [case]}),
+        source_revision=REVISION,
+    )
+    assert "invalid_scenario_field" in {finding.code for finding in result.findings}
+
+
+def test_blank_case_id_and_empty_yaml_return_typed_findings(tmp_path: Path) -> None:
+    case = _case(" ")
+    blank = assess_scenario_quality(
+        _skill(tmp_path / "blank", {"schema_version": "2.0", "skill_name": "blank", "cases": [case]}),
+        source_revision=REVISION,
+    )
+    assert blank.status == "blocked"
+    assert "missing_scenario_field" in {finding.code for finding in blank.findings}
+
+    empty_root = _skill(tmp_path / "empty", {"cases": [_case()]})
+    (empty_root / "references/evals.yaml").write_text("# empty\n", encoding="utf-8")
+    empty = assess_scenario_quality(empty_root, source_revision=REVISION)
+    assert empty.status == "blocked"
+    assert empty.findings[0].code == "invalid_evals_document"
+
+
+def test_release_identifiers_are_canonical_and_schema_rejects_whitespace(tmp_path: Path) -> None:
+    cases = [_case(f"case-{index}") for index in range(8)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [{"id": " release ", "groups": {"all": [case["id"] for case in cases]}}],
+        "cases": cases,
+    }
+    root = _skill(tmp_path / "example", payload)
+    assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id=" release ").status == "blocked"
+
+    valid_payload = assess_scenario_quality(root, source_revision=REVISION).model_dump(mode="json")
+    valid_payload.update({"scope": "release", "scenario_set_id": "   ", "status": "blocked"})
+    assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v1")).iter_errors(valid_payload))
+
+
+def test_release_policy_evidence_is_enforced_by_model_and_schema(tmp_path: Path) -> None:
+    cases = [_case(f"case-{index}") for index in range(8)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [{"id": "release", "groups": {"all": [case["id"] for case in cases]}}],
+        "cases": cases,
+    }
+    receipt = assess_scenario_quality(
+        _skill(tmp_path / "example", payload), source_revision=REVISION, scenario_set_id="release"
+    ).model_dump(mode="json")
+    assert receipt["pressure_or_regression_count"] == 1
+    assert receipt["negative_or_edge_count"] == 1
+    forged = dict(receipt)
+    forged["scenario_count"] = 1
+    with pytest.raises(ValidationError):
+        ScenarioQualityReceipt.model_validate(forged)
+    assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v1")).iter_errors(forged))
+
+
+def test_validation_receipt_preserves_every_upstream_finding(tmp_path: Path) -> None:
+    root = tmp_path / "missing"
+    validation = validate_skill_package(root, source_revision="invalid")
+    result = assess_scenario_quality(root, source_revision="invalid")
+    assert len(validation.findings) > 1
+    assert [finding.code for finding in result.findings] == [finding.code for finding in validation.findings]
+
+
+def test_scenario_quality_receipt_is_intentionally_registry_only(tmp_path: Path) -> None:
+    payload = assess_scenario_quality(
+        _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [_case()]}),
+        source_revision=REVISION,
+    ).model_dump(mode="json")
+    SchemaRegistry().validate("scenario-quality.v1", payload)
+    with pytest.raises(ContractError) as error:
+        parse_receipt(payload)
+    assert error.value.code == "unsupported_receipt_family"

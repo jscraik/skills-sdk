@@ -27,9 +27,9 @@ class ScenarioQualityFinding(_ContractModel):
 
 
 class ScenarioQualityAppliedPolicy(_ContractModel):
-    minimum_release_cases: int = Field(ge=0)
-    minimum_pressure_or_regression: int = Field(ge=0)
-    minimum_negative_or_edge: int = Field(ge=0)
+    minimum_release_cases: Literal[8] = 8
+    minimum_pressure_or_regression: Literal[1] = 1
+    minimum_negative_or_edge: Literal[1] = 1
 
 
 class ScenarioQualityReceipt(_ContractModel):
@@ -39,6 +39,8 @@ class ScenarioQualityReceipt(_ContractModel):
     scope: Literal["all", "release"]
     status: Literal["pass", "blocked"]
     scenario_count: int = Field(ge=0)
+    pressure_or_regression_count: int = Field(default=0, ge=0)
+    negative_or_edge_count: int = Field(default=0, ge=0)
     effective_policy: ScenarioQualityAppliedPolicy
     findings: tuple[ScenarioQualityFinding, ...] = ()
     mutation_performed: Literal[False] = False
@@ -53,6 +55,20 @@ class ScenarioQualityReceipt(_ContractModel):
             raise ValueError("passing scenario quality requires a candidate and no findings")
         if self.status == "pass" and self.scenario_count == 0:
             raise ValueError("passing scenario quality requires at least one scenario")
+        if self.pressure_or_regression_count > self.scenario_count:
+            raise ValueError("pressure or regression count cannot exceed scenario count")
+        if self.negative_or_edge_count > self.scenario_count:
+            raise ValueError("negative or edge count cannot exceed scenario count")
+        if (
+            self.status == "pass"
+            and self.scope == "release"
+            and (
+                self.scenario_count < self.effective_policy.minimum_release_cases
+                or self.pressure_or_regression_count < self.effective_policy.minimum_pressure_or_regression
+                or self.negative_or_edge_count < self.effective_policy.minimum_negative_or_edge
+            )
+        ):
+            raise ValueError("passing release quality must satisfy the effective policy")
         if self.status == "blocked" and not self.findings:
             raise ValueError("blocked scenario quality requires findings")
         return self

@@ -1,10 +1,11 @@
 # Scenario definition quality
 
 `assess_scenario_quality` and `skills-sdk eval scenario-quality` inspect one
-standalone package's `references/evals.yaml`. They produce deterministic,
-candidate-bound `scenario-quality/v1` evidence without running a scenario,
-calling a provider, reading a host registry, promoting artifacts, or mutating
-the package.
+standalone package's `references/evals.yaml`. They produce deterministic
+`scenario-quality/v1` evidence without running a scenario, calling a provider,
+reading a host registry, promoting artifacts, or mutating the package. Passing
+receipts are candidate-bound; early validation blockers may retain
+`candidate: null` when identity cannot be resolved.
 
 ## Input contract
 
@@ -34,13 +35,12 @@ expected prose. Each required output field needs a field-aware assertion.
 
 Without `--scenario-set`, the command checks every case and applies no release
 cardinality floor. With `--scenario-set`, it checks the named release set and
-applies the default `ScenarioQualityPolicy`: at least eight cases, one
-pressure-or-regression case, and one negative-or-edge case. These defaults are
-the selected portable release policy inherited from the characterized source;
-Python callers may select a different explicit non-negative policy. Changing
-the defaults is a public policy change requiring compatibility evidence. Every
-receipt records the three applied thresholds in `effective_policy`, so a
-consumer can reproduce the decision even when a caller overrides the defaults.
+applies `ScenarioQualityPolicy`: at least eight cases, one
+pressure-or-regression case, and one negative-or-edge case. These fixed values
+are the portable v1 release policy inherited from the characterized source.
+Changing them requires a new schema version and compatibility evidence. Every
+receipt records the applied thresholds and observed category counts so model
+and schema consumers can reproduce the decision.
 
 ```bash
 skills-sdk eval scenario-quality ./skills/example \
