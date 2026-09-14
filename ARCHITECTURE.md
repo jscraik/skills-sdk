@@ -142,8 +142,8 @@ Local candidate-bound contracts
          (separate external action and evidence lanes)
 ```
 
-The CLI is an outer adapter over the implemented local services. `validate`
-and `build` execute the two local paths above; the other lifecycle names are
+The CLI is an outer adapter over the implemented local services. `validate`,
+`build`, and `eval scenario-quality` execute the local paths above; the other lifecycle names are
 parseable discovery boundaries and do not perform provider, installation,
 runtime, or publication work.
 

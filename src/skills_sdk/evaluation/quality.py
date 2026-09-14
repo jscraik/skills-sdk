@@ -13,7 +13,11 @@ from typing import Literal, cast
 import yaml
 
 from skills_sdk.models.packaging import PackageReceiptBlocker
-from skills_sdk.models.scenario_quality import ScenarioQualityFinding, ScenarioQualityReceipt
+from skills_sdk.models.scenario_quality import (
+    ScenarioQualityAppliedPolicy,
+    ScenarioQualityFinding,
+    ScenarioQualityReceipt,
+)
 from skills_sdk.models.validation import SkillPackageValidation
 from skills_sdk.validation import validate_skill_package
 
@@ -133,7 +137,17 @@ def _capture_evals(root: Path, expected_sha256: str) -> bytes:
             raise ValueError("invalid_evals_file_type")
         if before.st_size > _MAX_EVALS_BYTES:
             raise ValueError("evals_file_too_large")
-        payload = os.read(file_fd, _MAX_EVALS_BYTES + 1)
+        chunks: list[bytes] = []
+        captured = 0
+        while captured <= _MAX_EVALS_BYTES:
+            chunk = os.read(file_fd, min(65_536, _MAX_EVALS_BYTES + 1 - captured))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            captured += len(chunk)
+        payload = b"".join(chunks)
+        if len(payload) > _MAX_EVALS_BYTES:
+            raise ValueError("evals_file_too_large")
         after = os.fstat(file_fd)
         if (before.st_size, before.st_mtime_ns, before.st_ino) != (after.st_size, after.st_mtime_ns, after.st_ino):
             raise ValueError("evals_source_changed")
@@ -213,10 +227,15 @@ def _case_findings(case: object) -> list[ScenarioQualityFinding]:
     if case.get("realistic") is not True:
         findings.append(_finding("scenario_not_realistic", "scenario realistic must be true", case_id))
     modes = case.get("eval_modes")
-    if not isinstance(modes, list) or not modes or any(mode not in {"smoke", "release"} for mode in modes):
+    if (
+        not isinstance(modes, list)
+        or not modes
+        or any(not isinstance(mode, str) or mode not in {"smoke", "release"} for mode in modes)
+    ):
         findings.append(_finding("invalid_eval_modes", "eval_modes must contain smoke or release", case_id))
     checks = case.get("deterministic_checks")
-    if not isinstance(checks, Mapping) or not isinstance(checks.get("forbidden_commands"), list):
+    forbidden = checks.get("forbidden_commands") if isinstance(checks, Mapping) else None
+    if not isinstance(forbidden, list) or any(not _text(command) for command in forbidden):
         findings.append(_finding("missing_deterministic_checks", "scenario requires forbidden_commands", case_id))
     acceptance = case.get("acceptance")
     if not isinstance(acceptance, list) or not acceptance:
@@ -224,7 +243,8 @@ def _case_findings(case: object) -> list[ScenarioQualityFinding]:
         acceptance = []
     field_assertions: set[str] = set()
     for assertion in acceptance:
-        if not isinstance(assertion, Mapping) or assertion.get("type") not in _ASSERTION_TYPES:
+        assertion_type = assertion.get("type") if isinstance(assertion, Mapping) else None
+        if not isinstance(assertion_type, str) or assertion_type not in _ASSERTION_TYPES:
             findings.append(
                 _finding("unsupported_acceptance_assertion", "acceptance assertion type is unsupported", case_id)
             )
@@ -265,6 +285,7 @@ def _case_findings(case: object) -> list[ScenarioQualityFinding]:
 def _blocked_validation_receipt(
     validation: SkillPackageValidation,
     scenario_set_id: str | None,
+    effective_policy: ScenarioQualityAppliedPolicy,
 ) -> ScenarioQualityReceipt:
     primary = validation.findings[0]
     finding = ScenarioQualityFinding(
@@ -283,6 +304,7 @@ def _blocked_validation_receipt(
         scope="release" if scenario_set_id else "all",
         status="blocked",
         scenario_count=0,
+        effective_policy=effective_policy,
         findings=(finding,),
         blocker=blocker,
     )
@@ -310,6 +332,30 @@ def _document_cases(
     return list(raw_cases)
 
 
+def _load_evals_payload(
+    package_root: Path,
+    expected_sha256: str,
+    findings: list[ScenarioQualityFinding],
+) -> object:
+    try:
+        raw = _capture_evals(package_root, expected_sha256)
+        return yaml.load(raw.decode("utf-8"), Loader=_ClosedLoader)
+    except UnicodeDecodeError:
+        findings.append(_finding("invalid_evals_utf8", "evals.yaml must be UTF-8"))
+    except ValueError as error:
+        code = (
+            str(error)
+            if str(error) in {"evals_file_too_large", "evals_source_changed", "invalid_evals_file_type"}
+            else "invalid_evals_yaml"
+        )
+        findings.append(_finding(code, f"evals.yaml could not be safely loaded: {type(error).__name__}"))
+    except (OSError, RecursionError, TypeError, yaml.YAMLError) as error:
+        findings.append(
+            _finding("invalid_evals_yaml", f"evals.yaml could not be safely loaded: {type(error).__name__}")
+        )
+    return None
+
+
 def assess_scenario_quality(
     package_root: Path,
     *,
@@ -318,53 +364,46 @@ def assess_scenario_quality(
     policy: ScenarioQualityPolicy | None = None,
 ) -> ScenarioQualityReceipt:
     active_policy = policy or ScenarioQualityPolicy()
+    effective_policy = ScenarioQualityAppliedPolicy(
+        minimum_release_cases=active_policy.minimum_release_cases,
+        minimum_pressure_or_regression=active_policy.minimum_pressure_or_regression,
+        minimum_negative_or_edge=active_policy.minimum_negative_or_edge,
+    )
+    selector_invalid = scenario_set_id is not None and not _text(scenario_set_id)
+    valid_scenario_set_id = scenario_set_id if not selector_invalid else None
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.candidate is None or validation.status == "blocked":
-        return _blocked_validation_receipt(validation, scenario_set_id)
+        return _blocked_validation_receipt(validation, valid_scenario_set_id, effective_policy)
     manifest = next((item for item in validation.files if item.path == _EVALS_PATH), None)
     findings: list[ScenarioQualityFinding] = []
     payload: object = None
-    if manifest is None:
+    if selector_invalid:
+        findings.append(_finding("invalid_scenario_set", "scenario set identifier must be non-empty text"))
+    elif manifest is None:
         findings.append(_finding("missing_evals_yaml", "package requires references/evals.yaml"))
     else:
-        try:
-            raw = _capture_evals(package_root, manifest.sha256)
-            payload = yaml.load(raw.decode("utf-8"), Loader=_ClosedLoader)
-        except UnicodeDecodeError:
-            findings.append(_finding("invalid_evals_utf8", "evals.yaml must be UTF-8"))
-        except ValueError as error:
-            code = (
-                str(error)
-                if str(error) in {"evals_file_too_large", "evals_source_changed", "invalid_evals_file_type"}
-                else "invalid_evals_yaml"
-            )
-            findings.append(_finding(code, f"evals.yaml could not be safely loaded: {type(error).__name__}"))
-        except (OSError, TypeError, yaml.YAMLError) as error:
-            findings.append(
-                _finding("invalid_evals_yaml", f"evals.yaml could not be safely loaded: {type(error).__name__}")
-            )
+        payload = _load_evals_payload(package_root, manifest.sha256, findings)
     cases = _document_cases(payload, validation.candidate.package_id, findings) if payload is not None else []
     raw_ids = [case.get("id") for case in cases if isinstance(case, Mapping) and _text(case.get("id"))]
     if len(raw_ids) != len(set(raw_ids)):
         findings.append(_finding("duplicate_scenario_id", "scenario ids must be unique"))
     selected = cases
-    scope: Literal["all", "release"] = "all"
-    if scenario_set_id and isinstance(payload, Mapping):
-        scope = "release"
+    scope: Literal["all", "release"] = "release" if valid_scenario_set_id else "all"
+    if valid_scenario_set_id and isinstance(payload, Mapping):
         sets = payload.get("release_scenario_sets")
         selected_ids: list[str] | None = None
         if isinstance(sets, list):
-            for item in sets:
-                if isinstance(item, Mapping) and item.get("id") == scenario_set_id:
-                    groups = item.get("groups")
-                    if isinstance(groups, Mapping):
-                        group_values = list(groups.values())
-                        if all(
-                            isinstance(values, list) and all(_text(value) for value in values)
-                            for values in group_values
-                        ):
-                            selected_ids = [value for values in group_values for value in values]
-                    break
+            matching_sets = [
+                item for item in sets if isinstance(item, Mapping) and item.get("id") == valid_scenario_set_id
+            ]
+            if len(matching_sets) == 1:
+                groups = matching_sets[0].get("groups")
+                if isinstance(groups, Mapping):
+                    group_values = list(groups.values())
+                    if all(
+                        isinstance(values, list) and all(_text(value) for value in values) for values in group_values
+                    ):
+                        selected_ids = [value for values in group_values for value in values]
         if not selected_ids:
             findings.append(_finding("invalid_scenario_set", "selected release scenario set is missing or empty"))
             selected = []
@@ -384,7 +423,12 @@ def assess_scenario_quality(
     if scope == "release":
         categories = [str(case.get("category")) for case in selected if isinstance(case, Mapping)]
         for case in selected:
-            if isinstance(case, Mapping) and "release" not in (case.get("eval_modes") or []):
+            modes = case.get("eval_modes") if isinstance(case, Mapping) else None
+            if isinstance(case, Mapping) and (
+                not isinstance(modes, list)
+                or any(not isinstance(mode, str) for mode in modes)
+                or "release" not in modes
+            ):
                 findings.append(
                     _finding(
                         "release_case_not_eligible",
@@ -421,10 +465,11 @@ def assess_scenario_quality(
         )
     return ScenarioQualityReceipt(
         candidate=validation.candidate,
-        scenario_set_id=scenario_set_id,
+        scenario_set_id=valid_scenario_set_id,
         scope=scope,
         status="blocked" if findings else "pass",
         scenario_count=len(selected),
+        effective_policy=effective_policy,
         findings=tuple(findings),
         blocker=primary_blocker,
     )

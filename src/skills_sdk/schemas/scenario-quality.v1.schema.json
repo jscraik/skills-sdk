@@ -66,6 +66,33 @@
       "title": "PackageReceiptBlocker",
       "type": "object"
     },
+    "ScenarioQualityAppliedPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "minimum_negative_or_edge": {
+          "minimum": 0,
+          "title": "Minimum Negative Or Edge",
+          "type": "integer"
+        },
+        "minimum_pressure_or_regression": {
+          "minimum": 0,
+          "title": "Minimum Pressure Or Regression",
+          "type": "integer"
+        },
+        "minimum_release_cases": {
+          "minimum": 0,
+          "title": "Minimum Release Cases",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minimum_release_cases",
+        "minimum_pressure_or_regression",
+        "minimum_negative_or_edge"
+      ],
+      "title": "ScenarioQualityAppliedPolicy",
+      "type": "object"
+    },
     "ScenarioQualityFinding": {
       "additionalProperties": false,
       "properties": {
@@ -114,6 +141,96 @@
   "$id": "https://schemas.skills-sdk.dev/scenario-quality.v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "pass"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "candidate": {
+            "$ref": "#/$defs/PackageCandidateIdentity"
+          },
+          "findings": {
+            "maxItems": 0
+          },
+          "scenario_count": {
+            "minimum": 1
+          }
+        },
+        "required": [
+          "candidate",
+          "scenario_count"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "$ref": "#/$defs/PackageReceiptBlocker"
+          },
+          "findings": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "findings",
+          "blocker"
+        ]
+      }
+    },
+    {
+      "else": {
+        "properties": {
+          "scenario_set_id": {
+            "type": "null"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "release"
+          }
+        },
+        "required": [
+          "scope"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scenario_set_id": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenario_set_id"
+        ]
+      }
+    }
+  ],
   "properties": {
     "blocker": {
       "anyOf": [
@@ -136,6 +253,9 @@
         }
       ],
       "default": null
+    },
+    "effective_policy": {
+      "$ref": "#/$defs/ScenarioQualityAppliedPolicy"
     },
     "execution_performed": {
       "const": false,
@@ -207,7 +327,8 @@
   "required": [
     "scope",
     "status",
-    "scenario_count"
+    "scenario_count",
+    "effective_policy"
   ],
   "title": "ScenarioQualityReceipt",
   "type": "object"

@@ -9,10 +9,13 @@ from typing import Any
 
 import pytest
 import yaml
+from jsonschema import Draft202012Validator
+from pydantic import ValidationError
 
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import ScenarioQualityPolicy, assess_scenario_quality
 from skills_sdk.evaluation import quality as quality_module
+from skills_sdk.models.scenario_quality import ScenarioQualityFinding, ScenarioQualityReceipt
 
 REVISION = "1" * 40
 
@@ -163,6 +166,21 @@ def test_capture_rejects_fifo_without_blocking(tmp_path: Path) -> None:
         quality_module._capture_evals(root, "0" * 64)
 
 
+def test_capture_reads_regular_files_until_eof(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "example"
+    references = root / "references"
+    references.mkdir(parents=True)
+    payload = b"schema_version: '2.0'\n"
+    (references / "evals.yaml").write_bytes(payload)
+    original_read = os.read
+
+    def short_read(descriptor: int, size: int) -> bytes:
+        return original_read(descriptor, min(size, 3))
+
+    monkeypatch.setattr(quality_module.os, "read", short_read)
+    assert quality_module._capture_evals(root, quality_module.hashlib.sha256(payload).hexdigest()) == payload
+
+
 def test_validation_blocker_preserves_upstream_evidence_refs(tmp_path: Path) -> None:
     root = tmp_path / "missing"
     result = assess_scenario_quality(root, source_revision=REVISION)
@@ -269,6 +287,96 @@ def test_release_selection_reports_duplicate_source_and_selector_ids(tmp_path: P
     )
 
     assert [finding.code for finding in result.findings].count("duplicate_scenario_id") == 2
+
+
+def test_duplicate_release_set_identifiers_are_rejected(tmp_path: Path) -> None:
+    cases = [_case(f"case-{index}") for index in range(8)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    selector = {"id": "release", "groups": {"all": [case["id"] for case in cases]}}
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [
+            selector,
+            {"id": "release", "groups": {"all": [case["id"] for case in cases]}},
+        ],
+        "cases": cases,
+    }
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload), source_revision=REVISION, scenario_set_id="release"
+    )
+    assert "invalid_scenario_set" in {finding.code for finding in result.findings}
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "code"),
+    [
+        ("eval_modes", [{}], "invalid_eval_modes"),
+        ("eval_modes", 42, "invalid_eval_modes"),
+        ("acceptance", [{"type": []}], "unsupported_acceptance_assertion"),
+        ("deterministic_checks", {"forbidden_commands": [{}]}, "missing_deterministic_checks"),
+    ],
+)
+def test_untrusted_nested_types_return_typed_findings(tmp_path: Path, field: str, value: object, code: str) -> None:
+    case = _case()
+    case[field] = value
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [case]}),
+        source_revision=REVISION,
+    )
+    assert code in {finding.code for finding in result.findings}
+
+
+def test_deep_yaml_and_empty_selector_return_typed_blockers(tmp_path: Path) -> None:
+    deep = _skill(tmp_path / "deep", {"cases": [_case()]})
+    (deep / "references/evals.yaml").write_text("value: " + "[" * 1200 + "0" + "]" * 1200, encoding="utf-8")
+    assert assess_scenario_quality(deep, source_revision=REVISION).findings[0].code == "invalid_evals_yaml"
+
+    root = _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [_case()]})
+    result = assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="   ")
+    assert result.status == "blocked"
+    assert result.findings[0].code == "invalid_scenario_set"
+
+
+def test_receipt_records_policy_and_enforces_state_scope_and_paths(tmp_path: Path) -> None:
+    root = _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [_case()]})
+    result = assess_scenario_quality(
+        root,
+        source_revision=REVISION,
+        policy=ScenarioQualityPolicy(
+            minimum_release_cases=0,
+            minimum_pressure_or_regression=0,
+            minimum_negative_or_edge=0,
+        ),
+    )
+    assert result.effective_policy.minimum_release_cases == 0
+    payload = result.model_dump(mode="json")
+    for mutation in (
+        lambda item: item.update({"scenario_count": 0}),
+        lambda item: item.update({"scope": "release", "scenario_set_id": None}),
+        lambda item: item.update({"scope": "all", "scenario_set_id": "release"}),
+    ):
+        invalid = dict(payload)
+        mutation(invalid)
+        with pytest.raises(ValidationError):
+            ScenarioQualityReceipt.model_validate(invalid)
+
+    with pytest.raises(ValidationError):
+        ScenarioQualityFinding(code="invalid", message="bad", evidence_refs=("/etc/passwd",))
+
+
+def test_published_schema_enforces_receipt_state_invariants(tmp_path: Path) -> None:
+    root = _skill(tmp_path / "example", {"schema_version": "2.0", "skill_name": "example", "cases": [_case()]})
+    payload = assess_scenario_quality(root, source_revision=REVISION).model_dump(mode="json")
+    schema = SchemaRegistry().load("scenario-quality.v1")
+    validator = Draft202012Validator(schema)
+    invalid = dict(payload)
+    invalid["candidate"] = None
+    assert list(validator.iter_errors(invalid))
+    invalid = dict(payload)
+    invalid["scenario_count"] = 0
+    assert list(validator.iter_errors(invalid))
 
 
 @pytest.mark.parametrize(

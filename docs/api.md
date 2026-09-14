@@ -65,7 +65,8 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   payloads require `provider-identity/v2` and do not reinterpret v1 identities.
   `assess_scenario_quality` is a separate pre-execution service over one
   package-local `references/evals.yaml`; it returns `ScenarioQualityReceipt`
-  and never supplies observations or claims that a scenario ran. See
+  with the applied release thresholds bound in `effective_policy`, and never
+  supplies observations or claims that a scenario ran. See
   [scenario definition quality](scenario-quality.md) for its input and policy.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.

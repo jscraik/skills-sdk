@@ -38,7 +38,9 @@ applies the default `ScenarioQualityPolicy`: at least eight cases, one
 pressure-or-regression case, and one negative-or-edge case. These defaults are
 the selected portable release policy inherited from the characterized source;
 Python callers may select a different explicit non-negative policy. Changing
-the defaults is a public policy change requiring compatibility evidence.
+the defaults is a public policy change requiring compatibility evidence. Every
+receipt records the three applied thresholds in `effective_policy`, so a
+consumer can reproduce the decision even when a caller overrides the defaults.
 
 ```bash
 skills-sdk eval scenario-quality ./skills/example \
