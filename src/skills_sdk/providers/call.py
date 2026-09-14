@@ -499,8 +499,8 @@ async def execute_provider_call(
     request, input_payload = _validate_request_and_input(request, input_payload, limits)
     bindings = await _read_adapter(adapter, request)
     descriptor = bindings.descriptor
-    started_at = await _read_clock(clock.now)
     try:
+        started_at = await _read_clock(clock.now)
         if request.declared_capability != "response_generation":
             terminal = _failure_terminal(
                 ProviderAdapterFailure(
