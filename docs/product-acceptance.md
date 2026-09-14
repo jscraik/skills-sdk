@@ -201,7 +201,7 @@ The signed acceptance baseline at `e7014ac9498920acfababa1934dcaeae146aee7d`
 was implemented as one 18-path SDK-3.1 candidate, with this acceptance update as
 its nineteenth owned path. On the frozen implementation bytes:
 
-- The focused command above passed 281 tests in 63.21 seconds.
+- The then-current focused command passed 281 tests in 63.21 seconds.
 - Schema generation check passed with exit `0`.
 - `bash scripts/validate-codestyle.sh` passed formatting, Ruff, MyPy,
   repository standards, and documentation checks.
