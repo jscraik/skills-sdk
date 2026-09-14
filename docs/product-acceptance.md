@@ -190,7 +190,7 @@ offline adapters. Acceptance requires all of the following:
 Run and record these exact commands on the completed candidate:
 
 ```bash
-MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_provider_call.py tests/test_provider_call_adapter_boundaries.py tests/test_provider_call_typing.py tests/test_provider_execution_contracts.py tests/test_provider_execution_review_regressions.py tests/test_public_repository_boundary.py
+MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_provider_call.py tests/test_provider_call_review_regressions.py tests/test_provider_call_adapter_boundaries.py tests/test_provider_call_typing.py tests/test_provider_execution_contracts.py tests/test_provider_execution_review_regressions.py tests/test_public_repository_boundary.py
 MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check
 bash scripts/validate-repository.sh
 ```
@@ -223,7 +223,8 @@ regression proving an adapter-supplied bypass clock cannot disable the overall
 deadline. The exact PR #29 documentation contract was then integrated locally;
 the containing commit is the final candidate for this evidence block.
 
-On that final candidate, the focused provider and architecture suite passed,
+On that then-final candidate before the current review-repair commits, the
+focused provider and architecture suite passed,
 the generated-schema check passed, and `bash scripts/validate-repository.sh`
 passed 1,443 tests with one skip and built the source distribution and wheel.
 Final independent re-review confirmed the deadline bypass was closed and
