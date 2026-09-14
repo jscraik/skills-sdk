@@ -358,6 +358,9 @@ def _release_sets(
     if not isinstance(raw_sets, list):
         findings.append(_finding("invalid_scenario_set", "release scenario sets must be a list"))
         return []
+    if not raw_sets:
+        findings.append(_finding("invalid_scenario_set", "release scenario sets must not be empty"))
+        return []
     valid_sets: list[Mapping[object, object]] = []
     identifiers: list[str] = []
     for item in raw_sets:

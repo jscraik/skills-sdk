@@ -332,6 +332,22 @@ def test_duplicate_unselected_release_set_identifiers_are_rejected(tmp_path: Pat
     assert "invalid_scenario_set" in {finding.code for finding in result.findings}
 
 
+@pytest.mark.parametrize("scenario_set_id", [None, "release"])
+def test_explicit_empty_release_sets_are_rejected(tmp_path: Path, scenario_set_id: str | None) -> None:
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [],
+        "cases": [_case()],
+    }
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload),
+        source_revision=REVISION,
+        scenario_set_id=scenario_set_id,
+    )
+    assert "invalid_scenario_set" in {finding.code for finding in result.findings}
+
+
 @pytest.mark.parametrize(
     ("field", "value", "code"),
     [
