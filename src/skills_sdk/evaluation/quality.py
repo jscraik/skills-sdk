@@ -391,16 +391,42 @@ def _release_sets(
         if not isinstance(item, Mapping) or not _text(item.get("id")):
             findings.append(_finding("invalid_scenario_set", "release scenario set identifiers must be non-empty text"))
             continue
+        declared_budget = (
+            item.get("minimum_scenarios"),
+            item.get("target_scenarios"),
+            item.get("maximum_scenarios"),
+        )
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) for value in declared_budget
+        ) or declared_budget != (
+            5,
+            8,
+            10,
+        ):
+            findings.append(
+                _finding(
+                    "invalid_scenario_set",
+                    "release scenario set budget must declare integer minimum/target/maximum values of 5/8/10",
+                )
+            )
+            continue
         groups = item.get("groups")
-        if (
-            not isinstance(groups, Mapping)
-            or not groups
-            or not all(
+        flat_cases = item.get("cases")
+        groups_valid = (
+            isinstance(groups, Mapping)
+            and bool(groups)
+            and all(
                 isinstance(values, list) and bool(values) and all(_text(value) for value in values)
                 for values in groups.values()
             )
-        ):
-            findings.append(_finding("invalid_scenario_set", "release scenario set groups must contain text IDs"))
+        )
+        flat_cases_valid = (
+            isinstance(flat_cases, list) and bool(flat_cases) and all(_text(value) for value in flat_cases)
+        )
+        if not groups_valid and not flat_cases_valid:
+            findings.append(
+                _finding("invalid_scenario_set", "release scenario set groups or cases must contain text IDs")
+            )
             continue
         identifier = cast(str, item["id"])
         if identifier != identifier.strip():
@@ -416,6 +442,13 @@ def _release_sets(
         findings.append(_finding("invalid_scenario_set", "release scenario set identifiers must be unique"))
         return []
     return valid_sets
+
+
+def _release_set_case_ids(release_set: Mapping[object, object]) -> list[str]:
+    groups = release_set.get("groups")
+    if isinstance(groups, Mapping):
+        return [cast(str, value) for values in groups.values() for value in cast(list[object], values)]
+    return [cast(str, value) for value in cast(list[object], release_set["cases"])]
 
 
 def assess_scenario_quality(
@@ -463,8 +496,7 @@ def assess_scenario_quality(
         selected_ids: list[str] | None = None
         matching_sets = [item for item in release_sets if item.get("id") == valid_scenario_set_id]
         if len(matching_sets) == 1:
-            groups = cast(Mapping[object, object], matching_sets[0]["groups"])
-            selected_ids = [cast(str, value) for values in groups.values() for value in cast(list[object], values)]
+            selected_ids = _release_set_case_ids(matching_sets[0])
         if not selected_ids:
             findings.append(_finding("invalid_scenario_set", "selected release scenario set is missing or empty"))
             selected = []

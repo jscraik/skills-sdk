@@ -37,6 +37,10 @@ Without `--scenario-set`, the command checks every case and applies no release
 cardinality floor. With `--scenario-set`, it checks the named release set and
 applies `ScenarioQualityPolicy`: five to ten cases with a target of eight, at
 least one pressure-or-regression case, and at least one negative-or-edge case.
+Each release set must declare integer `minimum_scenarios`,
+`target_scenarios`, and `maximum_scenarios` values of 5, 8, and 10. Its
+scenario IDs may use grouped `groups` lists or the canonical flat `cases`
+list.
 These fixed values are the portable v1 release policy inherited from the
 characterized source. Changing them requires a new schema version and
 compatibility evidence. Every receipt records the minimum, target, maximum,

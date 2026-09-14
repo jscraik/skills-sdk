@@ -40,6 +40,23 @@ def _case(case_id: str = "happy", *, category: str = "happy") -> dict[str, objec
     }
 
 
+def _release_set(
+    case_ids: list[object],
+    *,
+    set_id: str = "release",
+    flat: bool = False,
+    budget: tuple[object, object, object] = (5, 8, 10),
+) -> dict[str, object]:
+    selector: dict[str, object] = {
+        "id": set_id,
+        "minimum_scenarios": budget[0],
+        "target_scenarios": budget[1],
+        "maximum_scenarios": budget[2],
+    }
+    selector["cases" if flat else "groups"] = case_ids if flat else {"all": case_ids}
+    return selector
+
+
 def _skill(root: Path, payload: dict[str, object]) -> Path:
     root.mkdir()
     (root / "SKILL.md").write_text(
@@ -117,7 +134,7 @@ def test_release_policy_is_explicit_and_selector_scoped(tmp_path: Path) -> None:
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
-        "release_scenario_sets": [{"id": "release", "groups": {"all": [case["id"] for case in cases]}}],
+        "release_scenario_sets": [_release_set([case["id"] for case in cases])],
         "cases": cases,
     }
     root = _skill(tmp_path / "example", payload)
@@ -125,6 +142,56 @@ def test_release_policy_is_explicit_and_selector_scoped(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="fixed portable 5/8/10 and 1/1"):
         ScenarioQualityPolicy(minimum_release_cases=9)
     assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="missing").status == "blocked"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda selector: selector.pop("minimum_scenarios"),
+        lambda selector: selector.update({"minimum_scenarios": True}),
+        lambda selector: selector.update({"target_scenarios": 7}),
+        lambda selector: selector.update({"maximum_scenarios": "10"}),
+    ],
+)
+def test_release_policy_declarations_are_required_and_exact(
+    tmp_path: Path, mutation: Callable[[dict[str, object]], object]
+) -> None:
+    cases = [_case(f"case-{index}") for index in range(8)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    selector = _release_set([case["id"] for case in cases])
+    mutation(selector)
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [selector],
+        "cases": cases,
+    }
+
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload), source_revision=REVISION, scenario_set_id="release"
+    )
+
+    assert result.status == "blocked"
+    assert "invalid_scenario_set" in {finding.code for finding in result.findings}
+
+
+def test_release_selector_accepts_canonical_flat_cases_shape(tmp_path: Path) -> None:
+    cases = [_case(f"case-{index}") for index in range(8)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [_release_set([case["id"] for case in cases], flat=True)],
+        "cases": cases,
+    }
+
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload), source_revision=REVISION, scenario_set_id="release"
+    )
+
+    assert result.status == "pass"
 
 
 def test_malformed_yaml_aliases_duplicate_keys_and_invalid_revision_block(tmp_path: Path) -> None:
@@ -240,7 +307,7 @@ def test_release_selection_rejects_smoke_only_cases(tmp_path: Path) -> None:
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
-        "release_scenario_sets": [{"id": "release", "groups": {"all": [case["id"] for case in cases]}}],
+        "release_scenario_sets": [_release_set([case["id"] for case in cases])],
         "cases": cases,
     }
     result = assess_scenario_quality(
@@ -256,7 +323,12 @@ def test_release_selector_rejects_malformed_groups_and_ids(tmp_path: Path, group
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
-        "release_scenario_sets": [{"id": "release", "groups": groups}],
+        "release_scenario_sets": [
+            {
+                **_release_set(["case-0"]),
+                "groups": groups,
+            }
+        ],
         "cases": [_case("case-0")],
     }
     result = assess_scenario_quality(
@@ -274,7 +346,7 @@ def test_release_selection_reports_duplicate_source_and_selector_ids(tmp_path: P
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
-        "release_scenario_sets": [{"id": "release", "groups": {"all": ["duplicate", "duplicate"]}}],
+        "release_scenario_sets": [_release_set(["duplicate", "duplicate"])],
         "cases": [first, second],
     }
     result = assess_scenario_quality(
@@ -290,13 +362,13 @@ def test_duplicate_release_set_identifiers_are_rejected(tmp_path: Path) -> None:
     cases = [_case(f"case-{index}") for index in range(8)]
     cases[6]["category"] = "pressure"
     cases[7]["category"] = "edge"
-    selector = {"id": "release", "groups": {"all": [case["id"] for case in cases]}}
+    selector = _release_set([case["id"] for case in cases])
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
         "release_scenario_sets": [
             selector,
-            {"id": "release", "groups": {"all": [case["id"] for case in cases]}},
+            _release_set([case["id"] for case in cases]),
         ],
         "cases": cases,
     }
@@ -310,15 +382,15 @@ def test_duplicate_unselected_release_set_identifiers_are_rejected(tmp_path: Pat
     cases = [_case(f"case-{index}") for index in range(8)]
     cases[6]["category"] = "pressure"
     cases[7]["category"] = "edge"
-    selected = {"id": "release", "groups": {"all": [case["id"] for case in cases]}}
-    duplicate = {"id": "other", "groups": {"all": [case["id"] for case in cases]}}
+    selected = _release_set([case["id"] for case in cases])
+    duplicate = _release_set([case["id"] for case in cases], set_id="other")
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
         "release_scenario_sets": [
             selected,
             duplicate,
-            {"id": "other", "groups": {"all": [case["id"] for case in cases]}},
+            _release_set([case["id"] for case in cases], set_id="other"),
         ],
         "cases": cases,
     }
@@ -534,7 +606,7 @@ def test_release_identifiers_are_canonical_and_schema_rejects_whitespace(tmp_pat
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
-        "release_scenario_sets": [{"id": " release ", "groups": {"all": [case["id"] for case in cases]}}],
+        "release_scenario_sets": [_release_set([case["id"] for case in cases], set_id=" release ")],
         "cases": cases,
     }
     root = _skill(tmp_path / "example", payload)
@@ -552,7 +624,7 @@ def test_release_policy_evidence_is_enforced_by_model_and_schema(tmp_path: Path)
     payload = {
         "schema_version": "2.0",
         "skill_name": "example",
-        "release_scenario_sets": [{"id": "release", "groups": {"all": [case["id"] for case in cases]}}],
+        "release_scenario_sets": [_release_set([case["id"] for case in cases])],
         "cases": cases,
     }
     receipt = assess_scenario_quality(
