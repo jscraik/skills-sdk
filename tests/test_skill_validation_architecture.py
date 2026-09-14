@@ -13,10 +13,13 @@ TRUST_PREFIX = 'MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- '
 
 
 def _quick_start_commands(markdown: str) -> list[str]:
-    """Return the non-empty commands from the Markdown quick-start block."""
+    """Return non-empty commands from every Quick Start Bash block."""
     quick_start = markdown.split("## Quick start", 1)[1].split("## ", 1)[0]
-    bash_block = quick_start.split("```bash", 1)[1].split("```", 1)[0]
-    return [line for line in bash_block.splitlines() if line]
+    commands: list[str] = []
+    for fenced_section in quick_start.split("```bash")[1:]:
+        bash_block = fenced_section.split("```", 1)[0]
+        commands.extend(line for line in bash_block.splitlines() if line)
+    return commands
 
 
 def _assert_checkout_trust_prefixes(markdown: str) -> None:
@@ -139,6 +142,18 @@ def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute(
         pass
     else:
         raise AssertionError("Quick Start prefix regression was not detected")
+
+    broken_second_block = readme.replace(
+        TRUST_PREFIX + "uv run --frozen skills-sdk inventory --help",
+        "uv run --frozen skills-sdk inventory --help",
+        1,
+    )
+    try:
+        _assert_checkout_trust_prefixes(broken_second_block)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("Second Quick Start block prefix regression was not detected")
 
     version_command = next(command for command in readme_commands if command.endswith("skills-sdk --version"))
     environment = os.environ.copy()
