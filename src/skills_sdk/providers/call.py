@@ -69,6 +69,12 @@ class _AdapterBindings:
     cleanup: Callable[[], Awaitable[None]]
 
 
+@dataclass(frozen=True, slots=True)
+class _ClockBindings:
+    now: Callable[[], datetime]
+    wait_for: Callable[[Awaitable[object], float], Awaitable[object]]
+
+
 @dataclass(slots=True)
 class _StreamState:
     chunks: list[str] = field(default_factory=list)
@@ -195,13 +201,38 @@ def _event_digest(events: list[dict[str, object]]) -> str:
     return canonical_json_sha256(events)
 
 
+def _utf8_bytes(text: str) -> bytes:
+    try:
+        return text.encode("utf-8")
+    except UnicodeEncodeError:
+        raise _contract_error("invalid_provider_event", "provider text must be valid UTF-8") from None
+
+
 def _text_digest(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return hashlib.sha256(_utf8_bytes(text)).hexdigest()
 
 
 async def _captured(awaitable: Awaitable[object]) -> object:
     values = await gather(awaitable, return_exceptions=True)
     return values[0]
+
+
+async def _read_clock_bindings(clock: object) -> _ClockBindings:
+    async def read() -> object:
+        return clock.now, clock.wait_for
+
+    observed = await _captured(read())
+    if (
+        isinstance(observed, BaseException)
+        or not isinstance(observed, tuple)
+        or len(observed) != 2
+        or not all(callable(member) for member in observed)
+    ):
+        raise _contract_error("invalid_provider_clock", "provider clock members are invalid") from None
+    return _ClockBindings(
+        now=cast(Callable[[], datetime], observed[0]),
+        wait_for=cast(Callable[[Awaitable[object], float], Awaitable[object]], observed[1]),
+    )
 
 
 async def _read_clock(now: Callable[[], datetime]) -> datetime:
@@ -219,7 +250,7 @@ async def _read_clock(now: Callable[[], datetime]) -> datetime:
 def _validate_complete(value: object, limits: ProviderCallLimits) -> ProviderAdapterComplete:
     if not isinstance(value, ProviderAdapterComplete) or not isinstance(value.text, str):
         raise _contract_error("invalid_provider_event", "complete adapter returned an invalid result")
-    if len(value.text.encode("utf-8")) > limits.output_bytes:
+    if len(_utf8_bytes(value.text)) > limits.output_bytes:
         raise _contract_error("provider_output_too_large", "provider output exceeds the byte limit")
     return ProviderAdapterComplete(
         text=value.text,
@@ -267,7 +298,7 @@ async def _run_complete(
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
     result = _validate_complete(await adapter.complete(request, input_payload), limits)
     output_sha256 = _text_digest(result.text)
-    events = [{"kind": "complete", "sequence": 0, "bytes": len(result.text.encode("utf-8")), "sha256": output_sha256}]
+    events = [{"kind": "complete", "sequence": 0, "bytes": len(_utf8_bytes(result.text)), "sha256": output_sha256}]
     return _Terminal(
         status="completed",
         text=result.text,
@@ -286,7 +317,7 @@ async def _run_stream(
     input_payload: JsonValue,
     adapter: _AdapterBindings,
     limits: ProviderCallLimits,
-    clock: ProviderCallClock,
+    clock: _ClockBindings,
 ) -> _Terminal:
     if adapter.stream is None:
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
@@ -362,7 +393,7 @@ def _consume_chunk(
 ) -> None:
     if not isinstance(event.text, str):
         raise _contract_error("invalid_provider_event", "provider stream chunk must contain text")
-    chunk_bytes = event.text.encode("utf-8")
+    chunk_bytes = _utf8_bytes(event.text)
     if len(chunk_bytes) > limits.chunk_bytes:
         raise _contract_error("provider_chunk_too_large", "provider stream chunk exceeds the byte limit")
     if state.total_bytes + len(chunk_bytes) > limits.output_bytes:
@@ -439,7 +470,7 @@ def _execution_result(
         raise _contract_error("invalid_provider_result", "provider result evidence failed validation") from None
 
 
-async def _cleanup(adapter: _AdapterBindings, limits: ProviderCallLimits, clock: ProviderCallClock) -> bool:
+async def _cleanup(adapter: _AdapterBindings, limits: ProviderCallLimits, clock: _ClockBindings) -> bool:
     async def cleanup() -> object:
         return await clock.wait_for(adapter.cleanup(), limits.cleanup_seconds)
 
@@ -490,16 +521,17 @@ async def execute_provider_call(
 ) -> ProviderCallOutcome:
     """Execute one bounded offline provider call through an injected adapter."""
 
-    if not isinstance(limits, ProviderCallLimits):
+    if type(limits) is not ProviderCallLimits:
         raise _contract_error("invalid_provider_limits", "provider call limits failed validation")
     try:
         limits.__post_init__()
     except ValueError:
         raise _contract_error("invalid_provider_limits", "provider call limits failed validation") from None
     request, input_payload = _validate_request_and_input(request, input_payload, limits)
+    clock_bindings = await _read_clock_bindings(clock)
     bindings = await _read_adapter(adapter, request)
     descriptor = bindings.descriptor
-    started_at = await _read_clock(clock.now)
+    started_at = await _read_clock(clock_bindings.now)
     try:
         if request.declared_capability != "response_generation":
             terminal = _failure_terminal(
@@ -516,11 +548,11 @@ async def execute_provider_call(
 
             async def run() -> object:
                 runner_call = (
-                    runner(request, input_payload, bindings, limits, clock)
+                    runner(request, input_payload, bindings, limits, clock_bindings)
                     if descriptor.mode == "stream"
                     else runner(request, input_payload, bindings, limits)
                 )
-                return await clock.wait_for(
+                return await clock_bindings.wait_for(
                     runner_call,
                     limits.overall_seconds,
                 )
@@ -528,8 +560,8 @@ async def execute_provider_call(
             observed = await _captured(run())
             terminal = _terminal_from_observed(observed)
     finally:
-        cleanup_succeeded = await _cleanup(bindings, limits, clock)
-    finished_at = await _read_clock(clock.now)
+        cleanup_succeeded = await _cleanup(bindings, limits, clock_bindings)
+    finished_at = await _read_clock(clock_bindings.now)
     execution = _execution_result(request, terminal, started_at, finished_at)
     try:
         public_result = ProviderCallPublicResult(
@@ -537,7 +569,7 @@ async def execute_provider_call(
             mode=descriptor.mode,
             status=terminal.status,
             event_count=terminal.event_count,
-            output_bytes=len(terminal.text.encode("utf-8")) if terminal.text is not None else 0,
+            output_bytes=len(_utf8_bytes(terminal.text)) if terminal.text is not None else 0,
             output_sha256=terminal.output_sha256,
             event_sha256=terminal.event_sha256,
             max_buffered_events=terminal.max_buffered_events,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Literal
@@ -61,6 +62,8 @@ class ProviderCostObservation(_ProviderCallModel):
     @classmethod
     def amount_is_a_decimal_string(cls, value: object) -> object:
         if not isinstance(value, str):
+            raise ValueError("provider cost amount must be a decimal string")
+        if re.fullmatch(r"(?:0|[1-9]\d*)(?:\.\d+)?", value) is None:
             raise ValueError("provider cost amount must be a decimal string")
         try:
             amount = Decimal(value)
