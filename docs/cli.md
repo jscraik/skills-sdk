@@ -1,12 +1,12 @@
 # Command-line interface
 
-Install the pinned development environment and inspect the CLI through the
-managed `uv` entrypoint:
+From the repository checkout root, install the pinned development environment
+and inspect the CLI through the managed `uv` entrypoint:
 
 ```bash
-mise exec -- uv sync --frozen
-mise exec -- uv run --frozen skills-sdk --help
-mise exec -- uv run --frozen skills-sdk --version
+MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
+MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help
+MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --version
 ```
 
 The CLI exposes these explicit routes without provider, runtime, or
@@ -17,12 +17,13 @@ inventory   intake   validate   build   eval   package   project   verify
 tessl prepare   tessl verify
 ```
 
-Use `mise exec -- uv run --frozen skills-sdk <route> --help` for a short route description. The
+Use `MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk <route> --help`
+for a short route description. The
 `validate` and `build` routes are implemented local commands:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
-mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
+MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
+MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
 ```
 
 Both commands are non-interactive and non-mutating. For an invocation that
