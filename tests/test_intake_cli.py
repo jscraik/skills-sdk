@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from skills_sdk.cli import main as main_module
 from skills_sdk.cli.main import main
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "synthetic-skill"
@@ -122,6 +123,20 @@ def test_intake_cli_validates_the_context_wire_shape_before_normalization(
     payload = json.loads(context.read_text(encoding="utf-8"))
     payload["source_revision"] = f" {payload['source_revision']} "
     context.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="2"):
+        main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"])
+    assert "invalid intake context" in capsys.readouterr().err
+
+
+def test_intake_cli_fails_closed_without_no_follow_support(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = tmp_path / "context.json"
+    _write_context(context)
+    monkeypatch.setattr(main_module.os, "O_NOFOLLOW", 0)
 
     with pytest.raises(SystemExit, match="2"):
         main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"])

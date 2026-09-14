@@ -25,7 +25,10 @@ _MAX_INTAKE_CONTEXT_BYTES = 1_048_576
 
 def _read_intake_context(path: Path) -> bytes:
     """Read one bounded, regular, no-follow intake context file."""
-    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if not isinstance(nofollow, int) or nofollow == 0:
+        raise OSError("safe no-follow context reads are unavailable")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | nofollow)
     try:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_INTAKE_CONTEXT_BYTES:
