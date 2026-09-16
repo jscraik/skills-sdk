@@ -8,8 +8,8 @@ publication.
 ## Before opening an issue
 
 1. Confirm the SDK version, Python version, and operating system.
-2. Reproduce from a clean checkout with
-   `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen`.
+2. From the clean checkout root, reproduce with
+   `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen`.
 3. Run `bash scripts/validate-repository.sh` and include the exact command and
    outcome.
 4. Include the smallest redacted payload or schema name that reproduces the

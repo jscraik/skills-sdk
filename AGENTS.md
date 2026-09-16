@@ -57,12 +57,12 @@ registry, or publication service.
 ## Development and validation
 
 - Use Python `3.12` and the pinned `uv` environment:
-  `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen`.
+  `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen`.
 - Run the narrowest relevant check first. Schema changes require
-  `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` for the
+  `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` for the
   generator-managed subset and this canonical focused route for the
   hand-maintained resources:
-  `MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py`.
+  `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py`.
   That route checks the `receipt-base.v1`, `blocker.v1`, and
   `package-identity.v1` resources with Draft 2020-12 through
   `SchemaRegistry.load` and exercises their candidate, receipt, and blocker

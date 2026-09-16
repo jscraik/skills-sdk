@@ -49,7 +49,7 @@ decision.
 
 ```bash
 skills-sdk eval scenario-quality ./skills/example \
-  --source-revision <40-lowercase-hex> \
+  --source-revision "<40-lowercase-hex>" \
   --scenario-set example-release-v1 --json --robot
 ```
 
