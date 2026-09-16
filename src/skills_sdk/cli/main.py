@@ -23,6 +23,19 @@ COMMAND_HELP = {
 _MAX_INTAKE_CONTEXT_BYTES = 1_048_576
 
 
+class _UnsupportedContextRead(OSError):
+    """Safe context traversal is unavailable on this host."""
+
+
+def _reject_duplicate_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate intake context member")
+        result[key] = value
+    return result
+
+
 def _open_intake_context(path: Path) -> int:
     """Open a context file without following any path component."""
     directory = getattr(os, "O_DIRECTORY", None)
@@ -32,7 +45,9 @@ def _open_intake_context(path: Path) -> int:
         any(not isinstance(flag, int) or flag == 0 for flag in (directory, nofollow, nonblock))
         or os.open not in os.supports_dir_fd
     ):
-        raise OSError("safe descriptor-relative context reads are unavailable")
+        raise _UnsupportedContextRead("safe descriptor-relative context reads are unavailable")
+    if ".." in path.parts:
+        raise ValueError("parent traversal is not allowed in an intake context path")
     absolute = path.absolute()
     parent = os.open(absolute.anchor, os.O_RDONLY | directory | nofollow)
     try:
@@ -178,9 +193,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         from skills_sdk.models.intake import SkillPackageIntakeContext
 
         try:
-            context_payload = json.loads(_read_intake_context(arguments.context).decode("utf-8"))
+            context_payload = json.loads(
+                _read_intake_context(arguments.context).decode("utf-8"),
+                object_pairs_hook=_reject_duplicate_members,
+            )
             SchemaRegistry().validate("skill-package-intake-context.v1", context_payload)
             context = SkillPackageIntakeContext.model_validate(context_payload)
+        except _UnsupportedContextRead:
+            from skills_sdk.models.packaging import PackageReceiptBlocker
+
+            blocker = PackageReceiptBlocker(
+                code="unsupported_context_read",
+                message="safe descriptor-relative intake context reads are unavailable",
+                evidence_refs=("docs/compatibility.md",),
+            )
+            if arguments.json_output:
+                print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
+            else:
+                print(f"intake: blocked\n  {blocker.code}: {blocker.message}")
+            return 2
         except (ContractError, OSError, RecursionError, UnicodeDecodeError, ValueError, ValidationError):
             parser.error("invalid intake context")
         intake_result = intake_skill_package(arguments.package_root, context, policy=policy)

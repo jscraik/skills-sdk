@@ -145,7 +145,7 @@ def test_intake_cli_validates_the_context_wire_shape_before_normalization(
 
 
 @pytest.mark.parametrize("flag", ["O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK"])
-def test_intake_cli_fails_closed_without_safe_open_support(
+def test_intake_cli_emits_typed_blocker_without_safe_open_support(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -155,8 +155,35 @@ def test_intake_cli_fails_closed_without_safe_open_support(
     _write_context(context)
     monkeypatch.setattr(main_module.os, flag, 0)
 
+    assert main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"]) == 2
+    blocker = json.loads(capsys.readouterr().out)
+    assert blocker["code"] == "unsupported_context_read"
+    assert blocker["evidence_refs"] == ["docs/compatibility.md"]
+
+
+def test_intake_cli_rejects_duplicate_context_members(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    context = tmp_path / "context.json"
+    context.write_text('{"checks": {}, "checks": {}}', encoding="utf-8")
+
     with pytest.raises(SystemExit, match="2"):
         main(["intake", str(FIXTURE_ROOT), "--context", str(context), "--json"])
+    assert "invalid intake context" in capsys.readouterr().err
+
+
+def test_intake_cli_rejects_parent_components_before_open(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    context = tmp_path / "context.json"
+    _write_context(context)
+
+    with pytest.raises(SystemExit, match="2"):
+        main(["intake", str(FIXTURE_ROOT), "--context", str(directory / ".." / "context.json"), "--json"])
     assert "invalid intake context" in capsys.readouterr().err
 
 
