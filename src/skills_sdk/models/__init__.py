@@ -99,6 +99,11 @@ from skills_sdk.models.safety import (
     PackageSafetyFinding,
     PackageSafetyReviewer,
 )
+from skills_sdk.models.scenario_quality import (
+    ScenarioQualityAppliedPolicy,
+    ScenarioQualityFinding,
+    ScenarioQualityReceipt,
+)
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 __all__ = [
@@ -181,6 +186,9 @@ __all__ = [
     "ScenarioCaseV2",
     "ScenarioObservation",
     "ScenarioObservationV2",
+    "ScenarioQualityAppliedPolicy",
+    "ScenarioQualityFinding",
+    "ScenarioQualityReceipt",
     "ScenarioSet",
     "ScenarioSetV2",
     "ScorerProfile",

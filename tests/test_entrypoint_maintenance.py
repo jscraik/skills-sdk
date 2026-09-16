@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import stat
 from pathlib import Path
@@ -86,11 +87,11 @@ def test_publication_failure_preserves_current_and_recoverable_backup(
     _source, target, backup, args = _fixture(tmp_path)
     before = target.read_bytes()
 
-    def refuse_replace(*_args: object, **_kwargs: object) -> None:
+    def refuse_exchange(*_args: object, **_kwargs: object) -> None:
         """Inject a publication failure."""
         raise OSError("injected publication failure")
 
-    monkeypatch.setattr(entrypoint.os, "replace", refuse_replace)
+    monkeypatch.setattr(entrypoint, "_exchange", refuse_exchange)
     assert main([*args, "--apply"]) == 2
     assert target.read_bytes() == before
     assert [path.read_bytes() for path in backup.iterdir()] == [before]
@@ -102,16 +103,18 @@ def test_writer_racing_publication_is_preserved_in_backup(tmp_path: Path, monkey
     from skills_sdk.host import entrypoint
 
     _source, target, backup, args = _fixture(tmp_path)
-    replace = entrypoint.os.replace
+    exchange = entrypoint._exchange
 
-    def racing_replace(*positional: object, **keywords: object) -> None:
+    def racing_exchange(*positional: object, **keywords: object) -> None:
         """Inject a target write immediately before publication."""
         target.write_text("Concurrent writer bytes\n")
-        replace(*positional, **keywords)
+        exchange(*positional, **keywords)
 
-    monkeypatch.setattr(entrypoint.os, "replace", racing_replace)
+    monkeypatch.setattr(entrypoint, "_exchange", racing_exchange)
     assert main([*args, "--apply"]) == 2
-    assert [path.read_text() for path in backup.iterdir()] == ["Concurrent writer bytes\n"]
+    assert len(list(backup.iterdir())) == 1
+    recovery = [path for path in target.parent.iterdir() if path.name.startswith(".skills-sdk-stage-")]
+    assert [path.read_text() for path in recovery] == ["Concurrent writer bytes\n"]
 
 
 def test_replaced_parent_is_not_reported_as_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,17 +122,17 @@ def test_replaced_parent_is_not_reported_as_completed(tmp_path: Path, monkeypatc
     from skills_sdk.host import entrypoint
 
     _source, target, backup, args = _fixture(tmp_path)
-    replace = entrypoint.os.replace
+    exchange = entrypoint._exchange
     moved = target.parent.with_name("moved-example")
 
-    def racing_replace(*positional: object, **keywords: object) -> None:
+    def racing_exchange(*positional: object, **keywords: object) -> None:
         """Replace the target directory immediately before publication."""
         target.parent.rename(moved)
         target.parent.mkdir()
         target.write_text("Replacement directory writer\n")
-        replace(*positional, **keywords)
+        exchange(*positional, **keywords)
 
-    monkeypatch.setattr(entrypoint.os, "replace", racing_replace)
+    monkeypatch.setattr(entrypoint, "_exchange", racing_exchange)
     assert main([*args, "--apply"]) == 2
     assert target.read_text() == "Replacement directory writer\n"
     assert len(list(backup.iterdir())) == 1
@@ -176,6 +179,7 @@ def test_supporting_document_is_explicit_and_bounded(
 ) -> None:
     """Verify supporting-document maintenance is explicit and Markdown-only."""
     source, target, backup, args = _fixture(tmp_path)
+    target.write_text("---\nname: example\ndescription: Runtime metadata.\n---\n\n# Example\n")
     original_entrypoint = target.read_bytes()
     document_source, document_target = source.with_name(filename), target.with_name(filename)
     document_source.write_text("Maintained document\n")
@@ -187,3 +191,44 @@ def test_supporting_document_is_explicit_and_bounded(
     assert target.read_bytes() == original_entrypoint
     assert document_target.read_text() == ("Maintained document\n" if expected == 0 else "Original document\n")
     assert len(list(backup.iterdir())) == (1 if expected == 0 else 0)
+
+
+def test_supporting_document_requires_runtime_entrypoint(tmp_path: Path) -> None:
+    source, target, _backup, args = _fixture(tmp_path)
+    document_source, document_target = source.with_name("guide.md"), target.with_name("guide.md")
+    document_source.write_text("Maintained document\n")
+    document_target.write_text("Original document\n")
+    target.unlink()
+    args[1:3] = [str(document_source), str(document_target)]
+    args[args.index("--expected-source") + 1] = hashlib.sha256(document_source.read_bytes()).hexdigest()
+    args[args.index("--expected-current") + 1] = hashlib.sha256(document_target.read_bytes()).hexdigest()
+    assert main([*args, "--apply", "--supporting-document", "--json"]) == 2
+
+
+@pytest.mark.parametrize("tree", ["source", "runtime"])
+def test_backup_root_inside_package_tree_is_blocked(tmp_path: Path, tree: str) -> None:
+    source, target, _backup, args = _fixture(tmp_path)
+    nested = (source.parent if tree == "source" else target.parent) / "backups"
+    nested.mkdir()
+    args[args.index("--backup-root") + 1] = str(nested)
+    assert main([*args, "--apply", "--json"]) == 2
+
+
+def test_backup_is_an_independent_snapshot(tmp_path: Path) -> None:
+    _source, target, backup, args = _fixture(tmp_path)
+    alias = target.with_name("alias.md")
+    os.link(target, alias)
+    before = target.read_bytes()
+    assert main([*args, "--apply"]) == 0
+    alias.write_text("Alias mutation\n")
+    assert [path.read_bytes() for path in backup.iterdir()] == [before]
+
+
+def test_json_failure_is_typed_and_versioned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _source, _target, _backup, args = _fixture(tmp_path)
+    args[args.index("--expected-current") + 1] = "0" * 64
+    assert main([*args, "--apply", "--json"]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "entrypoint-maintenance-result/v1"
+    assert payload["status"] == "blocked"
+    assert payload["blocker"]["code"] == "entrypoint_maintenance_blocked"

@@ -53,7 +53,7 @@ def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
                 [
                     "import sys",
                     "from skills_sdk.cli.main import main",
-                    "for route in ('inventory', 'intake', 'eval', 'package', 'project', 'verify'):",
+                    "for route in ('inventory', 'package', 'project', 'verify'):",
                     "    assert main([route]) == 0",
                     "assert 'skills_sdk.host.entrypoint' not in sys.modules",
                 ]

@@ -58,6 +58,7 @@ SCHEMA_NAMES = frozenset(
         "scenario-observation.v2",
         "scenario-set.v1",
         "scenario-set.v2",
+        "scenario-quality.v1",
         "scorer-profile.v1",
         "skill-package-validation.v1",
         "skill-package-intake.v1",
@@ -342,6 +343,10 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation import ScenarioSet
 
             model = ScenarioSet
+        elif name == "scenario-quality.v1":
+            from skills_sdk.models.scenario_quality import ScenarioQualityReceipt
+
+            model = ScenarioQualityReceipt
         elif name == "scorer-profile.v1":
             from skills_sdk.models.evaluation import ScorerProfile
 

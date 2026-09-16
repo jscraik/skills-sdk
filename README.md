@@ -58,8 +58,8 @@ The migration is complete only when the SDK provides independently usable
 routes and proof for those lifecycle stages, Foundry can retain the resulting
 packages without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
-CLI names above remain honest discovery boundaries rather than claims that the
-workflow has already moved. [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
+CLI names above remain honest discovery boundaries except for the implemented
+`validate`, `build`, and `eval scenario-quality` routes. [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
 required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
 decision.
 
@@ -77,6 +77,8 @@ decision.
 - Deterministic, non-executing evaluation of externally produced observations,
   with explicit blockers for unsupported oracles, incomplete calibration, and
   candidate or scenario-set identity drift.
+- Candidate-bound, read-only scenario-definition quality assessment through
+  `skills-sdk eval scenario-quality`; it does not execute scenarios or providers.
 - An opt-in v2 evaluation family with secret-free provider identity binding,
   digest-only exact-match decisions, deterministic receipt identity, and
   generic receipt parsing. Existing v1 payloads and evaluator semantics remain

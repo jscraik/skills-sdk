@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,16 @@ def test_real_cli_matches_identical_copies_without_writes(tmp_path: Path, capsys
     assert "compare-copy: pass" in capsys.readouterr().out
     after = (runtime / "SKILL.md").stat()
     assert (before.st_ino, before.st_mtime_ns) == (after.st_ino, after.st_mtime_ns)
+
+
+def test_compare_copy_json_is_typed_and_versioned(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    source = _package(tmp_path / "source")
+    runtime = _package(tmp_path / "runtime")
+    assert main(["compare-copy", str(source), str(runtime), "--source-revision", REVISION, "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "runtime-copy-comparison/v1"
+    assert payload["status"] == "pass"
+    assert payload["different_paths"] == []
 
 
 @pytest.mark.parametrize("change", ["content", "extra", "missing"])

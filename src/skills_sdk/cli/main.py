@@ -29,13 +29,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
     for name, help_text in COMMAND_HELP.items():
-        if name in {"validate", "build"}:
+        if name in {"validate", "build", "eval"}:
             continue
         commands.add_parser(name, help=help_text, description=help_text)
     compare = commands.add_parser("compare-copy", help="compare validated source and runtime file bytes without writes")
     compare.add_argument("source_root", type=Path)
     compare.add_argument("runtime_root", type=Path)
     compare.add_argument("--source-revision", required=True)
+    compare.add_argument("--json", action="store_true", dest="json_output")
     maintenance = commands.add_parser(
         "maintain-entrypoint", help="check or repair an existing skill entrypoint or sibling document"
     )
@@ -48,6 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--supporting-document", action="store_true", help="maintain an existing sibling Markdown document"
     )
     maintenance.add_argument("--apply", action="store_true", help="apply the separately authorized repair")
+    maintenance.add_argument("--json", action="store_true", dest="json_output")
     for name in ("validate", "build"):
         command = commands.add_parser(name, help=COMMAND_HELP[name], description=COMMAND_HELP[name])
         command.add_argument("package_root", type=Path)
@@ -56,6 +58,14 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--max-reference-depth", type=int)
         command.add_argument("--json", action="store_true", dest="json_output")
         command.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    evaluation = commands.add_parser("eval", help=COMMAND_HELP["eval"], description=COMMAND_HELP["eval"])
+    evaluation_commands = evaluation.add_subparsers(dest="eval_command", title="eval commands", required=True)
+    quality = evaluation_commands.add_parser("scenario-quality", help="assess package-local scenario definitions")
+    quality.add_argument("package_root", type=Path)
+    quality.add_argument("--source-revision")
+    quality.add_argument("--scenario-set")
+    quality.add_argument("--json", action="store_true", dest="json_output")
+    quality.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     tessl = commands.add_parser(
         "tessl",
         help="prepare or verify a Tessl candidate without publishing",
@@ -73,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
     """Return findings suitable for the human-readable command output."""
-    if command == "validate":
+    if command in {"validate", "scenario-quality"}:
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 
@@ -93,7 +103,13 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
 
 def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
     """Run the bounded host-maintenance command and return its exit status."""
-    from skills_sdk.host.entrypoint import EntrypointRequest, check_entrypoint, repair_entrypoint
+    from skills_sdk.host.entrypoint import (
+        EntrypointMaintenanceBlocker,
+        EntrypointMaintenanceResult,
+        EntrypointRequest,
+        check_entrypoint,
+        repair_entrypoint,
+    )
 
     try:
         request = EntrypointRequest(
@@ -106,10 +122,21 @@ def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
         )
         result = repair_entrypoint(request) if arguments.apply else check_entrypoint(request)
     except (OSError, ValueError) as exc:
-        print(f"maintain-entrypoint: blocked or indeterminate: {exc}")
-        return 2
-    print(f"maintain-entrypoint: {result}")
-    return 2 if result == "repairable" else 0
+        result = EntrypointMaintenanceResult(
+            status="blocked",
+            blocker=EntrypointMaintenanceBlocker(code="entrypoint_maintenance_blocked", message=str(exc)),
+        )
+    if arguments.json_output:
+        print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+    else:
+        print(f"maintain-entrypoint: {result.status}")
+        if result.blocker is not None:
+            print(f"  {result.blocker.code}: {result.blocker.message}")
+        if result.backup_name is not None:
+            print(f"  backup: {result.backup_name}")
+        if result.recovery_name is not None:
+            print(f"  recovery: {result.recovery_name}")
+    return 0 if result.status in {"matching", "repaired"} else 2
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -121,6 +148,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         from skills_sdk.validation.runtime_copy import compare_runtime_copy
 
         comparison = compare_runtime_copy(arguments.source_root, arguments.runtime_root, arguments.source_revision)
+        if arguments.json_output:
+            print(json.dumps(comparison.model_dump(mode="json"), sort_keys=True))
+            return 0 if comparison.status == "pass" else 2
         print(f"compare-copy: {comparison.status}")
         for label, validation in (("source", comparison.source), ("runtime", comparison.runtime)):
             for finding in validation.findings:
@@ -128,6 +158,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         for path in comparison.different_paths:
             print(f"  different: {path}")
         return 0 if comparison.status == "pass" else 2
+    if arguments.command == "eval" and arguments.eval_command == "scenario-quality":
+        from skills_sdk.evaluation import assess_scenario_quality
+
+        quality_result = assess_scenario_quality(
+            arguments.package_root,
+            source_revision=arguments.source_revision or "",
+            scenario_set_id=arguments.scenario_set,
+        )
+        _print_result("scenario-quality", quality_result, json_output=arguments.json_output)
+        return 0 if quality_result.status == "pass" else 2
     if arguments.command not in {"validate", "build"}:
         return 0
     from skills_sdk.validation import SkillValidationPolicy
