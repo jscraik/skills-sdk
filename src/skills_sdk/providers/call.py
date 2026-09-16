@@ -270,9 +270,11 @@ def _close_awaitable(awaitable: object) -> None:
 
 
 async def _clock_wait_for(clock: _ClockBindings, awaitable: Awaitable[object], timeout_seconds: float) -> object:
-    try:
-        scheduled = clock.wait_for(awaitable, timeout_seconds)
-    except (AttributeError, TypeError):
+    async def schedule() -> object:
+        return clock.wait_for(awaitable, timeout_seconds)
+
+    scheduled = await _captured(schedule())
+    if isinstance(scheduled, BaseException):
         _close_awaitable(awaitable)
         raise _contract_error("invalid_provider_clock", "provider clock scheduler failed") from None
     if not inspect.isawaitable(scheduled):

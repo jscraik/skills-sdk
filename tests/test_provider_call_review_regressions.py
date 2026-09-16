@@ -73,6 +73,25 @@ def test_clock_scheduler_must_return_an_awaitable() -> None:
     assert adapter.cleanup_calls == 0
 
 
+@pytest.mark.parametrize(
+    "failure",
+    [RuntimeError("private scheduler state"), ContractError("private_code", "private scheduler detail")],
+)
+def test_synchronous_clock_scheduler_failures_are_redacted(failure: BaseException) -> None:
+    request = _provider_request(None)
+
+    class RaisingClock:
+        def now(self) -> datetime:
+            return datetime(2026, 9, 8, 10, 0, tzinfo=UTC)
+
+        def wait_for(self, awaitable: Awaitable[_T], timeout_seconds: float) -> Awaitable[_T]:
+            raise failure
+
+    with pytest.raises(ContractError, match="invalid_provider_clock") as error:
+        asyncio.run(execute_provider_call(request, None, FakeAdapter(request), clock=RaisingClock()))
+    assert "private" not in str(error.value)
+
+
 @pytest.mark.parametrize("invalid_stream", [[], object()])
 def test_stream_factory_must_return_an_async_iterator(invalid_stream: object) -> None:
     request = _provider_request(None)
