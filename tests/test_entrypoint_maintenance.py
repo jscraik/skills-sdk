@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from skills_sdk.cli.main import main
+from skills_sdk.core.schema_registry import SchemaRegistry
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, list[str]]:
@@ -51,10 +53,14 @@ def test_real_cli_preview_apply_backup_and_idempotence(tmp_path: Path, capsys: p
     assert neighbor.read_text() == "Keep this file\n"
     assert main([*args, "--apply"]) == 0
     assert list(backup.iterdir()) == backups
-    assert sorted(path.name for path in target.parent.iterdir()) == ["SKILL.md", "guide.md"]
+    assert sorted(path.name for path in target.parent.iterdir()) == [
+        ".skills-sdk-entrypoint.lock",
+        "SKILL.md",
+        "guide.md",
+    ]
 
 
-@pytest.mark.parametrize("fault", ["source-drift", "target-drift", "malformed", "symlink", "lock", "missing"])
+@pytest.mark.parametrize("fault", ["source-drift", "target-drift", "malformed", "symlink", "missing"])
 def test_real_cli_refuses_unapproved_or_invalid_state(tmp_path: Path, fault: str) -> None:
     """Verify maintenance refuses drift, malformed paths, locks, and absence."""
     source, target, backup, args = _fixture(tmp_path)
@@ -68,14 +74,27 @@ def test_real_cli_refuses_unapproved_or_invalid_state(tmp_path: Path, fault: str
     elif fault == "symlink":
         target.unlink()
         target.symlink_to(source)
-    elif fault == "lock":
-        (target.parent / ".skills-sdk-entrypoint.lock").write_text("Other operation\n")
     else:
         target.unlink()
     before = target.read_bytes() if target.exists() else None
     assert main([*args, "--apply"]) == 2
     assert (target.read_bytes() if target.exists() else None) == before
     assert list(backup.iterdir()) == []
+
+
+def test_live_advisory_lock_blocks_maintenance(tmp_path: Path) -> None:
+    """Verify a live writer blocks while a stale lock pathname remains reusable."""
+    _source, target, backup, args = _fixture(tmp_path)
+    lock_path = target.parent / ".skills-sdk-entrypoint.lock"
+    descriptor = os.open(lock_path, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert main([*args, "--apply"]) == 2
+        assert list(backup.iterdir()) == []
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+    assert main([*args, "--apply"]) == 0
 
 
 def test_publication_failure_preserves_current_and_recoverable_backup(
@@ -95,7 +114,7 @@ def test_publication_failure_preserves_current_and_recoverable_backup(
     assert main([*args, "--apply"]) == 2
     assert target.read_bytes() == before
     assert [path.read_bytes() for path in backup.iterdir()] == [before]
-    assert [path.name for path in target.parent.iterdir()] == ["SKILL.md"]
+    assert sorted(path.name for path in target.parent.iterdir()) == [".skills-sdk-entrypoint.lock", "SKILL.md"]
 
 
 def test_writer_racing_publication_is_preserved_in_backup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -168,7 +187,43 @@ def test_backup_sync_failure_prevents_publication(tmp_path: Path, monkeypatch: p
     assert main([*args, "--apply"]) == 2
     assert target.read_bytes() == before
     assert [path.read_bytes() for path in backup.iterdir()] == [before]
-    assert [path.name for path in target.parent.iterdir()] == ["SKILL.md"]
+    assert sorted(path.name for path in target.parent.iterdir()) == [".skills-sdk-entrypoint.lock", "SKILL.md"]
+
+
+def test_post_exchange_sync_failure_is_indeterminate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify post-publication durability failure retains both recovery copies."""
+    from skills_sdk.host import entrypoint
+
+    source, target, backup, args = _fixture(tmp_path)
+    target_parent_identity = (target.parent.stat().st_dev, target.parent.stat().st_ino)
+    fsync = os.fsync
+
+    def refuse_published_parent_sync(descriptor: int) -> None:
+        observed = os.fstat(descriptor)
+        if stat.S_ISDIR(observed.st_mode) and (observed.st_dev, observed.st_ino) == target_parent_identity:
+            raise OSError("injected publication durability failure")
+        fsync(descriptor)
+
+    monkeypatch.setattr(entrypoint.os, "fsync", refuse_published_parent_sync)
+    assert main([*args, "--apply", "--json"]) == 2
+    assert target.read_bytes() == source.read_bytes()
+    assert len(list(backup.iterdir())) == 1
+    assert len([path for path in target.parent.iterdir() if path.name.startswith(".skills-sdk-stage-")]) == 1
+
+
+def test_recursive_frontmatter_is_a_typed_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    before = target.read_bytes()
+
+    def recursive_frontmatter(_text: str) -> object:
+        raise RecursionError("injected recursive YAML")
+
+    monkeypatch.setattr(entrypoint, "read_frontmatter", recursive_frontmatter)
+    assert main([*args, "--apply", "--json"]) == 2
+    assert target.read_bytes() == before
+    assert list(backup.iterdir()) == []
 
 
 @pytest.mark.parametrize(
@@ -211,7 +266,37 @@ def test_backup_root_inside_package_tree_is_blocked(tmp_path: Path, tree: str) -
     nested = (source.parent if tree == "source" else target.parent) / "backups"
     nested.mkdir()
     args[args.index("--backup-root") + 1] = str(nested)
+    assert main([*args, "--json"]) == 2
     assert main([*args, "--apply", "--json"]) == 2
+
+
+@pytest.mark.parametrize("fault", ["executable", "non_utf8", "nul"])
+def test_supporting_document_rejects_unsafe_content(tmp_path: Path, fault: str) -> None:
+    source, target, backup, args = _fixture(tmp_path)
+    target.write_text("---\nname: example\ndescription: Runtime metadata.\n---\n\n# Example\n")
+    document_source, document_target = source.with_name("guide.md"), target.with_name("guide.md")
+    document_source.write_text("Maintained document\n")
+    document_target.write_text("Original document\n")
+    if fault == "executable":
+        document_source.chmod(0o755)
+    elif fault == "non_utf8":
+        document_source.write_bytes(b"\xff\xfe")
+    else:
+        document_source.write_bytes(b"text\x00payload")
+    args[1:3] = [str(document_source), str(document_target)]
+    args[args.index("--expected-source") + 1] = hashlib.sha256(document_source.read_bytes()).hexdigest()
+    args[args.index("--expected-current") + 1] = hashlib.sha256(document_target.read_bytes()).hexdigest()
+    assert main([*args, "--apply", "--supporting-document", "--json"]) == 2
+    assert document_target.read_text() == "Original document\n"
+    assert list(backup.iterdir()) == []
+
+
+def test_special_permission_bits_are_not_republished(tmp_path: Path) -> None:
+    _source, target, backup, args = _fixture(tmp_path)
+    target.chmod(0o4755)
+    assert main([*args, "--apply"]) == 0
+    assert stat.S_IMODE(target.stat().st_mode) == 0o755
+    assert all(stat.S_IMODE(path.stat().st_mode) == 0o755 for path in backup.iterdir())
 
 
 def test_backup_is_an_independent_snapshot(tmp_path: Path) -> None:
@@ -232,3 +317,4 @@ def test_json_failure_is_typed_and_versioned(tmp_path: Path, capsys: pytest.Capt
     assert payload["schema_version"] == "entrypoint-maintenance-result/v1"
     assert payload["status"] == "blocked"
     assert payload["blocker"]["code"] == "entrypoint_maintenance_blocked"
+    SchemaRegistry().validate("entrypoint-maintenance-result.v1", payload)

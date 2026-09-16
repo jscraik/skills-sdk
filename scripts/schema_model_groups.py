@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from skills_sdk.host.entrypoint import EntrypointMaintenanceResult
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
     ScenarioCaseResult,
@@ -36,6 +37,7 @@ from skills_sdk.models.runtime_evidence import (
     RuntimeOutcomeReceipt,
 )
 from skills_sdk.models.scenario_quality import ScenarioQualityReceipt
+from skills_sdk.validation.runtime_copy import RuntimeCopyComparison
 
 
 def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
@@ -97,6 +99,8 @@ def runtime_lifecycle_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (DiscoveryObservation, "discovery-observation.v1.schema.json"),
         (ActivationObservation, "activation-observation.v1.schema.json"),
         (RuntimeOutcomeReceipt, "runtime-outcome.v1.schema.json"),
+        (RuntimeCopyComparison, "runtime-copy-comparison.v1.schema.json"),
+        (EntrypointMaintenanceResult, "entrypoint-maintenance-result.v1.schema.json"),
     )
 
 

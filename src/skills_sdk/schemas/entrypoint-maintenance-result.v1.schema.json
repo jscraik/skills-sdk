@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "EntrypointMaintenanceBlocker": {
+      "additionalProperties": false,
+      "description": "Stable public reason that maintenance did not complete.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "EntrypointMaintenanceBlocker",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/entrypoint-maintenance-result.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Versioned result for preview and explicitly authorized maintenance.",
+  "properties": {
+    "backup_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Backup Name"
+    },
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EntrypointMaintenanceBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "recovery_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recovery Name"
+    },
+    "schema_version": {
+      "const": "entrypoint-maintenance-result/v1",
+      "default": "entrypoint-maintenance-result/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "matching",
+        "repairable",
+        "repaired",
+        "blocked",
+        "indeterminate"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "EntrypointMaintenanceResult",
+  "type": "object"
+}

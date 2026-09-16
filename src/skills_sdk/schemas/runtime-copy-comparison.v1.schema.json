@@ -1,0 +1,280 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageFileRole": {
+      "description": "The portable role of a file included in a package manifest.",
+      "enum": [
+        "skill_md",
+        "readme",
+        "reference",
+        "script",
+        "asset",
+        "eval"
+      ],
+      "title": "PackageFileRole",
+      "type": "string"
+    },
+    "PackageManifestFile": {
+      "additionalProperties": false,
+      "description": "One immutable file entry in a package manifest.",
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/PackageFileRole"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "role"
+      ],
+      "title": "PackageManifestFile",
+      "type": "object"
+    },
+    "SkillIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Skills identity, independent of runtime installation.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "skill",
+          "default": "skill",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "skill-identity/v1",
+          "default": "skill-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "SkillIdentity",
+      "type": "object"
+    },
+    "SkillPackageFinding": {
+      "additionalProperties": false,
+      "description": "One stable, evidence-bound standalone-skill finding.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "title": "SkillPackageFinding",
+      "type": "object"
+    },
+    "SkillPackageValidation": {
+      "additionalProperties": false,
+      "description": "Read-only structural result for one standalone skill candidate.",
+      "properties": {
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "files": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageManifestFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SkillPackageFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "skill-package-validation/v1",
+          "default": "skill-package-validation/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SkillPackageValidation",
+      "type": "object"
+    },
+    "ValidationSeverity": {
+      "description": "Whether a finding blocks immutable candidate construction.",
+      "enum": [
+        "warning",
+        "blocker"
+      ],
+      "title": "ValidationSeverity",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/runtime-copy-comparison.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Local comparison, not installation, activation, or admission evidence.",
+  "properties": {
+    "different_paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Different Paths",
+      "type": "array"
+    },
+    "runtime": {
+      "$ref": "#/$defs/SkillPackageValidation"
+    },
+    "schema_version": {
+      "const": "runtime-copy-comparison/v1",
+      "default": "runtime-copy-comparison/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/SkillPackageValidation"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "drift",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "source",
+    "runtime",
+    "different_paths"
+  ],
+  "title": "RuntimeCopyComparison",
+  "type": "object"
+}

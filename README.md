@@ -37,10 +37,10 @@ existing-copy comparison and maintenance routes are documented in
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `validate`, `build`, `compare-copy`,
-and `maintain-entrypoint`. Comparison is read-only. Maintenance is read-only by
+series. The implemented local commands are `intake`, `validate`, `build`,
+`eval scenario-quality`, `compare-copy`, and `maintain-entrypoint`. Comparison is read-only. Maintenance is read-only by
 default and requires explicit `--apply` to change an existing host file. The
-other lifecycle names, including `inventory`, `intake`, `eval`, `package`,
+other lifecycle names, including `inventory`, the remaining `eval` routes, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install

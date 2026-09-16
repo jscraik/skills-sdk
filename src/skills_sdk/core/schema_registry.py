@@ -52,6 +52,8 @@ SCHEMA_NAMES = frozenset(
         "activation-observation.v1",
         "runtime-outcome.v1",
         "runtime-lock.v1",
+        "runtime-copy-comparison.v1",
+        "entrypoint-maintenance-result.v1",
         "scenario-case-result.v1",
         "scenario-case-result.v2",
         "scenario-observation.v1",

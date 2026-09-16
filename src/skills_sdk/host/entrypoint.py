@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import ctypes
 import errno
+import fcntl
 import hashlib
 import os
 import platform
 import stat
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -85,7 +87,7 @@ def _validated_entrypoint(parent: int, expected_name: str) -> CapturedFile:
     captured = _capture(parent, "SKILL.md")
     try:
         metadata, _body, closed = read_frontmatter(captured.data.decode("utf-8"))
-    except (UnicodeError, YAMLError) as exc:
+    except (RecursionError, UnicodeError, YAMLError) as exc:
         raise ValueError("entrypoint metadata is malformed") from exc
     description = metadata.get("description")
     if not closed or metadata.get("name") != expected_name:
@@ -108,6 +110,14 @@ def _source(request: EntrypointRequest, parent: int, target_parent: int) -> Capt
     if captured.digest != request.expected_source:
         raise ValueError("source digest differs from the selected candidate")
     if request.supporting_document:
+        if captured.mode & 0o111:
+            raise ValueError("supporting documents must not be executable")
+        try:
+            text = captured.data.decode("utf-8")
+        except UnicodeError as exc:
+            raise ValueError("supporting documents must be valid UTF-8 text") from exc
+        if "\x00" in text:
+            raise ValueError("supporting documents must be valid UTF-8 text")
         _validated_entrypoint(parent, request.target.parent.name)
         _validated_entrypoint(target_parent, request.target.parent.name)
     else:
@@ -118,12 +128,15 @@ def _source(request: EntrypointRequest, parent: int, target_parent: int) -> Capt
 def check_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult:
     """Return matching or repairable; reject unexpected state without writing."""
     request = EntrypointRequest.model_validate(dict(request))
+    _validate_backup_root(request)
     source_parent = _open_directory_tree(request.source.parent)
     try:
         target_parent = _open_directory_tree(request.target.parent)
         try:
             source = _source(request, source_parent, target_parent)
             current = _capture(target_parent, request.target.name)
+            if request.supporting_document and current.mode & 0o111:
+                raise ValueError("supporting documents must not be executable")
             if current.digest == source.digest:
                 return EntrypointMaintenanceResult(status="matching")
             if current.digest != request.expected_current:
@@ -137,7 +150,7 @@ def check_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult:
 
 def _write_stage(parent: int, name: str, source: CapturedFile, current: CapturedFile) -> int:
     """Write and sync an exclusive staged replacement with the current mode."""
-    mode = stat.S_IMODE(current.mode)
+    mode = stat.S_IMODE(current.mode) & 0o777
     descriptor = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode, dir_fd=parent)
     try:
         with os.fdopen(os.dup(descriptor), "wb") as stream:
@@ -175,6 +188,15 @@ def _write_snapshot(parent: int, name: str, captured: CapturedFile) -> None:
 def _same_snapshot(left: CapturedFile, right: CapturedFile) -> bool:
     return (
         left.data == right.data and left.digest == right.digest and stat.S_IMODE(left.mode) == stat.S_IMODE(right.mode)
+    )
+
+
+def _same_published(published: CapturedFile, source: CapturedFile, current: CapturedFile) -> bool:
+    """Confirm published bytes and the sanitized original target mode."""
+    return (
+        published.data == source.data
+        and published.digest == source.digest
+        and stat.S_IMODE(published.mode) == (stat.S_IMODE(current.mode) & 0o777)
     )
 
 
@@ -220,6 +242,8 @@ def _publish(
     """Publish a staged replacement after backup and concurrency checks."""
     source_parent, target_parent, backup_parent = parents
     current = _capture(target_parent, request.target.name)
+    if request.supporting_document and current.mode & 0o111:
+        raise ValueError("supporting documents must not be executable")
     if current.digest == source.digest:
         _verify_parents(request, parents)
         return EntrypointMaintenanceResult(status="matching")
@@ -229,6 +253,7 @@ def _publish(
     stage_name = f".skills-sdk-stage-{operation}"
     backup_name = f"{request.target.parent.name}-{operation}-{request.target.name}"
     stage = _write_stage(target_parent, stage_name, source, current)
+    retain_stage = False
     try:
         _write_snapshot(backup_parent, backup_name, current)
         backup = _capture(backup_parent, backup_name)
@@ -241,23 +266,37 @@ def _publish(
             raise ValueError("source or runtime changed before publication; backup retained")
         _verify_parents(request, parents)
         _exchange(target_parent, stage_name, request.target.name)
-        os.fsync(target_parent)
-        _verify_parents(request, parents)
-        displaced = _capture(target_parent, stage_name)
-        if displaced != current:
+        try:
+            os.fsync(target_parent)
+            _verify_parents(request, parents)
+            displaced = _capture(target_parent, stage_name)
+            if displaced != current:
+                retain_stage = True
+                return EntrypointMaintenanceResult(
+                    status="indeterminate",
+                    blocker=EntrypointMaintenanceBlocker(
+                        code="concurrent_runtime_replacement",
+                        message="runtime changed at publication; competing bytes retained",
+                    ),
+                    backup_name=backup_name,
+                    recovery_name=stage_name,
+                )
+            published = _capture(target_parent, request.target.name)
+            if not _same_published(published, source, current) or not _same_snapshot(
+                _capture(backup_parent, backup_name), current
+            ):
+                raise ValueError("published target or backup changed after publication")
+        except (OSError, ValueError):
+            retain_stage = True
             return EntrypointMaintenanceResult(
                 status="indeterminate",
                 blocker=EntrypointMaintenanceBlocker(
-                    code="concurrent_runtime_replacement",
-                    message="runtime changed at publication; competing bytes retained",
+                    code="publication_verification_failed",
+                    message="publication occurred but durable verification did not complete",
                 ),
                 backup_name=backup_name,
                 recovery_name=stage_name,
             )
-        if _capture(target_parent, request.target.name).digest != source.digest or not _same_snapshot(
-            _capture(backup_parent, backup_name), current
-        ):
-            raise ValueError("concurrent runtime mutation detected; result indeterminate and backup retained")
         displaced_descriptor = os.open(stage_name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=target_parent)
         try:
             _remove_owned(target_parent, stage_name, displaced_descriptor)
@@ -265,12 +304,10 @@ def _publish(
             os.close(displaced_descriptor)
         return EntrypointMaintenanceResult(status="repaired", backup_name=backup_name)
     finally:
-        try:
-            _remove_owned(target_parent, stage_name, stage)
-        except ValueError:
-            pass
-        finally:
-            os.close(stage)
+        if not retain_stage:
+            with suppress(ValueError):
+                _remove_owned(target_parent, stage_name, stage)
+        os.close(stage)
 
 
 def repair_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult:
@@ -288,14 +325,16 @@ def repair_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult
         source_parent, target_parent, backup_parent = parents
         source = _source(request, source_parent, target_parent)
         lock_name = ".skills-sdk-entrypoint.lock"
-        lock = os.open(lock_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=target_parent)
+        lock = os.open(lock_name, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=target_parent)
         try:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise ValueError("another maintenance operation holds the runtime lock") from exc
             return _publish(request, (source_parent, target_parent, backup_parent), source)
         finally:
-            try:
-                _remove_owned(target_parent, lock_name, lock)
-            finally:
-                os.close(lock)
+            fcntl.flock(lock, fcntl.LOCK_UN)
+            os.close(lock)
     finally:
         for descriptor in reversed(parents):
             os.close(descriptor)
