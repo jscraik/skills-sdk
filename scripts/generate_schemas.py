@@ -11,6 +11,7 @@ from intake_schema import append_intake_constraints
 from package_archive_schema import append_package_archive_constraints
 from provider_execution_schema import append_provider_execution_constraints
 from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
+from scenario_quality_schema import append_scenario_quality_constraints
 from schema_model_groups import (
     evaluation_schema_models,
     intake_schema_models,
@@ -634,8 +635,6 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
     _append_registry_identity_constraints(schema)
     package_safety_schema.append_package_safety_schema_constraints(schema, filename)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:
-        # Pydantic emits field types but cannot express the status-dependent
-        # receipt invariants enforced by PackageReceipt.model_validator.
         schema["allOf"] = [
             {
                 "if": {"properties": {"status": {"const": "built"}}},
@@ -723,6 +722,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_evaluation_result_constraints(schema, filename)
     elif filename in {"evaluation-receipt.v1.schema.json", "evaluation-receipt.v2.schema.json"}:
         _append_evaluation_receipt_constraints(schema, filename)
+    elif filename == "scenario-quality.v1.schema.json":
+        append_scenario_quality_constraints(schema)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
     elif filename == "skill-package-intake.v1.schema.json":

@@ -149,6 +149,14 @@ return `invalid_receipt_schema_version`. This routing rule does not change the
 payload meaning, candidate matching, or immutable generic representation of
 any supported v1 or v2 receipt.
 
+`scenario-quality/v1` is an additive registry-only receipt family. Validate it
+with `ScenarioQualityReceipt` or `SchemaRegistry`; generic `parse_receipt`
+intentionally returns `unsupported_receipt_family`. Version 1 fixes its portable
+release policy at five to ten total cases with a target of eight, one
+pressure-or-regression case, and one negative-or-edge case. The generated Draft
+2020-12 schema and Pydantic model enforce identical policy evidence. Existing
+generic receipt dispatch remains unchanged.
+
 `registry-identity/v1` and `registry-preparation/v1` are additive contracts.
 Registry identity fields reject credential-shaped values at component
 boundaries while permitting ordinary identifiers that merely contain similar

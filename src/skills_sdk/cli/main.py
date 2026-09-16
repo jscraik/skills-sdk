@@ -29,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
     for name, help_text in COMMAND_HELP.items():
-        if name in {"validate", "build"}:
+        if name in {"validate", "build", "eval"}:
             continue
         commands.add_parser(name, help=help_text, description=help_text)
     for name in ("validate", "build"):
@@ -40,6 +40,14 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--max-reference-depth", type=int)
         command.add_argument("--json", action="store_true", dest="json_output")
         command.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    evaluation = commands.add_parser("eval", help=COMMAND_HELP["eval"], description=COMMAND_HELP["eval"])
+    evaluation_commands = evaluation.add_subparsers(dest="eval_command", title="eval commands", required=True)
+    quality = evaluation_commands.add_parser("scenario-quality", help="assess package-local scenario definitions")
+    quality.add_argument("package_root", type=Path)
+    quality.add_argument("--source-revision")
+    quality.add_argument("--scenario-set")
+    quality.add_argument("--json", action="store_true", dest="json_output")
+    quality.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     tessl = commands.add_parser(
         "tessl",
         help="prepare or verify a Tessl candidate without publishing",
@@ -56,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
-    if command == "validate":
+    if command in {"validate", "scenario-quality"}:
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 
@@ -76,6 +84,16 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     arguments = build_parser().parse_args(argv)
+    if arguments.command == "eval" and arguments.eval_command == "scenario-quality":
+        from skills_sdk.evaluation import assess_scenario_quality
+
+        quality_result = assess_scenario_quality(
+            arguments.package_root,
+            source_revision=arguments.source_revision or "",
+            scenario_set_id=arguments.scenario_set,
+        )
+        _print_result("scenario-quality", quality_result, json_output=arguments.json_output)
+        return 0 if quality_result.status == "pass" else 2
     if arguments.command not in {"validate", "build"}:
         return 0
     from skills_sdk.validation import SkillValidationPolicy
