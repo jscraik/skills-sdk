@@ -101,9 +101,11 @@ operational contracts.
 
 ## Bird's-eye view
 
-There are two related local paths. A package path captures a filesystem view,
-validates its entrypoint and files, and then (only after a resolved identity and
-a pass) composes a candidate-bound manifest and receipt. A contract path
+There are three related package-processing paths. A package path captures a filesystem view
+and validates its entrypoint and files. Intake combines that validation with a
+caller-supplied source and ownership context to produce a read-only normalized
+receipt. Build runs only after resolved identity and passing validation to
+compose a candidate-bound manifest and receipt. A contract path
 validates JSON-shaped payloads against packaged schemas and, for registered
 families, applies the corresponding Pydantic invariants.
 
@@ -114,6 +116,10 @@ Package source
 validation/skill_ir.py + validation/skill_package.py
     |
     +--> SkillPackageValidation (pass or typed blockers)
+    |
+    +--> intake/normalization.py + SkillPackageIntakeContext
+    |        |
+    |        +--> SkillPackageIntakeReceipt (normalized decision or typed blockers)
     |
     +--> packaging/manifest.py (only after validation passes)
              |
@@ -142,8 +148,11 @@ Local candidate-bound contracts
          (separate external action and evidence lanes)
 ```
 
-The CLI is an outer adapter over the implemented local services. `validate`,
-`build`, and `eval scenario-quality` execute the local paths above; the other lifecycle names are
+The CLI is an outer adapter over the implemented local services. `intake`,
+`validate`, and `build` execute the package-processing paths above. `eval
+scenario-quality` lazily invokes the separate read-only
+`evaluation/quality.py` service, prints its versioned assessment, and exits 0
+for a passing assessment or 2 for a blocked assessment. The other lifecycle names are
 parseable discovery boundaries and do not perform provider, installation,
 runtime, or publication work.
 
@@ -194,15 +203,19 @@ docstrings and the linked API or CLI guides.
   runtime lock to produce a deterministic intended transition. It does not
   inspect a host, resolve installation paths, apply files, or execute rollback.
 - `cli` is the outermost process adapter. During `main()` dispatch, the
-  `validate` and `build` routes import their validation and packaging services
-  lazily, print versioned results, and map a blocked result to the documented
-  exit status.
+  `intake`, `validate`, and `build` routes import their intake, validation, and
+  packaging services lazily, while `eval scenario-quality` lazily imports
+  `assess_scenario_quality` from `evaluation/quality.py`. The routes print
+  versioned results and map blocked results, normalized non-admit intake
+  decisions, and blocked scenario assessments to the documented exit status.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
-- The CLI service-invocation path is
-  `CLI -> validation/packaging -> models/core`: only `validate` and `build`
-  invoke those services, while reserved routes remain parse-only. This is not
+- The CLI service-invocation paths are
+  `CLI -> intake/validation/packaging -> models/core` and
+  `CLI -> evaluation/quality -> validation/models/core`: `intake`, `validate`,
+  `build`, and `eval scenario-quality` invoke those services, while the
+  remaining reserved routes stay parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
   `skills_sdk/__init__.py`, whose public convenience exports eagerly import
   evaluation, distribution, lifecycle, and their model dependencies. Those

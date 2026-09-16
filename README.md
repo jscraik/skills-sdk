@@ -4,9 +4,9 @@ Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines explicit, versioned contracts for inventory,
 intake, evaluation, risk, security, manifests, and receipts. Its local
 source-consuming services validate standalone packages and, after a candidate
-identity is resolved and validation passes, build candidate-bound manifest and
-receipt data; inventory, intake, evaluation, risk, and security are
-caller-populated contract lanes. The core remains independent of a host
+identity is resolved and validation passes, normalize intake context or build
+candidate-bound manifest and receipt data; inventory, evaluation, risk, and
+security remain caller-populated contract lanes. The core remains independent of a host
 repository, provider account, runtime installation, or registry.
 
 The Python API can deterministically prepare an intended runtime-lock
@@ -34,8 +34,9 @@ operations belong to a future host adapter and separate evidence contracts.
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `validate` and `build`. The other
-lifecycle names, including `inventory`, `intake`, `eval`, `package`,
+series. The implemented local commands are `intake`, `validate`, `build`, and
+`eval scenario-quality`. The other lifecycle names, including `inventory`,
+other `eval` routes, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
@@ -54,7 +55,8 @@ routes and proof for those lifecycle stages, Foundry can retain the resulting
 packages without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
 CLI names above remain honest discovery boundaries except for the implemented
-`validate`, `build`, and `eval scenario-quality` routes. [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
+`intake`, `validate`, `build`, and `eval scenario-quality` routes.
+[`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
 required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
 decision.
 
