@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 from typing import Literal, TypeVar, cast
@@ -13,6 +12,7 @@ from skills_sdk.models.provider_call import ProviderCostObservation
 from skills_sdk.providers import (
     ProviderAdapterChunk,
     ProviderAdapterComplete,
+    ProviderAdapterFailure,
     ProviderAdapterTerminal,
     ProviderCallLimits,
     execute_provider_call,
@@ -81,7 +81,7 @@ def test_stream_factory_must_return_an_async_iterator(invalid_stream: object) ->
     class MalformedStreamAdapter:
         descriptor = base.descriptor
 
-        def stream(self, request: object, input_payload: object) -> object:
+        async def stream(self, request: object, input_payload: object) -> object:
             return invalid_stream
 
         async def cleanup(self) -> None:
@@ -154,7 +154,43 @@ def test_cleanup_must_return_an_awaitable() -> None:
         asyncio.run(execute_provider_call(request, None, cast(object, SynchronousCleanupAdapter())))
 
 
-def test_stream_factory_work_is_bounded_by_overall_deadline() -> None:
+def test_cleanup_must_resolve_to_none() -> None:
+    request = _provider_request(None)
+
+    class InvalidCleanupResultAdapter(FakeAdapter):
+        async def cleanup(self) -> object:
+            return "not-none"
+
+    with pytest.raises(ContractError, match="invalid_provider_adapter"):
+        asyncio.run(execute_provider_call(request, None, InvalidCleanupResultAdapter(request)))
+
+
+def test_stream_pull_must_return_an_awaitable() -> None:
+    request = _provider_request(None)
+    base = FakeAdapter(request, mode="stream")
+
+    class InvalidIterator:
+        def __aiter__(self) -> InvalidIterator:
+            return self
+
+        def __anext__(self) -> object:
+            return ProviderAdapterTerminal(("evidence/output.json",))
+
+    class InvalidPullAdapter:
+        descriptor = base.descriptor
+
+        async def stream(self, request: object, input_payload: object) -> object:
+            return InvalidIterator()
+
+        async def cleanup(self) -> None:
+            base.cleanup_calls += 1
+
+    with pytest.raises(ContractError, match="invalid_provider_adapter"):
+        asyncio.run(execute_provider_call(request, None, cast(object, InvalidPullAdapter())))
+    assert base.cleanup_calls == 1
+
+
+def test_synchronous_stream_factory_is_rejected_before_execution() -> None:
     request = _provider_request(None)
     base = FakeAdapter(request, mode="stream")
 
@@ -162,28 +198,45 @@ def test_stream_factory_work_is_bounded_by_overall_deadline() -> None:
         descriptor = base.descriptor
 
         def stream(self, request: object, input_payload: object) -> object:
-            time.sleep(0.1)
             return iter(())
 
         async def cleanup(self) -> None:
             base.cleanup_calls += 1
 
-    outcome = asyncio.run(
-        execute_provider_call(
-            request,
-            None,
-            cast(object, BlockingStreamAdapter()),
-            limits=ProviderCallLimits(overall_seconds=0.01),
-        )
-    )
-    assert outcome.public_result.execution.error is not None
-    assert outcome.public_result.execution.error.code == "provider_call_timeout"
-    assert base.cleanup_calls == 1
+    with pytest.raises(ContractError, match="invalid_provider_adapter"):
+        asyncio.run(execute_provider_call(request, None, cast(object, BlockingStreamAdapter())))
+    assert base.cleanup_calls == 0
 
 
 def test_provider_outcome_repr_redacts_private_text() -> None:
     outcome = ProviderCallOutcome(public_result=cast(object, "public"), complete_text="private provider text")
     assert "private provider text" not in repr(outcome)
+
+
+@pytest.mark.parametrize("payload", [{"value": "\ud800"}, {"\ud800": "value"}])
+def test_provider_input_strings_must_be_valid_utf8(payload: object) -> None:
+    request = _provider_request(payload)
+    adapter = FakeAdapter(request)
+    with pytest.raises(ContractError, match="invalid_provider_input"):
+        _run(request, payload, adapter)
+    assert adapter.complete_calls == adapter.cleanup_calls == 0
+
+
+def test_blocked_timeout_failure_maps_to_a_typed_blocker() -> None:
+    request = _provider_request(None)
+    adapter = FakeAdapter(request)
+    adapter.complete_value = ProviderAdapterFailure(
+        code="provider_temporarily_unavailable",
+        category="timeout",
+        retryable=True,
+        evidence_refs=("provider-call/timeout",),
+        status="blocked",
+    )
+
+    outcome = _run(request, None, adapter)
+    assert outcome.public_result.status == "blocked"
+    assert outcome.public_result.execution.blocker is not None
+    assert outcome.public_result.execution.blocker.category == "transport"
 
 
 def test_mutated_exported_defaults_do_not_raise_limit_ceilings() -> None:

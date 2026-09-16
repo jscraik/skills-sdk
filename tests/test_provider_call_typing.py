@@ -37,7 +37,7 @@ accepts(Adapter())
         shared
         + """
 class Adapter(Base):
-    def stream(
+    async def stream(
         self, request: ProviderExecutionRequest, input_payload: JsonValue
     ) -> AsyncIterator[ProviderAdapterStreamItem]:
         raise NotImplementedError

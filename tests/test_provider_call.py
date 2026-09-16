@@ -115,7 +115,7 @@ class FakeAdapter:
                 raise value
             yield cast(ProviderAdapterStreamItem, value)
 
-    def stream(
+    async def stream(
         self,
         request: ProviderExecutionRequest,
         input_payload: object,
@@ -585,7 +585,7 @@ def test_caller_cancellation_during_stalled_stream_stops_pulls_and_cleans_up() -
                 await asyncio.Event().wait()
                 yield ProviderAdapterChunk("late")
 
-            def stream(
+            async def stream(
                 self,
                 request: ProviderExecutionRequest,
                 input_payload: object,

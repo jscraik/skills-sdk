@@ -181,7 +181,7 @@ class CompleteTextProviderAdapter(TextProviderAdapterBase, Protocol):
 
 
 class StreamingTextProviderAdapter(TextProviderAdapterBase, Protocol):
-    def stream(
+    async def stream(
         self, request: ProviderExecutionRequest, input_payload: JsonValue
     ) -> AsyncIterator[ProviderAdapterStreamItem]: ...
 

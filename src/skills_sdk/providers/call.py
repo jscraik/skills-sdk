@@ -67,7 +67,7 @@ class _Terminal:
 class _AdapterBindings:
     descriptor: TextProviderAdapterDescriptor
     complete: Callable[[ProviderExecutionRequest, JsonValue], Awaitable[ProviderAdapterComplete]] | None
-    stream: Callable[[ProviderExecutionRequest, JsonValue], AsyncIterator[ProviderAdapterStreamItem]] | None
+    stream: Callable[[ProviderExecutionRequest, JsonValue], Awaitable[AsyncIterator[ProviderAdapterStreamItem]]] | None
     cleanup: Callable[[], Awaitable[None]]
 
 
@@ -92,7 +92,13 @@ def _contract_error(code: str, message: str) -> ContractError:
 def _normalize_json(value: object, *, depth: int, maximum_depth: int, active: set[int]) -> JsonValue:
     if depth > maximum_depth:
         raise _contract_error("provider_input_depth_exceeded", "provider input exceeds the nesting-depth limit")
-    if value is None or isinstance(value, (str, bool, int)):
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise _contract_error("invalid_provider_input", "provider input strings must be valid UTF-8") from None
         return value
     if isinstance(value, float):
         if not math.isfinite(value):
@@ -110,6 +116,11 @@ def _normalize_json(value: object, *, depth: int, maximum_depth: int, active: se
                 ]
             if not all(isinstance(key, str) for key in value):
                 raise _contract_error("invalid_provider_input", "provider input object keys must be strings")
+            try:
+                for key in value:
+                    key.encode("utf-8")
+            except UnicodeEncodeError:
+                raise _contract_error("invalid_provider_input", "provider input keys must be valid UTF-8") from None
             return {
                 key: _normalize_json(item, depth=depth + 1, maximum_depth=maximum_depth, active=active)
                 for key, item in value.items()
@@ -169,13 +180,15 @@ def _validate_adapter(
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement cleanup")
     if not callable(raw_selected):
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
+    if descriptor.mode == "stream" and not inspect.iscoroutinefunction(raw_selected):
+        raise _contract_error("invalid_provider_adapter", "provider stream factory must be asynchronous")
     return _AdapterBindings(
         descriptor=descriptor,
         complete=cast(Callable[[ProviderExecutionRequest, JsonValue], Awaitable[ProviderAdapterComplete]], raw_selected)
         if descriptor.mode == "complete"
         else None,
         stream=cast(
-            Callable[[ProviderExecutionRequest, JsonValue], AsyncIterator[ProviderAdapterStreamItem]],
+            Callable[[ProviderExecutionRequest, JsonValue], Awaitable[AsyncIterator[ProviderAdapterStreamItem]]],
             raw_selected,
         )
         if descriptor.mode == "stream"
@@ -342,10 +355,7 @@ async def _run_stream(
 ) -> _Terminal:
     if adapter.stream is None:
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
-    stream = await asyncio.to_thread(adapter.stream, request, input_payload)
-    if inspect.isawaitable(stream):
-        _close_awaitable(stream)
-        raise _contract_error("invalid_provider_adapter", "provider stream must return an async iterator")
+    stream = await adapter.stream(request, input_payload)
     try:
         iterator = stream.__aiter__()
         next_event = iterator.__anext__
@@ -356,7 +366,10 @@ async def _run_stream(
     state = _StreamState()
     while len(state.events) < limits.events:
         try:
-            item = cast(ProviderAdapterStreamItem, await _clock_wait_for(clock, next_event(), limits.idle_seconds))
+            pull = next_event()
+            if not inspect.isawaitable(pull):
+                raise _contract_error("invalid_provider_adapter", "provider stream pulls must be awaitable")
+            item = cast(ProviderAdapterStreamItem, await _clock_wait_for(clock, pull, limits.idle_seconds))
         except TimeoutError as error:
             raise ProviderAdapterFailure(
                 code="provider_idle_timeout",
@@ -447,7 +460,7 @@ def _failure_terminal(failure: ProviderAdapterFailure) -> _Terminal:
         if failure.status == "blocked":
             blocker = ProviderExecutionBlocker(
                 code=failure.code,
-                category=failure.category,
+                category="transport" if failure.category == "timeout" else failure.category,
                 evidence_refs=failure.evidence_refs,
             )
             return _Terminal(
@@ -513,6 +526,8 @@ async def _cleanup(adapter: _AdapterBindings, limits: ProviderCallLimits, clock:
         raise observed
     if isinstance(observed, ContractError):
         raise observed
+    if not isinstance(observed, BaseException) and observed is not None:
+        raise _contract_error("invalid_provider_adapter", "provider cleanup must resolve to None")
     return not isinstance(observed, BaseException)
 
 

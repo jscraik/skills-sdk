@@ -50,7 +50,7 @@ def test_selected_stream_mode_does_not_require_complete_member() -> None:
         async def _events(self) -> AsyncIterator[ProviderAdapterStreamItem]:
             yield ProviderAdapterTerminal(("evidence/output.json",))
 
-        def stream(
+        async def stream(
             self, request: ProviderExecutionRequest, input_payload: object
         ) -> AsyncIterator[ProviderAdapterStreamItem]:
             return self._events()
