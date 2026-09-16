@@ -11,8 +11,8 @@ compatibility documentation synchronized with contract changes.
 Run:
 
 ```bash
-MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
-mise exec -- uv sync --frozen
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
 bash scripts/validate-codestyle.sh
 bash scripts/validate-repository.sh
 ```
