@@ -102,7 +102,10 @@
       "then": {
         "properties": {
           "backup_name": {
-            "type": "null"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "blocker": {
             "type": "object"

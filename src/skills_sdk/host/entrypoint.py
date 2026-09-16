@@ -224,6 +224,8 @@ def _publish(
 ) -> EntrypointMaintenanceResult:
     """Publish a staged replacement after backup and concurrency checks."""
     source_parent, target_parent, backup_parent = parents
+    if os.fstat(target_parent).st_dev != os.fstat(backup_parent).st_dev:
+        raise ValueError("backup root must be on the runtime target filesystem")
     current = _capture(target_parent, request.target.name)
     if request.supporting_document and current.mode & 0o111:
         raise ValueError("supporting documents must not be executable")
@@ -250,7 +252,17 @@ def _publish(
         ):
             raise ValueError("source or runtime changed before publication; backup retained")
         _verify_parents(request, parents)
-        _exchange(target_parent, stage_name, request.target.name)
+        try:
+            _exchange(target_parent, stage_name, request.target.name)
+        except OSError:
+            return EntrypointMaintenanceResult(
+                status="blocked",
+                blocker=EntrypointMaintenanceBlocker(
+                    code="publication_unavailable",
+                    message="atomic publication was unavailable; snapshot retained",
+                ),
+                backup_name=backup_name,
+            )
         try:
             os.fsync(target_parent)
             _verify_parents(request, parents)
@@ -333,8 +345,15 @@ def repair_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult
         source = _source(request, source_parent, target_parent)
         lock_key = hashlib.sha256(os.fsencode(request.target)).hexdigest()[:32]
         lock_name = f".skills-sdk-entrypoint-{lock_key}.lock"
-        lock = os.open(lock_name, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=backup_parent)
+        lock = os.open(
+            lock_name,
+            os.O_RDWR | os.O_CREAT | os.O_NONBLOCK | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=backup_parent,
+        )
         try:
+            if not stat.S_ISREG(os.fstat(lock).st_mode):
+                raise ValueError("runtime lock must be a regular file")
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:

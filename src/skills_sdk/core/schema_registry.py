@@ -128,14 +128,15 @@ class SchemaRegistry:
             format_checker=FormatChecker(),
             registry=registry,
         )
+        normalized_payload = _require_json_value(payload)
         errors = sorted(
-            validator.iter_errors(_require_json_value(payload)),
+            validator.iter_errors(normalized_payload),
             key=lambda error: tuple(str(part) for part in error.path),
         )
         if errors:
             details = tuple(error.message for error in errors)
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details)
-        self._validate_registered_model(name, payload)
+        self._validate_registered_model(name, normalized_payload)
 
     def validate_package_safety_evidence_against_package_receipt(
         self,

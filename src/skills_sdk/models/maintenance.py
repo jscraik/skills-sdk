@@ -36,10 +36,8 @@ class EntrypointMaintenanceResult(BaseModel):
             raise ValueError("preview success must not carry failure or recovery evidence")
         if self.status == "repaired" and (self.blocker is not None or self.backup_name is None):
             raise ValueError("repaired maintenance requires a backup and no blocker")
-        if self.status == "blocked" and (
-            self.blocker is None or self.backup_name is not None or self.recovery_name is not None
-        ):
-            raise ValueError("blocked maintenance requires only blocker evidence")
+        if self.status == "blocked" and (self.blocker is None or self.recovery_name is not None):
+            raise ValueError("blocked maintenance requires blocker evidence and no recovery name")
         if self.status == "indeterminate" and (
             self.blocker is None or self.backup_name is None or self.recovery_name is None
         ):
@@ -69,7 +67,7 @@ class EntrypointMaintenanceResult(BaseModel):
                     "required": ["blocker"],
                     "properties": {
                         "blocker": {"type": "object"},
-                        "backup_name": {"type": "null"},
+                        "backup_name": {"type": ["string", "null"]},
                         "recovery_name": {"type": "null"},
                     },
                 },

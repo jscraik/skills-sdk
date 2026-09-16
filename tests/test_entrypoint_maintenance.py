@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import builtins
 import fcntl
 import hashlib
 import json
 import os
 import stat
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,7 @@ import pytest
 from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.models import EntrypointMaintenanceBlocker, EntrypointMaintenanceResult, RuntimeCopyComparison
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, list[str]]:
@@ -97,6 +100,79 @@ def test_live_advisory_lock_blocks_maintenance(tmp_path: Path) -> None:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
         os.close(descriptor)
     assert main([*args, "--apply"]) == 0
+
+
+def test_non_regular_lock_is_rejected_without_blocking(tmp_path: Path) -> None:
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO creation is unavailable")
+    _source, target, backup, args = _fixture(tmp_path)
+    lock_key = hashlib.sha256(os.fsencode(target)).hexdigest()[:32]
+    os.mkfifo(backup / f".skills-sdk-entrypoint-{lock_key}.lock")
+    assert main([*args, "--apply", "--json"]) == 2
+
+
+def test_cross_device_backup_root_is_rejected_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    before = target.read_bytes()
+    backup_inode = backup.stat().st_ino
+    real_fstat = os.fstat
+
+    def cross_device_fstat(descriptor: int) -> os.stat_result:
+        observed = real_fstat(descriptor)
+        if observed.st_ino != backup_inode:
+            return observed
+        values = list(observed)
+        values[2] = observed.st_dev + 1
+        return os.stat_result(values)
+
+    monkeypatch.setattr(entrypoint.os, "fstat", cross_device_fstat)
+    assert main([*args, "--apply", "--json"]) == 2
+    assert target.read_bytes() == before
+    assert _backup_files(backup) == []
+
+
+def test_unsupported_host_adapter_import_is_a_typed_blocker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _source, _target, _backup, args = _fixture(tmp_path)
+    real_import = builtins.__import__
+
+    def guarded_import(name: str, *positional: object, **keywords: object) -> object:
+        if name == "skills_sdk.host.entrypoint":
+            raise ModuleNotFoundError("unsupported host")
+        return real_import(name, *positional, **keywords)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    assert main([*args, "--json"]) == 2
+    assert json.loads(capsys.readouterr().out)["status"] == "blocked"
+
+
+def test_maintenance_models_are_exported_from_facade() -> None:
+    assert EntrypointMaintenanceBlocker.__name__ == "EntrypointMaintenanceBlocker"
+    assert EntrypointMaintenanceResult.__name__ == "EntrypointMaintenanceResult"
+    assert RuntimeCopyComparison.__name__ == "RuntimeCopyComparison"
+
+
+def test_registry_normalizes_mapping_before_model_validation() -> None:
+    class ProxyMapping(Mapping[str, object]):
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+        def __getitem__(self, key: str) -> object:
+            return self.payload[key]
+
+        def __iter__(self):
+            return iter(self.payload)
+
+        def __len__(self) -> int:
+            return len(self.payload)
+
+    result = EntrypointMaintenanceResult(status="blocked", blocker=EntrypointMaintenanceBlocker(code="x", message="x"))
+    SchemaRegistry().validate("entrypoint-maintenance-result.v1", ProxyMapping(result.model_dump(mode="json")))
 
 
 def test_publication_failure_preserves_current_and_recoverable_backup(

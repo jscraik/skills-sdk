@@ -103,15 +103,11 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
 
 def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
     """Run the bounded host-maintenance command and return its exit status."""
-    from skills_sdk.host.entrypoint import (
-        EntrypointMaintenanceBlocker,
-        EntrypointMaintenanceResult,
-        EntrypointRequest,
-        check_entrypoint,
-        repair_entrypoint,
-    )
+    from skills_sdk.models.maintenance import EntrypointMaintenanceBlocker, EntrypointMaintenanceResult
 
     try:
+        from skills_sdk.host.entrypoint import EntrypointRequest, check_entrypoint, repair_entrypoint
+
         request = EntrypointRequest(
             source=arguments.source,
             target=arguments.target,
@@ -121,7 +117,7 @@ def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
             supporting_document=arguments.supporting_document,
         )
         result = repair_entrypoint(request) if arguments.apply else check_entrypoint(request)
-    except (OSError, ValueError) as exc:
+    except (ImportError, OSError, ValueError) as exc:
         result = EntrypointMaintenanceResult(
             status="blocked",
             blocker=EntrypointMaintenanceBlocker(code="entrypoint_maintenance_blocked", message=str(exc)),
