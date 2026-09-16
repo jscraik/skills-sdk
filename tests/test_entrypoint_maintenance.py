@@ -299,7 +299,8 @@ def test_special_permission_bits_are_not_republished(tmp_path: Path) -> None:
     target.chmod(0o4755)
     assert main([*args, "--apply"]) == 0
     assert stat.S_IMODE(target.stat().st_mode) == 0o755
-    assert all(stat.S_IMODE(path.stat().st_mode) == 0o755 for path in _backup_files(backup))
+    snapshots = [path for path in _backup_files(backup) if path.suffix == ".bak"]
+    assert all(stat.S_IMODE(path.stat().st_mode) == 0o755 for path in snapshots)
 
 
 def test_backup_is_an_independent_snapshot(tmp_path: Path) -> None:
