@@ -24,12 +24,14 @@ Use `mise exec -- uv run --frozen skills-sdk <route> --help` for a short route d
 mise exec -- uv run --frozen skills-sdk intake ./skills/example --context ./intake-context.json --json --robot
 mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision <40-lowercase-hex> --json --robot
 mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision <40-lowercase-hex> --json --robot
+mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision <40-lowercase-hex> --json --robot
 ```
 
-All three commands are non-interactive and non-mutating. For an invocation that
+All four commands are non-interactive and non-mutating. For an invocation that
 reaches a service, exit `0` means intake normalized with an `admit` decision,
-validation passed, or a receipt was built. Exit `2` means a blocked receipt or
-a normalized non-admit intake decision was returned. Intake decision blocker
+validation passed, a receipt was built, or the `eval scenario-quality`
+assessment passed. Exit `2` means a structured blocker, blocked receipt, or
+normalized non-admit intake decision was returned. Intake decision blocker
 codes remain visible in both JSON and human output. Malformed invocations are
 rejected by `argparse` with exit `2` before a versioned result exists.
 `intake` reads a `skill-package-intake-context/v1` JSON file and returns
@@ -44,7 +46,9 @@ discovery boundaries while their deeper implementations are built in separate,
 candidate-bound lanes:
 
 - `inventory` is read-only source-inventory intent.
-- `eval` and `package` name reserved local contract lanes and do not execute.
+- `eval scenario-quality` performs read-only package-local definition checks;
+  other evaluation execution remains outside this command.
+- `package` names a reserved local contract lane and does not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.
 - `tessl prepare` and `tessl verify` name preparation and verification only;
