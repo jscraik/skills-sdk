@@ -26,6 +26,7 @@ from skills_sdk.models.packaging import (
     PackageReceipt,
     PackageReceiptV2,
 )
+from skills_sdk.models.provider_call import ProviderCallPublicResult, TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
 from skills_sdk.models.runtime_evidence import (
     ActivationObservation,
@@ -61,6 +62,15 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
     return (
         (ProviderExecutionRequest, "provider-execution-request.v1.schema.json"),
         (ProviderExecutionResult, "provider-execution-result.v1.schema.json"),
+    )
+
+
+def provider_call_schema_models() -> tuple[tuple[type[Any], str], ...]:
+    """Return additive provider-call schemas in dependency order."""
+
+    return (
+        (TextProviderAdapterDescriptor, "provider-call-adapter.v1.schema.json"),
+        (ProviderCallPublicResult, "provider-call-result.v1.schema.json"),
     )
 
 
@@ -104,6 +114,7 @@ __all__ = [
     "evaluation_schema_models",
     "intake_schema_models",
     "packaging_schema_models",
+    "provider_call_schema_models",
     "provider_execution_schema_models",
     "runtime_lifecycle_schema_models",
 ]

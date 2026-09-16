@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Generate committed JSON Schemas from the public Pydantic contracts."""
-
 from __future__ import annotations
 
 import argparse
@@ -18,6 +16,7 @@ from schema_model_groups import (
     evaluation_schema_models,
     intake_schema_models,
     packaging_schema_models,
+    provider_call_schema_models,
     provider_execution_schema_models,
     runtime_lifecycle_schema_models,
 )
@@ -781,6 +780,7 @@ def main() -> int:
         *evaluation_schema_models(),
         *intake_schema_models(),
         *provider_execution_schema_models(),
+        *provider_call_schema_models(),
         *runtime_lifecycle_schema_models(),
         (SkillPackageValidation, "skill-package-validation.v1.schema.json"),
     ):
