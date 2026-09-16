@@ -1,12 +1,12 @@
 # Command-line interface
 
-Install the pinned development environment and inspect the CLI through the
-managed `uv` entrypoint:
+From the repository checkout root, install the pinned development environment
+and inspect the CLI through the managed `uv` entrypoint:
 
 ```bash
-mise exec -- uv sync --frozen
-mise exec -- uv run --frozen skills-sdk --help
-mise exec -- uv run --frozen skills-sdk --version
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --version
 ```
 
 The CLI exposes these explicit routes without provider, runtime, or

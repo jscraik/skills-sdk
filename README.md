@@ -115,21 +115,21 @@ for the compatibility policy and evidence boundary.
 
 ## Quick start
 
-The supported development floor is Python `>=3.12,<3.13`. From a checkout:
+The supported development floor is Python `>=3.12,<3.13`. From the checkout root:
 
 ```bash
-mise exec -- uv sync --frozen
-mise exec -- uv run --frozen skills-sdk --version
-mise exec -- uv run --frozen skills-sdk --help
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --version
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help
 ```
 
 The default help route stays short. Load more detail only for the route you
 need:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk inventory --help
-mise exec -- uv run --frozen skills-sdk validate --help
-mise exec -- uv run --frozen skills-sdk build --help
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk inventory --help
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate --help
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build --help
 ```
 
 The first-run route and its boundaries are also documented in
@@ -165,8 +165,8 @@ Replace `<40-lowercase-hex>` with the revision that identifies the source you
 are validating:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk validate ./path/to/skill \
-  --source-revision <40-lowercase-hex> \
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate ./path/to/skill \
+  --source-revision "<40-lowercase-hex>" \
   --json --robot
 ```
 
@@ -185,7 +185,7 @@ The committed `tests/fixtures/synthetic-skill` fixture makes the validation
 contract runnable from the repository root. A passing validation is:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill \
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill \
   --source-revision 0000000000000000000000000000000000000000 \
   --json --robot
 ```
@@ -194,7 +194,7 @@ Expected evidence is exit `0`, `status: "pass"`, and a candidate with
 `package_id: "synthetic-skill"`. A blocked validation is:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill \
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill \
   --source-revision not-a-revision \
   --json --robot
 ```
@@ -215,8 +215,8 @@ blocked result contains a typed blocker, does not claim a package digest, and
 exits `2`.
 
 ```bash
-mise exec -- uv run --frozen skills-sdk build ./path/to/skill \
-  --source-revision <40-lowercase-hex> \
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./path/to/skill \
+  --source-revision "<40-lowercase-hex>" \
   --json --robot
 ```
 
@@ -224,7 +224,7 @@ The committed fixture also makes both build outcomes concrete. A successful
 build is:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk build tests/fixtures/synthetic-skill \
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build tests/fixtures/synthetic-skill \
   --source-revision 0000000000000000000000000000000000000000 \
   --json --robot
 ```
@@ -233,7 +233,7 @@ Expected evidence is exit `0`, `status: "built"`, and populated `manifest` and
 `package_digest` fields with `mutation_performed: false`. A blocked build is:
 
 ```bash
-mise exec -- uv run --frozen skills-sdk build tests/fixtures/synthetic-skill \
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build tests/fixtures/synthetic-skill \
   --source-revision not-a-revision \
   --json --robot
 ```
@@ -364,15 +364,15 @@ Install the pinned environment and run the repository gate before a commit or
 pull request:
 
 ```bash
-MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
-mise exec -- uv sync --frozen
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
 bash scripts/validate-repository.sh
 ```
 
 The canonical focused route for the hand-maintained schema subset is:
 
 ```bash
-mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
 ```
 
 This route loads `receipt-base.v1.schema.json`, `blocker.v1.schema.json`, and
