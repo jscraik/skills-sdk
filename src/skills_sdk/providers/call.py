@@ -342,7 +342,7 @@ async def _run_stream(
 ) -> _Terminal:
     if adapter.stream is None:
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
-    stream = adapter.stream(request, input_payload)
+    stream = await asyncio.to_thread(adapter.stream, request, input_payload)
     if inspect.isawaitable(stream):
         _close_awaitable(stream)
         raise _contract_error("invalid_provider_adapter", "provider stream must return an async iterator")
@@ -503,10 +503,15 @@ def _execution_result(
 
 async def _cleanup(adapter: _AdapterBindings, limits: ProviderCallLimits, clock: _ClockBindings) -> bool:
     async def cleanup() -> object:
-        return await _clock_wait_for(clock, adapter.cleanup(), limits.cleanup_seconds)
+        cleanup_call = adapter.cleanup()
+        if not inspect.isawaitable(cleanup_call):
+            raise _contract_error("invalid_provider_adapter", "provider cleanup must return an awaitable")
+        return await _clock_wait_for(clock, cleanup_call, limits.cleanup_seconds)
 
     observed = await _captured(cleanup())
     if isinstance(observed, CancelledError):
+        raise observed
+    if isinstance(observed, ContractError):
         raise observed
     return not isinstance(observed, BaseException)
 

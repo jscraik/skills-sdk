@@ -5,8 +5,9 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import AsyncIterator, Awaitable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from types import MappingProxyType
 from typing import Literal, Protocol, TypeVar
 
 from skills_sdk.models.provider_call import (
@@ -18,6 +19,21 @@ from skills_sdk.models.provider_execution import ProviderExecutionRequest, Provi
 
 JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 _T = TypeVar("_T")
+
+_LIMIT_CEILINGS = MappingProxyType(
+    {
+        "input_bytes": 262_144,
+        "metadata_bytes": 65_536,
+        "nesting_depth": 32,
+        "output_bytes": 1_048_576,
+        "chunk_bytes": 16_384,
+        "events": 4_096,
+        "buffered_events": 8,
+        "overall_seconds": 30.0,
+        "idle_seconds": 5.0,
+        "cleanup_seconds": 1.0,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +52,6 @@ class ProviderCallLimits:
     cleanup_seconds: float = 1.0
 
     def __post_init__(self) -> None:
-        defaults = DEFAULT_PROVIDER_CALL_LIMITS if "DEFAULT_PROVIDER_CALL_LIMITS" in globals() else self
         for field_name in (
             "input_bytes",
             "metadata_bytes",
@@ -46,12 +61,12 @@ class ProviderCallLimits:
             "events",
         ):
             value = getattr(self, field_name)
-            if type(value) is not int or value <= 0 or value > getattr(defaults, field_name):
+            if type(value) is not int or value <= 0 or value > _LIMIT_CEILINGS[field_name]:
                 raise ValueError(f"provider call {field_name} must be a positive tightening of the default")
         if (
             type(self.buffered_events) is not int
             or self.buffered_events < 0
-            or self.buffered_events > defaults.buffered_events
+            or self.buffered_events > _LIMIT_CEILINGS["buffered_events"]
         ):
             raise ValueError("provider call buffered_events must be a non-negative tightening of the default")
         for field_name in ("overall_seconds", "idle_seconds", "cleanup_seconds"):
@@ -60,7 +75,7 @@ class ProviderCallLimits:
                 type(value) not in {int, float}
                 or not math.isfinite(value)
                 or value <= 0
-                or value > getattr(defaults, field_name)
+                or value > _LIMIT_CEILINGS[field_name]
             ):
                 raise ValueError(f"provider call {field_name} must be a positive tightening of the default")
 
@@ -106,7 +121,7 @@ class ProviderCallOutcome:
     """Private output paired with redaction-safe public evidence."""
 
     public_result: ProviderCallPublicResult
-    complete_text: str | None = None
+    complete_text: str | None = field(default=None, repr=False)
 
 
 class ProviderCallClock(Protocol):
@@ -124,12 +139,17 @@ class AsyncioProviderCallClock:
 
     async def wait_for(self, awaitable: Awaitable[_T], timeout_seconds: float) -> _T:
         task = asyncio.ensure_future(awaitable)
-        done, _pending = await asyncio.wait({task}, timeout=timeout_seconds)
-        if task in done:
-            return task.result()
-        task.cancel()
-        task.add_done_callback(_consume_detached_task_result)
-        raise TimeoutError
+        try:
+            done, _pending = await asyncio.wait({task}, timeout=timeout_seconds)
+            if task in done:
+                return task.result()
+            task.cancel()
+            task.add_done_callback(_consume_detached_task_result)
+            raise TimeoutError
+        except asyncio.CancelledError:
+            task.cancel()
+            task.add_done_callback(_consume_detached_task_result)
+            raise
 
 
 def _consume_detached_task_result[T](task: asyncio.Future[T]) -> None:

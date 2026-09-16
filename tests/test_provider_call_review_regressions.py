@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable
 from datetime import UTC, datetime
 from typing import Literal, TypeVar, cast
@@ -16,6 +17,7 @@ from skills_sdk.providers import (
     ProviderCallLimits,
     execute_provider_call,
 )
+from skills_sdk.providers.types import AsyncioProviderCallClock, ProviderCallOutcome
 from tests.test_provider_call import FakeAdapter, _provider_request, _run
 
 _T = TypeVar("_T")
@@ -113,6 +115,87 @@ def test_asyncio_clock_rejects_late_result_after_deadline() -> None:
     assert outcome.public_result.execution.error is not None
     assert outcome.public_result.execution.error.code == "provider_call_timeout"
     assert outcome.complete_text is None
+
+
+def test_asyncio_clock_cancels_nested_task_when_caller_is_cancelled() -> None:
+    cancelled = asyncio.Event()
+
+    async def run() -> None:
+        async def nested() -> None:
+            try:
+                await asyncio.sleep(60)
+            finally:
+                cancelled.set()
+
+        waiter = asyncio.create_task(AsyncioProviderCallClock().wait_for(nested(), 60))
+        await asyncio.sleep(0)
+        waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+        await asyncio.wait_for(cancelled.wait(), 1)
+
+    asyncio.run(run())
+
+
+def test_cleanup_must_return_an_awaitable() -> None:
+    request = _provider_request(None)
+    base = FakeAdapter(request)
+
+    class SynchronousCleanupAdapter:
+        descriptor = base.descriptor
+
+        async def complete(self, request: object, input_payload: object) -> ProviderAdapterComplete:
+            return ProviderAdapterComplete("ok", ())
+
+        def cleanup(self) -> None:
+            return None
+
+    with pytest.raises(ContractError, match="invalid_provider_adapter"):
+        asyncio.run(execute_provider_call(request, None, cast(object, SynchronousCleanupAdapter())))
+
+
+def test_stream_factory_work_is_bounded_by_overall_deadline() -> None:
+    request = _provider_request(None)
+    base = FakeAdapter(request, mode="stream")
+
+    class BlockingStreamAdapter:
+        descriptor = base.descriptor
+
+        def stream(self, request: object, input_payload: object) -> object:
+            time.sleep(0.1)
+            return iter(())
+
+        async def cleanup(self) -> None:
+            base.cleanup_calls += 1
+
+    outcome = asyncio.run(
+        execute_provider_call(
+            request,
+            None,
+            cast(object, BlockingStreamAdapter()),
+            limits=ProviderCallLimits(overall_seconds=0.01),
+        )
+    )
+    assert outcome.public_result.execution.error is not None
+    assert outcome.public_result.execution.error.code == "provider_call_timeout"
+    assert base.cleanup_calls == 1
+
+
+def test_provider_outcome_repr_redacts_private_text() -> None:
+    outcome = ProviderCallOutcome(public_result=cast(object, "public"), complete_text="private provider text")
+    assert "private provider text" not in repr(outcome)
+
+
+def test_mutated_exported_defaults_do_not_raise_limit_ceilings() -> None:
+    from skills_sdk.providers import DEFAULT_PROVIDER_CALL_LIMITS
+
+    original = DEFAULT_PROVIDER_CALL_LIMITS.output_bytes
+    object.__setattr__(DEFAULT_PROVIDER_CALL_LIMITS, "output_bytes", original + 1)
+    try:
+        with pytest.raises(ValueError, match="positive tightening"):
+            ProviderCallLimits(output_bytes=original + 1)
+    finally:
+        object.__setattr__(DEFAULT_PROVIDER_CALL_LIMITS, "output_bytes", original)
 
 
 @pytest.mark.parametrize("mode", ["complete", "stream"])
