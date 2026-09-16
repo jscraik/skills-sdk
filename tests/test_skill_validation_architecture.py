@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 from pathlib import Path
 
@@ -130,7 +131,7 @@ def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute(
 
     _assert_checkout_trust_prefixes(readme)
     assert prompt_commands
-    assert len(prompt_commands) == 3
+    assert len(prompt_commands) == 4
     assert all(command.startswith(TRUST_PREFIX) for command in prompt_commands)
 
     broken_readme = readme.replace(TRUST_PREFIX + "uv sync --frozen", "uv sync --frozen", 1)
@@ -185,3 +186,11 @@ def test_documented_mise_commands_stop_parent_config_discovery() -> None:
         for line in (REPOSITORY_ROOT / relative).read_text(encoding="utf-8").splitlines():
             if "MISE_TRUSTED_CONFIG_PATHS=" in line:
                 assert 'MISE_CEILING_PATHS="$PWD/.."' in line
+
+
+def test_documented_cli_placeholders_are_shell_safe() -> None:
+    placeholder = re.compile(r"(?<![\"'])<[a-z0-9-]+>(?![\"'])")
+    for relative in ("README.md", "UBIQUITOUS.md", "docs/cli.md", "docs/scenario-quality.md"):
+        for line in (REPOSITORY_ROOT / relative).read_text(encoding="utf-8").splitlines():
+            if "skills-sdk" in line or "--source-revision" in line:
+                assert placeholder.search(line) is None, f"{relative}: unquoted shell placeholder: {line}"

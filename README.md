@@ -164,7 +164,7 @@ are validating:
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate ./path/to/skill \
-  --source-revision <40-lowercase-hex> \
+  --source-revision "<40-lowercase-hex>" \
   --json --robot
 ```
 
@@ -214,7 +214,7 @@ exits `2`.
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./path/to/skill \
-  --source-revision <40-lowercase-hex> \
+  --source-revision "<40-lowercase-hex>" \
   --json --robot
 ```
 
