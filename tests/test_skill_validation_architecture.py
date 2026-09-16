@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import ast
-import os
-import shlex
 import subprocess
 from pathlib import Path
 
 SDK_ROOT = Path(__file__).resolve().parents[1] / "src" / "skills_sdk"
 REPOSITORY_ROOT = SDK_ROOT.parents[1]
 FORBIDDEN_PREFIXES = ("ask", "tessl", "codex")
-TRUST_PREFIX = 'MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- '
+TRUST_PREFIX = 'MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- '
 
 
 def _quick_start_commands(markdown: str) -> list[str]:
@@ -82,11 +80,11 @@ def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> No
 
     assert "exact repository commands" in architecture
     expected_commands = (
-        'MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
+        'MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
         "pytest tests/test_public_repository_boundary.py "
         "tests/test_repository_standards.py tests/test_skill_validation_architecture.py",
         "bash scripts/validate-codestyle.sh",
-        'MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
+        'MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
         "python scripts/generate_schemas.py --check",
         "bash scripts/validate-repository.sh",
         "git diff --check",
@@ -118,7 +116,7 @@ def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
     assert "Run commands from the repository checkout root" in template
     assert "Run the checkout-scoped commands below from the repository checkout root" in ubiquitous
     assert (
-        'MISE_CEILING_PATHS="$PWD" MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
+        'MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
         "pytest tests/test_repository_standards.py -q"
     ) in template
 
@@ -156,13 +154,9 @@ def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute(
         raise AssertionError("Second Quick Start block prefix regression was not detected")
 
     version_command = next(command for command in readme_commands if command.endswith("skills-sdk --version"))
-    environment = os.environ.copy()
-    environment["MISE_CEILING_PATHS"] = str(REPOSITORY_ROOT)
-    environment["MISE_TRUSTED_CONFIG_PATHS"] = str(REPOSITORY_ROOT / ".mise.toml")
     completed = subprocess.run(
-        shlex.split(version_command.removeprefix(TRUST_PREFIX)),
+        ["bash", "-c", version_command],
         cwd=REPOSITORY_ROOT,
-        env=environment,
         capture_output=True,
         text=True,
         timeout=30,
@@ -190,4 +184,4 @@ def test_documented_mise_commands_stop_parent_config_discovery() -> None:
     ):
         for line in (REPOSITORY_ROOT / relative).read_text(encoding="utf-8").splitlines():
             if "MISE_TRUSTED_CONFIG_PATHS=" in line:
-                assert 'MISE_CEILING_PATHS="$PWD"' in line
+                assert 'MISE_CEILING_PATHS="$PWD/.."' in line
