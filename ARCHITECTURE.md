@@ -278,7 +278,7 @@ its `--check` mode for the generated subset. The canonical focused route for
 the hand-maintained subset is:
 
 ```bash
-mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py
 ```
 
 That route loads all three resources through `SchemaRegistry.load`, which
@@ -331,7 +331,7 @@ Use the pinned environment and the repository wrapper before a commit or pull
 request:
 
 ```bash
-mise exec -- uv sync --frozen
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
 bash scripts/validate-repository.sh
 ```
 
@@ -346,11 +346,11 @@ runtime, or publication evidence.
 The documentation-only capability-map update was checked with these exact
 repository commands:
 
-- `mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_repository_standards.py tests/test_skill_validation_architecture.py`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_repository_standards.py tests/test_skill_validation_architecture.py`
   — `pass` (`84 passed`).
 - `bash scripts/validate-codestyle.sh` — `pass` (Ruff, MyPy, repository
   standards, and Vale completed without findings).
-- `mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
   `pass` (no generated-schema drift).
 - `bash scripts/validate-repository.sh` — `pass` (`926 passed`, `1 skipped`;
   source distribution and wheel built successfully).

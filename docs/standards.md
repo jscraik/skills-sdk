@@ -6,8 +6,10 @@ SDK implementation of that policy.
 ## Validation entrypoints
 
 Install `uv` and Vale from `.mise.toml` with
-`MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale`, then create
-the project environment with `mise exec -- uv sync --frozen`. The validation
+`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale`, then create
+the project environment with
+`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen`.
+The validation
 wrappers apply the same checkout-scoped trust binding and invoke `uv` through
 `mise`, so an ambient tool release or persistent global trust record cannot
 silently change the proof path.
