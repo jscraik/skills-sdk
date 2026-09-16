@@ -17,6 +17,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import PydanticSerializationError
 
 from skills_sdk.models.inventory import Sha256, _ContractModel
 from skills_sdk.models.provider import ProviderIdentityV2
@@ -108,13 +109,19 @@ class ProviderCallPublicResult(_ProviderCallModel):
     @classmethod
     def nested_models_are_revalidated(cls, value: object) -> object:
         if isinstance(value, cls):
-            value = value.model_dump(mode="json")
+            try:
+                value = value.model_dump(mode="json")
+            except PydanticSerializationError:
+                raise ValueError("provider call result failed revalidation") from None
         if isinstance(value, Mapping):
             normalized = dict(value)
             for field in ("usage", "cost", "execution"):
                 nested = normalized.get(field)
                 if isinstance(nested, BaseModel):
-                    normalized[field] = nested.model_dump(mode="json")
+                    try:
+                        normalized[field] = nested.model_dump(mode="json")
+                    except PydanticSerializationError:
+                        raise ValueError("provider call result failed revalidation") from None
             return normalized
         return value
 

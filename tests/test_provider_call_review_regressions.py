@@ -6,9 +6,10 @@ from datetime import UTC, datetime
 from typing import Literal, TypeVar, cast
 
 import pytest
+from pydantic import ValidationError
 
 from skills_sdk.core.errors import ContractError
-from skills_sdk.models.provider_call import ProviderCostObservation
+from skills_sdk.models.provider_call import ProviderCallPublicResult, ProviderCostObservation
 from skills_sdk.providers import (
     ProviderAdapterChunk,
     ProviderAdapterComplete,
@@ -340,3 +341,63 @@ def test_cost_amount_rejects_noncanonical_wire_forms(amount: str) -> None:
 
     valid = ProviderCostObservation(amount="0", currency="USD", observed_at="2026-09-08T10:00:00Z")
     assert str(valid.amount) == "0"
+
+
+def test_timeout_waits_for_cancelled_adapter_before_cleanup() -> None:
+    request = _provider_request(None)
+    runner_finished = False
+
+    class CancellationSuppressingAdapter(FakeAdapter):
+        async def complete(self, request: object, input_payload: object) -> ProviderAdapterComplete:
+            nonlocal runner_finished
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                await asyncio.sleep(0)
+                runner_finished = True
+                return ProviderAdapterComplete("late", ())
+            raise AssertionError("unreachable")
+
+        async def cleanup(self) -> None:
+            assert runner_finished
+            await super().cleanup()
+
+    outcome = asyncio.run(
+        execute_provider_call(
+            request,
+            None,
+            CancellationSuppressingAdapter(request),
+            limits=ProviderCallLimits(overall_seconds=0.01),
+        )
+    )
+    assert outcome.public_result.execution.error is not None
+    assert outcome.public_result.execution.error.code == "provider_call_timeout"
+
+
+def test_selected_adapter_hook_signature_is_validated() -> None:
+    request = _provider_request(None)
+    base = FakeAdapter(request)
+
+    class WrongArityAdapter:
+        descriptor = base.descriptor
+
+        async def complete(self) -> ProviderAdapterComplete:
+            return ProviderAdapterComplete("unreachable", ())
+
+        async def cleanup(self) -> None:
+            return None
+
+    with pytest.raises(ContractError, match="invalid_provider_adapter"):
+        asyncio.run(execute_provider_call(request, None, cast(object, WrongArityAdapter())))
+
+
+def test_nested_public_result_serialization_failure_is_typed() -> None:
+    request = _provider_request(None)
+    adapter = FakeAdapter(request)
+    cost = ProviderCostObservation(amount="1", currency="USD", observed_at="2026-09-08T10:00:00Z")
+    result = _run(request, None, adapter).public_result
+    forged_cost = cost.model_copy(update={"amount": object()})
+    forged = result.model_copy(update={"cost": forged_cost})
+
+    with pytest.raises(ValidationError, match="provider call result failed revalidation"):
+        ProviderCallPublicResult.model_validate(forged)

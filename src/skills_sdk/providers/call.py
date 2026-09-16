@@ -182,6 +182,11 @@ def _validate_adapter(
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
     if not inspect.iscoroutinefunction(raw_selected):
         raise _contract_error("invalid_provider_adapter", "provider selected hook must be asynchronous")
+    try:
+        inspect.signature(raw_selected).bind(request, None)
+        inspect.signature(raw_cleanup).bind()
+    except (TypeError, ValueError):
+        raise _contract_error("invalid_provider_adapter", "provider adapter hook signature is invalid") from None
     return _AdapterBindings(
         descriptor=descriptor,
         complete=cast(Callable[[ProviderExecutionRequest, JsonValue], Awaitable[ProviderAdapterComplete]], raw_selected)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import AsyncIterator, Awaitable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from types import MappingProxyType
@@ -144,7 +145,8 @@ class AsyncioProviderCallClock:
             if task in done:
                 return task.result()
             task.cancel()
-            task.add_done_callback(_consume_detached_task_result)
+            with suppress(asyncio.CancelledError, Exception):
+                await task
             raise TimeoutError
         except asyncio.CancelledError:
             task.cancel()
