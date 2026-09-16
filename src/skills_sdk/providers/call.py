@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import inspect
 import json
 import math
 from asyncio import CancelledError, gather
@@ -247,6 +249,25 @@ async def _read_clock(now: Callable[[], datetime]) -> datetime:
     return value
 
 
+def _close_awaitable(awaitable: object) -> None:
+    if inspect.iscoroutine(awaitable):
+        awaitable.close()
+    elif isinstance(awaitable, asyncio.Future):
+        awaitable.cancel()
+
+
+async def _clock_wait_for(clock: _ClockBindings, awaitable: Awaitable[object], timeout_seconds: float) -> object:
+    try:
+        scheduled = clock.wait_for(awaitable, timeout_seconds)
+    except (AttributeError, TypeError):
+        _close_awaitable(awaitable)
+        raise _contract_error("invalid_provider_clock", "provider clock scheduler failed") from None
+    if not inspect.isawaitable(scheduled):
+        _close_awaitable(awaitable)
+        raise _contract_error("invalid_provider_clock", "provider clock scheduler must return an awaitable")
+    return await scheduled
+
+
 def _validate_complete(value: object, limits: ProviderCallLimits) -> ProviderAdapterComplete:
     if not isinstance(value, ProviderAdapterComplete) or not isinstance(value.text, str):
         raise _contract_error("invalid_provider_event", "complete adapter returned an invalid result")
@@ -321,11 +342,21 @@ async def _run_stream(
 ) -> _Terminal:
     if adapter.stream is None:
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
-    iterator = adapter.stream(request, input_payload).__aiter__()
+    stream = adapter.stream(request, input_payload)
+    if inspect.isawaitable(stream):
+        _close_awaitable(stream)
+        raise _contract_error("invalid_provider_adapter", "provider stream must return an async iterator")
+    try:
+        iterator = stream.__aiter__()
+        next_event = iterator.__anext__
+    except (AttributeError, TypeError):
+        raise _contract_error("invalid_provider_adapter", "provider stream must return an async iterator") from None
+    if not callable(next_event):
+        raise _contract_error("invalid_provider_adapter", "provider stream must return an async iterator")
     state = _StreamState()
     while len(state.events) < limits.events:
         try:
-            item = await clock.wait_for(iterator.__anext__(), limits.idle_seconds)
+            item = cast(ProviderAdapterStreamItem, await _clock_wait_for(clock, next_event(), limits.idle_seconds))
         except TimeoutError as error:
             raise ProviderAdapterFailure(
                 code="provider_idle_timeout",
@@ -472,7 +503,7 @@ def _execution_result(
 
 async def _cleanup(adapter: _AdapterBindings, limits: ProviderCallLimits, clock: _ClockBindings) -> bool:
     async def cleanup() -> object:
-        return await clock.wait_for(adapter.cleanup(), limits.cleanup_seconds)
+        return await _clock_wait_for(clock, adapter.cleanup(), limits.cleanup_seconds)
 
     observed = await _captured(cleanup())
     if isinstance(observed, CancelledError):
@@ -552,7 +583,8 @@ async def execute_provider_call(
                     if descriptor.mode == "stream"
                     else runner(request, input_payload, bindings, limits)
                 )
-                return await clock_bindings.wait_for(
+                return await _clock_wait_for(
+                    clock_bindings,
                     runner_call,
                     limits.overall_seconds,
                 )

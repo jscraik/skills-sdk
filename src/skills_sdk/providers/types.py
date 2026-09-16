@@ -123,7 +123,24 @@ class AsyncioProviderCallClock:
         return datetime.now(UTC)
 
     async def wait_for(self, awaitable: Awaitable[_T], timeout_seconds: float) -> _T:
-        return await asyncio.wait_for(awaitable, timeout_seconds)
+        task = asyncio.ensure_future(awaitable)
+        done, _pending = await asyncio.wait({task}, timeout=timeout_seconds)
+        if task in done:
+            return task.result()
+        task.cancel()
+        task.add_done_callback(_consume_detached_task_result)
+        raise TimeoutError
+
+
+def _consume_detached_task_result[T](task: asyncio.Future[T]) -> None:
+    """Consume a late task result after a deadline without accepting it."""
+
+    if task.cancelled():
+        return
+    try:
+        task.exception()
+    except asyncio.CancelledError:
+        return
 
 
 DEFAULT_PROVIDER_CALL_CLOCK = AsyncioProviderCallClock()
