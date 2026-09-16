@@ -238,6 +238,107 @@
   "$id": "https://schemas.skills-sdk.dev/runtime-copy-comparison.v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "pass"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "different_paths": {
+            "maxItems": 0
+          },
+          "runtime": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            }
+          },
+          "source": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "drift"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "different_paths": {
+            "minItems": 1
+          },
+          "runtime": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            }
+          },
+          "source": {
+            "properties": {
+              "status": {
+                "const": "pass"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "source": {
+                "properties": {
+                  "status": {
+                    "not": {
+                      "const": "pass"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "runtime": {
+                "properties": {
+                  "status": {
+                    "not": {
+                      "const": "pass"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
   "description": "Local comparison, not installation, activation, or admission evidence.",
   "properties": {
     "different_paths": {

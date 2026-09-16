@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from skills_sdk.cli.main import main
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 
 REVISION = "a" * 40
@@ -39,6 +40,9 @@ def test_compare_copy_json_is_typed_and_versioned(tmp_path: Path, capsys: pytest
     assert payload["status"] == "pass"
     assert payload["different_paths"] == []
     SchemaRegistry().validate("runtime-copy-comparison.v1", payload)
+    payload["different_paths"] = ["SKILL.md"]
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("runtime-copy-comparison.v1", payload)
 
 
 @pytest.mark.parametrize("change", ["content", "extra", "missing"])

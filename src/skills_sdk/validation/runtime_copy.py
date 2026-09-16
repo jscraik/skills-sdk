@@ -3,23 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
-
-from skills_sdk.models.validation import SkillPackageValidation
+from skills_sdk.models.maintenance import RuntimeCopyComparison
 from skills_sdk.validation.skill_package import validate_skill_package
-
-
-class RuntimeCopyComparison(BaseModel):
-    """Local comparison, not installation, activation, or admission evidence."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
-    schema_version: Literal["runtime-copy-comparison/v1"] = "runtime-copy-comparison/v1"
-    status: Literal["pass", "drift", "blocked"]
-    source: SkillPackageValidation
-    runtime: SkillPackageValidation
-    different_paths: tuple[str, ...]
 
 
 def compare_runtime_copy(source_root: Path, runtime_root: Path, source_revision: str) -> RuntimeCopyComparison:

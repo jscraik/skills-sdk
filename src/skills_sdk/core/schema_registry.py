@@ -309,6 +309,10 @@ class SchemaRegistry:
             from skills_sdk.models.lifecycle import RuntimeLock
 
             model = RuntimeLock
+        elif name in {"runtime-copy-comparison.v1", "entrypoint-maintenance-result.v1"}:
+            from skills_sdk.models.maintenance import EntrypointMaintenanceResult, RuntimeCopyComparison
+
+            model = RuntimeCopyComparison if name == "runtime-copy-comparison.v1" else EntrypointMaintenanceResult
         elif name == "installation-result.v1":
             from skills_sdk.models.runtime_evidence import InstallationResult
 
@@ -389,7 +393,10 @@ class SchemaRegistry:
             return
 
         try:
-            model.model_validate(payload)
+            if name in {"runtime-copy-comparison.v1", "entrypoint-maintenance-result.v1"}:
+                model.model_validate_json(json.dumps(payload))
+            else:
+                model.model_validate(payload)
         except ValidationError as error:
             details = tuple(item["msg"] for item in error.errors())
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details) from error

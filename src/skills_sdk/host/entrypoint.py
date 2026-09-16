@@ -13,11 +13,11 @@ import uuid
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from yaml import YAMLError
 
+from skills_sdk.models.maintenance import EntrypointMaintenanceBlocker, EntrypointMaintenanceResult
 from skills_sdk.validation.skill_ir import read_frontmatter
 from skills_sdk.validation.skill_package import _open_directory_tree
 
@@ -32,25 +32,6 @@ class EntrypointRequest(BaseModel):
     expected_source: str = Field(pattern=r"^[a-f0-9]{64}$")
     expected_current: str = Field(pattern=r"^[a-f0-9]{64}$")
     supporting_document: bool = False
-
-
-class EntrypointMaintenanceBlocker(BaseModel):
-    """Stable public reason that maintenance did not complete."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
-    code: str
-    message: str
-
-
-class EntrypointMaintenanceResult(BaseModel):
-    """Versioned result for preview and explicitly authorized maintenance."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
-    schema_version: Literal["entrypoint-maintenance-result/v1"] = "entrypoint-maintenance-result/v1"
-    status: Literal["matching", "repairable", "repaired", "blocked", "indeterminate"]
-    blocker: EntrypointMaintenanceBlocker | None = None
-    backup_name: str | None = None
-    recovery_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,7 +168,9 @@ def _write_snapshot(parent: int, name: str, captured: CapturedFile) -> None:
 
 def _same_snapshot(left: CapturedFile, right: CapturedFile) -> bool:
     return (
-        left.data == right.data and left.digest == right.digest and stat.S_IMODE(left.mode) == stat.S_IMODE(right.mode)
+        left.data == right.data
+        and left.digest == right.digest
+        and stat.S_IMODE(left.mode) == (stat.S_IMODE(right.mode) & 0o777)
     )
 
 
@@ -251,7 +234,9 @@ def _publish(
         raise ValueError("runtime changed before repair")
     operation = uuid.uuid4().hex
     stage_name = f".skills-sdk-stage-{operation}"
-    backup_name = f"{request.target.parent.name}-{operation}-{request.target.name}"
+    target_key = hashlib.sha256(os.fsencode(request.target)).hexdigest()[:16]
+    backup_name = f"entrypoint-{target_key}-{operation}.bak"
+    recovery_name = f"entrypoint-{target_key}-{operation}.recovery"
     stage = _write_stage(target_parent, stage_name, source, current)
     retain_stage = False
     try:
@@ -297,11 +282,33 @@ def _publish(
                 backup_name=backup_name,
                 recovery_name=stage_name,
             )
-        displaced_descriptor = os.open(stage_name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=target_parent)
+        moved_to_backup = False
         try:
-            _remove_owned(target_parent, stage_name, displaced_descriptor)
-        finally:
-            os.close(displaced_descriptor)
+            os.rename(stage_name, recovery_name, src_dir_fd=target_parent, dst_dir_fd=backup_parent)
+            moved_to_backup = True
+            recovery = _capture(backup_parent, recovery_name)
+            if displaced != recovery:
+                retain_stage = True
+                return EntrypointMaintenanceResult(
+                    status="indeterminate",
+                    blocker=EntrypointMaintenanceBlocker(
+                        code="concurrent_runtime_replacement",
+                        message="runtime changed during recovery preservation",
+                    ),
+                    backup_name=backup_name,
+                    recovery_name=recovery_name,
+                )
+        except (OSError, ValueError):
+            retain_stage = True
+            return EntrypointMaintenanceResult(
+                status="indeterminate",
+                blocker=EntrypointMaintenanceBlocker(
+                    code="publication_verification_failed",
+                    message="publication occurred but displaced bytes could not be preserved externally",
+                ),
+                backup_name=backup_name,
+                recovery_name=recovery_name if moved_to_backup else stage_name,
+            )
         return EntrypointMaintenanceResult(status="repaired", backup_name=backup_name)
     finally:
         if not retain_stage:
@@ -324,8 +331,9 @@ def repair_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult
             parents.append(_open_directory_tree(path))
         source_parent, target_parent, backup_parent = parents
         source = _source(request, source_parent, target_parent)
-        lock_name = ".skills-sdk-entrypoint.lock"
-        lock = os.open(lock_name, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=target_parent)
+        lock_key = hashlib.sha256(os.fsencode(request.target)).hexdigest()[:32]
+        lock_name = f".skills-sdk-entrypoint-{lock_key}.lock"
+        lock = os.open(lock_name, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=backup_parent)
         try:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

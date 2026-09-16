@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from skills_sdk.host.entrypoint import EntrypointMaintenanceResult
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
     ScenarioCaseResult,
@@ -20,6 +19,7 @@ from skills_sdk.models.evaluation_v2 import (
 )
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
+from skills_sdk.models.maintenance import EntrypointMaintenanceResult, RuntimeCopyComparison
 from skills_sdk.models.packaging import (
     PackageArchiveVerificationReceipt,
     PackageHardeningReceipt,
@@ -37,7 +37,6 @@ from skills_sdk.models.runtime_evidence import (
     RuntimeOutcomeReceipt,
 )
 from skills_sdk.models.scenario_quality import ScenarioQualityReceipt
-from skills_sdk.validation.runtime_copy import RuntimeCopyComparison
 
 
 def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
