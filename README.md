@@ -4,9 +4,9 @@ Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines explicit, versioned contracts for inventory,
 intake, evaluation, risk, security, manifests, and receipts. Its local
 source-consuming services validate standalone packages and, after a candidate
-identity is resolved and validation passes, build candidate-bound manifest and
-receipt data; inventory, intake, evaluation, risk, and security are
-caller-populated contract lanes. The core remains independent of a host
+identity is resolved and validation passes, normalize intake context or build
+candidate-bound manifest and receipt data; inventory, evaluation, risk, and
+security remain caller-populated contract lanes. The core remains independent of a host
 repository, provider account, runtime installation, or registry.
 
 The Python API can deterministically prepare an intended runtime-lock
@@ -37,10 +37,11 @@ existing-copy comparison and maintenance routes are documented in
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `validate`, `build`,
-`eval scenario-quality`, `compare-copy`, and `maintain-entrypoint`. Comparison is read-only. Maintenance is read-only by
-default and requires explicit `--apply` to change an existing host file. The
-other lifecycle names, including `intake`, `inventory`, the remaining `eval` routes, `package`,
+series. The implemented local commands are `intake`, `validate`, `build`,
+`eval scenario-quality`, `compare-copy`, and `maintain-entrypoint`. Comparison
+is read-only. Maintenance is read-only by default and requires explicit
+`--apply` to change an existing host file. The other lifecycle names, including
+`inventory`, the remaining `eval` routes, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
@@ -59,7 +60,8 @@ routes and proof for those lifecycle stages, Foundry can retain the resulting
 packages without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
 CLI names above remain honest discovery boundaries except for the implemented
-`validate`, `build`, and `eval scenario-quality` routes. [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
+`intake`, `validate`, `build`, and `eval scenario-quality` routes.
+[`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
 required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
 decision.
 
@@ -97,6 +99,10 @@ decision.
   adapters. They bind one candidate, scenario case, provider identity, input or
   output digests, and typed outcomes without carrying prompts, outputs,
   credentials, costs, or a provider client.
+- Bounded offline provider-call orchestration through one injected adapter.
+  The service supports complete and pull-driven text modes, keeps raw input and
+  output private, emits compact typed evidence, and performs no discovery,
+  credential access, network transport, or automatic retry.
 - Packaged JSON Schema resources with a `SchemaRegistry` for registered schema
   names. The registry applies structural validation to those names and
   semantic invariants only for registered model families; other packaged
@@ -110,11 +116,12 @@ decision.
 - A prompt-free CLI contract with JSON output and stable exit behavior for the
   implemented commands.
 
-The SDK does not own canonical package source, provider execution, runtime
-projection or installation, Tessl or other registry publication, or installed
-behavior. Those are separate lanes and must supply their own evidence for the
-same candidate identity. See [`docs/compatibility.md`](docs/compatibility.md)
-for the compatibility policy and evidence boundary.
+The SDK does not own canonical package source, real-provider transport or
+credentials, runtime projection or installation, Tessl or other registry
+publication, or installed behavior. Those are separate lanes and must supply
+their own evidence for the same candidate identity. See
+[`docs/compatibility.md`](docs/compatibility.md) for the compatibility policy
+and evidence boundary.
 
 ## Quick start
 

@@ -203,6 +203,19 @@ SHA-256 of its complete canonical JSON envelope together; self-references fail s
 validation. Direct Draft validation enforces the all-or-none field shape, and
 `SchemaRegistry` applies the cross-field self-reference invariant.
 
+`provider-call-adapter/v1` and `provider-call-result/v1` are additive offline
+orchestration contracts in the `0.1.x` line. They do not change
+`provider-identity/v2` or either provider-execution `/v1` envelope. The public
+`skills_sdk.providers.execute_provider_call` service accepts only a prepared,
+digest-bound request and an injected descriptor matching that request. The
+selected pilot supports `response_generation` in complete or pull-driven
+stream mode, preserves complete output outside public model serialization, and
+performs zero automatic retries. Expected provider and adapter failures use
+typed terminal evidence; contract violations raise `ContractError`, and caller
+cancellation is not converted into a provider result. Passing offline
+conformance does not prove a real provider outcome, supported provider, billing
+accuracy, release, registry state, runtime state, or consumer compatibility.
+
 `runtime-lock/v1` and `install-plan/v1` are additive schema families. They are
 registered for structural and Pydantic semantic validation but are not generic
 receipts: generic receipt parsing must not reinterpret intended runtime state

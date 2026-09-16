@@ -92,9 +92,9 @@ def test_architecture_distinguishes_cli_invocation_from_package_imports() -> Non
     architecture = " ".join((REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").split())
 
     assert "CLI service-invocation path" in architecture
-    assert "only `validate` and `build`" in architecture
+    assert "`build`, and `eval scenario-quality` invoke those services" in architecture
     assert "During `main()` dispatch" in architecture
-    assert "routes import their validation and packaging services lazily" in architecture
+    assert "routes import their intake, validation, and packaging services lazily" in architecture
     assert "This is not the package import graph" in architecture
     assert "public convenience exports eagerly import" in architecture
 

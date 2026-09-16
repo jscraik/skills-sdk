@@ -24,6 +24,7 @@ from skills_sdk.validation import validate_skill_package
 _EVALS_PATH = "references/evals.yaml"
 _MAX_EVALS_BYTES = 1_048_576
 _MAX_YAML_NODES = 20_000
+_MAX_YAML_DEPTH = 128
 _CASE_FIELDS = {
     "id",
     "name",
@@ -113,7 +114,16 @@ class _ClosedLoader(yaml.SafeLoader):
             raise yaml.constructor.ConstructorError(
                 None, None, "YAML node limit exceeded", self.peek_event().start_mark
             )
-        return cast(yaml.Node, super().compose_node(parent, index))
+        depth = getattr(self, "_node_depth", 0) + 1
+        if depth > _MAX_YAML_DEPTH:
+            raise yaml.constructor.ConstructorError(
+                None, None, "YAML nesting limit exceeded", self.peek_event().start_mark
+            )
+        self._node_depth = depth
+        try:
+            return cast(yaml.Node, super().compose_node(parent, index))
+        finally:
+            self._node_depth = depth - 1
 
 
 def _mapping(loader: _ClosedLoader, node: yaml.MappingNode, deep: bool = False) -> dict[object, object]:

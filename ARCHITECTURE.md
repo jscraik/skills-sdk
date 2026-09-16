@@ -5,10 +5,11 @@ Agent Skills packages. It defines versioned contract models for caller-provided
 inventory, intake, evaluation, risk, and security data, and consumes package
 source only through read-only validation and, after a resolved identity and a
 passing validation, build candidate-bound manifest and receipt records.
-The package also defines secret-free provider execution envelopes, prepares
+The package also defines secret-free provider execution envelopes and bounded
+offline orchestration through an injected adapter, prepares
 local private-registry receipts, and plans intended runtime-lock transitions.
-Provider calls, host apply or rollback, registry interaction, and publication
-remain outside the core package.
+Real-provider transports and credentials, host apply or rollback, registry
+interaction, and publication remain outside the core package.
 
 ## Product ownership and migration
 
@@ -90,6 +91,11 @@ operational contracts.
   `ProviderExecutionRequest` and `ProviderExecutionResult` in
   `src/skills_sdk/models/provider_execution.py`; external adapters still own
   provider calls, credentials, and provider-result truth.
+- Changing offline provider-call orchestration: start with
+  `execute_provider_call` in `src/skills_sdk/providers/call.py`, then follow its
+  additive contracts in `src/skills_sdk/models/provider_call.py`. Injected
+  adapters own transport and external truth; the SDK owns only bounded local
+  orchestration and public evidence.
 - Changing runtime-lock planning: follow `plan_runtime_install` in
   `src/skills_sdk/lifecycle/planning.py` and the versioned models in
   `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
@@ -101,9 +107,11 @@ operational contracts.
 
 ## Bird's-eye view
 
-There are two related local paths. A package path captures a filesystem view,
-validates its entrypoint and files, and then (only after a resolved identity and
-a pass) composes a candidate-bound manifest and receipt. A contract path
+There are three related package-processing paths. A package path captures a filesystem view
+and validates its entrypoint and files. Intake combines that validation with a
+caller-supplied source and ownership context to produce a read-only normalized
+receipt. Build runs only after resolved identity and passing validation to
+compose a candidate-bound manifest and receipt. A contract path
 validates JSON-shaped payloads against packaged schemas and, for registered
 families, applies the corresponding Pydantic invariants.
 
@@ -114,6 +122,10 @@ Package source
 validation/skill_ir.py + validation/skill_package.py
     |
     +--> SkillPackageValidation (pass or typed blockers)
+    |
+    +--> intake/normalization.py + SkillPackageIntakeContext
+    |        |
+    |        +--> SkillPackageIntakeReceipt (normalized decision or typed blockers)
     |
     +--> packaging/manifest.py (only after validation passes)
              |
@@ -133,7 +145,11 @@ Local candidate-bound contracts
     |
     +--> models/provider_execution.py
     |    (locally validated envelopes for externally observed provider evidence;
-    |     no provider call or locally proved provider outcome)
+    |     no external transport or locally proved provider outcome)
+    |
+    +--> providers/call.py
+    |    (bounded offline orchestration through one injected adapter;
+    |     no discovery, credentials, network transport, or provider truth)
     |
     +--> lifecycle/planning.py
     |    (intended runtime-lock transition only; no host mutation)
@@ -142,14 +158,18 @@ Local candidate-bound contracts
          (separate external action and evidence lanes)
 ```
 
-The CLI is an outer adapter over the implemented local services. `validate`,
-`build`, and `eval scenario-quality` execute local paths above.
-`compare-copy` performs two
-read-only validations and compares captured files. `maintain-entrypoint`
-checks an existing host entrypoint and permits a digest-bound replacement
-only with explicit `--apply`. Other lifecycle names remain parseable discovery
-boundaries. See [Runtime copy integration](docs/runtime-copy-integration.md)
-for maintenance authority, backup, platform, and concurrency limitations.
+The CLI is an outer adapter over the implemented local services. `intake`,
+`validate`, and `build` execute the package-processing paths above. `eval
+scenario-quality` lazily invokes the separate read-only
+`evaluation/quality.py` service, prints its versioned assessment, and exits 0
+for a passing assessment or 2 for a blocked assessment. `compare-copy`
+performs two read-only validations and compares captured files.
+`maintain-entrypoint` checks an existing host entrypoint and permits a
+digest-bound replacement only with explicit `--apply`. The other lifecycle
+names are parseable discovery boundaries and do not perform provider,
+installation, runtime, or publication work. See
+[Runtime copy integration](docs/runtime-copy-integration.md) for maintenance
+authority, backup, platform, and concurrency limitations.
 
 ## Code map
 
@@ -170,6 +190,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
 | `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
+| `src/skills_sdk/providers/` | Bounded offline complete and pull-stream orchestration through an injected adapter; no discovery, credentials, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter` |
 | `src/skills_sdk/models/runtime_evidence.py` | Candidate-bound adapter observations for installation, rollback, discovery, activation, and runtime outcome; no host path resolution, filesystem mutation, activation, or runtime invocation. | `InstallationResult`, `RuntimeOutcomeReceipt` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/host/` | Explicit, digest-bound maintenance of an existing entrypoint with retained backups; no package installation or workflow execution. | `EntrypointRequest`, `check_entrypoint`, `repair_entrypoint` |
@@ -198,20 +219,24 @@ docstrings and the linked API or CLI guides.
 - `lifecycle` composes package and registry receipts with an existing logical
   runtime lock to produce a deterministic intended transition. It does not
   inspect a host, resolve installation paths, apply files, or execute rollback.
-- `cli` is the outermost process adapter. During `main()` dispatch, only
-  `validate` and `build` routes import their validation and packaging services
-  lazily, print versioned results, and map a blocked result to the documented
-  exit status.
+- `cli` is the outermost process adapter. During `main()` dispatch, the
+  `intake`, `validate`, and `build` routes import their intake, validation, and
+  packaging services lazily, while `eval scenario-quality` lazily imports
+  `assess_scenario_quality` from `evaluation/quality.py`. The routes print
+  versioned results and map blocked results, normalized non-admit intake
+  decisions, and blocked scenario assessments to the documented exit status.
 - `schemas` are contract resources, not an independent source of domain
   meaning. The generator and the Pydantic models are changed together when a
   public contract changes.
 - Host maintenance depends on read-only validation helpers, never the reverse.
   It accepts local paths outside portable receipt contracts and does not
   implement the package-installation or runtime-lock planning protocols.
-- The package CLI service-invocation path is
-  `CLI -> validation/packaging -> models/core`; `compare-copy` also composes
-  validation, while `maintain-entrypoint` invokes the explicit host adapter.
-  Reserved routes remain parse-only. This is not
+- The CLI service-invocation paths are
+  `CLI -> intake/validation/packaging -> models/core` and
+  `CLI -> evaluation/quality -> validation/models/core`: `intake`, `validate`,
+  `build`, and `eval scenario-quality` invoke those services. `compare-copy`
+  also composes validation, while `maintain-entrypoint` invokes the explicit
+  host adapter. The remaining reserved routes stay parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
   `skills_sdk/__init__.py`, whose public convenience exports eagerly import
   evaluation, distribution, lifecycle, and their model dependencies. Those
@@ -361,7 +386,7 @@ repository commands:
   standards, and Vale completed without findings).
 - `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
   `pass` (no generated-schema drift).
-- `bash scripts/validate-repository.sh` — `pass` (`926 passed`, `1 skipped`;
+- `bash scripts/validate-repository.sh` — `pass` (`1,443 passed`, `1 skipped`;
   source distribution and wheel built successfully).
 - `git diff --check` — `pass`.
 - `git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb` — `pass`
@@ -372,7 +397,7 @@ checks:
 
 | Lane | Outcome | Concrete reason | Nearest meaningful fallback |
 | --- | --- | --- | --- |
-| Provider | `blocked` | The repository contains envelopes, not a provider client, credentials, or an authorized provider call. | Provider execution model, schema, and adapter-boundary tests. |
+| Provider | `blocked` | The repository contains offline orchestration and envelopes, not a selected provider client, credentials, network transport, or an authorized real-provider call. | Provider-call conformance plus provider execution model and schema tests. |
 | Registry | `blocked` | Private-registry preparation performs no registry authentication, upload, or mutation. | Deterministic registry-preparation contract tests. |
 | Host runtime | `blocked` | Runtime lifecycle code plans transitions but has no host apply or rollback adapter. | Runtime-lock and installation-planning contract tests. |
 | Tessl | `blocked` | Tessl CLI routes are parse-only and no Tessl integration was executed. | CLI parser/help tests and candidate-bound local contract checks. |

@@ -70,6 +70,11 @@ from skills_sdk.models.packaging import (
     PackageReceiptV2,
 )
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
+from skills_sdk.models.provider_call import (
+    ProviderCallPublicResult,
+    ProviderCostObservation,
+    TextProviderAdapterDescriptor,
+)
 from skills_sdk.models.provider_execution import (
     ProviderExecutionBlocker,
     ProviderExecutionError,
@@ -159,6 +164,8 @@ __all__ = [
     "PackageSourceKind",
     "PackageType",
     "PluginIdentity",
+    "ProviderCallPublicResult",
+    "ProviderCostObservation",
     "ProviderExecutionBlocker",
     "ProviderExecutionError",
     "ProviderExecutionRequest",
@@ -208,6 +215,7 @@ __all__ = [
     "SkillPackageIntakeReceipt",
     "SkillPackageValidation",
     "SourceProvenance",
+    "TextProviderAdapterDescriptor",
     "ValidationSeverity",
     "ValueDecision",
     "ValueDecisionV2",
