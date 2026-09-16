@@ -176,12 +176,12 @@ def _validate_adapter(
     if provider != request.provider:
         raise _contract_error("provider_adapter_mismatch", "provider adapter identity does not match the request")
     raw_selected, raw_cleanup = raw_members
-    if not callable(raw_cleanup):
+    if not callable(raw_cleanup) or not inspect.iscoroutinefunction(raw_cleanup):
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement cleanup")
     if not callable(raw_selected):
         raise _contract_error("invalid_provider_adapter", "provider adapter does not implement its selected mode")
-    if descriptor.mode == "stream" and not inspect.iscoroutinefunction(raw_selected):
-        raise _contract_error("invalid_provider_adapter", "provider stream factory must be asynchronous")
+    if not inspect.iscoroutinefunction(raw_selected):
+        raise _contract_error("invalid_provider_adapter", "provider selected hook must be asynchronous")
     return _AdapterBindings(
         descriptor=descriptor,
         complete=cast(Callable[[ProviderExecutionRequest, JsonValue], Awaitable[ProviderAdapterComplete]], raw_selected)
@@ -270,17 +270,44 @@ def _close_awaitable(awaitable: object) -> None:
 
 
 async def _clock_wait_for(clock: _ClockBindings, awaitable: Awaitable[object], timeout_seconds: float) -> object:
+    operation_marker = object()
+
+    async def capture_operation() -> object:
+        return operation_marker, await _captured(awaitable)
+
+    captured = capture_operation()
+
     async def schedule() -> object:
-        return clock.wait_for(awaitable, timeout_seconds)
+        return clock.wait_for(captured, timeout_seconds)
 
     scheduled = await _captured(schedule())
     if isinstance(scheduled, BaseException):
+        _close_awaitable(captured)
         _close_awaitable(awaitable)
         raise _contract_error("invalid_provider_clock", "provider clock scheduler failed") from None
     if not inspect.isawaitable(scheduled):
+        _close_awaitable(captured)
         _close_awaitable(awaitable)
         raise _contract_error("invalid_provider_clock", "provider clock scheduler must return an awaitable")
-    return await scheduled
+
+    async def wait_scheduled() -> object:
+        return await scheduled
+
+    observed = await _captured(wait_scheduled())
+    if isinstance(observed, TimeoutError):
+        _close_awaitable(captured)
+        _close_awaitable(awaitable)
+        raise observed
+    if isinstance(observed, BaseException):
+        _close_awaitable(captured)
+        _close_awaitable(awaitable)
+        raise _contract_error("invalid_provider_clock", "provider clock scheduler failed") from None
+    if not isinstance(observed, tuple) or len(observed) != 2 or observed[0] is not operation_marker:
+        raise _contract_error("invalid_provider_clock", "provider clock scheduler returned an invalid result")
+    result = observed[1]
+    if isinstance(result, BaseException):
+        raise result
+    return result
 
 
 def _validate_complete(value: object, limits: ProviderCallLimits) -> ProviderAdapterComplete:
@@ -525,7 +552,7 @@ async def _cleanup(adapter: _AdapterBindings, limits: ProviderCallLimits, clock:
 
     observed = await _captured(cleanup())
     if isinstance(observed, CancelledError):
-        raise observed
+        return False
     if isinstance(observed, ContractError):
         raise observed
     if not isinstance(observed, BaseException) and observed is not None:

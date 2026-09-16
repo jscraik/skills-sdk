@@ -92,6 +92,56 @@ def test_synchronous_clock_scheduler_failures_are_redacted(failure: BaseExceptio
     assert "private" not in str(error.value)
 
 
+def test_asynchronous_clock_scheduler_failures_are_redacted() -> None:
+    request = _provider_request(None)
+
+    class RaisingClock:
+        def now(self) -> datetime:
+            return datetime(2026, 9, 8, 10, 0, tzinfo=UTC)
+
+        async def wait_for(self, awaitable: Awaitable[_T], timeout_seconds: float) -> _T:
+            raise RuntimeError("private scheduler state")
+
+    with pytest.raises(ContractError, match="invalid_provider_clock") as error:
+        asyncio.run(execute_provider_call(request, None, FakeAdapter(request), clock=RaisingClock()))
+    assert "private" not in str(error.value)
+
+
+def test_cleanup_originated_cancellation_is_reported_as_cleanup_failure() -> None:
+    request = _provider_request(None)
+    base = FakeAdapter(request)
+
+    class CancelledCleanupAdapter:
+        descriptor = base.descriptor
+
+        async def complete(self, request: object, input_payload: object) -> ProviderAdapterComplete:
+            return await base.complete(request, input_payload)
+
+        async def cleanup(self) -> None:
+            raise asyncio.CancelledError
+
+    outcome = asyncio.run(execute_provider_call(request, None, CancelledCleanupAdapter()))
+    assert outcome.complete_text == "answer"
+    assert outcome.public_result.cleanup_succeeded is False
+
+
+def test_complete_hook_must_be_declared_async() -> None:
+    request = _provider_request(None)
+    base = FakeAdapter(request)
+
+    class SynchronousCompleteAdapter:
+        descriptor = base.descriptor
+
+        def complete(self, request: object, input_payload: object) -> Awaitable[ProviderAdapterComplete]:
+            return base.complete(request, input_payload)
+
+        async def cleanup(self) -> None:
+            return None
+
+    with pytest.raises(ContractError, match="invalid_provider_adapter"):
+        asyncio.run(execute_provider_call(request, None, SynchronousCompleteAdapter()))
+
+
 @pytest.mark.parametrize("invalid_stream", [[], object()])
 def test_stream_factory_must_return_an_async_iterator(invalid_stream: object) -> None:
     request = _provider_request(None)
