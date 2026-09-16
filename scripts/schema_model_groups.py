@@ -35,6 +35,7 @@ from skills_sdk.models.runtime_evidence import (
     RollbackOutcome,
     RuntimeOutcomeReceipt,
 )
+from skills_sdk.models.scenario_quality import ScenarioQualityReceipt
 
 
 def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
@@ -50,6 +51,7 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ScenarioObservationV2, "scenario-observation.v2.schema.json"),
         (ScenarioCaseResultV2, "scenario-case-result.v2.schema.json"),
         (EvaluationReceiptV2, "evaluation-receipt.v2.schema.json"),
+        (ScenarioQualityReceipt, "scenario-quality.v1.schema.json"),
     )
 
 
