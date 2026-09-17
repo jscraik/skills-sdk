@@ -170,6 +170,14 @@ def _remove_owned(parent: int, name: str, descriptor: int) -> None:
     os.unlink(name, dir_fd=parent)
 
 
+def _remove_captured(parent: int, name: str, captured: CapturedFile) -> None:
+    """Remove a captured path only while it retains the captured identity."""
+    observed = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    if (observed.st_dev, observed.st_ino) != (captured.device, captured.inode):
+        raise ValueError("captured path was replaced; refusing removal")
+    os.unlink(name, dir_fd=parent)
+
+
 def _write_snapshot(parent: int, name: str, captured: CapturedFile) -> None:
     descriptor = _write_stage(parent, name, captured, captured)
     os.close(descriptor)
@@ -256,14 +264,24 @@ def _publish(
     try:
         _write_snapshot(backup_parent, backup_name, current)
         backup = _capture(backup_parent, backup_name)
-        latest = _capture(target_parent, request.target.name)
-        if (
-            not _same_snapshot(backup, current)
-            or latest != current
-            or _source(request, source_parent, target_parent) != source
-        ):
-            raise ValueError("source or runtime changed before publication; backup retained")
-        _verify_parents(request, parents)
+        try:
+            latest = _capture(target_parent, request.target.name)
+            if (
+                not _same_snapshot(backup, current)
+                or latest != current
+                or _source(request, source_parent, target_parent) != source
+            ):
+                raise ValueError("source or runtime changed before publication")
+            _verify_parents(request, parents)
+        except (OSError, ValueError):
+            return EntrypointMaintenanceResult(
+                status="blocked",
+                blocker=EntrypointMaintenanceBlocker(
+                    code="prepublication_verification_failed",
+                    message="source, runtime, or parent changed before publication; snapshot retained",
+                ),
+                backup_name=backup_name,
+            )
         try:
             _exchange(target_parent, stage_name, request.target.name)
         except OSError:
@@ -328,7 +346,7 @@ def _publish(
                     backup_name=backup_name,
                     recovery_name=recovery_name,
                 )
-            os.unlink(stage_name, dir_fd=target_parent)
+            _remove_captured(target_parent, stage_name, displaced)
             retain_stage = True
         except (OSError, ValueError):
             retain_stage = True

@@ -305,6 +305,50 @@ def test_existing_recovery_file_is_not_replaced(tmp_path: Path, monkeypatch: pyt
     assert len(recovery) == 1
 
 
+def test_replacement_of_displaced_stage_is_not_unlinked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify a writer replacing the displaced stage retains its bytes."""
+    from skills_sdk.host import entrypoint
+
+    _source, target, _backup, args = _fixture(tmp_path)
+    link = os.link
+
+    def racing_link(source: str, destination: str, **keywords: object) -> None:
+        link(source, destination, **keywords)
+        replacement = target.parent / ".racing-writer"
+        replacement.write_text("Concurrent replacement\n")
+        replacement.replace(target.parent / source)
+
+    monkeypatch.setattr(entrypoint.os, "link", racing_link)
+    assert main([*args, "--apply", "--json"]) == 2
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "indeterminate"
+    stages = [path for path in target.parent.iterdir() if path.name.startswith(".skills-sdk-stage-")]
+    assert [path.read_text() for path in stages] == ["Concurrent replacement\n"]
+
+
+def test_prepublication_race_reports_retained_backup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify a pre-publication race reports its retained snapshot."""
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    write_snapshot = entrypoint._write_snapshot
+
+    def racing_snapshot(parent: int, name: str, captured: entrypoint.CapturedFile) -> None:
+        write_snapshot(parent, name, captured)
+        target.write_text("Concurrent replacement\n")
+
+    monkeypatch.setattr(entrypoint, "_write_snapshot", racing_snapshot)
+    assert main([*args, "--apply", "--json"]) == 2
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "blocked"
+    assert result["backup_name"] is not None
+    assert (backup / result["backup_name"]).exists()
+
+
 def test_replaced_parent_is_not_reported_as_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify replacing the target parent prevents a completed result."""
     from skills_sdk.host import entrypoint
