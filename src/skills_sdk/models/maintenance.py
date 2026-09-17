@@ -2,22 +2,43 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, GetJsonSchemaHandler, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    GetJsonSchemaHandler,
+    StringConstraints,
+    model_validator,
+)
 from pydantic.json_schema import JsonSchemaValue
 
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath
-from skills_sdk.models.packaging import BlockerCode
 from skills_sdk.models.validation import SkillPackageValidation
+
+
+def _reject_blocker_code_line_breaks(value: str) -> str:
+    if "\r" in value or "\n" in value:
+        raise ValueError("blocker code must not contain line breaks")
+    return value
+
+
+MaintenanceBlockerCode = Annotated[
+    str,
+    StringConstraints(pattern=r"^[a-z0-9_]+$"),
+    AfterValidator(_reject_blocker_code_line_breaks),
+    Field(json_schema_extra={"not": {"pattern": r"[\r\n]"}}),
+]
 
 
 class EntrypointMaintenanceBlocker(BaseModel):
     """Stable public reason that maintenance did not complete."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
-    code: BlockerCode
+    code: MaintenanceBlockerCode
     message: NonEmptyText
 
 

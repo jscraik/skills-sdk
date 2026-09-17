@@ -198,7 +198,7 @@ def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
             supporting_document=arguments.supporting_document,
         )
         result = repair_entrypoint(request) if arguments.apply else check_entrypoint(request)
-    except (ImportError, OSError, ValueError) as exc:
+    except (ImportError, OSError, RuntimeError, ValueError) as exc:
         result = EntrypointMaintenanceResult(
             status="blocked",
             blocker=EntrypointMaintenanceBlocker(code="entrypoint_maintenance_blocked", message=str(exc)),

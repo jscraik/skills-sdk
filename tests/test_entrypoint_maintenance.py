@@ -183,6 +183,21 @@ def test_preview_rejects_non_directory_backup_root(tmp_path: Path) -> None:
     assert backup.read_text() == "not a directory\n"
 
 
+@pytest.mark.parametrize("apply", [False, True])
+def test_symlink_loop_backup_root_is_a_typed_blocker(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], apply: bool
+) -> None:
+    """Verify a backup-root symlink loop cannot escape the typed CLI boundary."""
+    _source, _target, backup, args = _fixture(tmp_path)
+    backup.rmdir()
+    backup.symlink_to(backup.name)
+    command = [*args, "--json"]
+    if apply:
+        command.append("--apply")
+    assert main(command) == 2
+    assert json.loads(capsys.readouterr().out)["status"] == "blocked"
+
+
 def test_unsupported_host_adapter_import_is_a_typed_blocker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -221,6 +236,20 @@ def test_registry_normalizes_mapping_before_model_validation() -> None:
 
     result = EntrypointMaintenanceResult(status="blocked", blocker=EntrypointMaintenanceBlocker(code="x", message="x"))
     SchemaRegistry().validate("entrypoint-maintenance-result.v1", ProxyMapping(result.model_dump(mode="json")))
+
+
+def test_maintenance_schema_rejects_line_break_in_blocker_code() -> None:
+    with pytest.raises(ValueError):
+        EntrypointMaintenanceBlocker(code="blocked\n", message="blocked")
+    result = EntrypointMaintenanceResult(
+        status="blocked",
+        blocker=EntrypointMaintenanceBlocker(code="blocked", message="blocked"),
+    ).model_dump(mode="json")
+    blocker = result["blocker"]
+    assert isinstance(blocker, dict)
+    blocker["code"] = "blocked\n"
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("entrypoint-maintenance-result.v1", result)
 
 
 def test_publication_failure_preserves_current_and_recoverable_backup(

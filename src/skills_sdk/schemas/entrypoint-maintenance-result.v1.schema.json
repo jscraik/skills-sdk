@@ -5,6 +5,9 @@
       "description": "Stable public reason that maintenance did not complete.",
       "properties": {
         "code": {
+          "not": {
+            "pattern": "[\\r\\n]"
+          },
           "pattern": "^[a-z0-9_]+$",
           "title": "Code",
           "type": "string"
