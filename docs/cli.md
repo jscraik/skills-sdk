@@ -9,12 +9,13 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --version
 ```
 
-The CLI exposes these explicit routes without provider, runtime, or
-distribution side effects:
+The CLI exposes these routes. Existing-copy maintenance is the only route
+below that permits a host write, and requires explicit `--apply`:
 
 ```text
 inventory   intake   validate   build   eval   package   project   verify
 tessl prepare   tessl verify
+compare-copy   maintain-entrypoint
 ```
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
@@ -56,4 +57,12 @@ candidate-bound lanes:
 
 Run `bash scripts/validate-repository.sh` for the repository's complete local
 schema, lint, test, build, and diff checks. Do not pass credentials or machine
-paths through the public CLI contract.
+paths through portable receipt contracts; host paths belong only in explicit
+local adapter arguments.
+
+## Existing-copy maintenance and comparison
+
+The explicit `compare-copy` and `maintain-entrypoint` routes are documented in
+[Runtime copy integration](runtime-copy-integration.md). Comparison is read-only.
+Entrypoint maintenance requires `--apply` for a digest-bound change to an
+existing host file; it is not the reserved `project` package-installation route.

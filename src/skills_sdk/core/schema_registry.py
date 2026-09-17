@@ -54,6 +54,8 @@ SCHEMA_NAMES = frozenset(
         "activation-observation.v1",
         "runtime-outcome.v1",
         "runtime-lock.v1",
+        "runtime-copy-comparison.v1",
+        "entrypoint-maintenance-result.v1",
         "scenario-case-result.v1",
         "scenario-case-result.v2",
         "scenario-observation.v1",
@@ -128,14 +130,15 @@ class SchemaRegistry:
             format_checker=FormatChecker(),
             registry=registry,
         )
+        normalized_payload = _require_json_value(payload)
         errors = sorted(
-            validator.iter_errors(_require_json_value(payload)),
+            validator.iter_errors(normalized_payload),
             key=lambda error: tuple(str(part) for part in error.path),
         )
         if errors:
             details = tuple(error.message for error in errors)
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details)
-        self._validate_registered_model(name, payload)
+        self._validate_registered_model(name, normalized_payload)
 
     def validate_package_safety_evidence_against_package_receipt(
         self,
@@ -317,6 +320,10 @@ class SchemaRegistry:
             from skills_sdk.models.lifecycle import RuntimeLock
 
             model = RuntimeLock
+        elif name in {"runtime-copy-comparison.v1", "entrypoint-maintenance-result.v1"}:
+            from skills_sdk.models.maintenance import EntrypointMaintenanceResult, RuntimeCopyComparison
+
+            model = RuntimeCopyComparison if name == "runtime-copy-comparison.v1" else EntrypointMaintenanceResult
         elif name == "installation-result.v1":
             from skills_sdk.models.runtime_evidence import InstallationResult
 
@@ -397,7 +404,10 @@ class SchemaRegistry:
             return
 
         try:
-            model.model_validate(payload)
+            if name in {"runtime-copy-comparison.v1", "entrypoint-maintenance-result.v1"}:
+                model.model_validate_json(json.dumps(payload))
+            else:
+                model.model_validate(payload)
         except ValidationError as error:
             details = tuple(item["msg"] for item in error.errors())
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details) from error

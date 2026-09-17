@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 SDK_ROOT = Path(__file__).resolve().parents[1] / "src" / "skills_sdk"
@@ -59,6 +60,31 @@ def test_validation_service_does_not_depend_on_packaging_service() -> None:
                     if alias.name == "skills_sdk.packaging" or alias.name.startswith("skills_sdk.packaging."):
                         violations.append(f"{path.relative_to(SDK_ROOT)}:{node.lineno}")
     assert violations == []
+
+
+def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
+    """Verify parse-only CLI routes do not import the host mutation adapter."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                [
+                    "import sys",
+                    "from skills_sdk.cli.main import main",
+                    "for route in ('inventory', 'package', 'project', 'verify'):",
+                    "    assert main([route]) == 0",
+                    "assert 'skills_sdk.host.entrypoint' not in sys.modules",
+                ]
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
 
 
 def test_architecture_distinguishes_cli_invocation_from_package_imports() -> None:

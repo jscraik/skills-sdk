@@ -19,6 +19,7 @@ from skills_sdk.models.evaluation_v2 import (
 )
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
+from skills_sdk.models.maintenance import EntrypointMaintenanceResult, RuntimeCopyComparison
 from skills_sdk.models.packaging import (
     PackageArchiveVerificationReceipt,
     PackageHardeningReceipt,
@@ -107,6 +108,8 @@ def runtime_lifecycle_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (DiscoveryObservation, "discovery-observation.v1.schema.json"),
         (ActivationObservation, "activation-observation.v1.schema.json"),
         (RuntimeOutcomeReceipt, "runtime-outcome.v1.schema.json"),
+        (RuntimeCopyComparison, "runtime-copy-comparison.v1.schema.json"),
+        (EntrypointMaintenanceResult, "entrypoint-maintenance-result.v1.schema.json"),
     )
 
 

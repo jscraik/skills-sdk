@@ -1,0 +1,245 @@
+{
+  "$defs": {
+    "EntrypointMaintenanceBlocker": {
+      "additionalProperties": false,
+      "description": "Stable public reason that maintenance did not complete.",
+      "properties": {
+        "code": {
+          "not": {
+            "pattern": "[\\r\\n]"
+          },
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "EntrypointMaintenanceBlocker",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/entrypoint-maintenance-result.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "matching"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backup_name": {
+            "type": "null"
+          },
+          "blocker": {
+            "type": "null"
+          },
+          "recovery_name": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "repairable"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backup_name": {
+            "type": "null"
+          },
+          "blocker": {
+            "type": "null"
+          },
+          "recovery_name": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "repaired"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backup_name": {
+            "type": "string"
+          },
+          "blocker": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "backup_name"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backup_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocker": {
+            "type": "object"
+          },
+          "recovery_name": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "blocker"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "indeterminate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backup_name": {
+            "type": "string"
+          },
+          "blocker": {
+            "type": "object"
+          },
+          "recovery_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "blocker",
+          "backup_name",
+          "recovery_name"
+        ]
+      }
+    }
+  ],
+  "description": "Versioned result for preview and explicitly authorized maintenance.",
+  "properties": {
+    "backup_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "not": {
+            "anyOf": [
+              {
+                "enum": [
+                  ".",
+                  ".."
+                ]
+              },
+              {
+                "pattern": "\\u0000"
+              }
+            ]
+          },
+          "pattern": "^[^/\\\\]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Backup Name"
+    },
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EntrypointMaintenanceBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "recovery_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "not": {
+            "anyOf": [
+              {
+                "enum": [
+                  ".",
+                  ".."
+                ]
+              },
+              {
+                "pattern": "\\u0000"
+              }
+            ]
+          },
+          "pattern": "^[^/\\\\]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recovery Name"
+    },
+    "schema_version": {
+      "const": "entrypoint-maintenance-result/v1",
+      "default": "entrypoint-maintenance-result/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "matching",
+        "repairable",
+        "repaired",
+        "blocked",
+        "indeterminate"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "EntrypointMaintenanceResult",
+  "type": "object"
+}

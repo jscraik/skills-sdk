@@ -22,6 +22,12 @@ privileged concurrent writer. Promotion callers must validate an immutable
 source revision or prepared snapshot when adversarial concurrent mutation is
 in scope.
 
+The host-facing `runtime-copy-comparison/v1` and
+`entrypoint-maintenance-result/v1` JSON families are versioned public result
+contracts with packaged Draft 2020-12 schemas. Additive optional fields require
+a compatible schema update; incompatible shape or meaning changes require a
+new schema version.
+
 ## Contract policy
 
 `package-archive-verification/v1` is an additive, read-only verification

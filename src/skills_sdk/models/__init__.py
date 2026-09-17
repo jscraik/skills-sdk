@@ -36,6 +36,11 @@ from skills_sdk.models.inventory import (
     ValueDecisionV2,
 )
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeFile, RuntimeLock, RuntimeLockEntry, RuntimeTarget
+from skills_sdk.models.maintenance import (
+    EntrypointMaintenanceBlocker,
+    EntrypointMaintenanceResult,
+    RuntimeCopyComparison,
+)
 from skills_sdk.models.package import (
     IntakeChecks,
     IntakeDecision,
@@ -114,6 +119,8 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 __all__ = [
     "ActivationObservation",
     "DiscoveryObservation",
+    "EntrypointMaintenanceBlocker",
+    "EntrypointMaintenanceResult",
     "EvaluationReceipt",
     "EvaluationReceiptV2",
     "FormatChecks",
@@ -180,6 +187,7 @@ __all__ = [
     "RollbackJournalEntry",
     "RollbackOutcome",
     "RuntimeAdapterIdentity",
+    "RuntimeCopyComparison",
     "RuntimeEvidenceBlocker",
     "RuntimeFile",
     "RuntimeLock",

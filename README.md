@@ -12,8 +12,11 @@ repository, provider account, runtime installation, or registry.
 The Python API can deterministically prepare an intended runtime-lock
 transition with `plan_runtime_install`. The plan is portable and
 mutation-free: it does not resolve host paths, write a lock, install files,
-execute rollback, or prove discovery, activation, or runtime behavior. Those
-operations belong to a future host adapter and separate evidence contracts.
+execute rollback, or prove discovery, activation, or runtime behavior. Package
+installation, runtime-lock application, rollback, discovery, and activation
+belong to a future host adapter and separate evidence contracts. The narrower
+existing-copy comparison and maintenance routes are documented in
+[`docs/runtime-copy-integration.md`](docs/runtime-copy-integration.md).
 
 > Thin Surfaces. Strong Guardrails. Progressive Disclosure. Durable Memory.
 > Professional Output.
@@ -34,9 +37,11 @@ operations belong to a future host adapter and separate evidence contracts.
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `intake`, `validate`, `build`, and
-`eval scenario-quality`. The other lifecycle names, including `inventory`,
-other `eval` routes, `package`,
+series. The implemented local commands are `intake`, `validate`, `build`,
+`eval scenario-quality`, `compare-copy`, and `maintain-entrypoint`. Comparison
+is read-only. Maintenance is read-only by default and requires explicit
+`--apply` to change an existing host file. The other lifecycle names, including
+`inventory`, the remaining `eval` routes, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
@@ -55,7 +60,8 @@ routes and proof for those lifecycle stages, Foundry can retain the resulting
 packages without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
 CLI names above remain honest discovery boundaries except for the implemented
-`intake`, `validate`, `build`, and `eval scenario-quality` routes.
+`intake`, `validate`, `build`, `eval scenario-quality`, `compare-copy`, and
+`maintain-entrypoint` routes.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
 required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
 decision.
