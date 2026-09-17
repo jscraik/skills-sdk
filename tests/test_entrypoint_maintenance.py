@@ -155,15 +155,29 @@ def test_lock_namespace_is_independent_of_alias_and_backup_root(
         os.close(descriptor)
 
 
-def test_lock_root_must_be_private_and_user_owned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify maintenance refuses a lock namespace accessible to other users."""
+def test_lock_root_is_created_private_beneath_shared_temp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify maintenance creates a private user lock directory beneath a shared root."""
     from skills_sdk.host import entrypoint
 
-    _source, target, backup, args = _fixture(tmp_path)
+    _source, _target, _backup, args = _fixture(tmp_path)
     shared_lock_root = tmp_path / "shared-locks"
     shared_lock_root.mkdir(mode=0o777)
     shared_lock_root.chmod(0o777)
-    monkeypatch.setattr(entrypoint, "_LOCK_ROOT", shared_lock_root)
+    private_lock_root = shared_lock_root / "skills-sdk-user"
+    monkeypatch.setattr(entrypoint, "_LOCK_ROOT", private_lock_root)
+    assert main([*args, "--apply", "--json"]) == 0
+    assert stat.S_IMODE(private_lock_root.stat().st_mode) == 0o700
+
+
+def test_existing_lock_root_must_be_private_and_user_owned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify maintenance refuses an existing lock namespace accessible to others."""
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    unsafe_lock_root = tmp_path / "unsafe-locks"
+    unsafe_lock_root.mkdir(mode=0o777)
+    unsafe_lock_root.chmod(0o777)
+    monkeypatch.setattr(entrypoint, "_LOCK_ROOT", unsafe_lock_root)
     assert main([*args, "--apply", "--json"]) == 2
     assert target.read_text().startswith("---\nname: example\ndescription: Broken")
     assert _backup_files(backup) == []
@@ -269,7 +283,7 @@ def test_maintenance_schema_rejects_line_break_in_blocker_code() -> None:
         SchemaRegistry().validate("entrypoint-maintenance-result.v1", result)
 
 
-@pytest.mark.parametrize("name", ["", ".", "..", "../backup", "ABSOLUTE", r"dir\backup"])
+@pytest.mark.parametrize("name", ["", ".", "..", "../backup", "ABSOLUTE", r"dir\backup", "nul\x00name"])
 def test_maintenance_artifact_names_are_single_components(tmp_path: Path, name: str) -> None:
     if name == "ABSOLUTE":
         name = str(tmp_path / "backup")
@@ -332,6 +346,29 @@ def test_existing_recovery_file_is_not_replaced(tmp_path: Path, monkeypatch: pyt
     assert recovery.read_text() == "other actor\n"
     recovery = [path for path in target.parent.iterdir() if path.name.startswith(".skills-sdk-stage-")]
     assert len(recovery) == 1
+
+
+def test_replaced_recovery_reports_retained_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify a replaced backup link does not hide the retained displaced stage."""
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    link = os.link
+
+    def racing_link(source: str, destination: str, **keywords: object) -> None:
+        link(source, destination, **keywords)
+        replacement = backup / ".racing-recovery"
+        replacement.write_text("Foreign recovery\n")
+        replacement.replace(backup / destination)
+
+    monkeypatch.setattr(entrypoint.os, "link", racing_link)
+    assert main([*args, "--apply", "--json"]) == 2
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "indeterminate"
+    assert result["recovery_name"].startswith(".skills-sdk-stage-")
+    assert (target.parent / result["recovery_name"]).exists()
 
 
 def test_replacement_of_displaced_stage_is_not_unlinked(
@@ -469,6 +506,37 @@ def test_recursive_frontmatter_is_a_typed_blocker(tmp_path: Path, monkeypatch: p
     monkeypatch.setattr(entrypoint, "read_frontmatter", recursive_frontmatter)
     assert main([*args, "--apply", "--json"]) == 2
     assert target.read_bytes() == before
+    assert _backup_files(backup) == []
+
+
+def test_staged_entrypoint_bytes_are_the_validated_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify an alternate validation capture cannot admit malformed staged bytes."""
+    from skills_sdk.host import entrypoint
+
+    source, target, backup, args = _fixture(tmp_path)
+    capture = entrypoint._capture
+    source_parent = os.open(source.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        valid = capture(source_parent, source.name)
+    finally:
+        os.close(source_parent)
+    malformed = b"---\nname: example\ndescription: Invalid: YAML\n---\n"
+    source.write_bytes(malformed)
+    args[args.index("--expected-source") + 1] = hashlib.sha256(malformed).hexdigest()
+    source_captures = 0
+
+    def alternating_capture(parent: int, name: str) -> entrypoint.CapturedFile:
+        nonlocal source_captures
+        observed = capture(parent, name)
+        if name == source.name and observed.data == malformed:
+            source_captures += 1
+            if source_captures % 2 == 0:
+                return valid
+        return observed
+
+    monkeypatch.setattr(entrypoint, "_capture", alternating_capture)
+    assert main([*args, "--apply", "--json"]) == 2
+    assert target.read_text().startswith("---\nname: example\ndescription: Broken")
     assert _backup_files(backup) == []
 
 

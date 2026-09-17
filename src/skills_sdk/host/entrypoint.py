@@ -22,7 +22,7 @@ from skills_sdk.models.maintenance import EntrypointMaintenanceBlocker, Entrypoi
 from skills_sdk.validation.skill_ir import read_frontmatter
 from skills_sdk.validation.skill_package import _open_directory_tree
 
-_LOCK_ROOT = Path(tempfile.gettempdir()).resolve(strict=True)
+_LOCK_ROOT = Path(tempfile.gettempdir()).resolve(strict=True) / f"skills-sdk-{os.getuid()}"
 
 
 class EntrypointRequest(BaseModel):
@@ -77,6 +77,8 @@ def _lock_name(target_parent: int, target_name: str) -> str:
 
 def _validated_lock_root() -> int:
     """Open the host-provided per-user temporary directory for lock files."""
+    with suppress(FileExistsError):
+        _LOCK_ROOT.mkdir(mode=0o700)
     descriptor = _open_directory_tree(_LOCK_ROOT)
     observed = os.fstat(descriptor)
     if observed.st_uid != os.getuid() or stat.S_IMODE(observed.st_mode) & 0o077:
@@ -87,6 +89,12 @@ def _validated_lock_root() -> int:
 
 def _validated_entrypoint(parent: int, expected_name: str) -> CapturedFile:
     captured = _capture(parent, "SKILL.md")
+    _validate_entrypoint(captured, expected_name)
+    return captured
+
+
+def _validate_entrypoint(captured: CapturedFile, expected_name: str) -> None:
+    """Validate the exact captured entrypoint bytes selected for use."""
     try:
         metadata, _body, closed = read_frontmatter(captured.data.decode("utf-8"))
     except (RecursionError, UnicodeError, YAMLError) as exc:
@@ -96,7 +104,6 @@ def _validated_entrypoint(parent: int, expected_name: str) -> CapturedFile:
         raise ValueError("entrypoint must declare the existing target skill name")
     if not isinstance(description, str) or not description.strip():
         raise ValueError("entrypoint must contain a non-empty description")
-    return captured
 
 
 def _source(request: EntrypointRequest, parent: int, target_parent: int) -> CapturedFile:
@@ -123,7 +130,7 @@ def _source(request: EntrypointRequest, parent: int, target_parent: int) -> Capt
         _validated_entrypoint(parent, request.target.parent.name)
         _validated_entrypoint(target_parent, request.target.parent.name)
     else:
-        _validated_entrypoint(parent, request.target.parent.name)
+        _validate_entrypoint(captured, request.target.parent.name)
     return captured
 
 
@@ -368,7 +375,7 @@ def _publish(
                         message="runtime changed during recovery preservation",
                     ),
                     backup_name=backup_name,
-                    recovery_name=recovery_name,
+                    recovery_name=stage_name,
                 )
             _remove_captured(target_parent, stage_name, displaced)
             retain_stage = True

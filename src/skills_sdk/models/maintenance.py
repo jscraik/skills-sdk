@@ -45,7 +45,10 @@ ArtifactName = Annotated[
     AfterValidator(_validate_artifact_name),
     Field(
         min_length=1,
-        json_schema_extra={"pattern": r"^[^/\\]+$", "not": {"enum": [".", ".."]}},
+        json_schema_extra={
+            "pattern": r"^[^/\\]+$",
+            "not": {"anyOf": [{"enum": [".", ".."]}, {"pattern": r"\u0000"}]},
+        },
     ),
 ]
 
