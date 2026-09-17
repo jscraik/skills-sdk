@@ -21,6 +21,8 @@ from skills_sdk.models.maintenance import EntrypointMaintenanceBlocker, Entrypoi
 from skills_sdk.validation.skill_ir import read_frontmatter
 from skills_sdk.validation.skill_package import _open_directory_tree
 
+_LOCK_ROOT = Path("/tmp").resolve(strict=True)
+
 
 class EntrypointRequest(BaseModel):
     """Local-only host arguments; never a portable receipt or authorization grant."""
@@ -62,6 +64,14 @@ def _capture(parent: int, name: str) -> CapturedFile:
         return CapturedFile(data, hashlib.sha256(data).hexdigest(), before.st_dev, before.st_ino, before.st_mode)
     finally:
         os.close(descriptor)
+
+
+def _lock_name(target_parent: int, target_name: str) -> str:
+    """Return one host-stable cooperative lock name for an opened target."""
+    parent = os.fstat(target_parent)
+    identity = f"{parent.st_dev}:{parent.st_ino}:{target_name}".encode()
+    lock_key = hashlib.sha256(identity).hexdigest()[:32]
+    return f".skills-sdk-entrypoint-{os.getuid()}-{lock_key}.lock"
 
 
 def _validated_entrypoint(parent: int, expected_name: str) -> CapturedFile:
@@ -343,25 +353,28 @@ def repair_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult
             parents.append(_open_directory_tree(path))
         source_parent, target_parent, backup_parent = parents
         source = _source(request, source_parent, target_parent)
-        lock_key = hashlib.sha256(os.fsencode(request.target)).hexdigest()[:32]
-        lock_name = f".skills-sdk-entrypoint-{lock_key}.lock"
-        lock = os.open(
-            lock_name,
-            os.O_RDWR | os.O_CREAT | os.O_NONBLOCK | os.O_NOFOLLOW,
-            0o600,
-            dir_fd=backup_parent,
-        )
+        lock_parent = _open_directory_tree(_LOCK_ROOT)
         try:
-            if not stat.S_ISREG(os.fstat(lock).st_mode):
-                raise ValueError("runtime lock must be a regular file")
+            lock_name = _lock_name(target_parent, request.target.name)
+            lock = os.open(
+                lock_name,
+                os.O_RDWR | os.O_CREAT | os.O_NONBLOCK | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=lock_parent,
+            )
             try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError as exc:
-                raise ValueError("another maintenance operation holds the runtime lock") from exc
-            return _publish(request, (source_parent, target_parent, backup_parent), source)
+                if not stat.S_ISREG(os.fstat(lock).st_mode):
+                    raise ValueError("runtime lock must be a regular file")
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError as exc:
+                    raise ValueError("another maintenance operation holds the runtime lock") from exc
+                return _publish(request, (source_parent, target_parent, backup_parent), source)
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+                os.close(lock)
         finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
-            os.close(lock)
+            os.close(lock_parent)
     finally:
         for descriptor in reversed(parents):
             os.close(descriptor)

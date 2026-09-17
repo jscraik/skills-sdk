@@ -69,11 +69,14 @@ and a non-empty description. This format check serves existing-entrypoint
 maintenance only: full SDK validation may still reject legacy package names
 or fields, and those failures remain blockers for SDK package claims.
 
-The adapter opens paths without following symlinks, holds a cooperative lock,
-stages replacement bytes, and preserves the prior bytes through an exclusive,
-independent snapshot before atomic publication. The backup root must be outside
-both package trees. The adapter preserves target mode bits and syncs the backup
-directory before publication. It does not preserve
+The adapter opens paths without following symlinks and holds a cooperative lock
+in the host's stable `/tmp` namespace. The lock identity comes from the opened
+target-parent device and inode plus the target filename, so path aliases and
+alternate backup roots serialize the same repair. It stages replacement bytes
+and preserves the prior bytes through an exclusive, independent snapshot before
+atomic publication. The backup root must be outside both package trees. The
+adapter preserves target mode bits and syncs the backup directory before
+publication. It does not preserve
 ownership, ACLs, or extended attributes on the replacement, or establish
 crash-durable preexisting content. The backup directory must already
 exist on the target filesystem. Failed publication retains the backup and

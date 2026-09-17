@@ -89,8 +89,13 @@ def test_real_cli_refuses_unapproved_or_invalid_state(tmp_path: Path, fault: str
 def test_live_advisory_lock_blocks_maintenance(tmp_path: Path) -> None:
     """Verify a live writer blocks while a stale lock pathname remains reusable."""
     _source, target, backup, args = _fixture(tmp_path)
-    lock_key = hashlib.sha256(os.fsencode(target)).hexdigest()[:32]
-    lock_path = backup / f".skills-sdk-entrypoint-{lock_key}.lock"
+    from skills_sdk.host.entrypoint import _LOCK_ROOT, _lock_name
+
+    target_parent = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        lock_path = _LOCK_ROOT / _lock_name(target_parent, target.name)
+    finally:
+        os.close(target_parent)
     descriptor = os.open(lock_path, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -105,10 +110,46 @@ def test_live_advisory_lock_blocks_maintenance(tmp_path: Path) -> None:
 def test_non_regular_lock_is_rejected_without_blocking(tmp_path: Path) -> None:
     if not hasattr(os, "mkfifo"):
         pytest.skip("FIFO creation is unavailable")
-    _source, target, backup, args = _fixture(tmp_path)
-    lock_key = hashlib.sha256(os.fsencode(target)).hexdigest()[:32]
-    os.mkfifo(backup / f".skills-sdk-entrypoint-{lock_key}.lock")
-    assert main([*args, "--apply", "--json"]) == 2
+    _source, target, _backup, args = _fixture(tmp_path)
+    from skills_sdk.host.entrypoint import _LOCK_ROOT, _lock_name
+
+    target_parent = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        lock_path = _LOCK_ROOT / _lock_name(target_parent, target.name)
+    finally:
+        os.close(target_parent)
+    lock_path.unlink(missing_ok=True)
+    os.mkfifo(lock_path)
+    try:
+        assert main([*args, "--apply", "--json"]) == 2
+    finally:
+        lock_path.unlink()
+
+
+def test_lock_namespace_is_independent_of_alias_and_backup_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify target aliases and alternate backup roots serialize one repair."""
+    from skills_sdk.host.entrypoint import _LOCK_ROOT, _lock_name
+
+    _source, target, _backup, args = _fixture(tmp_path)
+    alternate_backup = tmp_path / "alternate-backups"
+    alternate_backup.mkdir()
+    monkeypatch.chdir(tmp_path)
+    args[2] = str(target.relative_to(tmp_path))
+    args[args.index("--backup-root") + 1] = str(alternate_backup)
+    target_parent = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        lock_path = _LOCK_ROOT / _lock_name(target_parent, target.name)
+    finally:
+        os.close(target_parent)
+    descriptor = os.open(lock_path, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert main([*args, "--apply"]) == 2
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
 
 
 def test_cross_device_backup_root_is_rejected_before_publication(
