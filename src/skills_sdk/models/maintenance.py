@@ -7,6 +7,9 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, GetJsonSchemaHandler, model_validator
 from pydantic.json_schema import JsonSchemaValue
 
+from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.models.inventory import NonEmptyText, PortablePath
+from skills_sdk.models.packaging import BlockerCode
 from skills_sdk.models.validation import SkillPackageValidation
 
 
@@ -14,8 +17,8 @@ class EntrypointMaintenanceBlocker(BaseModel):
     """Stable public reason that maintenance did not complete."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
-    code: str
-    message: str
+    code: BlockerCode
+    message: NonEmptyText
 
 
 class EntrypointMaintenanceResult(BaseModel):
@@ -92,10 +95,14 @@ class RuntimeCopyComparison(BaseModel):
     status: Literal["pass", "drift", "blocked"]
     source: SkillPackageValidation
     runtime: SkillPackageValidation
-    different_paths: tuple[str, ...]
+    different_paths: tuple[PortablePath, ...]
 
     @model_validator(mode="after")
     def status_matches_evidence(self) -> Self:
+        for path in self.different_paths:
+            require_portable_relative_path(path)
+        if tuple(sorted(set(self.different_paths))) != self.different_paths:
+            raise ValueError("comparison paths must be sorted and unique")
         validations_pass = self.source.status == self.runtime.status == "pass"
         if self.status == "pass" and (not validations_pass or self.different_paths):
             raise ValueError("passing comparison requires passing validation and no differences")

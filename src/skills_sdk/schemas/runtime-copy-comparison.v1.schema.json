@@ -343,6 +343,8 @@
   "properties": {
     "different_paths": {
       "items": {
+        "minLength": 1,
+        "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
         "type": "string"
       },
       "title": "Different Paths",

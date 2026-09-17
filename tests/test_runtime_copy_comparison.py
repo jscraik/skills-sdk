@@ -4,10 +4,12 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.models import RuntimeCopyComparison
 
 REVISION = "a" * 40
 
@@ -43,6 +45,32 @@ def test_compare_copy_json_is_typed_and_versioned(tmp_path: Path, capsys: pytest
     payload["different_paths"] = ["SKILL.md"]
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("runtime-copy-comparison.v1", payload)
+
+
+@pytest.mark.parametrize("paths", [("../other",), ("/absolute",), ("guide.md", "guide.md"), ("z.md", "a.md")])
+def test_comparison_paths_are_portable_sorted_and_unique(tmp_path: Path, paths: tuple[str, ...]) -> None:
+    source = _package(tmp_path / "source")
+    runtime = _package(tmp_path / "runtime")
+    from skills_sdk.validation import validate_skill_package
+
+    source_result = validate_skill_package(source, source_revision=REVISION)
+    runtime_result = validate_skill_package(runtime, source_revision=REVISION)
+    with pytest.raises((ValidationError, ValueError)):
+        RuntimeCopyComparison(status="drift", source=source_result, runtime=runtime_result, different_paths=paths)
+
+
+def test_recursive_metadata_becomes_comparison_blocker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from skills_sdk.validation import runtime_copy
+
+    source = _package(tmp_path / "source")
+    runtime = _package(tmp_path / "runtime")
+    monkeypatch.setattr(
+        runtime_copy, "validate_skill_package", lambda *_args, **_kwargs: (_ for _ in ()).throw(RecursionError())
+    )
+    assert main(["compare-copy", str(source), str(runtime), "--source-revision", REVISION, "--json"]) == 2
+    assert json.loads(capsys.readouterr().out)["status"] == "blocked"
 
 
 @pytest.mark.parametrize("change", ["content", "extra", "missing"])

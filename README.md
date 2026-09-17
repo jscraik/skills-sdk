@@ -60,7 +60,8 @@ routes and proof for those lifecycle stages, Foundry can retain the resulting
 packages without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
 CLI names above remain honest discovery boundaries except for the implemented
-`intake`, `validate`, `build`, and `eval scenario-quality` routes.
+`intake`, `validate`, `build`, `eval scenario-quality`, `compare-copy`, and
+`maintain-entrypoint` routes.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
 required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
 decision.

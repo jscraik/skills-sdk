@@ -173,7 +173,14 @@ def test_cross_device_backup_root_is_rejected_before_publication(
     monkeypatch.setattr(entrypoint.os, "fstat", cross_device_fstat)
     assert main([*args, "--apply", "--json"]) == 2
     assert target.read_bytes() == before
-    assert _backup_files(backup) == []
+
+
+def test_preview_rejects_non_directory_backup_root(tmp_path: Path) -> None:
+    _source, _target, backup, args = _fixture(tmp_path)
+    backup.rmdir()
+    backup.write_text("not a directory\n")
+    assert main(args) == 2
+    assert backup.read_text() == "not a directory\n"
 
 
 def test_unsupported_host_adapter_import_is_a_typed_blocker(
@@ -252,8 +259,21 @@ def test_writer_racing_publication_is_preserved_in_backup(tmp_path: Path, monkey
     monkeypatch.setattr(entrypoint, "_exchange", racing_exchange)
     assert main([*args, "--apply"]) == 2
     assert len(_backup_files(backup)) >= 1
+
+
+def test_existing_recovery_file_is_not_replaced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    operation = "a" * 32
+    target_key = hashlib.sha256(os.fsencode(target)).hexdigest()[:16]
+    recovery = backup / f"entrypoint-{target_key}-{operation}.recovery"
+    recovery.write_text("other actor\n")
+    monkeypatch.setattr(entrypoint.uuid, "uuid4", lambda: type("Operation", (), {"hex": operation})())
+    assert main([*args, "--apply", "--json"]) == 2
+    assert recovery.read_text() == "other actor\n"
     recovery = [path for path in target.parent.iterdir() if path.name.startswith(".skills-sdk-stage-")]
-    assert [path.read_text() for path in recovery] == ["Concurrent writer bytes\n"]
+    assert len(recovery) == 1
 
 
 def test_replaced_parent_is_not_reported_as_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

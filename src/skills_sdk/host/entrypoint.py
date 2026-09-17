@@ -210,6 +210,8 @@ def _exchange(parent: int, left: str, right: str) -> None:
 
 def _validate_backup_root(request: EntrypointRequest) -> None:
     backup = request.backup_root.resolve(strict=True)
+    backup_parent = _open_directory_tree(backup)
+    os.close(backup_parent)
     for package_root in (request.source.parent.resolve(strict=True), request.target.parent.resolve(strict=True)):
         if backup == package_root or backup.is_relative_to(package_root):
             raise ValueError("backup root must be outside source and runtime package trees")
@@ -306,7 +308,13 @@ def _publish(
             )
         moved_to_backup = False
         try:
-            os.rename(stage_name, recovery_name, src_dir_fd=target_parent, dst_dir_fd=backup_parent)
+            os.link(
+                stage_name,
+                recovery_name,
+                src_dir_fd=target_parent,
+                dst_dir_fd=backup_parent,
+                follow_symlinks=False,
+            )
             moved_to_backup = True
             recovery = _capture(backup_parent, recovery_name)
             if displaced != recovery:
@@ -320,6 +328,8 @@ def _publish(
                     backup_name=backup_name,
                     recovery_name=recovery_name,
                 )
+            os.unlink(stage_name, dir_fd=target_parent)
+            retain_stage = True
         except (OSError, ValueError):
             retain_stage = True
             return EntrypointMaintenanceResult(
