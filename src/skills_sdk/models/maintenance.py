@@ -34,6 +34,22 @@ MaintenanceBlockerCode = Annotated[
 ]
 
 
+def _validate_artifact_name(value: str) -> str:
+    if not value or value in {".", ".."} or "/" in value or "\\" in value or "\x00" in value:
+        raise ValueError("artifact name must be one non-empty path component")
+    return value
+
+
+ArtifactName = Annotated[
+    str,
+    AfterValidator(_validate_artifact_name),
+    Field(
+        min_length=1,
+        json_schema_extra={"pattern": r"^[^/\\]+$", "not": {"enum": [".", ".."]}},
+    ),
+]
+
+
 class EntrypointMaintenanceBlocker(BaseModel):
     """Stable public reason that maintenance did not complete."""
 
@@ -49,8 +65,8 @@ class EntrypointMaintenanceResult(BaseModel):
     schema_version: Literal["entrypoint-maintenance-result/v1"] = "entrypoint-maintenance-result/v1"
     status: Literal["matching", "repairable", "repaired", "blocked", "indeterminate"]
     blocker: EntrypointMaintenanceBlocker | None = None
-    backup_name: str | None = None
-    recovery_name: str | None = None
+    backup_name: ArtifactName | None = None
+    recovery_name: ArtifactName | None = None
 
     @model_validator(mode="after")
     def evidence_matches_status(self) -> Self:

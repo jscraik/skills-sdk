@@ -157,6 +157,14 @@
     "backup_name": {
       "anyOf": [
         {
+          "minLength": 1,
+          "not": {
+            "enum": [
+              ".",
+              ".."
+            ]
+          },
+          "pattern": "^[^/\\\\]+$",
           "type": "string"
         },
         {
@@ -180,6 +188,14 @@
     "recovery_name": {
       "anyOf": [
         {
+          "minLength": 1,
+          "not": {
+            "enum": [
+              ".",
+              ".."
+            ]
+          },
+          "pattern": "^[^/\\\\]+$",
           "type": "string"
         },
         {

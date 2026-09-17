@@ -54,7 +54,10 @@ def test_real_cli_preview_apply_backup_and_idempotence(tmp_path: Path, capsys: p
     assert "repairable" in capsys.readouterr().out
     assert target.read_bytes() == before
     assert _backup_files(backup) == []
-    assert main([*args, "--apply"]) == 0
+    assert main([*args, "--apply", "--json"]) == 0
+    repaired = json.loads(capsys.readouterr().out)
+    assert repaired["backup_name"] is not None
+    assert repaired["recovery_name"] is not None
     assert target.read_bytes() == source.read_bytes()
     backups = _backup_files(backup)
     assert len(backups) == 2 and all(path.read_bytes() == before for path in backups)
@@ -150,6 +153,20 @@ def test_lock_namespace_is_independent_of_alias_and_backup_root(
     finally:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
         os.close(descriptor)
+
+
+def test_lock_root_must_be_private_and_user_owned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify maintenance refuses a lock namespace accessible to other users."""
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    shared_lock_root = tmp_path / "shared-locks"
+    shared_lock_root.mkdir(mode=0o777)
+    shared_lock_root.chmod(0o777)
+    monkeypatch.setattr(entrypoint, "_LOCK_ROOT", shared_lock_root)
+    assert main([*args, "--apply", "--json"]) == 2
+    assert target.read_text().startswith("---\nname: example\ndescription: Broken")
+    assert _backup_files(backup) == []
 
 
 def test_cross_device_backup_root_is_rejected_before_publication(
@@ -250,6 +267,18 @@ def test_maintenance_schema_rejects_line_break_in_blocker_code() -> None:
     blocker["code"] = "blocked\n"
     with pytest.raises(ContractError):
         SchemaRegistry().validate("entrypoint-maintenance-result.v1", result)
+
+
+@pytest.mark.parametrize("name", ["", ".", "..", "../backup", "ABSOLUTE", r"dir\backup"])
+def test_maintenance_artifact_names_are_single_components(tmp_path: Path, name: str) -> None:
+    if name == "ABSOLUTE":
+        name = str(tmp_path / "backup")
+    with pytest.raises(ValueError):
+        EntrypointMaintenanceResult(status="repaired", backup_name=name)
+    payload = EntrypointMaintenanceResult(status="repaired", backup_name="backup.bak").model_dump(mode="json")
+    payload["backup_name"] = name
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("entrypoint-maintenance-result.v1", payload)
 
 
 def test_publication_failure_preserves_current_and_recoverable_backup(
@@ -380,7 +409,9 @@ def test_repair_preserves_target_permissions(tmp_path: Path, mode: int) -> None:
     assert all(stat.S_IMODE(path.stat().st_mode) == mode for path in _backup_files(backup))
 
 
-def test_backup_sync_failure_prevents_publication(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_backup_sync_failure_prevents_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Verify an unsynced backup prevents replacement publication."""
     from skills_sdk.host import entrypoint
 
@@ -397,7 +428,9 @@ def test_backup_sync_failure_prevents_publication(tmp_path: Path, monkeypatch: p
         fsync(descriptor)
 
     monkeypatch.setattr(entrypoint.os, "fsync", refuse_backup_sync)
-    assert main([*args, "--apply"]) == 2
+    assert main([*args, "--apply", "--json"]) == 2
+    result = json.loads(capsys.readouterr().out)
+    assert result["backup_name"] is not None
     assert target.read_bytes() == before
     assert [path.read_bytes() for path in _backup_files(backup)] == [before]
     assert sorted(path.name for path in target.parent.iterdir()) == ["SKILL.md"]

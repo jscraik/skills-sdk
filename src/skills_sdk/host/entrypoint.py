@@ -9,6 +9,7 @@ import hashlib
 import os
 import platform
 import stat
+import tempfile
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
@@ -21,7 +22,7 @@ from skills_sdk.models.maintenance import EntrypointMaintenanceBlocker, Entrypoi
 from skills_sdk.validation.skill_ir import read_frontmatter
 from skills_sdk.validation.skill_package import _open_directory_tree
 
-_LOCK_ROOT = Path("/tmp").resolve(strict=True)
+_LOCK_ROOT = Path(tempfile.gettempdir()).resolve(strict=True)
 
 
 class EntrypointRequest(BaseModel):
@@ -72,6 +73,16 @@ def _lock_name(target_parent: int, target_name: str) -> str:
     identity = f"{parent.st_dev}:{parent.st_ino}:{target_name}".encode()
     lock_key = hashlib.sha256(identity).hexdigest()[:32]
     return f".skills-sdk-entrypoint-{os.getuid()}-{lock_key}.lock"
+
+
+def _validated_lock_root() -> int:
+    """Open the host-provided per-user temporary directory for lock files."""
+    descriptor = _open_directory_tree(_LOCK_ROOT)
+    observed = os.fstat(descriptor)
+    if observed.st_uid != os.getuid() or stat.S_IMODE(observed.st_mode) & 0o077:
+        os.close(descriptor)
+        raise ValueError("runtime lock directory must be private and owned by the current user")
+    return descriptor
 
 
 def _validated_entrypoint(parent: int, expected_name: str) -> CapturedFile:
@@ -262,7 +273,20 @@ def _publish(
     stage = _write_stage(target_parent, stage_name, source, current)
     retain_stage = False
     try:
-        _write_snapshot(backup_parent, backup_name, current)
+        try:
+            _write_snapshot(backup_parent, backup_name, current)
+        except OSError:
+            with suppress(OSError, ValueError):
+                if _same_snapshot(_capture(backup_parent, backup_name), current):
+                    return EntrypointMaintenanceResult(
+                        status="blocked",
+                        blocker=EntrypointMaintenanceBlocker(
+                            code="backup_sync_failed",
+                            message="snapshot was retained but directory durability could not be confirmed",
+                        ),
+                        backup_name=backup_name,
+                    )
+            raise
         backup = _capture(backup_parent, backup_name)
         try:
             latest = _capture(target_parent, request.target.name)
@@ -359,7 +383,7 @@ def _publish(
                 backup_name=backup_name,
                 recovery_name=recovery_name if moved_to_backup else stage_name,
             )
-        return EntrypointMaintenanceResult(status="repaired", backup_name=backup_name)
+        return EntrypointMaintenanceResult(status="repaired", backup_name=backup_name, recovery_name=recovery_name)
     finally:
         if not retain_stage:
             with suppress(ValueError):
@@ -381,7 +405,7 @@ def repair_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult
             parents.append(_open_directory_tree(path))
         source_parent, target_parent, backup_parent = parents
         source = _source(request, source_parent, target_parent)
-        lock_parent = _open_directory_tree(_LOCK_ROOT)
+        lock_parent = _validated_lock_root()
         try:
             lock_name = _lock_name(target_parent, request.target.name)
             lock = os.open(
