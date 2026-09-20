@@ -141,7 +141,8 @@ def test_edge_case_rejects_smoke_but_accepts_release(tmp_path: Path) -> None:
     assert selected.scenario_set.cases[0].case_id == "edge-empty-diff"
 
 
-def test_loader_rejects_runtime_mode_outside_public_literals(tmp_path: Path) -> None:
+@pytest.mark.parametrize("mode", ["release/x", [], {}])
+def test_loader_rejects_runtime_mode_outside_public_literals(tmp_path: Path, mode: object) -> None:
     package = _skill(tmp_path / "simplify")
 
     with pytest.raises(ContractError, match="selected case mode is unsupported"):
@@ -149,7 +150,7 @@ def test_loader_rejects_runtime_mode_outside_public_literals(tmp_path: Path) -> 
             package,
             source_revision=REVISION,
             case_id="happy-diff",
-            mode=cast(EvaluationMode, "release/x"),
+            mode=cast(EvaluationMode, mode),
         )
 
 

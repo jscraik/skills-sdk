@@ -189,7 +189,7 @@ def load_selected_case(
 ) -> SelectedCaseDefinition:
     """Load one validated package-local eval case without executing it."""
 
-    if mode not in _SUPPORTED_MODES:
+    if not isinstance(mode, str) or mode not in _SUPPORTED_MODES:
         raise _contract_error("invalid_selected_case", "selected case mode is unsupported")
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.status != "pass" or validation.candidate is None:
