@@ -276,6 +276,17 @@ def test_present_semantic_term_fields_must_be_non_empty_lists(tmp_path: Path, fi
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
+def test_semantic_requirements_reject_undeclared_fields(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"][1]["requirements"][0]["extra"] = "ignored"
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="semantic requirements contain unsupported fields"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 @pytest.mark.parametrize("value", ["", "   "])
 def test_empty_deterministic_assertion_values_are_rejected(tmp_path: Path, value: str) -> None:
     package = _skill(tmp_path / "simplify")

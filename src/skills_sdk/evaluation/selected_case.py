@@ -156,6 +156,8 @@ def _assertion_signal(raw: object, index: int) -> tuple[tuple[SemanticAssertion,
 
 
 def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAssertion:
+    if set(raw) - {"id", "all_of", "any_of"}:
+        raise _contract_error("invalid_acceptance_assertion", "semantic requirements contain unsupported fields")
     requirement_id = raw.get("id")
     all_of = raw.get("all_of", ())
     any_of = raw.get("any_of", ())
