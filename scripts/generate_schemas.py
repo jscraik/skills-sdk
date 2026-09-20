@@ -20,6 +20,7 @@ from schema_model_groups import (
     provider_execution_schema_models,
     runtime_lifecycle_schema_models,
 )
+from selected_case_schema import append_selected_case_constraints
 
 from skills_sdk.models.inventory import (
     PackageInventory,
@@ -55,7 +56,6 @@ _PORTABLE_PATH_PATTERN = (
 _NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"
 _NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
 _PROVIDER_IDENTITY_FIELDS = ("provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest")
-_REGISTRY_IDENTITY_FIELDS = ("registry_id", "namespace")
 _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN = (
     r"(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
@@ -72,7 +72,6 @@ _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
-_MODEL_ID_URI_SCHEME_SCHEMA_PATTERN = r"^[A-Za-z][A-Za-z0-9+.-]*:"
 
 
 def _append_portable_path_constraints(schema: Any) -> None:
@@ -101,9 +100,7 @@ def _append_provider_identity_constraints(schema: Any) -> None:
             properties = schema.get("properties", {})
             for field in _PROVIDER_IDENTITY_FIELDS:
                 properties[field]["not"] = {"pattern": _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
-            properties["model_id"].setdefault("allOf", []).append(
-                {"not": {"pattern": _MODEL_ID_URI_SCHEME_SCHEMA_PATTERN}}
-            )
+            properties["model_id"].setdefault("allOf", []).append({"not": {"pattern": r"^[A-Za-z][A-Za-z0-9+.-]*:"}})
         for value in schema.values():
             _append_provider_identity_constraints(value)
     elif isinstance(schema, list):
@@ -118,7 +115,7 @@ def _append_registry_identity_constraints(schema: Any) -> None:
         title = schema.get("title")
         if title == "RegistryIdentity":
             properties = schema.get("properties", {})
-            for field in _REGISTRY_IDENTITY_FIELDS:
+            for field in ("registry_id", "namespace"):
                 properties[field]["not"] = {"pattern": _REGISTRY_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
         elif title in {"RegistryPreparationRequest", "RegistryPreparationReceipt"}:
             properties = schema["properties"]
@@ -632,6 +629,7 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
     schema = model.model_json_schema()
     _append_portable_path_constraints(schema)
     _append_provider_identity_constraints(schema)
+    append_selected_case_constraints(schema, filename, _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN)
     _append_registry_identity_constraints(schema)
     package_safety_schema.append_package_safety_schema_constraints(schema, filename)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:

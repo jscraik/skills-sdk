@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from jsonschema import Draft202012Validator
 
 from skills_sdk.cli.main import main
 from skills_sdk.core.digests import canonical_json_sha256
@@ -312,6 +313,7 @@ def test_judge_evidence_rejects_credential_shaped_refs_at_model_and_schema_bound
 
     with pytest.raises(ValueError, match="credential-shaped"):
         SelectedCaseJudgeEvidence.model_validate(payload)
+    assert list(Draft202012Validator(SchemaRegistry().load("selected-case-judge-evidence.v1")).iter_errors(payload))
     with pytest.raises(ValueError, match="contract_validation_failed"):
         SchemaRegistry().validate("selected-case-judge-evidence.v1", payload)
 
