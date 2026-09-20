@@ -9,3 +9,5 @@ def append_selected_case_constraints(schema: dict[str, Any], filename: str, cred
     if filename != "selected-case-judge-evidence.v1.schema.json":
         return
     schema["properties"]["evidence_refs"]["items"]["not"] = {"pattern": credential_pattern}
+    schema["properties"]["evidence_refs"]["uniqueItems"] = True
+    schema["properties"]["satisfied_assertion_ids"]["uniqueItems"] = True

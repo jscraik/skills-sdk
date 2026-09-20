@@ -164,6 +164,29 @@ def test_malformed_deterministic_check_shapes_return_typed_contract_error(
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
+@pytest.mark.parametrize("command", ["ghp_secret_marker", str(Path("/").joinpath("Users", "private", "tool"))])
+def test_private_forbidden_commands_are_rejected(tmp_path: Path, command: str) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["deterministic_checks"]["forbidden_commands"] = [command]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="forbidden_commands must not contain private values"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_case_id_must_match_provider_execution_syntax(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["id"] = "happy case"
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="selected case id must use provider execution id syntax"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy case", mode="release")
+
+
 def test_duplicate_semantic_requirement_ids_are_rejected(tmp_path: Path) -> None:
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
@@ -214,7 +237,7 @@ def test_deterministic_only_case_accepts_empty_satisfied_assertion_ids(tmp_path:
     payload["cases"][0]["acceptance"] = [{"type": "contains", "value": "focused validation"}]
     evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
-    input_payload = {"prompt": "bounded"}
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
     output = "Use focused validation."
     request = _prepared_request(definition, input_payload)
 
@@ -236,7 +259,7 @@ def test_missing_adapter_or_semantic_evidence_blocks_without_execution_claim(tmp
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    input_payload = {"prompt": "bounded"}
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
     request = _prepared_request(definition, input_payload)
 
     receipt = asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
@@ -251,7 +274,7 @@ def test_output_or_identity_mismatch_blocks_instead_of_fabricating_pass(tmp_path
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    input_payload = {"prompt": "bounded"}
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
     request = _prepared_request(definition, input_payload)
     output = "A reviewed answer."
     evidence = _evidence(definition, request, "different output")
@@ -269,7 +292,7 @@ def test_assertion_contract_mismatch_blocks_claimed_semantic_pass(tmp_path: Path
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    input_payload = {"prompt": "bounded"}
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
     request = _prepared_request(definition, input_payload)
     output = "A reviewed answer."
     evidence_payload = _evidence(definition, request, output).model_dump(mode="json")
@@ -294,7 +317,7 @@ def test_judge_evidence_round_trips_through_public_schema(tmp_path: Path) -> Non
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    request = _prepared_request(definition, {"prompt": "bounded"})
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
     payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
 
     SchemaRegistry().validate("selected-case-judge-evidence.v1", payload)
@@ -307,7 +330,7 @@ def test_judge_evidence_rejects_credential_shaped_refs_at_model_and_schema_bound
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    request = _prepared_request(definition, {"prompt": "bounded"})
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
     payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
     payload["evidence_refs"] = [evidence_ref]
 
@@ -318,12 +341,25 @@ def test_judge_evidence_rejects_credential_shaped_refs_at_model_and_schema_bound
         SchemaRegistry().validate("selected-case-judge-evidence.v1", payload)
 
 
+@pytest.mark.parametrize("field", ["evidence_refs", "satisfied_assertion_ids"])
+def test_judge_evidence_schema_rejects_duplicate_array_items(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload[field] = [payload[field][0], payload[field][0]]
+
+    errors = list(Draft202012Validator(SchemaRegistry().load("selected-case-judge-evidence.v1")).iter_errors(payload))
+    assert any(error.validator == "uniqueItems" for error in errors)
+
+
 @pytest.mark.parametrize("field", ["candidate", "scenario_set_id", "case_id"])
 def test_request_identity_mismatch_blocks_before_provider_execution(tmp_path: Path, field: str) -> None:
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    input_payload = {"prompt": "bounded"}
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
     request = _prepared_request(definition, input_payload)
     payload = request.model_dump(mode="json")
     if field == "candidate":
@@ -347,11 +383,34 @@ def test_request_identity_mismatch_blocks_before_provider_execution(tmp_path: Pa
     assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
 
 
+def test_provider_input_must_match_the_selected_case_prompt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": "A different prompt."}
+    request = _prepared_request(definition, input_payload)
+    output = "Preserve behavior with focused validation."
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition,
+            request,
+            input_payload,
+            _adapter(request, output),
+            _evidence(definition, request, output),
+        )
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
+
+
 def test_forbidden_command_in_private_output_fails(tmp_path: Path) -> None:
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    input_payload = {"prompt": "bounded"}
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
     output = "Run rm -rf now."
     request = _prepared_request(definition, input_payload)
 
@@ -374,7 +433,7 @@ def test_cli_runs_controlled_supplied_adapter_without_agent_skills(
 ) -> None:
     package = _skill(tmp_path / "simplify")
     definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
-    input_payload = {"prompt": "bounded"}
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
     request = _prepared_request(definition, input_payload)
     output = "Preserve behavior with focused validation."
     host_input = tmp_path / "host-input.json"

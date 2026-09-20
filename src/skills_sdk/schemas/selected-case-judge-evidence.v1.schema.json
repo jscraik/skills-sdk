@@ -153,7 +153,8 @@
       },
       "minItems": 1,
       "title": "Evidence Refs",
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "judge": {
       "$ref": "#/$defs/ProviderIdentityV2"
@@ -190,7 +191,8 @@
         "type": "string"
       },
       "title": "Satisfied Assertion Ids",
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "scenario_set_id": {
       "minLength": 1,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
@@ -16,7 +17,7 @@ from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2, ScenarioObservationV2, ScenarioSetV2
 from skills_sdk.models.packaging import PackageManifestFile, PackageReceiptBlocker
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
-from skills_sdk.models.provider_execution import ProviderExecutionRequest
+from skills_sdk.models.provider_execution import ProviderExecutionRequest, _identity_is_public
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.providers import JsonValue, ProviderAdapterComplete, TextProviderAdapter, execute_provider_call
 from skills_sdk.validation import validate_skill_package
@@ -25,6 +26,7 @@ EvaluationMode = Literal["standard", "smoke", "release"]
 SemanticAssertion = tuple[str, str, tuple[str, ...], tuple[str, ...]]
 _SEMANTIC_ASSERTIONS = {"discovery_question", "expected_signal", "semantic_requirements"}
 _DETERMINISTIC_ASSERTIONS = {"contains", "must_not", "not_contains"}
+_EXECUTION_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,10 +202,14 @@ def load_selected_case(
         raw_forbidden = []
     if not isinstance(raw_forbidden, list) or not all(isinstance(item, str) and item.strip() for item in raw_forbidden):
         raise _contract_error("invalid_selected_case", "forbidden_commands must be a list of non-empty text")
+    if not all(_identity_is_public(item) for item in raw_forbidden):
+        raise _contract_error("invalid_selected_case", "forbidden_commands must not contain private values")
     forbidden = tuple(raw_forbidden)
     prompt = case.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise _contract_error("invalid_selected_case", "selected case requires a prompt")
+    if _EXECUTION_ID_PATTERN.fullmatch(case_id) is None:
+        raise _contract_error("invalid_selected_case", "selected case id must use provider execution id syntax")
     semantic_ids = tuple(item[0] for item in semantic)
     selected = ScenarioCaseV2(
         case_id=case_id,
@@ -318,11 +324,16 @@ def _validated_observation(
 def _request_matches_definition(
     definition: SelectedCaseDefinition,
     request: ProviderExecutionRequest,
+    input_payload: JsonValue,
 ) -> bool:
+    case = definition.scenario_set.cases[0]
     return (
         request.candidate == definition.scenario_set.candidate
         and request.scenario_set_id == definition.scenario_set.scenario_set_id
-        and request.case_id == definition.scenario_set.cases[0].case_id
+        and request.case_id == case.case_id
+        and isinstance(input_payload, dict)
+        and input_payload.get("prompt") == case.prompt
+        and request.input_sha256 == canonical_json_sha256(input_payload)
     )
 
 
@@ -335,7 +346,7 @@ async def execute_selected_case(
 ) -> EvaluationReceiptV2:
     """Execute one injected provider call and evaluate bound assertion evidence."""
 
-    if not _request_matches_definition(definition, request):
+    if not _request_matches_definition(definition, request, input_payload):
         observation = _blocked_observation(
             definition,
             request,
