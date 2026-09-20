@@ -179,6 +179,17 @@ def test_malformed_deterministic_check_shapes_return_typed_contract_error(
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
+def test_acceptance_assertions_reject_undeclared_fields(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"][0]["extra"] = "ignored"
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="acceptance assertions contain unsupported fields"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 @pytest.mark.parametrize("command", ["ghp_secret_marker", str(Path("/").joinpath("Users", "private", "tool"))])
 def test_private_forbidden_commands_are_rejected(tmp_path: Path, command: str) -> None:
     package = _skill(tmp_path / "simplify")
@@ -200,6 +211,19 @@ def test_case_id_must_match_provider_execution_syntax(tmp_path: Path) -> None:
 
     with pytest.raises(ContractError, match="selected case id must use provider execution id syntax"):
         load_selected_case(package, source_revision=REVISION, case_id="happy case", mode="release")
+
+
+@pytest.mark.parametrize("case_id", [True, [], {}])
+def test_case_id_requires_text_before_selection(tmp_path: Path, case_id: object) -> None:
+    package = _skill(tmp_path / "simplify")
+
+    with pytest.raises(ContractError, match="selected case id must use provider execution id syntax"):
+        load_selected_case(
+            package,
+            source_revision=REVISION,
+            case_id=cast(str, case_id),
+            mode="release",
+        )
 
 
 def test_case_id_must_not_contain_private_values(tmp_path: Path) -> None:

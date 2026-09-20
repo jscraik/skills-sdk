@@ -127,6 +127,9 @@ def _assertion_signal(raw: object, index: int) -> tuple[tuple[SemanticAssertion,
     if not isinstance(raw, dict) or not isinstance(raw.get("type"), str):
         raise _contract_error("invalid_acceptance_assertion", "acceptance assertions must be typed mappings")
     assertion_type = cast(str, raw["type"])
+    allowed_fields = {"type", "requirements"} if assertion_type == "semantic_requirements" else {"type", "value"}
+    if set(raw) - allowed_fields:
+        raise _contract_error("invalid_acceptance_assertion", "acceptance assertions contain unsupported fields")
     prefix = f"acceptance-{index}"
     if assertion_type == "semantic_requirements":
         requirements = raw.get("requirements")
@@ -191,6 +194,8 @@ def load_selected_case(
 
     if not isinstance(mode, str) or mode not in _SUPPORTED_MODES:
         raise _contract_error("invalid_selected_case", "selected case mode is unsupported")
+    if not isinstance(case_id, str):
+        raise _contract_error("invalid_selected_case", "selected case id must use provider execution id syntax")
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.status != "pass" or validation.candidate is None:
         raise _contract_error("package_validation_blocked", "selected-case evaluation requires a valid package")
