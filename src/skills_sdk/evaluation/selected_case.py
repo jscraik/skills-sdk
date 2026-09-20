@@ -128,6 +128,9 @@ def _assertion_signal(raw: object, index: int) -> tuple[tuple[SemanticAssertion,
         assertions = tuple(_semantic_requirement(prefix, item) for item in requirements if isinstance(item, dict))
         if len(assertions) != len(requirements):
             raise _contract_error("invalid_acceptance_assertion", "semantic requirements require stable ids")
+        assertion_ids = tuple(item[0] for item in assertions)
+        if len(assertion_ids) != len(set(assertion_ids)):
+            raise _contract_error("invalid_acceptance_assertion", "semantic requirement ids must be unique")
         return assertions, None
     if assertion_type in _SEMANTIC_ASSERTIONS:
         value = raw.get("value")
@@ -176,8 +179,17 @@ def load_selected_case(
         raise _contract_error("package_validation_blocked", "selected-case evaluation requires a valid package")
     case = _selected_case(_load_cases(package_root, _evals_digest(validation.files)), case_id, mode)
     semantic, deterministic = _assertion_signals(case)
-    checks = cast(dict[str, object], case.get("deterministic_checks") or {})
-    forbidden = tuple(cast(list[str], checks.get("forbidden_commands") or []))
+    raw_checks = case.get("deterministic_checks")
+    if raw_checks is None:
+        raw_checks = {}
+    if not isinstance(raw_checks, dict):
+        raise _contract_error("invalid_selected_case", "deterministic_checks must be a mapping")
+    raw_forbidden = raw_checks.get("forbidden_commands")
+    if raw_forbidden is None:
+        raw_forbidden = []
+    if not isinstance(raw_forbidden, list) or not all(isinstance(item, str) and item.strip() for item in raw_forbidden):
+        raise _contract_error("invalid_selected_case", "forbidden_commands must be a list of non-empty text")
+    forbidden = tuple(raw_forbidden)
     prompt = case.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise _contract_error("invalid_selected_case", "selected case requires a prompt")

@@ -181,11 +181,11 @@
       "type": "boolean"
     },
     "satisfied_assertion_ids": {
+      "default": [],
       "items": {
         "minLength": 1,
         "type": "string"
       },
-      "minItems": 1,
       "title": "Satisfied Assertion Ids",
       "type": "array"
     },
@@ -209,7 +209,6 @@
     "output_sha256",
     "assertion_contract_sha256",
     "judge",
-    "satisfied_assertion_ids",
     "evidence_refs",
     "judge_result_sha256"
   ],

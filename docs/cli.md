@@ -29,7 +29,7 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
 
-All four commands are non-interactive and non-mutating. For an invocation that
+All five commands are non-interactive and non-mutating. For an invocation that
 reaches a service, exit `0` means intake normalized with an `admit` decision,
 validation passed, a receipt was built, or the `eval scenario-quality`
 assessment passed. Exit `2` means a structured blocker, blocked receipt, or

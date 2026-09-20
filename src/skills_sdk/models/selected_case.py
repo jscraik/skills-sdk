@@ -23,7 +23,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     output_sha256: Sha256
     assertion_contract_sha256: Sha256
     judge: ProviderIdentityV2
-    satisfied_assertion_ids: tuple[NonEmptyText, ...] = Field(min_length=1)
+    satisfied_assertion_ids: tuple[NonEmptyText, ...] = ()
     evidence_refs: tuple[PortablePath, ...] = Field(min_length=1)
     judge_result_sha256: Sha256
     credentials_included: Literal[False] = False

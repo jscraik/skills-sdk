@@ -138,6 +138,69 @@ def test_edge_case_rejects_smoke_but_accepts_release(tmp_path: Path) -> None:
     assert selected.scenario_set.cases[0].case_id == "edge-empty-diff"
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("deterministic_checks", ["rm -rf"]),
+        ("forbidden_commands", "rm -rf"),
+        ("forbidden_commands", [""]),
+    ],
+)
+def test_malformed_deterministic_check_shapes_return_typed_contract_error(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    case = payload["cases"][0]
+    if field == "deterministic_checks":
+        case[field] = value
+    else:
+        case["deterministic_checks"][field] = value
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="invalid_selected_case"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_duplicate_semantic_requirement_ids_are_rejected(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"][1]["requirements"].append(
+        {"id": "preserve_behavior", "all_of": ["separate evidence"]}
+    )
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="semantic requirement ids must be unique"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_deterministic_only_case_accepts_empty_satisfied_assertion_ids(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"] = [{"type": "contains", "value": "focused validation"}]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    input_payload = {"prompt": "bounded"}
+    output = "Use focused validation."
+    request = _prepared_request(definition, input_payload)
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition,
+            request,
+            input_payload,
+            _adapter(request, output),
+            _evidence(definition, request, output),
+        )
+    )
+
+    assert definition.semantic_signal_ids == ()
+    assert receipt.status == "pass"
+
+
 def test_missing_adapter_or_semantic_evidence_blocks_without_execution_claim(tmp_path: Path) -> None:
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
