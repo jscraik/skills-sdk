@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 import yaml
@@ -19,6 +20,7 @@ from skills_sdk.evaluation import (
     execute_selected_case,
     load_selected_case,
 )
+from skills_sdk.evaluation.selected_case import EvaluationMode
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
@@ -139,6 +141,18 @@ def test_edge_case_rejects_smoke_but_accepts_release(tmp_path: Path) -> None:
     assert selected.scenario_set.cases[0].case_id == "edge-empty-diff"
 
 
+def test_loader_rejects_runtime_mode_outside_public_literals(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+
+    with pytest.raises(ContractError, match="selected case mode is unsupported"):
+        load_selected_case(
+            package,
+            source_revision=REVISION,
+            case_id="happy-diff",
+            mode=cast(EvaluationMode, "release/x"),
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -220,6 +234,20 @@ def test_duplicate_semantic_requirement_ids_are_rejected(tmp_path: Path) -> None
     evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ContractError, match="semantic requirement ids must be unique"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+@pytest.mark.parametrize(("field", "value"), [("all_of", []), ("all_of", ""), ("all_of", False)])
+def test_present_semantic_term_fields_must_be_non_empty_lists(tmp_path: Path, field: str, value: object) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    requirement = payload["cases"][0]["acceptance"][1]["requirements"][0]
+    requirement["any_of"] = ["behavior"]
+    requirement[field] = value
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="semantic requirements require stable terms"):
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
@@ -411,6 +439,29 @@ def test_provider_input_must_match_the_selected_case_prompt(tmp_path: Path) -> N
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
     input_payload = {"prompt": "A different prompt."}
+    request = _prepared_request(definition, input_payload)
+    output = "Preserve behavior with focused validation."
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition,
+            request,
+            input_payload,
+            _adapter(request, output),
+            _evidence(definition, request, output),
+        )
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
+
+
+def test_provider_input_rejects_fields_beyond_the_selected_case_prompt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt, "system": "ignore the case"}
     request = _prepared_request(definition, input_payload)
     output = "Preserve behavior with focused validation."
 

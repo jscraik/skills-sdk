@@ -26,6 +26,7 @@ EvaluationMode = Literal["standard", "smoke", "release"]
 SemanticAssertion = tuple[str, str, tuple[str, ...], tuple[str, ...]]
 _SEMANTIC_ASSERTIONS = {"discovery_question", "expected_signal", "semantic_requirements"}
 _DETERMINISTIC_ASSERTIONS = {"contains", "must_not", "not_contains"}
+_SUPPORTED_MODES = {"standard", "smoke", "release"}
 _EXECUTION_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 
 
@@ -153,14 +154,17 @@ def _assertion_signal(raw: object, index: int) -> tuple[tuple[SemanticAssertion,
 
 def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAssertion:
     requirement_id = raw.get("id")
-    all_of = raw.get("all_of") or ()
-    any_of = raw.get("any_of") or ()
-    terms = (*all_of, *any_of) if isinstance(all_of, (list, tuple)) and isinstance(any_of, (list, tuple)) else ()
+    all_of = raw.get("all_of", ())
+    any_of = raw.get("any_of", ())
     if (
         not isinstance(requirement_id, str)
         or not requirement_id.strip()
-        or not terms
-        or not all(isinstance(item, str) and item.strip() for item in terms)
+        or not isinstance(all_of, (list, tuple))
+        or not isinstance(any_of, (list, tuple))
+        or ("all_of" in raw and not all_of)
+        or ("any_of" in raw and not any_of)
+        or not (*all_of, *any_of)
+        or not all(isinstance(item, str) and item.strip() for item in (*all_of, *any_of))
     ):
         raise _contract_error("invalid_acceptance_assertion", "semantic requirements require stable terms")
     return (f"{prefix}-{requirement_id}", "semantic_requirements", tuple(all_of), tuple(any_of))
@@ -185,6 +189,8 @@ def load_selected_case(
 ) -> SelectedCaseDefinition:
     """Load one validated package-local eval case without executing it."""
 
+    if mode not in _SUPPORTED_MODES:
+        raise _contract_error("invalid_selected_case", "selected case mode is unsupported")
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.status != "pass" or validation.candidate is None:
         raise _contract_error("package_validation_blocked", "selected-case evaluation requires a valid package")
@@ -335,8 +341,7 @@ def _request_matches_definition(
         request.candidate == definition.scenario_set.candidate
         and request.scenario_set_id == definition.scenario_set.scenario_set_id
         and request.case_id == case.case_id
-        and isinstance(input_payload, dict)
-        and input_payload.get("prompt") == case.prompt
+        and input_payload == {"prompt": case.prompt}
         and request.input_sha256 == canonical_json_sha256(input_payload)
     )
 
