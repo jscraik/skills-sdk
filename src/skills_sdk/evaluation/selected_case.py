@@ -79,13 +79,17 @@ def _evals_digest(validation_files: tuple[PackageManifestFile, ...]) -> str:
     raise _contract_error("missing_eval_definitions", "package does not contain references/evals.yaml")
 
 
-def _load_cases(package_root: Path, expected_sha256: str) -> list[object]:
+def _load_cases(package_root: Path, expected_sha256: str, package_id: str) -> list[object]:
     try:
         payload = yaml.load(_capture_evals(package_root, expected_sha256), Loader=_ClosedLoader)
     except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
         raise _contract_error("invalid_eval_definitions", "package eval definitions could not be loaded") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("cases"), list):
         raise _contract_error("invalid_eval_definitions", "package eval definitions require a cases list")
+    if payload.get("schema_version") != "2.0":
+        raise _contract_error("unsupported_evals_schema", "package eval definitions require schema_version 2.0")
+    if payload.get("skill_name") != package_id:
+        raise _contract_error("skill_name_mismatch", "package eval definitions must match the candidate")
     return cast(list[object], payload["cases"])
 
 
@@ -138,7 +142,10 @@ def _assertion_signal(raw: object, index: int) -> tuple[tuple[SemanticAssertion,
             raise _contract_error("invalid_acceptance_assertion", "semantic assertions require expected behavior")
         return ((prefix, assertion_type, (value,), ()),), None
     if assertion_type in _DETERMINISTIC_ASSERTIONS and isinstance(raw.get("value"), str):
-        return (), (prefix, assertion_type, cast(str, raw["value"]))
+        value = cast(str, raw["value"])
+        if not value.strip():
+            raise _contract_error("invalid_acceptance_assertion", "deterministic assertions require non-empty values")
+        return (), (prefix, assertion_type, value)
     raise _contract_error("unsupported_acceptance_assertion", "selected case uses an unsupported assertion type")
 
 
@@ -177,7 +184,11 @@ def load_selected_case(
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.status != "pass" or validation.candidate is None:
         raise _contract_error("package_validation_blocked", "selected-case evaluation requires a valid package")
-    case = _selected_case(_load_cases(package_root, _evals_digest(validation.files)), case_id, mode)
+    case = _selected_case(
+        _load_cases(package_root, _evals_digest(validation.files), validation.candidate.package_id),
+        case_id,
+        mode,
+    )
     semantic, deterministic = _assertion_signals(case)
     raw_checks = case.get("deterministic_checks")
     if raw_checks is None:

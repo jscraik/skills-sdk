@@ -176,6 +176,36 @@ def test_duplicate_semantic_requirement_ids_are_rejected(tmp_path: Path) -> None
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
+@pytest.mark.parametrize("value", ["", "   "])
+def test_empty_deterministic_assertion_values_are_rejected(tmp_path: Path, value: str) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"] = [{"type": "contains", "value": value}]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="deterministic assertions require non-empty values"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    [
+        ("schema_version", "1.0", "unsupported_evals_schema"),
+        ("skill_name", "another-skill", "skill_name_mismatch"),
+    ],
+)
+def test_eval_definitions_must_bind_the_candidate(tmp_path: Path, field: str, value: str, error: str) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload[field] = value
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match=error):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 def test_deterministic_only_case_accepts_empty_satisfied_assertion_ids(tmp_path: Path) -> None:
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
@@ -267,6 +297,23 @@ def test_judge_evidence_round_trips_through_public_schema(tmp_path: Path) -> Non
     payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
 
     SchemaRegistry().validate("selected-case-judge-evidence.v1", payload)
+
+
+@pytest.mark.parametrize("evidence_ref", ["evidence/ghp_secret_marker.json", "evidence/hf_secret_marker.json"])
+def test_judge_evidence_rejects_credential_shaped_refs_at_model_and_schema_boundaries(
+    tmp_path: Path, evidence_ref: str
+) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": "bounded"})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["evidence_refs"] = [evidence_ref]
+
+    with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    with pytest.raises(ValueError, match="contract_validation_failed"):
+        SchemaRegistry().validate("selected-case-judge-evidence.v1", payload)
 
 
 @pytest.mark.parametrize("field", ["candidate", "scenario_set_id", "case_id"])
