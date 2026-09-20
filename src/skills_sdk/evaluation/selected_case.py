@@ -167,6 +167,8 @@ def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAss
 
 
 def _category(value: object) -> Literal["happy", "pressure", "boundary", "regression"]:
+    if not isinstance(value, str):
+        raise _contract_error("invalid_selected_case", "selected case category must be text")
     if value in {"happy", "pressure", "regression"}:
         return cast(Literal["happy", "pressure", "regression"], value)
     if value in {"boundary", "edge", "negative"}:
@@ -210,6 +212,8 @@ def load_selected_case(
         raise _contract_error("invalid_selected_case", "selected case requires a prompt")
     if _EXECUTION_ID_PATTERN.fullmatch(case_id) is None:
         raise _contract_error("invalid_selected_case", "selected case id must use provider execution id syntax")
+    if not _identity_is_public(case_id):
+        raise _contract_error("invalid_selected_case", "selected case id must not contain private values")
     semantic_ids = tuple(item[0] for item in semantic)
     selected = ScenarioCaseV2(
         case_id=case_id,

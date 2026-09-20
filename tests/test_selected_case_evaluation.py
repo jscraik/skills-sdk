@@ -187,6 +187,29 @@ def test_case_id_must_match_provider_execution_syntax(tmp_path: Path) -> None:
         load_selected_case(package, source_revision=REVISION, case_id="happy case", mode="release")
 
 
+def test_case_id_must_not_contain_private_values(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["id"] = "ghp_secret_marker"
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="selected case id must not contain private values"):
+        load_selected_case(package, source_revision=REVISION, case_id="ghp_secret_marker", mode="release")
+
+
+@pytest.mark.parametrize("category", [[], {}])
+def test_category_requires_text_before_membership_checks(tmp_path: Path, category: object) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["category"] = category
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="selected case category must be text"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 def test_duplicate_semantic_requirement_ids_are_rejected(tmp_path: Path) -> None:
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
