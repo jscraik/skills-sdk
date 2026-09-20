@@ -63,6 +63,7 @@ SCHEMA_NAMES = frozenset(
         "scenario-set.v1",
         "scenario-set.v2",
         "scenario-quality.v1",
+        "selected-case-judge-evidence.v1",
         "scorer-profile.v1",
         "skill-package-validation.v1",
         "skill-package-intake.v1",
@@ -364,6 +365,10 @@ class SchemaRegistry:
             from skills_sdk.models.scenario_quality import ScenarioQualityReceipt
 
             model = ScenarioQualityReceipt
+        elif name == "selected-case-judge-evidence.v1":
+            from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
+
+            model = SelectedCaseJudgeEvidence
         elif name == "scorer-profile.v1":
             from skills_sdk.models.evaluation import ScorerProfile
 

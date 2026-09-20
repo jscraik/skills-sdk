@@ -155,6 +155,22 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   Cancellation remains cancellation after bounded cleanup. This service does
   not discover adapters, read credentials, contact a network, evaluate output,
   or establish external provider truth.
+- **Selected-case behavioral orchestration:**
+  `load_selected_case` validates one case from package-local
+  `references/evals.yaml`, including exact mode eligibility, and projects its
+  existing acceptance declarations into a candidate-bound `ScenarioSetV2`.
+  `execute_selected_case` composes the existing `execute_provider_call` and
+  `evaluate_scenario_set_v2` services for one injected adapter. Semantic
+  assertion signals must be supplied through a `SelectedCaseJudgeEvidence`
+  artifact bound to the candidate, scenario set, case, provider output digest,
+  and a digest of the complete semantic assertion contract. The artifact also
+  identifies the judge adapter and its result digest; the service never derives
+  semantic proof from keyword matches or an unreferenced boolean. Deterministic text
+  absence or presence checks remain SDK-owned. Missing adapters, missing judge
+  evidence, unavailable output, or identity mismatches return blocked
+  evaluation receipts. `SuppliedTextProviderAdapter` is a no-I/O adapter for
+  controlled host or test evidence. These APIs prove portable orchestration,
+  not live-provider authorization, execution provenance, or model quality.
 - **Runtime-lock planning:** `RuntimeLock` (`runtime-lock/v1`) describes
   candidate-bound intended state for a logical user or project target. Each
   entry binds package and candidate identity, version, package digest, registry

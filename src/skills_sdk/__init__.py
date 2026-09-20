@@ -1,10 +1,7 @@
 """Portable lifecycle contracts and tooling for Agent Skills packages."""
 
 from skills_sdk.distribution import prepare_private_registry_candidate
-from skills_sdk.evaluation import (
-    evaluate_scenario_set,
-    evaluate_scenario_set_v2,
-)
+from skills_sdk.evaluation import evaluate_scenario_set, evaluate_scenario_set_v2
 from skills_sdk.lifecycle import plan_runtime_install
 from skills_sdk.models import (
     ActivationObservation,
@@ -63,6 +60,7 @@ from skills_sdk.models import (
     ScenarioSetV2,
     ScorerProfile,
     SecurityScreeningResult,
+    SelectedCaseJudgeEvidence,
     TextProviderAdapterDescriptor,
     ValueDecision,
     ValueDecisionV2,
@@ -79,6 +77,25 @@ def __getattr__(name: str) -> object:
         return {
             "ScenarioQualityPolicy": ScenarioQualityPolicy,
             "assess_scenario_quality": assess_scenario_quality,
+        }[name]
+    if name in {
+        "SelectedCaseDefinition",
+        "SuppliedTextProviderAdapter",
+        "execute_selected_case",
+        "load_selected_case",
+    }:
+        from skills_sdk.evaluation.selected_case import (
+            SelectedCaseDefinition,
+            SuppliedTextProviderAdapter,
+            execute_selected_case,
+            load_selected_case,
+        )
+
+        return {
+            "SelectedCaseDefinition": SelectedCaseDefinition,
+            "SuppliedTextProviderAdapter": SuppliedTextProviderAdapter,
+            "execute_selected_case": execute_selected_case,
+            "load_selected_case": load_selected_case,
         }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
@@ -141,6 +158,9 @@ __all__ = [
     "ScenarioSetV2",
     "ScorerProfile",
     "SecurityScreeningResult",
+    "SelectedCaseDefinition",
+    "SelectedCaseJudgeEvidence",
+    "SuppliedTextProviderAdapter",
     "TextProviderAdapterDescriptor",
     "ValueDecision",
     "ValueDecisionV2",
@@ -149,6 +169,8 @@ __all__ = [
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_provider_call",
+    "execute_selected_case",
+    "load_selected_case",
     "plan_runtime_install",
     "prepare_private_registry_candidate",
 ]

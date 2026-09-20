@@ -26,6 +26,7 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
 
 All four commands are non-interactive and non-mutating. For an invocation that
@@ -47,8 +48,21 @@ discovery boundaries while their deeper implementations are built in separate,
 candidate-bound lanes:
 
 - `inventory` is read-only source-inventory intent.
-- `eval scenario-quality` performs read-only package-local definition checks;
-  other evaluation execution remains outside this command.
+- `eval scenario-quality` performs read-only package-local definition checks.
+- `eval selected-case` loads one declared case for the requested mode, runs a
+  caller-supplied bounded text adapter, validates separately supplied semantic
+  assertion evidence against the candidate, case, provider, and output digest,
+  and emits an `evaluation-receipt/v2`. The host-input JSON contains
+  `request`, `input_payload`, optional `adapter`, and optional
+  `assertion_evidence` members. `assertion_evidence` is a
+  `selected-case-judge-evidence/v1` artifact that binds the complete semantic
+  assertion contract, candidate, scenario set, case, provider output, judge
+  adapter, and judge-result digest. Omitting the adapter or assertion evidence
+  produces a typed blocker. This route does not discover provider executables,
+  read credentials, select a model or profile, or establish live-model truth.
+  Semantic signals must carry portable evidence references; the command does
+  not infer them from keywords. Deterministic `contains`, `not_contains`, and
+  `must_not` assertions are evaluated against the private supplied output.
 - `package` names a reserved local contract lane and does not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.

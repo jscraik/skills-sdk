@@ -162,7 +162,10 @@ The CLI is an outer adapter over the implemented local services. `intake`,
 `validate`, and `build` execute the package-processing paths above. `eval
 scenario-quality` lazily invokes the separate read-only
 `evaluation/quality.py` service, prints its versioned assessment, and exits 0
-for a passing assessment or 2 for a blocked assessment. `compare-copy`
+for a passing assessment or 2 for a blocked assessment. `eval selected-case`
+composes one package-local case with an injected bounded provider adapter and
+separately bound semantic assertion evidence; it does not own credentials,
+provider discovery, model selection, or semantic judging. `compare-copy`
 performs two read-only validations and compares captured files.
 `maintain-entrypoint` checks an existing host entrypoint and permits a
 digest-bound replacement only with explicit `--apply`. The other lifecycle
@@ -184,7 +187,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/validation/` | Read-only standalone-skill capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. | `SkillIR`, `read_frontmatter`, `validate_skill_package` |
 | `src/skills_sdk/intake/` | Composition of structural validation with caller-supplied source, ownership, rights, and admission evidence into a candidate-bound normalized package; no copying or Foundry admission. | `intake_skill_package` in `normalization.py` |
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
-| `src/skills_sdk/evaluation/` | Deterministic scoring over external observations and read-only assessment of package-local scenario definitions; no prompt, provider, scenario, or runtime execution. | `evaluate_scenario_set` in `deterministic.py`, `assess_scenario_quality` in `quality.py` |
+| `src/skills_sdk/evaluation/` | Deterministic scoring over external observations, package-local definition checks, and one selected-case orchestration route over an injected adapter and bound judge evidence; no provider discovery, credentials, or live-model authority. | `evaluate_scenario_set` in `deterministic.py`, `assess_scenario_quality` in `quality.py`, `execute_selected_case` in `selected_case.py` |
 | `src/skills_sdk/evaluation/quality.py` | Read-only, candidate-bound assessment of package-local scenario definitions; no scenario or provider execution. | `assess_scenario_quality` |
 | `src/skills_sdk/lifecycle/` | Pure planning of candidate-bound intended runtime-lock transitions; no installation, host inspection, rollback execution, or runtime mutation. | `plan_runtime_install` in `planning.py` |
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |

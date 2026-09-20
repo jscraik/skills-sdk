@@ -142,6 +142,17 @@ structured oracles remain blocked, and no raw output is accepted or retained.
 Generic receipt parsing dispatches both evaluation receipt versions without
 changing their payload meaning.
 
+Selected-case orchestration reuses the existing v2 scenario, observation,
+provider, and evaluation receipt families without changing their wire shape.
+Package-local case categories `edge` and `negative` project to the existing v2
+`boundary` category only inside this loader. Requested modes must already be
+declared by the selected case. Semantic assertion results remain external judge
+evidence and require portable references plus matching candidate, scenario set,
+case, provider, output, full assertion-contract, judge-adapter, and judge-result
+digest identities; the SDK does not reinterpret textual keyword presence as
+semantic proof. Deterministic text assertions are evaluated locally over the
+private adapter output and are not retained as raw output.
+
 The v1 models, schemas, fixtures, registry names, parser dispatch, and
 `evaluate_scenario_set` semantics remain unchanged. In particular, v1
 `exact_match` remains an `unsupported_oracle` outcome; callers must opt into

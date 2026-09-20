@@ -114,6 +114,7 @@ from skills_sdk.models.scenario_quality import (
     ScenarioQualityFinding,
     ScenarioQualityReceipt,
 )
+from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 __all__ = [
@@ -209,6 +210,7 @@ __all__ = [
     "ScorerProfile",
     "SecurityFinding",
     "SecurityScreeningResult",
+    "SelectedCaseJudgeEvidence",
     "SkillIdentity",
     "SkillPackageFinding",
     "SkillPackageIntakeContext",
