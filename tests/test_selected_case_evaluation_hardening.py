@@ -220,3 +220,51 @@ def test_forged_provider_request_is_rejected_before_blocked_receipt(tmp_path: Pa
 
     with pytest.raises(ContractError, match="invalid_provider_request"):
         asyncio.run(execute_selected_case(definition, forged_request, input_payload, None, None))
+
+
+@pytest.mark.parametrize("field", ["case_id", "scenario_set_id", "satisfied_assertion_ids"])
+def test_judge_identity_normalization_matches_schema(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload[field] = [" preserve_behavior "] if field == "satisfied_assertion_ids" else f" {payload[field]} "
+
+    with pytest.raises(ValueError, match="normalized"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
+def test_judge_candidate_id_screening_matches_schema(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["candidate"]["package_id"] = "ghp_secret"
+
+    with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
+def test_private_provider_evidence_ref_returns_blocked_receipt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    adapter = _adapter(request, "reviewed")
+    adapter = adapter.__class__(adapter.descriptor, adapter.text, ("evidence/client_secret.json",))
+
+    receipt = asyncio.run(
+        execute_selected_case(definition, request, input_payload, adapter, _evidence(definition, request, "reviewed"))
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "private_provider_evidence_ref"
+    assert "client_secret" not in receipt.model_dump_json()

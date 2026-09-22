@@ -20,6 +20,7 @@ from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2,
 from skills_sdk.models.packaging import PackageManifestFile, PackageReceiptBlocker
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, _identity_is_public
+from skills_sdk.models.safety import _public_text_is_redaction_safe
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.providers import JsonValue, ProviderAdapterComplete, TextProviderAdapter, execute_provider_call
 from skills_sdk.validation import validate_skill_package
@@ -441,6 +442,14 @@ async def execute_selected_case(
             failure_refs,
         )
     else:
+        if any(not _public_text_is_redaction_safe(ref) for ref in outcome.public_result.execution.evidence_refs):
+            observation = _blocked_observation(
+                definition,
+                request,
+                "private_provider_evidence_ref",
+                "provider evidence references contain credential-shaped values",
+            )
+            return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
         observation = _validated_observation(
             definition,
             request,

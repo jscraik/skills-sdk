@@ -31,6 +31,14 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     raw_output_included: Literal[False] = False
     mutation_performed: Literal[False] = False
 
+    @field_validator("candidate", mode="before")
+    @classmethod
+    def candidate_id_must_be_public(cls, value: object) -> object:
+        package_id = value.get("package_id") if isinstance(value, dict) else getattr(value, "package_id", None)
+        if isinstance(package_id, str) and not _public_text_is_redaction_safe(package_id):
+            raise ValueError("selected-case judge candidate id must not contain credential-shaped values")
+        return value
+
     @field_validator("scenario_set_id", "case_id", "satisfied_assertion_ids", mode="before")
     @classmethod
     def identity_fields_must_already_be_normalized(cls, value: object) -> object:
