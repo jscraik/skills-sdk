@@ -64,6 +64,11 @@ class SuppliedTextProviderAdapter:
     text: str
     evidence_refs: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        """Reject modes that this complete-only adapter cannot execute."""
+        if self.descriptor.mode != "complete":
+            raise _contract_error("unsupported_provider_mode", "supplied text adapter requires complete mode")
+
     async def complete(
         self,
         request: ProviderExecutionRequest,
@@ -296,6 +301,9 @@ def _blocked_observation(
     evidence_refs: tuple[str, ...] = ("references/evals.yaml",),
 ) -> ScenarioObservationV2:
     """Build a candidate-bound blocked observation for one selected case."""
+    if not _public_text_is_redaction_safe(code):
+        code = "private_provider_blocker_code"
+        message = "provider blocker code contains credential-shaped values"
     if any(not _public_text_is_redaction_safe(ref) for ref in evidence_refs):
         code = "private_provider_evidence_ref"
         message = "provider evidence references contain credential-shaped values"
@@ -428,6 +436,8 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
             raise ValueError("selected case semantic assertion type is unsupported")
         if any(item[1] not in _DETERMINISTIC_ASSERTIONS for item in deterministic):
             raise ValueError("selected case deterministic assertion type is unsupported")
+        if any(not item[2].strip() for item in deterministic):
+            raise ValueError("selected case deterministic assertion operand must not be empty")
         public_values = (
             scenario_set.candidate.package_id,
             scenario_set.scenario_set_id,
@@ -506,7 +516,18 @@ async def execute_selected_case(
             definition, request, "selected_case_identity_mismatch", "assertion evidence does not bind the selected case"
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
-    outcome = await execute_provider_call(request, input_payload, adapter)
+    try:
+        outcome = await execute_provider_call(request, input_payload, adapter)
+    except ContractError as exc:
+        if exc.code != "invalid_provider_failure":
+            raise
+        observation = _blocked_observation(
+            definition,
+            request,
+            "invalid_provider_failure",
+            "provider failure evidence failed boundary validation",
+        )
+        return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     if outcome.complete_text is None or outcome.public_result.output_sha256 is None:
         execution = outcome.public_result.execution
         failure = execution.blocker or execution.error

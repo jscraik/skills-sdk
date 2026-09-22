@@ -13,7 +13,7 @@ from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepar
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
+from skills_sdk.evaluation.selected_case import SuppliedTextProviderAdapter, execute_selected_case, load_selected_case
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.providers import ProviderAdapterFailure
@@ -324,6 +324,50 @@ def test_private_provider_evidence_ref_returns_blocked_receipt(tmp_path: Path) -
     assert "client_secret" not in receipt.model_dump_json()
 
 
+def test_supplied_text_adapter_rejects_stream_mode(tmp_path: Path) -> None:
+    """Reject a stream descriptor at construction, before provider dispatch."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    adapter = _adapter(request, "reviewed")
+    descriptor = adapter.descriptor.model_copy(update={"mode": "stream"})
+
+    with pytest.raises(ContractError, match="unsupported_provider_mode"):
+        SuppliedTextProviderAdapter(descriptor, adapter.text, adapter.evidence_refs)
+
+
+def test_private_provider_failure_code_is_not_published(tmp_path: Path) -> None:
+    """Keep credential-shaped adapter failure codes out of public receipts."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+
+    class FailingAdapter:
+        descriptor = _adapter(request, "reviewed").descriptor
+
+        async def complete(self, request: object, input_payload: object) -> None:
+            """Raise an adapter failure carrying a private code."""
+            raise ProviderAdapterFailure(code="client_secret", category="provider", retryable=False, evidence_refs=())
+
+        async def cleanup(self) -> None:
+            """Complete the adapter protocol's no-op cleanup."""
+            return None
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition, request, input_payload, FailingAdapter(), _evidence(definition, request, "reviewed")
+        )
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "invalid_provider_failure"
+    assert "client_secret" not in receipt.model_dump_json()
+
+
 def test_forged_selected_case_definition_is_rejected_before_receipt(tmp_path: Path) -> None:
     """Reject a forged selected-case definition before producing a receipt."""
     definition = load_selected_case(
@@ -363,6 +407,24 @@ def test_forged_deterministic_assertion_type_is_rejected(tmp_path: Path) -> None
         definition,
         semantic_assertions=definition.semantic_assertions[:-1],
         deterministic_assertions=((definition.semantic_assertions[-1][0], "bogus", "absent"),),
+    )
+
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
+
+
+@pytest.mark.parametrize("operand", ["", "  "])
+def test_forged_empty_deterministic_operand_is_rejected(tmp_path: Path, operand: str) -> None:
+    """Reject operands that would trivially satisfy a contains assertion."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    forged = replace(
+        definition,
+        semantic_assertions=definition.semantic_assertions[:-1],
+        deterministic_assertions=((definition.semantic_assertions[-1][0], "contains", operand),),
     )
 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
