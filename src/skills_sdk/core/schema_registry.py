@@ -77,6 +77,7 @@ def _require_json_value(
     active_containers: set[int] | None = None,
     depth: int = 0,
 ) -> JsonValue:
+    """Normalize a bounded acyclic value into the public JSON value contract."""
     if depth > MAX_JSON_NESTING_DEPTH:
         raise ContractError("invalid_json_value", "schema payload exceeds the maximum JSON nesting depth")
     if isinstance(value, float) and not math.isfinite(value):
@@ -107,6 +108,7 @@ class SchemaRegistry:
     """Resolve only known, packaged schema versions."""
 
     def load(self, name: str) -> dict[str, Any]:
+        """Load and structurally check one known packaged schema."""
         if name not in SCHEMA_NAMES:
             raise ContractError("unknown_schema", f"unsupported schema: {name}")
         resource = files("skills_sdk.schemas").joinpath(f"{name}.schema.json")
@@ -120,6 +122,7 @@ class SchemaRegistry:
         return payload
 
     def validate(self, name: str, payload: object) -> None:
+        """Validate a payload against structural and semantic schema rules."""
         if name not in SCHEMA_NAMES:
             raise ContractError("unknown_schema", f"unsupported schema: {name}")
         schemas = {schema_name: self.load(schema_name) for schema_name in SCHEMA_NAMES}

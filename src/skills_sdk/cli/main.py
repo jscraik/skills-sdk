@@ -29,6 +29,7 @@ class _UnsupportedContextRead(OSError):
 
 
 def _reject_duplicate_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Build a JSON object while rejecting duplicate member names."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -229,6 +230,7 @@ def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
 
 
 def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int:
+    """Print a selected-case blocker and return the blocked exit status."""
     from skills_sdk.models.packaging import PackageReceiptBlocker
 
     blocker = PackageReceiptBlocker(code=code, message=message, evidence_refs=("references/evals.yaml",))
@@ -240,6 +242,7 @@ def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int
 
 
 def _selected_case_host_input(path: Path) -> tuple[object, object, object | None, object | None]:
+    """Load the bounded host-supplied inputs for one selected-case run."""
     payload = json.loads(
         _read_intake_context(path).decode("utf-8"),
         object_pairs_hook=_reject_duplicate_members,
@@ -260,6 +263,7 @@ def _selected_case_host_input(path: Path) -> tuple[object, object, object | None
 
 
 def _supplied_adapter(payload: object) -> object | None:
+    """Validate and construct the caller-supplied text adapter, if present."""
     if payload is None:
         return None
     if not isinstance(payload, dict) or set(payload) != {"descriptor", "evidence_refs", "output_text"}:
@@ -279,6 +283,7 @@ def _supplied_adapter(payload: object) -> object | None:
 
 
 def _selected_case_eval(arguments: argparse.Namespace) -> int:
+    """Execute the selected-case CLI route and report its receipt."""
     from pydantic import ValidationError
 
     from skills_sdk.core.errors import ContractError

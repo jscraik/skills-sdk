@@ -36,6 +36,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     @field_validator("candidate", mode="before")
     @classmethod
     def candidate_id_must_be_public(cls: type[SelectedCaseJudgeEvidence], value: object) -> object:
+        """Revalidate the candidate and require a public package identifier."""
         if isinstance(value, PackageCandidateIdentity):
             try:
                 value = value.model_dump(mode="json")
@@ -55,6 +56,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     @field_validator("scenario_set_id", "case_id", "satisfied_assertion_ids", mode="before")
     @classmethod
     def identity_fields_must_already_be_normalized(cls, value: object) -> object:
+        """Require selected-case identities to be normalized public strings."""
         values = value if isinstance(value, (list, tuple)) else (value,)
         if any(isinstance(item, str) and item != item.strip() for item in values):
             raise ValueError("selected-case judge identity fields must already be normalized")
@@ -65,6 +67,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     @field_validator("output_sha256", "assertion_contract_sha256", "judge_result_sha256", mode="before")
     @classmethod
     def digests_must_already_be_normalized(cls, value: object) -> object:
+        """Require judge digests without surrounding whitespace."""
         if isinstance(value, str) and value != value.strip():
             raise ValueError("selected-case judge digests must already be normalized")
         return value
@@ -72,6 +75,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     @field_validator("credentials_included", "raw_output_included", "mutation_performed", mode="before")
     @classmethod
     def false_claims_must_be_json_booleans(cls, value: object) -> object:
+        """Reject truthy coercions for judge-owned false-only claims."""
         if type(value) is not bool:
             raise ValueError("selected-case judge false-only claims must be JSON booleans")
         return value
@@ -79,6 +83,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     @field_validator("satisfied_assertion_ids")
     @classmethod
     def assertion_ids_must_be_unique(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        """Require unique satisfied assertion identifiers."""
         if len(values) != len(set(values)):
             raise ValueError("selected-case judge assertion ids must be unique")
         return values
@@ -86,6 +91,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     @field_validator("evidence_refs")
     @classmethod
     def evidence_refs_must_be_unique_and_portable(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        """Require unique portable evidence references without credentials."""
         if len(values) != len(set(values)):
             raise ValueError("selected-case judge evidence refs must be unique")
         for value in values:

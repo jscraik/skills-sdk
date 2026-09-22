@@ -626,6 +626,7 @@ def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> N
 
 
 def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str) -> str:
+    """Render one model as a normalized, policy-augmented JSON Schema."""
     schema = model.model_json_schema()
     _append_portable_path_constraints(schema)
     _append_provider_identity_constraints(schema)
@@ -749,6 +750,7 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
 
 
 def main() -> int:
+    """Generate packaged schemas or report drift in check mode."""
     parser = argparse.ArgumentParser(description="Generate or check packaged JSON Schemas.")
     parser.add_argument("--check", action="store_true", help="fail when a committed schema differs from the models")
     args = parser.parse_args()

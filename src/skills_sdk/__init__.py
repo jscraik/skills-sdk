@@ -71,6 +71,7 @@ __version__ = "0.1.0"
 
 
 def __getattr__(name: str) -> object:
+    """Load optional public evaluation exports only when requested."""
     if name in {"ScenarioQualityPolicy", "assess_scenario_quality"}:
         from skills_sdk.evaluation.quality import ScenarioQualityPolicy, assess_scenario_quality
 

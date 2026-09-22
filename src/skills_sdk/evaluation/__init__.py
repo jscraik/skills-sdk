@@ -16,6 +16,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> object:
+    """Load optional evaluation services only when requested."""
     if name in {"ScenarioQualityPolicy", "assess_scenario_quality"}:
         from skills_sdk.evaluation.quality import ScenarioQualityPolicy, assess_scenario_quality
 

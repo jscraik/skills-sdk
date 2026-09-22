@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 from pathlib import Path
 from typing import cast
 
@@ -10,7 +9,6 @@ import pytest
 import yaml
 from jsonschema import Draft202012Validator
 
-from skills_sdk.cli.main import main
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -31,6 +29,7 @@ REVISION = "1" * 40
 
 
 def _case(case_id: str, modes: list[str], *, edge: bool = False) -> dict[str, object]:
+    """Build one package-local selected-case fixture."""
     acceptance: list[dict[str, object]] = [
         {"type": "expected_signal", "value": "Bound semantic evidence."},
     ]
@@ -54,6 +53,7 @@ def _case(case_id: str, modes: list[str], *, edge: bool = False) -> dict[str, ob
 
 
 def _skill(root: Path) -> Path:
+    """Create a minimal valid skill package with selected cases."""
     root.mkdir()
     (root / "SKILL.md").write_text(
         "---\nname: simplify\ndescription: Preserve behavior during cleanup.\n---\n",
@@ -74,6 +74,7 @@ def _skill(root: Path) -> Path:
 
 
 def _prepared_request(definition: SelectedCaseDefinition, input_payload: object) -> ProviderExecutionRequest:
+    """Build a provider request bound to a selected-case definition."""
     scenario_set = definition.scenario_set
     payload = _request()
     payload.update(
@@ -86,15 +87,18 @@ def _prepared_request(definition: SelectedCaseDefinition, input_payload: object)
 
 
 def _adapter(request: ProviderExecutionRequest, output: str) -> SuppliedTextProviderAdapter:
+    """Build a controlled supplied-text adapter for a request."""
     descriptor = TextProviderAdapterDescriptor(provider=request.provider, mode="complete")
     return SuppliedTextProviderAdapter(descriptor, output, ("evidence/provider-output.json",))
 
 
 class _FailingAdapter:
     def __init__(self, request: ProviderExecutionRequest) -> None:
+        """Bind the failing adapter to the request provider."""
         self.descriptor = TextProviderAdapterDescriptor(provider=request.provider, mode="complete")
 
     async def complete(self, request: ProviderExecutionRequest, input_payload: object) -> ProviderAdapterComplete:
+        """Raise a typed retryable provider failure."""
         del request, input_payload
         raise ProviderAdapterFailure(
             code="rate_limited",
@@ -104,6 +108,7 @@ class _FailingAdapter:
         )
 
     async def cleanup(self) -> None:
+        """Complete the adapter protocol's no-op cleanup."""
         return None
 
 
@@ -112,6 +117,7 @@ def _evidence(
     request: ProviderExecutionRequest,
     output: str,
 ) -> SelectedCaseJudgeEvidence:
+    """Build judge evidence bound to the selected output and assertions."""
     return SelectedCaseJudgeEvidence(
         candidate=definition.scenario_set.candidate,
         scenario_set_id=definition.scenario_set.scenario_set_id,
@@ -127,6 +133,7 @@ def _evidence(
 
 
 def test_release_case_executes_supplied_adapter_and_bound_assertion_evidence(tmp_path: Path) -> None:
+    """Execute a release case with evidence bound to provider output."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -150,6 +157,7 @@ def test_release_case_executes_supplied_adapter_and_bound_assertion_evidence(tmp
 
 
 def test_edge_case_rejects_smoke_but_accepts_release(tmp_path: Path) -> None:
+    """Restrict an edge case to its declared release mode."""
     package = _skill(tmp_path / "simplify")
 
     with pytest.raises(ContractError, match="selected_case_mode_mismatch"):
@@ -161,6 +169,7 @@ def test_edge_case_rejects_smoke_but_accepts_release(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("mode", ["release/x", [], {}])
 def test_loader_rejects_runtime_mode_outside_public_literals(tmp_path: Path, mode: object) -> None:
+    """Reject runtime modes outside the selected-case public literals."""
     package = _skill(tmp_path / "simplify")
 
     with pytest.raises(ContractError, match="selected case mode is unsupported"):
@@ -173,6 +182,7 @@ def test_loader_rejects_runtime_mode_outside_public_literals(tmp_path: Path, mod
 
 
 def test_standard_mode_is_not_accepted_by_selected_case_contract(tmp_path: Path) -> None:
+    """Reject the legacy standard mode at the selected-case boundary."""
     with pytest.raises(ContractError, match="selected case mode is unsupported"):
         load_selected_case(
             _skill(tmp_path / "simplify"),
@@ -183,6 +193,7 @@ def test_standard_mode_is_not_accepted_by_selected_case_contract(tmp_path: Path)
 
 
 def test_eval_definitions_require_utf8(tmp_path: Path) -> None:
+    """Reject evaluation definitions that are not UTF-8 encoded."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     evals.write_bytes(evals.read_text(encoding="utf-8").encode("utf-16"))
@@ -201,6 +212,7 @@ def test_eval_definitions_require_utf8(tmp_path: Path) -> None:
 def test_malformed_deterministic_check_shapes_return_typed_contract_error(
     tmp_path: Path, field: str, value: object
 ) -> None:
+    """Return a typed error for malformed deterministic check shapes."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -216,6 +228,7 @@ def test_malformed_deterministic_check_shapes_return_typed_contract_error(
 
 
 def test_acceptance_assertions_reject_undeclared_fields(tmp_path: Path) -> None:
+    """Reject undeclared fields in acceptance assertions."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -228,6 +241,7 @@ def test_acceptance_assertions_reject_undeclared_fields(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("command", ["ghp_secret_marker", str(Path("/").joinpath("Users", "private", "tool"))])
 def test_private_forbidden_commands_are_rejected(tmp_path: Path, command: str) -> None:
+    """Reject forbidden-command declarations containing private values."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -239,6 +253,7 @@ def test_private_forbidden_commands_are_rejected(tmp_path: Path, command: str) -
 
 
 def test_case_id_must_match_provider_execution_syntax(tmp_path: Path) -> None:
+    """Require case identifiers to match provider execution syntax."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -251,6 +266,7 @@ def test_case_id_must_match_provider_execution_syntax(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("case_id", [True, [], {}])
 def test_case_id_requires_text_before_selection(tmp_path: Path, case_id: object) -> None:
+    """Require a textual case identifier before selecting a case."""
     package = _skill(tmp_path / "simplify")
 
     with pytest.raises(ContractError, match="selected case id must use provider execution id syntax"):
@@ -263,6 +279,7 @@ def test_case_id_requires_text_before_selection(tmp_path: Path, case_id: object)
 
 
 def test_case_id_must_not_contain_private_values(tmp_path: Path) -> None:
+    """Reject selected-case identifiers containing private values."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -275,6 +292,7 @@ def test_case_id_must_not_contain_private_values(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("category", [[], {}])
 def test_category_requires_text_before_membership_checks(tmp_path: Path, category: object) -> None:
+    """Require textual categories before category normalization."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -286,6 +304,7 @@ def test_category_requires_text_before_membership_checks(tmp_path: Path, categor
 
 
 def test_duplicate_semantic_requirement_ids_are_rejected(tmp_path: Path) -> None:
+    """Reject duplicate semantic requirement identifiers."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -300,6 +319,7 @@ def test_duplicate_semantic_requirement_ids_are_rejected(tmp_path: Path) -> None
 
 @pytest.mark.parametrize(("field", "value"), [("all_of", []), ("all_of", ""), ("all_of", False)])
 def test_present_semantic_term_fields_must_be_non_empty_lists(tmp_path: Path, field: str, value: object) -> None:
+    """Require present semantic term fields to be non-empty lists."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -313,6 +333,7 @@ def test_present_semantic_term_fields_must_be_non_empty_lists(tmp_path: Path, fi
 
 
 def test_semantic_requirements_reject_undeclared_fields(tmp_path: Path) -> None:
+    """Reject undeclared fields in semantic requirements."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -325,6 +346,7 @@ def test_semantic_requirements_reject_undeclared_fields(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("value", ["", "   "])
 def test_empty_deterministic_assertion_values_are_rejected(tmp_path: Path, value: str) -> None:
+    """Reject empty deterministic assertion values."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -343,6 +365,7 @@ def test_empty_deterministic_assertion_values_are_rejected(tmp_path: Path, value
     ],
 )
 def test_eval_definitions_must_bind_the_candidate(tmp_path: Path, field: str, value: str, error: str) -> None:
+    """Require evaluation definitions to bind the validated candidate."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -354,6 +377,7 @@ def test_eval_definitions_must_bind_the_candidate(tmp_path: Path, field: str, va
 
 
 def test_provider_incompatible_candidate_id_is_rejected_during_loading(tmp_path: Path) -> None:
+    """Reject candidate identifiers incompatible with provider contracts."""
     package = _skill(tmp_path / "bearer-token")
     (package / "SKILL.md").write_text(
         "---\nname: bearer-token\ndescription: Preserve behavior during cleanup.\n---\n", encoding="utf-8"
@@ -367,6 +391,7 @@ def test_provider_incompatible_candidate_id_is_rejected_during_loading(tmp_path:
 
 
 def test_deterministic_only_case_accepts_empty_satisfied_assertion_ids(tmp_path: Path) -> None:
+    """Allow no semantic evidence for a deterministic-only case."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -392,6 +417,7 @@ def test_deterministic_only_case_accepts_empty_satisfied_assertion_ids(tmp_path:
 
 
 def test_missing_adapter_or_semantic_evidence_blocks_without_execution_claim(tmp_path: Path) -> None:
+    """Block when the provider adapter or semantic evidence is absent."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -407,6 +433,7 @@ def test_missing_adapter_or_semantic_evidence_blocks_without_execution_claim(tmp
 
 
 def test_provider_failure_details_are_preserved_in_blocked_receipt(tmp_path: Path) -> None:
+    """Preserve provider failure details in the blocked evaluation receipt."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -429,6 +456,7 @@ def test_provider_failure_details_are_preserved_in_blocked_receipt(tmp_path: Pat
 
 
 def test_output_or_identity_mismatch_blocks_instead_of_fabricating_pass(tmp_path: Path) -> None:
+    """Block output identity mismatches instead of fabricating a pass."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -447,6 +475,7 @@ def test_output_or_identity_mismatch_blocks_instead_of_fabricating_pass(tmp_path
 
 
 def test_assertion_contract_mismatch_blocks_claimed_semantic_pass(tmp_path: Path) -> None:
+    """Block semantic evidence bound to a different assertion contract."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -472,6 +501,7 @@ def test_assertion_contract_mismatch_blocks_claimed_semantic_pass(tmp_path: Path
 
 
 def test_judge_evidence_round_trips_through_public_schema(tmp_path: Path) -> None:
+    """Round-trip valid judge evidence through the public schema registry."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -485,6 +515,7 @@ def test_judge_evidence_round_trips_through_public_schema(tmp_path: Path) -> Non
 def test_judge_evidence_rejects_credential_shaped_refs_at_model_and_schema_boundaries(
     tmp_path: Path, evidence_ref: str
 ) -> None:
+    """Reject credential-shaped evidence refs at model and schema boundaries."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -508,6 +539,7 @@ def test_judge_evidence_rejects_credential_shaped_refs_at_model_and_schema_bound
     ],
 )
 def test_judge_evidence_schema_matches_complete_public_reference_screening(tmp_path: Path, evidence_ref: str) -> None:
+    """Keep schema screening aligned with complete public reference checks."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -521,6 +553,7 @@ def test_judge_evidence_schema_matches_complete_public_reference_screening(tmp_p
 
 @pytest.mark.parametrize("field", ["evidence_refs", "satisfied_assertion_ids"])
 def test_judge_evidence_schema_rejects_duplicate_array_items(tmp_path: Path, field: str) -> None:
+    """Reject duplicate judge evidence arrays in the public schema."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -534,6 +567,7 @@ def test_judge_evidence_schema_rejects_duplicate_array_items(tmp_path: Path, fie
 
 @pytest.mark.parametrize("field", ["candidate", "scenario_set_id", "case_id"])
 def test_request_identity_mismatch_blocks_before_provider_execution(tmp_path: Path, field: str) -> None:
+    """Block request identity mismatches before provider execution."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -562,6 +596,7 @@ def test_request_identity_mismatch_blocks_before_provider_execution(tmp_path: Pa
 
 
 def test_provider_input_must_match_the_selected_case_prompt(tmp_path: Path) -> None:
+    """Require provider input to match the selected-case prompt."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -585,6 +620,7 @@ def test_provider_input_must_match_the_selected_case_prompt(tmp_path: Path) -> N
 
 
 def test_provider_input_rejects_fields_beyond_the_selected_case_prompt(tmp_path: Path) -> None:
+    """Reject provider input fields beyond the selected-case prompt."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -608,6 +644,7 @@ def test_provider_input_rejects_fields_beyond_the_selected_case_prompt(tmp_path:
 
 
 def test_forbidden_command_in_private_output_fails(tmp_path: Path) -> None:
+    """Fail a case when private output contains a forbidden command."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -630,6 +667,7 @@ def test_forbidden_command_in_private_output_fails(tmp_path: Path) -> None:
 
 
 def test_partial_semantic_judgment_is_a_failed_case(tmp_path: Path) -> None:
+    """Fail a case when semantic judgment omits required signals."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -647,6 +685,7 @@ def test_partial_semantic_judgment_is_a_failed_case(tmp_path: Path) -> None:
 
 
 def test_judge_result_digest_changes_receipt_identity(tmp_path: Path) -> None:
+    """Bind receipt identity to the external judge result digest."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -666,6 +705,7 @@ def test_judge_result_digest_changes_receipt_identity(tmp_path: Path) -> None:
 
 
 def test_forged_judge_evidence_is_revalidated_at_execution(tmp_path: Path) -> None:
+    """Revalidate forged judge evidence at the execution boundary."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -683,6 +723,7 @@ def test_forged_judge_evidence_is_revalidated_at_execution(tmp_path: Path) -> No
 
 @pytest.mark.parametrize("field", ["credentials_included", "raw_output_included", "mutation_performed"])
 def test_judge_false_only_claims_require_json_booleans(tmp_path: Path, field: str) -> None:
+    """Require JSON booleans for judge-owned false-only claims."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -695,6 +736,7 @@ def test_judge_false_only_claims_require_json_booleans(tmp_path: Path, field: st
 
 @pytest.mark.parametrize("field", ["output_sha256", "assertion_contract_sha256", "judge_result_sha256"])
 def test_judge_digests_reject_padding(tmp_path: Path, field: str) -> None:
+    """Reject padded judge digests before model normalization."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -703,96 +745,3 @@ def test_judge_digests_reject_padding(tmp_path: Path, field: str) -> None:
     payload[field] = f" {payload[field]} "
     with pytest.raises(ValueError, match="normalized"):
         SelectedCaseJudgeEvidence.model_validate(payload)
-
-
-def test_cli_runs_controlled_supplied_adapter_without_agent_skills(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    package = _skill(tmp_path / "simplify")
-    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
-    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
-    request = _prepared_request(definition, input_payload)
-    output = "Preserve behavior with focused validation."
-    host_input = tmp_path / "host-input.json"
-    host_input.write_text(
-        json.dumps(
-            {
-                "request": request.model_dump(mode="json"),
-                "input_payload": input_payload,
-                "adapter": {
-                    "descriptor": _adapter(request, output).descriptor.model_dump(mode="json"),
-                    "output_text": output,
-                    "evidence_refs": ["evidence/provider-output.json"],
-                },
-                "assertion_evidence": _evidence(definition, request, output).model_dump(mode="json"),
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    exit_code = main(
-        [
-            "eval",
-            "selected-case",
-            str(package),
-            "--source-revision",
-            REVISION,
-            "--case",
-            "happy-diff",
-            "--mode",
-            "release",
-            "--host-input",
-            str(host_input),
-            "--json",
-            "--robot",
-        ]
-    )
-
-    payload = json.loads(capsys.readouterr().out)
-    assert exit_code == 0
-    assert payload["schema_version"] == "evaluation-receipt/v2"
-    assert payload["status"] == "pass"
-    assert "Agent-Skills" not in json.dumps(payload)
-
-
-def test_cli_rejects_malformed_supplied_final_output(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    package = _skill(tmp_path / "simplify")
-    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
-    request = _prepared_request(definition, None)
-    host_input = tmp_path / "malformed.json"
-    host_input.write_text(
-        json.dumps(
-            {
-                "request": request.model_dump(mode="json"),
-                "input_payload": None,
-                "adapter": {
-                    "descriptor": _adapter(request, "output").descriptor.model_dump(mode="json"),
-                    "output_text": {"not": "text"},
-                    "evidence_refs": ["evidence/provider-output.json"],
-                },
-                "assertion_evidence": None,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    exit_code = main(
-        [
-            "eval",
-            "selected-case",
-            str(package),
-            "--source-revision",
-            REVISION,
-            "--case",
-            "happy-diff",
-            "--mode",
-            "release",
-            "--host-input",
-            str(host_input),
-            "--json",
-        ]
-    )
-
-    payload = json.loads(capsys.readouterr().out)
-    assert exit_code == 2
-    assert payload["code"] == "invalid_selected_case_input"

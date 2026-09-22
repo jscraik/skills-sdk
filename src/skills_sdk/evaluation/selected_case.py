@@ -44,10 +44,12 @@ class SelectedCaseDefinition:
 
     @property
     def semantic_signal_ids(self) -> tuple[str, ...]:
+        """Return the declared semantic signal identifiers in stable order."""
         return tuple(item[0] for item in self.semantic_assertions)
 
     @property
     def assertion_contract_sha256(self) -> str:
+        """Return the digest binding the normalized semantic assertions."""
         payload = [
             {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in self.semantic_assertions
         ]
@@ -67,18 +69,22 @@ class SuppliedTextProviderAdapter:
         request: ProviderExecutionRequest,
         input_payload: JsonValue,
     ) -> ProviderAdapterComplete:
+        """Return the caller-supplied text without performing external I/O."""
         del request, input_payload
         return ProviderAdapterComplete(text=self.text, evidence_refs=self.evidence_refs)
 
     async def cleanup(self) -> None:
+        """Complete the no-op cleanup required by the adapter protocol."""
         return None
 
 
 def _contract_error(code: str, message: str) -> ContractError:
+    """Create a selected-case contract error with a stable code."""
     return ContractError(code=code, message=message)
 
 
 def _evals_digest(validation_files: tuple[PackageManifestFile, ...]) -> str:
+    """Return the validated digest for the package evaluation definitions."""
     for item in validation_files:
         if item.path == "references/evals.yaml":
             return item.sha256
@@ -86,6 +92,7 @@ def _evals_digest(validation_files: tuple[PackageManifestFile, ...]) -> str:
 
 
 def _load_cases(package_root: Path, expected_sha256: str, package_id: str) -> list[object]:
+    """Load candidate-bound cases from the validated evaluation document."""
     try:
         payload = yaml.load(_capture_evals(package_root, expected_sha256).decode("utf-8"), Loader=_ClosedLoader)
     except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
@@ -100,6 +107,7 @@ def _load_cases(package_root: Path, expected_sha256: str, package_id: str) -> li
 
 
 def _selected_case(cases: list[object], case_id: str, mode: EvaluationMode) -> dict[str, object]:
+    """Select exactly one case that declares the requested evaluation mode."""
     matches = [item for item in cases if isinstance(item, dict) and item.get("id") == case_id]
     if len(matches) != 1:
         raise _contract_error("selected_case_not_found", "selected case must exist exactly once")
@@ -119,6 +127,7 @@ def _selected_case(cases: list[object], case_id: str, mode: EvaluationMode) -> d
 def _assertion_signals(
     case: dict[str, object],
 ) -> tuple[tuple[SemanticAssertion, ...], tuple[tuple[str, str, str], ...]]:
+    """Normalize a case's semantic and deterministic acceptance assertions."""
     acceptance = case.get("acceptance")
     if not isinstance(acceptance, list) or not acceptance:
         raise _contract_error("missing_acceptance_evidence", "selected case requires acceptance assertions")
@@ -133,6 +142,7 @@ def _assertion_signals(
 
 
 def _assertion_signal(raw: object, index: int) -> tuple[tuple[SemanticAssertion, ...], tuple[str, str, str] | None]:
+    """Normalize one typed acceptance assertion into evaluation signals."""
     if not isinstance(raw, dict) or not isinstance(raw.get("type"), str):
         raise _contract_error("invalid_acceptance_assertion", "acceptance assertions must be typed mappings")
     assertion_type = cast(str, raw["type"])
@@ -165,6 +175,7 @@ def _assertion_signal(raw: object, index: int) -> tuple[tuple[SemanticAssertion,
 
 
 def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAssertion:
+    """Normalize one semantic requirement with its stable public identity."""
     if set(raw) - {"id", "all_of", "any_of"}:
         raise _contract_error("invalid_acceptance_assertion", "semantic requirements contain unsupported fields")
     requirement_id = raw.get("id")
@@ -187,6 +198,7 @@ def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAss
 
 
 def _category(value: object) -> Literal["happy", "pressure", "boundary", "regression"]:
+    """Map supported package categories onto the evaluation-v2 contract."""
     if not isinstance(value, str):
         raise _contract_error("invalid_selected_case", "selected case category must be text")
     if value in {"happy", "pressure", "regression"}:
@@ -270,6 +282,7 @@ def load_selected_case(
 def _blocker(
     code: str, message: str, evidence_refs: tuple[str, ...] = ("references/evals.yaml",)
 ) -> PackageReceiptBlocker:
+    """Create a package receipt blocker with bounded evidence references."""
     return PackageReceiptBlocker(code=code, message=message, evidence_refs=evidence_refs)
 
 
@@ -280,6 +293,7 @@ def _blocked_observation(
     message: str,
     evidence_refs: tuple[str, ...] = ("references/evals.yaml",),
 ) -> ScenarioObservationV2:
+    """Build a candidate-bound blocked observation for one selected case."""
     if any(not _public_text_is_redaction_safe(ref) for ref in evidence_refs):
         code = "private_provider_evidence_ref"
         message = "provider evidence references contain credential-shaped values"
@@ -297,6 +311,7 @@ def _blocked_observation(
 
 
 def _deterministic_signals(text: str, assertions: tuple[tuple[str, str, str], ...]) -> tuple[str, ...]:
+    """Return identifiers for deterministic assertions satisfied by the text."""
     normalized = text.casefold()
     signals: list[str] = []
     for signal, assertion_type, expected in assertions:
@@ -308,6 +323,7 @@ def _deterministic_signals(text: str, assertions: tuple[tuple[str, str, str], ..
 
 
 def _observed_forbidden_commands(text: str, commands: tuple[str, ...]) -> tuple[str, ...]:
+    """Return forbidden commands observed in case-insensitive output text."""
     normalized = text.casefold()
     return tuple(command for command in commands if command.casefold() in normalized)
 
@@ -320,6 +336,7 @@ def _validated_observation(
     output_sha256: str,
     provider_evidence_refs: tuple[str, ...],
 ) -> ScenarioObservationV2:
+    """Bind provider output and judge evidence into a completed observation."""
     case_id = definition.scenario_set.cases[0].case_id
     if (
         supplied.candidate != definition.scenario_set.candidate
@@ -366,6 +383,7 @@ def _request_matches_definition(
     request: ProviderExecutionRequest,
     input_payload: JsonValue,
 ) -> bool:
+    """Return whether the request and payload bind exactly to the selected case."""
     case = definition.scenario_set.cases[0]
     return (
         request.candidate == definition.scenario_set.candidate
@@ -377,6 +395,7 @@ def _request_matches_definition(
 
 
 def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDefinition:
+    """Revalidate a selected-case definition at the execution boundary."""
     try:
         scenario_set = ScenarioSetV2.model_validate(definition.scenario_set.model_dump(mode="json"))
         scorer = ScorerProfile.model_validate(definition.scorer.model_dump(mode="json"))

@@ -21,6 +21,7 @@ from skills_sdk.providers import ProviderAdapterFailure
 
 @pytest.mark.parametrize("evidence_ref", ["evidence/eyJabc.def.ghi.json", "evidence/client_secret.json"])
 def test_judge_evidence_model_matches_schema_credential_screening(tmp_path: Path, evidence_ref: str) -> None:
+    """Keep model and schema credential screening aligned."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -35,6 +36,7 @@ def test_judge_evidence_model_matches_schema_credential_screening(tmp_path: Path
 
 
 def test_unserializable_forged_judge_evidence_returns_typed_blocker(tmp_path: Path) -> None:
+    """Return a typed blocker for unserializable forged judge evidence."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -51,6 +53,7 @@ def test_unserializable_forged_judge_evidence_returns_typed_blocker(tmp_path: Pa
 
 
 def test_existing_judge_result_ref_is_not_duplicated(tmp_path: Path) -> None:
+    """Avoid duplicating an existing judge-result evidence reference."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -71,6 +74,7 @@ def test_existing_judge_result_ref_is_not_duplicated(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("missing_field", ["deterministic_checks", "forbidden_commands"])
 def test_selected_case_requires_declared_deterministic_checks(tmp_path: Path, missing_field: str) -> None:
+    """Require selected cases to declare deterministic check fields."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -86,6 +90,7 @@ def test_selected_case_requires_declared_deterministic_checks(tmp_path: Path, mi
 
 
 def test_selected_case_accepts_explicit_empty_forbidden_commands(tmp_path: Path) -> None:
+    """Accept an explicitly empty forbidden-command declaration."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -98,6 +103,7 @@ def test_selected_case_accepts_explicit_empty_forbidden_commands(tmp_path: Path)
 
 
 def test_provider_output_evidence_survives_selected_case_receipt(tmp_path: Path) -> None:
+    """Preserve provider output evidence in the selected-case receipt."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -114,6 +120,7 @@ def test_provider_output_evidence_survives_selected_case_receipt(tmp_path: Path)
 
 @pytest.mark.parametrize("mode_list", [["release", "standard"], ["release", "release"], ["release", []], []])
 def test_selected_case_rejects_invalid_declared_modes(tmp_path: Path, mode_list: list[object]) -> None:
+    """Reject invalid or empty declared evaluation mode lists."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -125,6 +132,7 @@ def test_selected_case_rejects_invalid_declared_modes(tmp_path: Path, mode_list:
 
 @pytest.mark.parametrize("field", ["case_id", "scenario_set_id", "satisfied_assertion_ids"])
 def test_judge_identity_fields_reject_padding(tmp_path: Path, field: str) -> None:
+    """Reject padding in judge-owned identity fields."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -140,6 +148,7 @@ def test_judge_identity_fields_reject_padding(tmp_path: Path, field: str) -> Non
 
 @pytest.mark.parametrize("field", ["case_id", "scenario_set_id", "satisfied_assertion_ids"])
 def test_judge_identity_fields_reject_private_values_in_model_and_schema(tmp_path: Path, field: str) -> None:
+    """Reject private judge identities in both model and schema validation."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -157,6 +166,7 @@ def test_judge_identity_fields_reject_private_values_in_model_and_schema(tmp_pat
 
 @pytest.mark.parametrize("requirement_id", ["ghp_secret", " preserve_behavior "])
 def test_selected_case_rejects_private_or_padded_requirement_ids(tmp_path: Path, requirement_id: str) -> None:
+    """Reject private or padded semantic requirement identifiers."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -169,6 +179,7 @@ def test_selected_case_rejects_private_or_padded_requirement_ids(tmp_path: Path,
 
 
 def test_blocked_provider_request_returns_bound_receipt_without_adapter(tmp_path: Path) -> None:
+    """Return bound blocker evidence without invoking an adapter."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -188,6 +199,7 @@ def test_blocked_provider_request_returns_bound_receipt_without_adapter(tmp_path
 
 
 def test_mismatched_judge_binding_blocks_before_adapter_call(tmp_path: Path) -> None:
+    """Block mismatched judge evidence before calling the provider adapter."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -199,9 +211,11 @@ def test_mismatched_judge_binding_blocks_before_adapter_call(tmp_path: Path) -> 
         descriptor = _adapter(request, "reviewed").descriptor
 
         async def complete(self, request: object, input_payload: object) -> None:
+            """Fail if execution reaches the adapter unexpectedly."""
             raise AssertionError("adapter must not be called")
 
         async def cleanup(self) -> None:
+            """Complete the adapter protocol's no-op cleanup."""
             return None
 
     receipt = asyncio.run(execute_selected_case(definition, request, input_payload, NeverCallAdapter(), evidence))
@@ -212,6 +226,7 @@ def test_mismatched_judge_binding_blocks_before_adapter_call(tmp_path: Path) -> 
 
 
 def test_forged_provider_request_is_rejected_before_blocked_receipt(tmp_path: Path) -> None:
+    """Reject a forged provider request before creating a blocked receipt."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -227,6 +242,7 @@ def test_forged_provider_request_is_rejected_before_blocked_receipt(tmp_path: Pa
 @pytest.mark.parametrize("field", ["case_id", "scenario_set_id", "satisfied_assertion_ids"])
 @pytest.mark.parametrize("padding", [" ", "\n", "\r\n"])
 def test_judge_identity_normalization_matches_schema(tmp_path: Path, field: str, padding: str) -> None:
+    """Keep judge identity normalization aligned with the public schema."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -243,6 +259,7 @@ def test_judge_identity_normalization_matches_schema(tmp_path: Path, field: str,
 
 
 def test_judge_candidate_id_screening_matches_schema(tmp_path: Path) -> None:
+    """Keep candidate identity screening aligned with the public schema."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -258,6 +275,7 @@ def test_judge_candidate_id_screening_matches_schema(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("field,value", [("source_revision", "not-a-revision"), ("content_sha256", "d" * 63)])
 def test_forged_nested_judge_candidate_is_revalidated(tmp_path: Path, field: str, value: str) -> None:
+    """Revalidate forged nested candidate fields in judge evidence."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -272,6 +290,7 @@ def test_forged_nested_judge_candidate_is_revalidated(tmp_path: Path, field: str
 
 
 def test_padded_judge_candidate_revision_is_rejected(tmp_path: Path) -> None:
+    """Reject a padded candidate revision in judge evidence."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -286,6 +305,7 @@ def test_padded_judge_candidate_revision_is_rejected(tmp_path: Path) -> None:
 
 
 def test_private_provider_evidence_ref_returns_blocked_receipt(tmp_path: Path) -> None:
+    """Block private provider evidence references without exposing them."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -305,6 +325,7 @@ def test_private_provider_evidence_ref_returns_blocked_receipt(tmp_path: Path) -
 
 
 def test_forged_selected_case_definition_is_rejected_before_receipt(tmp_path: Path) -> None:
+    """Reject a forged selected-case definition before producing a receipt."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -320,6 +341,7 @@ def test_forged_selected_case_definition_is_rejected_before_receipt(tmp_path: Pa
 
 
 def test_selected_case_blocks_unsupported_output_contract(tmp_path: Path) -> None:
+    """Block output contracts the selected-case route cannot prove."""
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
@@ -331,6 +353,7 @@ def test_selected_case_blocks_unsupported_output_contract(tmp_path: Path) -> Non
 
 
 def test_forged_deterministic_assertion_type_is_rejected(tmp_path: Path) -> None:
+    """Reject a forged deterministic assertion type at execution."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -347,6 +370,7 @@ def test_forged_deterministic_assertion_type_is_rejected(tmp_path: Path) -> None
 
 
 def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:
+    """Prevent a forged scorer threshold from turning failure into success."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -365,6 +389,7 @@ def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Pat
 
 
 def test_private_failure_evidence_ref_returns_redacted_blocker(tmp_path: Path) -> None:
+    """Redact private evidence references from provider failure blockers."""
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
@@ -375,11 +400,13 @@ def test_private_failure_evidence_ref_returns_redacted_blocker(tmp_path: Path) -
         descriptor = _adapter(request, "reviewed").descriptor
 
         async def complete(self, request: object, input_payload: object) -> None:
+            """Raise a provider failure containing a private evidence reference."""
             raise ProviderAdapterFailure(
                 code="rate_limited", category="provider", retryable=True, evidence_refs=("evidence/client_secret.json",)
             )
 
         async def cleanup(self) -> None:
+            """Complete the adapter protocol's no-op cleanup."""
             return None
 
     receipt = asyncio.run(
