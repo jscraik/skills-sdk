@@ -141,7 +141,7 @@
     "case_id": {
       "allOf": [
         {
-          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$(?![\\s\\S])"
         },
         {
           "not": {
@@ -220,7 +220,7 @@
       "items": {
         "allOf": [
           {
-            "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$(?![\\s\\S])"
           },
           {
             "not": {
@@ -243,7 +243,7 @@
     "scenario_set_id": {
       "allOf": [
         {
-          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$(?![\\s\\S])"
         },
         {
           "not": {

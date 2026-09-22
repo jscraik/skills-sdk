@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 from pydantic import Field, field_validator
+from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
@@ -33,10 +35,21 @@ class SelectedCaseJudgeEvidence(_ContractModel):
 
     @field_validator("candidate", mode="before")
     @classmethod
-    def candidate_id_must_be_public(cls, value: object) -> object:
-        package_id = value.get("package_id") if isinstance(value, dict) else getattr(value, "package_id", None)
-        if isinstance(package_id, str) and not _public_text_is_redaction_safe(package_id):
-            raise ValueError("selected-case judge candidate id must not contain credential-shaped values")
+    def candidate_id_must_be_public(cls: type[SelectedCaseJudgeEvidence], value: object) -> object:
+        if isinstance(value, PackageCandidateIdentity):
+            try:
+                value = value.model_dump(mode="json")
+            except PydanticSerializationError:
+                raise ValueError("selected-case judge candidate failed revalidation") from None
+        if isinstance(value, Mapping):
+            for field in ("package_id", "source_revision", "content_sha256"):
+                item = value.get(field)
+                if isinstance(item, str) and item != item.strip():
+                    raise ValueError("selected-case judge candidate fields must already be normalized")
+            package_id = value.get("package_id")
+            if isinstance(package_id, str) and not _public_text_is_redaction_safe(package_id):
+                raise ValueError("selected-case judge candidate id must not contain credential-shaped values")
+            return PackageCandidateIdentity.model_validate(value)
         return value
 
     @field_validator("scenario_set_id", "case_id", "satisfied_assertion_ids", mode="before")

@@ -16,6 +16,7 @@ from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
+from skills_sdk.providers import ProviderAdapterFailure
 
 
 @pytest.mark.parametrize("evidence_ref", ["evidence/eyJabc.def.ghi.json", "evidence/client_secret.json"])
@@ -224,13 +225,16 @@ def test_forged_provider_request_is_rejected_before_blocked_receipt(tmp_path: Pa
 
 
 @pytest.mark.parametrize("field", ["case_id", "scenario_set_id", "satisfied_assertion_ids"])
-def test_judge_identity_normalization_matches_schema(tmp_path: Path, field: str) -> None:
+@pytest.mark.parametrize("padding", [" ", "\n", "\r\n"])
+def test_judge_identity_normalization_matches_schema(tmp_path: Path, field: str, padding: str) -> None:
     definition = load_selected_case(
         _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
     )
     request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
     payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
-    payload[field] = [" preserve_behavior "] if field == "satisfied_assertion_ids" else f" {payload[field]} "
+    payload[field] = (
+        [f"preserve_behavior{padding}"] if field == "satisfied_assertion_ids" else f"{payload[field]}{padding}"
+    )
 
     with pytest.raises(ValueError, match="normalized"):
         SelectedCaseJudgeEvidence.model_validate(payload)
@@ -247,6 +251,35 @@ def test_judge_candidate_id_screening_matches_schema(tmp_path: Path) -> None:
     payload["candidate"]["package_id"] = "ghp_secret"
 
     with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
+@pytest.mark.parametrize("field,value", [("source_revision", "not-a-revision"), ("content_sha256", "d" * 63)])
+def test_forged_nested_judge_candidate_is_revalidated(tmp_path: Path, field: str, value: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    evidence = _evidence(definition, request, "reviewed")
+    forged_candidate = evidence.candidate.model_copy(update={field: value})
+
+    with pytest.raises(ValueError):
+        SelectedCaseJudgeEvidence.model_validate(
+            evidence.model_copy(update={"candidate": forged_candidate}).model_dump(mode="json")
+        )
+
+
+def test_padded_judge_candidate_revision_is_rejected(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["candidate"]["source_revision"] += " "
+
+    with pytest.raises(ValueError, match="normalized"):
         SelectedCaseJudgeEvidence.model_validate(payload)
     schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
     assert list(Draft202012Validator(schema).iter_errors(payload))
@@ -295,3 +328,67 @@ def test_selected_case_blocks_unsupported_output_contract(tmp_path: Path) -> Non
 
     with pytest.raises(ContractError, match="unsupported_output_contract"):
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_forged_deterministic_assertion_type_is_rejected(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    forged = replace(
+        definition,
+        semantic_assertions=definition.semantic_assertions[:-1],
+        deterministic_assertions=((definition.semantic_assertions[-1][0], "bogus", "absent"),),
+    )
+
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
+
+
+def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = "reviewed"
+    evidence = _evidence(definition, request, output).model_copy(update={"satisfied_assertion_ids": ()})
+    adapter = _adapter(request, output)
+
+    valid_receipt = asyncio.run(execute_selected_case(definition, request, input_payload, adapter, evidence))
+    assert valid_receipt.status == "fail"
+
+    forged = replace(definition, scorer=definition.scorer.model_copy(update={"pass_threshold": 0.0}))
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(execute_selected_case(forged, request, input_payload, adapter, evidence))
+
+
+def test_private_failure_evidence_ref_returns_redacted_blocker(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+
+    class FailingAdapter:
+        descriptor = _adapter(request, "reviewed").descriptor
+
+        async def complete(self, request: object, input_payload: object) -> None:
+            raise ProviderAdapterFailure(
+                code="rate_limited", category="provider", retryable=True, evidence_refs=("evidence/client_secret.json",)
+            )
+
+        async def cleanup(self) -> None:
+            return None
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition, request, input_payload, FailingAdapter(), _evidence(definition, request, "reviewed")
+        )
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "private_provider_evidence_ref"
+    assert "client_secret" not in receipt.model_dump_json()

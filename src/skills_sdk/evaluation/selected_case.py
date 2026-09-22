@@ -280,6 +280,10 @@ def _blocked_observation(
     message: str,
     evidence_refs: tuple[str, ...] = ("references/evals.yaml",),
 ) -> ScenarioObservationV2:
+    if any(not _public_text_is_redaction_safe(ref) for ref in evidence_refs):
+        code = "private_provider_evidence_ref"
+        message = "provider evidence references contain credential-shaped values"
+        evidence_refs = ("references/evals.yaml",)
     return ScenarioObservationV2(
         candidate=definition.scenario_set.candidate,
         scenario_set_id=definition.scenario_set.scenario_set_id,
@@ -382,10 +386,25 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
         )
         if len(scenario_set.cases) != 1 or scorer.candidate != scenario_set.candidate:
             raise ValueError("selected case must have one matching candidate")
+        expected_scorer = ScorerProfile(
+            candidate=scenario_set.candidate,
+            scorer_id="selected-case-deterministic-v1",
+            scorer_type="deterministic",
+            version_or_digest="selected-case-v1",
+            pass_threshold=1.0,
+            deterministic_checks_first=True,
+            calibration_required=False,
+        )
+        if scorer != expected_scorer:
+            raise ValueError("selected case scorer contract does not match the loaded route")
         case = scenario_set.cases[0]
         signal_ids = tuple(item[0] for item in semantic) + tuple(item[0] for item in deterministic)
         if case.expected_signals != signal_ids or case.oracle != "expected_signal":
             raise ValueError("selected case assertion projection does not match its scenario")
+        if any(item[1] not in _SEMANTIC_ASSERTIONS for item in semantic):
+            raise ValueError("selected case semantic assertion type is unsupported")
+        if any(item[1] not in _DETERMINISTIC_ASSERTIONS for item in deterministic):
+            raise ValueError("selected case deterministic assertion type is unsupported")
         public_values = (
             *case.forbidden_commands,
             *(part for item in semantic for part in (item[0], item[1], *item[2], *item[3])),

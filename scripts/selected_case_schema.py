@@ -4,7 +4,7 @@ from typing import Any
 
 from package_safety_schema import MACHINE_PATH_SCHEMA_PATTERN, PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN
 
-_NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
+_NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$(?![\s\S])"
 
 
 def append_selected_case_constraints(schema: dict[str, Any], filename: str) -> None:
