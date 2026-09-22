@@ -53,6 +53,16 @@ class SelectedCaseJudgeEvidence(_ContractModel):
             return PackageCandidateIdentity.model_validate(value)
         return value
 
+    @field_validator("provider", "judge", mode="before")
+    @classmethod
+    def provider_identities_must_be_valid(cls: type[SelectedCaseJudgeEvidence], value: object) -> object:
+        if isinstance(value, ProviderIdentityV2):
+            try:
+                value = value.model_dump(mode="json")
+            except PydanticSerializationError:
+                raise ValueError("selected-case judge provider identity failed revalidation") from None
+        return ProviderIdentityV2.model_validate(value)
+
     @field_validator("scenario_set_id", "case_id", "satisfied_assertion_ids", mode="before")
     @classmethod
     def identity_fields_must_already_be_normalized(cls, value: object) -> object:

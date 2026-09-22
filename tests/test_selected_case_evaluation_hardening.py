@@ -419,3 +419,48 @@ def test_private_failure_evidence_ref_returns_redacted_blocker(tmp_path: Path) -
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "private_provider_evidence_ref"
     assert "client_secret" not in receipt.model_dump_json()
+
+
+@pytest.mark.parametrize("field", ["scenario_set_id", "case_id"])
+def test_forged_definition_identity_is_rejected_before_receipt(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    if field == "scenario_set_id":
+        scenario_set = definition.scenario_set.model_copy(update={field: "ghp_secret"})
+    else:
+        case = definition.scenario_set.cases[0].model_copy(update={field: "ghp_secret"})
+        scenario_set = definition.scenario_set.model_copy(update={"cases": (case,)})
+
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(
+            execute_selected_case(replace(definition, scenario_set=scenario_set), request, input_payload, None, None)
+        )
+
+
+@pytest.mark.parametrize("field", ["provider", "judge"])
+def test_forged_nested_provider_identity_is_rejected(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    evidence = _evidence(definition, request, "reviewed")
+    forged_provider = evidence.provider.model_copy(update={"adapter_id": "ghp_secret"})
+    payload = evidence.model_dump(mode="json")
+    payload[field] = forged_provider
+
+    with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+
+
+def test_loader_rejects_candidate_incompatible_with_judge_contract(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "client-secret")
+    skill_file = package / "SKILL.md"
+    skill_file.write_text(skill_file.read_text(encoding="utf-8").replace("simplify", "client-secret"), encoding="utf-8")
+    evals = package / "references" / "evals.yaml"
+    evals.write_text(evals.read_text(encoding="utf-8").replace("simplify", "client-secret"), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="candidate package id must not contain private values"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")

@@ -224,7 +224,9 @@ def load_selected_case(
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.status != "pass" or validation.candidate is None:
         raise _contract_error("package_validation_blocked", "selected-case evaluation requires a valid package")
-    if not _identity_is_public(validation.candidate.package_id):
+    if not _identity_is_public(validation.candidate.package_id) or not _public_text_is_redaction_safe(
+        validation.candidate.package_id
+    ):
         raise _contract_error("invalid_selected_case", "candidate package id must not contain private values")
     case = _selected_case(
         _load_cases(package_root, _evals_digest(validation.files), validation.candidate.package_id),
@@ -425,6 +427,9 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
         if any(item[1] not in _DETERMINISTIC_ASSERTIONS for item in deterministic):
             raise ValueError("selected case deterministic assertion type is unsupported")
         public_values = (
+            scenario_set.candidate.package_id,
+            scenario_set.scenario_set_id,
+            case.case_id,
             *case.forbidden_commands,
             *(part for item in semantic for part in (item[0], item[1], *item[2], *item[3])),
             *(part for item in deterministic for part in item),
