@@ -464,3 +464,42 @@ def test_loader_rejects_candidate_incompatible_with_judge_contract(tmp_path: Pat
 
     with pytest.raises(ContractError, match="candidate package id must not contain private values"):
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_private_deterministic_operand_remains_usable_but_unpublished(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"].append({"type": "must_not", "value": "password="})
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = "reviewed"
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition, request, input_payload, _adapter(request, output), _evidence(definition, request, output)
+        )
+    )
+
+    assert receipt.status == "pass"
+    assert "password=" not in receipt.model_dump_json()
+
+
+def test_forged_duplicate_projected_signal_ids_are_rejected(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    duplicate = definition.semantic_assertions[0]
+    semantic = (*definition.semantic_assertions, duplicate)
+    case = definition.scenario_set.cases[0].model_copy(
+        update={"expected_signals": (*definition.scenario_set.cases[0].expected_signals, duplicate[0])}
+    )
+    scenario_set = definition.scenario_set.model_copy(update={"cases": (case,)})
+    forged = replace(definition, scenario_set=scenario_set, semantic_assertions=semantic)
+
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(execute_selected_case(forged, request, input_payload, None, None))

@@ -422,6 +422,8 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
         signal_ids = tuple(item[0] for item in semantic) + tuple(item[0] for item in deterministic)
         if case.expected_signals != signal_ids or case.oracle != "expected_signal":
             raise ValueError("selected case assertion projection does not match its scenario")
+        if len(signal_ids) != len(set(signal_ids)):
+            raise ValueError("selected case projected signal ids must be unique")
         if any(item[1] not in _SEMANTIC_ASSERTIONS for item in semantic):
             raise ValueError("selected case semantic assertion type is unsupported")
         if any(item[1] not in _DETERMINISTIC_ASSERTIONS for item in deterministic):
@@ -431,8 +433,8 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
             scenario_set.scenario_set_id,
             case.case_id,
             *case.forbidden_commands,
-            *(part for item in semantic for part in (item[0], item[1], *item[2], *item[3])),
-            *(part for item in deterministic for part in item),
+            *(item[0] for item in semantic),
+            *(item[0] for item in deterministic),
         )
         if not all(_public_text_is_redaction_safe(value) for value in public_values):
             raise ValueError("selected case projected fields contain private values")

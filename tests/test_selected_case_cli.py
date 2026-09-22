@@ -105,3 +105,4 @@ def test_cli_rejects_malformed_supplied_final_output(tmp_path: Path, capsys: pyt
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 2
     assert payload["code"] == "invalid_selected_case_input"
+    assert payload["evidence_refs"] == []

@@ -233,7 +233,7 @@ def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int
     """Print a selected-case blocker and return the blocked exit status."""
     from skills_sdk.models.packaging import PackageReceiptBlocker
 
-    blocker = PackageReceiptBlocker(code=code, message=message, evidence_refs=("references/evals.yaml",))
+    blocker = PackageReceiptBlocker(code=code, message=message)
     if json_output:
         print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
     else:
