@@ -31,6 +31,20 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     raw_output_included: Literal[False] = False
     mutation_performed: Literal[False] = False
 
+    @field_validator("output_sha256", "assertion_contract_sha256", "judge_result_sha256", mode="before")
+    @classmethod
+    def digests_must_already_be_normalized(cls, value: object) -> object:
+        if isinstance(value, str) and value != value.strip():
+            raise ValueError("selected-case judge digests must already be normalized")
+        return value
+
+    @field_validator("credentials_included", "raw_output_included", "mutation_performed", mode="before")
+    @classmethod
+    def false_claims_must_be_json_booleans(cls, value: object) -> object:
+        if type(value) is not bool:
+            raise ValueError("selected-case judge false-only claims must be JSON booleans")
+        return value
+
     @field_validator("satisfied_assertion_ids")
     @classmethod
     def assertion_ids_must_be_unique(cls, values: tuple[str, ...]) -> tuple[str, ...]:

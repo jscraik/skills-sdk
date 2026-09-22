@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 import yaml
+from pydantic import ValidationError
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
@@ -22,11 +23,11 @@ from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.providers import JsonValue, ProviderAdapterComplete, TextProviderAdapter, execute_provider_call
 from skills_sdk.validation import validate_skill_package
 
-EvaluationMode = Literal["standard", "smoke", "release"]
+EvaluationMode = Literal["smoke", "release"]
 SemanticAssertion = tuple[str, str, tuple[str, ...], tuple[str, ...]]
 _SEMANTIC_ASSERTIONS = {"discovery_question", "expected_signal", "semantic_requirements"}
 _DETERMINISTIC_ASSERTIONS = {"contains", "must_not", "not_contains"}
-_SUPPORTED_MODES = {"standard", "smoke", "release"}
+_SUPPORTED_MODES = {"smoke", "release"}
 _EXECUTION_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 
 
@@ -84,7 +85,7 @@ def _evals_digest(validation_files: tuple[PackageManifestFile, ...]) -> str:
 
 def _load_cases(package_root: Path, expected_sha256: str, package_id: str) -> list[object]:
     try:
-        payload = yaml.load(_capture_evals(package_root, expected_sha256), Loader=_ClosedLoader)
+        payload = yaml.load(_capture_evals(package_root, expected_sha256).decode("utf-8"), Loader=_ClosedLoader)
     except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
         raise _contract_error("invalid_eval_definitions", "package eval definitions could not be loaded") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("cases"), list):
@@ -201,6 +202,8 @@ def load_selected_case(
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.status != "pass" or validation.candidate is None:
         raise _contract_error("package_validation_blocked", "selected-case evaluation requires a valid package")
+    if not _identity_is_public(validation.candidate.package_id):
+        raise _contract_error("invalid_selected_case", "candidate package id must not contain private values")
     case = _selected_case(
         _load_cases(package_root, _evals_digest(validation.files), validation.candidate.package_id),
         case_id,
@@ -254,8 +257,10 @@ def load_selected_case(
     return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic)
 
 
-def _blocker(code: str, message: str) -> PackageReceiptBlocker:
-    return PackageReceiptBlocker(code=code, message=message, evidence_refs=("references/evals.yaml",))
+def _blocker(
+    code: str, message: str, evidence_refs: tuple[str, ...] = ("references/evals.yaml",)
+) -> PackageReceiptBlocker:
+    return PackageReceiptBlocker(code=code, message=message, evidence_refs=evidence_refs)
 
 
 def _blocked_observation(
@@ -263,6 +268,7 @@ def _blocked_observation(
     request: ProviderExecutionRequest,
     code: str,
     message: str,
+    evidence_refs: tuple[str, ...] = ("references/evals.yaml",),
 ) -> ScenarioObservationV2:
     return ScenarioObservationV2(
         candidate=definition.scenario_set.candidate,
@@ -272,7 +278,7 @@ def _blocked_observation(
         status="blocked",
         runner_id=request.provider.adapter_id,
         runner_version_or_digest=request.provider.adapter_version_or_digest,
-        blocker=_blocker(code, message),
+        blocker=_blocker(code, message, evidence_refs),
     )
 
 
@@ -314,7 +320,7 @@ def _validated_observation(
             "selected_case_identity_mismatch",
             "assertion evidence does not bind the executed output",
         )
-    if set(supplied.satisfied_assertion_ids) != set(definition.semantic_signal_ids):
+    if not set(supplied.satisfied_assertion_ids) <= set(definition.semantic_signal_ids):
         return _blocked_observation(
             definition,
             request,
@@ -331,7 +337,7 @@ def _validated_observation(
         status="completed",
         observed_signals=(*supplied.satisfied_assertion_ids, *deterministic),
         observed_commands=_observed_forbidden_commands(output_text, case.forbidden_commands),
-        evidence_refs=supplied.evidence_refs,
+        evidence_refs=(*supplied.evidence_refs, f"judge-results/{supplied.judge_result_sha256}"),
         output_sha256=supplied.output_sha256,
         runner_id=supplied.judge.adapter_id,
         runner_version_or_digest=supplied.judge.adapter_version_or_digest,
@@ -378,13 +384,29 @@ async def execute_selected_case(
             "adapter and assertion evidence are required",
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
-    outcome = await execute_provider_call(request, input_payload, adapter)
-    if outcome.complete_text is None or outcome.public_result.output_sha256 is None:
+    try:
+        assertion_evidence = SelectedCaseJudgeEvidence.model_validate(assertion_evidence.model_dump(mode="json"))
+    except ValidationError:
         observation = _blocked_observation(
             definition,
             request,
-            "provider_output_unavailable",
-            "provider produced no complete output",
+            "invalid_judge_evidence",
+            "assertion evidence failed boundary validation",
+        )
+        return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
+    outcome = await execute_provider_call(request, input_payload, adapter)
+    if outcome.complete_text is None or outcome.public_result.output_sha256 is None:
+        execution = outcome.public_result.execution
+        failure = execution.blocker or execution.error
+        failure_code = failure.code if failure is not None else "provider_output_unavailable"
+        failure_refs = failure.evidence_refs if failure is not None else ("references/evals.yaml",)
+        retryable = execution.error.retryable if execution.error is not None else False
+        observation = _blocked_observation(
+            definition,
+            request,
+            failure_code,
+            f"provider execution {execution.status}; retryable={str(retryable).lower()}",
+            failure_refs,
         )
     else:
         observation = _validated_observation(

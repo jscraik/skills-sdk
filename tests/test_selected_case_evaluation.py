@@ -24,6 +24,7 @@ from skills_sdk.evaluation.selected_case import EvaluationMode
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
+from skills_sdk.providers import ProviderAdapterComplete, ProviderAdapterFailure
 from tests.test_provider_execution_contracts import _request
 
 REVISION = "1" * 40
@@ -89,6 +90,23 @@ def _adapter(request: ProviderExecutionRequest, output: str) -> SuppliedTextProv
     return SuppliedTextProviderAdapter(descriptor, output, ("evidence/provider-output.json",))
 
 
+class _FailingAdapter:
+    def __init__(self, request: ProviderExecutionRequest) -> None:
+        self.descriptor = TextProviderAdapterDescriptor(provider=request.provider, mode="complete")
+
+    async def complete(self, request: ProviderExecutionRequest, input_payload: object) -> ProviderAdapterComplete:
+        del request, input_payload
+        raise ProviderAdapterFailure(
+            code="rate_limited",
+            category="provider",
+            retryable=True,
+            evidence_refs=("provider/rate-limit.json",),
+        )
+
+    async def cleanup(self) -> None:
+        return None
+
+
 def _evidence(
     definition: SelectedCaseDefinition,
     request: ProviderExecutionRequest,
@@ -152,6 +170,24 @@ def test_loader_rejects_runtime_mode_outside_public_literals(tmp_path: Path, mod
             case_id="happy-diff",
             mode=cast(EvaluationMode, mode),
         )
+
+
+def test_standard_mode_is_not_accepted_by_selected_case_contract(tmp_path: Path) -> None:
+    with pytest.raises(ContractError, match="selected case mode is unsupported"):
+        load_selected_case(
+            _skill(tmp_path / "simplify"),
+            source_revision=REVISION,
+            case_id="happy-diff",
+            mode=cast(EvaluationMode, "standard"),
+        )
+
+
+def test_eval_definitions_require_utf8(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    evals.write_bytes(evals.read_text(encoding="utf-8").encode("utf-16"))
+    with pytest.raises(ContractError, match="invalid_eval_definitions"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
 @pytest.mark.parametrize(
@@ -317,6 +353,19 @@ def test_eval_definitions_must_bind_the_candidate(tmp_path: Path, field: str, va
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
+def test_provider_incompatible_candidate_id_is_rejected_during_loading(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "bearer-token")
+    (package / "SKILL.md").write_text(
+        "---\nname: bearer-token\ndescription: Preserve behavior during cleanup.\n---\n", encoding="utf-8"
+    )
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["skill_name"] = "bearer-token"
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(ContractError, match="candidate package id must not contain private values"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 def test_deterministic_only_case_accepts_empty_satisfied_assertion_ids(tmp_path: Path) -> None:
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
@@ -355,6 +404,28 @@ def test_missing_adapter_or_semantic_evidence_blocks_without_execution_claim(tmp
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "provider_adapter_required"
     assert receipt.case_results[0].observation_sha256 is None
+
+
+def test_provider_failure_details_are_preserved_in_blocked_receipt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition,
+            request,
+            input_payload,
+            _FailingAdapter(request),
+            _evidence(definition, request, "unused"),
+        )
+    )
+    blocker = receipt.case_results[0].blocker
+    assert blocker is not None
+    assert blocker.code == "rate_limited"
+    assert "retryable=true" in blocker.message
+    assert blocker.evidence_refs == ("provider/rate-limit.json",)
 
 
 def test_output_or_identity_mismatch_blocks_instead_of_fabricating_pass(tmp_path: Path) -> None:
@@ -426,6 +497,26 @@ def test_judge_evidence_rejects_credential_shaped_refs_at_model_and_schema_bound
     assert list(Draft202012Validator(SchemaRegistry().load("selected-case-judge-evidence.v1")).iter_errors(payload))
     with pytest.raises(ValueError, match="contract_validation_failed"):
         SchemaRegistry().validate("selected-case-judge-evidence.v1", payload)
+
+
+@pytest.mark.parametrize(
+    "evidence_ref",
+    [
+        "/".join(("evidence", "home", "user", "result.json")),
+        "/".join(("evidence", "$" + "HOME", "result.json")),
+        "evidence/secret=value.json",
+    ],
+)
+def test_judge_evidence_schema_matches_complete_public_reference_screening(tmp_path: Path, evidence_ref: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["evidence_refs"] = [evidence_ref]
+    with pytest.raises(ValueError):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    assert list(Draft202012Validator(SchemaRegistry().load("selected-case-judge-evidence.v1")).iter_errors(payload))
 
 
 @pytest.mark.parametrize("field", ["evidence_refs", "satisfied_assertion_ids"])
@@ -536,6 +627,82 @@ def test_forbidden_command_in_private_output_fails(tmp_path: Path) -> None:
 
     assert receipt.status == "fail"
     assert receipt.case_results[0].forbidden_commands_observed == ("rm -rf",)
+
+
+def test_partial_semantic_judgment_is_a_failed_case(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = "reviewed"
+    evidence = _evidence(definition, request, output).model_copy(update={"satisfied_assertion_ids": ()})
+
+    receipt = asyncio.run(
+        execute_selected_case(definition, request, input_payload, _adapter(request, output), evidence)
+    )
+
+    assert receipt.status == "fail"
+    assert set(receipt.case_results[0].missing_signals) == set(definition.semantic_signal_ids)
+
+
+def test_judge_result_digest_changes_receipt_identity(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = "behavior"
+    first = _evidence(definition, request, output)
+    second = first.model_copy(update={"judge_result_sha256": "d" * 64})
+
+    receipts = [
+        asyncio.run(execute_selected_case(definition, request, input_payload, _adapter(request, output), evidence))
+        for evidence in (first, second)
+    ]
+
+    assert receipts[0].receipt_id != receipts[1].receipt_id
+    assert receipts[0].case_results[0].evidence_refs != receipts[1].case_results[0].evidence_refs
+
+
+def test_forged_judge_evidence_is_revalidated_at_execution(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = "behavior"
+    forged = _evidence(definition, request, output).model_copy(update={"evidence_refs": ("evidence/ghp_secret.json",)})
+
+    receipt = asyncio.run(execute_selected_case(definition, request, input_payload, _adapter(request, output), forged))
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "invalid_judge_evidence"
+
+
+@pytest.mark.parametrize("field", ["credentials_included", "raw_output_included", "mutation_performed"])
+def test_judge_false_only_claims_require_json_booleans(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload[field] = 0
+    with pytest.raises(ValueError, match="JSON booleans"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+
+
+@pytest.mark.parametrize("field", ["output_sha256", "assertion_contract_sha256", "judge_result_sha256"])
+def test_judge_digests_reject_padding(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload[field] = f" {payload[field]} "
+    with pytest.raises(ValueError, match="normalized"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
 
 
 def test_cli_runs_controlled_supplied_adapter_without_agent_skills(

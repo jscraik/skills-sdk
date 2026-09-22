@@ -629,7 +629,7 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
     schema = model.model_json_schema()
     _append_portable_path_constraints(schema)
     _append_provider_identity_constraints(schema)
-    append_selected_case_constraints(schema, filename, _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN)
+    append_selected_case_constraints(schema, filename)
     _append_registry_identity_constraints(schema)
     package_safety_schema.append_package_safety_schema_constraints(schema, filename)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:

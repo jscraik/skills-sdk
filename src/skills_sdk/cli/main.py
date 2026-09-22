@@ -151,7 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     selected.add_argument("package_root", type=Path)
     selected.add_argument("--source-revision", required=True)
     selected.add_argument("--case", required=True, dest="case_id")
-    selected.add_argument("--mode", choices=("standard", "smoke", "release"), required=True)
+    selected.add_argument("--mode", choices=("smoke", "release"), required=True)
     selected.add_argument("--host-input", type=Path, required=True)
     selected.add_argument("--json", action="store_true", dest="json_output")
     selected.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
