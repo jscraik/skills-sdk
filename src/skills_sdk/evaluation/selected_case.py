@@ -337,7 +337,9 @@ def _validated_observation(
         status="completed",
         observed_signals=(*supplied.satisfied_assertion_ids, *deterministic),
         observed_commands=_observed_forbidden_commands(output_text, case.forbidden_commands),
-        evidence_refs=(*supplied.evidence_refs, f"judge-results/{supplied.judge_result_sha256}"),
+        evidence_refs=tuple(
+            dict.fromkeys((*supplied.evidence_refs, f"judge-results/{supplied.judge_result_sha256}"))
+        ),
         output_sha256=supplied.output_sha256,
         runner_id=supplied.judge.adapter_id,
         runner_version_or_digest=supplied.judge.adapter_version_or_digest,
