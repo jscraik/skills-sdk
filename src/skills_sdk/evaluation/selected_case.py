@@ -212,13 +212,9 @@ def load_selected_case(
     )
     semantic, deterministic = _assertion_signals(case)
     raw_checks = case.get("deterministic_checks")
-    if raw_checks is None:
-        raw_checks = {}
     if not isinstance(raw_checks, dict):
         raise _contract_error("invalid_selected_case", "deterministic_checks must be a mapping")
     raw_forbidden = raw_checks.get("forbidden_commands")
-    if raw_forbidden is None:
-        raw_forbidden = []
     if not isinstance(raw_forbidden, list) or not all(isinstance(item, str) and item.strip() for item in raw_forbidden):
         raise _contract_error("invalid_selected_case", "forbidden_commands must be a list of non-empty text")
     if not all(_identity_is_public(item) for item in raw_forbidden):

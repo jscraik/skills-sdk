@@ -6,6 +6,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+import yaml
 from jsonschema import Draft202012Validator
 from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepared_request, _skill
 
@@ -62,3 +63,31 @@ def test_existing_judge_result_ref_is_not_duplicated(tmp_path: Path) -> None:
 
     assert receipt.status == "pass"
     assert receipt.case_results[0].evidence_refs == (judge_result_ref,)
+
+
+@pytest.mark.parametrize("missing_field", ["deterministic_checks", "forbidden_commands"])
+def test_selected_case_requires_declared_deterministic_checks(tmp_path: Path, missing_field: str) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    case = payload["cases"][0]
+    if missing_field == "deterministic_checks":
+        case.pop(missing_field)
+    else:
+        case["deterministic_checks"].pop(missing_field)
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid_selected_case"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_selected_case_accepts_explicit_empty_forbidden_commands(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["deterministic_checks"]["forbidden_commands"] = []
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+    assert definition.scenario_set.cases[0].forbidden_commands == ()
