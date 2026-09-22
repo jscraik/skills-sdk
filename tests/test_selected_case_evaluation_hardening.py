@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -268,3 +269,29 @@ def test_private_provider_evidence_ref_returns_blocked_receipt(tmp_path: Path) -
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "private_provider_evidence_ref"
     assert "client_secret" not in receipt.model_dump_json()
+
+
+def test_forged_selected_case_definition_is_rejected_before_receipt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    forged_case = definition.scenario_set.cases[0].model_copy(update={"forbidden_commands": ("bearer=opaque-secret",)})
+    forged_set = definition.scenario_set.model_copy(update={"cases": (forged_case,)})
+
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(
+            execute_selected_case(replace(definition, scenario_set=forged_set), request, input_payload, None, None)
+        )
+
+
+def test_selected_case_blocks_unsupported_output_contract(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["output_contract"] = {"required_fields": ["summary"]}
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="unsupported_output_contract"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 import yaml
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import canonical_json_sha256
@@ -219,6 +219,10 @@ def load_selected_case(
         case_id,
         mode,
     )
+    if case.get("output_contract") is not None:
+        raise _contract_error(
+            "unsupported_output_contract", "selected-case execution cannot prove structured output fields"
+        )
     semantic, deterministic = _assertion_signals(case)
     raw_checks = case.get("deterministic_checks")
     if not isinstance(raw_checks, dict):
@@ -368,6 +372,34 @@ def _request_matches_definition(
     )
 
 
+def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDefinition:
+    try:
+        scenario_set = ScenarioSetV2.model_validate(definition.scenario_set.model_dump(mode="json"))
+        scorer = ScorerProfile.model_validate(definition.scorer.model_dump(mode="json"))
+        semantic = TypeAdapter(tuple[SemanticAssertion, ...]).validate_python(definition.semantic_assertions)
+        deterministic = TypeAdapter(tuple[tuple[str, str, str], ...]).validate_python(
+            definition.deterministic_assertions
+        )
+        if len(scenario_set.cases) != 1 or scorer.candidate != scenario_set.candidate:
+            raise ValueError("selected case must have one matching candidate")
+        case = scenario_set.cases[0]
+        signal_ids = tuple(item[0] for item in semantic) + tuple(item[0] for item in deterministic)
+        if case.expected_signals != signal_ids or case.oracle != "expected_signal":
+            raise ValueError("selected case assertion projection does not match its scenario")
+        public_values = (
+            *case.forbidden_commands,
+            *(part for item in semantic for part in (item[0], item[1], *item[2], *item[3])),
+            *(part for item in deterministic for part in item),
+        )
+        if not all(_public_text_is_redaction_safe(value) for value in public_values):
+            raise ValueError("selected case projected fields contain private values")
+        return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic)
+    except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
+        raise _contract_error(
+            "invalid_selected_case_definition", "selected-case definition failed revalidation"
+        ) from None
+
+
 async def execute_selected_case(
     definition: SelectedCaseDefinition,
     request: ProviderExecutionRequest,
@@ -377,6 +409,7 @@ async def execute_selected_case(
 ) -> EvaluationReceiptV2:
     """Execute one injected provider call and evaluate bound assertion evidence."""
 
+    definition = _revalidate_definition(definition)
     try:
         request = ProviderExecutionRequest.model_validate(request)
     except ValidationError:
