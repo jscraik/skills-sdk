@@ -10,6 +10,7 @@ import yaml
 from jsonschema import Draft202012Validator
 from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepared_request, _skill
 
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
@@ -206,3 +207,16 @@ def test_mismatched_judge_binding_blocks_before_adapter_call(tmp_path: Path) -> 
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "selected_case_identity_mismatch"
+
+
+def test_forged_provider_request_is_rejected_before_blocked_receipt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    forged_provider = request.provider.model_copy(update={"model_id": "ghp_secret"})
+    forged_request = request.model_copy(update={"provider": forged_provider, "status": "blocked"})
+
+    with pytest.raises(ContractError, match="invalid_provider_request"):
+        asyncio.run(execute_selected_case(definition, forged_request, input_payload, None, None))

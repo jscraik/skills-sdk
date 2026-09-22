@@ -375,6 +375,10 @@ async def execute_selected_case(
 ) -> EvaluationReceiptV2:
     """Execute one injected provider call and evaluate bound assertion evidence."""
 
+    try:
+        request = ProviderExecutionRequest.model_validate(request)
+    except ValidationError:
+        raise _contract_error("invalid_provider_request", "provider request failed revalidation") from None
     if not _request_matches_definition(definition, request, input_payload):
         observation = _blocked_observation(
             definition,
