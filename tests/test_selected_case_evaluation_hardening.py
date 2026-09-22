@@ -110,7 +110,7 @@ def test_provider_output_evidence_survives_selected_case_receipt(tmp_path: Path)
     assert "evidence/provider-output.json" in receipt.case_results[0].evidence_refs
 
 
-@pytest.mark.parametrize("mode_list", [["release", "standard"], ["release", []], []])
+@pytest.mark.parametrize("mode_list", [["release", "standard"], ["release", "release"], ["release", []], []])
 def test_selected_case_rejects_invalid_declared_modes(tmp_path: Path, mode_list: list[object]) -> None:
     package = _skill(tmp_path / "simplify")
     evals = package / "references" / "evals.yaml"
