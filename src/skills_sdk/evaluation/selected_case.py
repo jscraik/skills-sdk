@@ -251,13 +251,17 @@ def load_selected_case(
         raise _contract_error("invalid_selected_case", "forbidden_commands must be a list of non-empty text")
     if not all(_identity_is_public(item) for item in raw_forbidden):
         raise _contract_error("invalid_selected_case", "forbidden_commands must not contain private values")
+    if any(item != item.strip() for item in raw_forbidden):
+        raise _contract_error("invalid_selected_case", "forbidden_commands must preserve exact text")
     forbidden = tuple(raw_forbidden)
     prompt = case.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise _contract_error("invalid_selected_case", "selected case requires a prompt")
+    if prompt != prompt.strip():
+        raise _contract_error("invalid_selected_case", "selected case prompt must preserve exact text")
     if _EXECUTION_ID_PATTERN.fullmatch(case_id) is None:
         raise _contract_error("invalid_selected_case", "selected case id must use provider execution id syntax")
-    if not _identity_is_public(case_id):
+    if not _identity_is_public(case_id) or not _public_text_is_redaction_safe(case_id):
         raise _contract_error("invalid_selected_case", "selected case id must not contain private values")
     semantic_ids = tuple(item[0] for item in semantic)
     selected = ScenarioCaseV2(
@@ -434,6 +438,13 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
             raise ValueError("selected case projected signal ids must be unique")
         if any(item[1] not in _SEMANTIC_ASSERTIONS for item in semantic):
             raise ValueError("selected case semantic assertion type is unsupported")
+        if any(
+            not (*item[2], *item[3])
+            or any(not term.strip() for term in (*item[2], *item[3]))
+            or (item[1] != "semantic_requirements" and (len(item[2]) != 1 or item[3]))
+            for item in semantic
+        ):
+            raise ValueError("selected case semantic assertion operands are invalid")
         if any(item[1] not in _DETERMINISTIC_ASSERTIONS for item in deterministic):
             raise ValueError("selected case deterministic assertion type is unsupported")
         if any(not item[2].strip() for item in deterministic):

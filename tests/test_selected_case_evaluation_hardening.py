@@ -102,6 +102,23 @@ def test_selected_case_accepts_explicit_empty_forbidden_commands(tmp_path: Path)
     assert definition.scenario_set.cases[0].forbidden_commands == ()
 
 
+@pytest.mark.parametrize("field", ["prompt", "forbidden_commands"])
+def test_selected_case_rejects_source_text_that_would_be_stripped(tmp_path: Path, field: str) -> None:
+    """Do not execute a prompt or command changed by model normalization."""
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    case = payload["cases"][0]
+    if field == "prompt":
+        case["prompt"] = f"{case['prompt']}\n"
+    else:
+        case["deterministic_checks"]["forbidden_commands"] = [" rm -rf "]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="invalid_selected_case"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 def test_provider_output_evidence_survives_selected_case_receipt(tmp_path: Path) -> None:
     """Preserve provider output evidence in the selected-case receipt."""
     definition = load_selected_case(
@@ -429,6 +446,35 @@ def test_forged_empty_deterministic_operand_is_rejected(tmp_path: Path, operand:
 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
         asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
+
+
+@pytest.mark.parametrize("terms", [("",), (" ",), ()])
+def test_forged_empty_semantic_terms_are_rejected(tmp_path: Path, terms: tuple[str, ...]) -> None:
+    """Recheck semantic operand shape before accepting judge evidence."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    semantic = definition.semantic_assertions[0]
+    forged = replace(
+        definition, semantic_assertions=((semantic[0], semantic[1], terms, ()), *definition.semantic_assertions[1:])
+    )
+
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
+
+
+def test_private_case_id_is_rejected_by_loader(tmp_path: Path) -> None:
+    """Keep case identity screening aligned with public judge evidence."""
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["id"] = "client-secret"
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="invalid_selected_case"):
+        load_selected_case(package, source_revision=REVISION, case_id="client-secret", mode="release")
 
 
 def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:
