@@ -9,6 +9,7 @@ from typing import Literal, cast
 
 import yaml
 from pydantic import ValidationError
+from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
@@ -329,6 +330,12 @@ def _validated_observation(
         )
     deterministic = _deterministic_signals(output_text, definition.deterministic_assertions)
     case = definition.scenario_set.cases[0]
+    judge_result_ref = f"judge-results/{supplied.judge_result_sha256}"
+    evidence_refs = (
+        supplied.evidence_refs
+        if judge_result_ref in supplied.evidence_refs
+        else (*supplied.evidence_refs, judge_result_ref)
+    )
     return ScenarioObservationV2(
         candidate=supplied.candidate,
         scenario_set_id=supplied.scenario_set_id,
@@ -337,7 +344,7 @@ def _validated_observation(
         status="completed",
         observed_signals=(*supplied.satisfied_assertion_ids, *deterministic),
         observed_commands=_observed_forbidden_commands(output_text, case.forbidden_commands),
-        evidence_refs=(*supplied.evidence_refs, f"judge-results/{supplied.judge_result_sha256}"),
+        evidence_refs=evidence_refs,
         output_sha256=supplied.output_sha256,
         runner_id=supplied.judge.adapter_id,
         runner_version_or_digest=supplied.judge.adapter_version_or_digest,
@@ -386,7 +393,7 @@ async def execute_selected_case(
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     try:
         assertion_evidence = SelectedCaseJudgeEvidence.model_validate(assertion_evidence.model_dump(mode="json"))
-    except ValidationError:
+    except (ValidationError, PydanticSerializationError):
         observation = _blocked_observation(
             definition,
             request,

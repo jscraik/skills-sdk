@@ -10,7 +10,7 @@ from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.provider import ProviderIdentityV2
-from skills_sdk.models.provider_execution import _identity_is_public
+from skills_sdk.models.safety import _public_text_is_redaction_safe
 
 
 class SelectedCaseJudgeEvidence(_ContractModel):
@@ -59,7 +59,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
             raise ValueError("selected-case judge evidence refs must be unique")
         for value in values:
             require_portable_relative_path(value)
-            if not _identity_is_public(value):
+            if not _public_text_is_redaction_safe(value):
                 raise ValueError("selected-case judge evidence refs must not contain credential-shaped values")
         return values
 
