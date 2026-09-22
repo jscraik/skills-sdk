@@ -12,6 +12,7 @@ from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepar
 
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
+from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 
 
@@ -162,3 +163,46 @@ def test_selected_case_rejects_private_or_padded_requirement_ids(tmp_path: Path,
     evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
     with pytest.raises(ValueError, match="invalid_acceptance_assertion"):
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_blocked_provider_request_returns_bound_receipt_without_adapter(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    prepared = _prepared_request(definition, input_payload)
+    payload = prepared.model_dump(mode="json")
+    payload["status"] = "blocked"
+    payload["blocker"] = {"code": "safety_unavailable", "category": "safety", "evidence_refs": ["evidence/safety.json"]}
+    blocked = ProviderExecutionRequest.model_validate(payload)
+
+    receipt = asyncio.run(execute_selected_case(definition, blocked, input_payload, None, None))
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "safety_unavailable"
+    assert receipt.case_results[0].blocker.evidence_refs == ("evidence/safety.json",)
+
+
+def test_mismatched_judge_binding_blocks_before_adapter_call(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    evidence = _evidence(definition, request, "reviewed").model_copy(update={"assertion_contract_sha256": "d" * 64})
+
+    class NeverCallAdapter:
+        descriptor = _adapter(request, "reviewed").descriptor
+
+        async def complete(self, request: object, input_payload: object) -> None:
+            raise AssertionError("adapter must not be called")
+
+        async def cleanup(self) -> None:
+            return None
+
+    receipt = asyncio.run(execute_selected_case(definition, request, input_payload, NeverCallAdapter(), evidence))
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "selected_case_identity_mismatch"

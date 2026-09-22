@@ -383,6 +383,16 @@ async def execute_selected_case(
             "provider request does not bind the selected case",
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
+    if request.status == "blocked":
+        blocker = request.blocker
+        observation = _blocked_observation(
+            definition,
+            request,
+            blocker.code if blocker is not None else "provider_request_blocked",
+            "provider request was blocked before execution",
+            blocker.evidence_refs if blocker is not None else request.evidence_refs,
+        )
+        return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     if adapter is None or assertion_evidence is None:
         observation = _blocked_observation(
             definition,
@@ -399,6 +409,17 @@ async def execute_selected_case(
             request,
             "invalid_judge_evidence",
             "assertion evidence failed boundary validation",
+        )
+        return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
+    if (
+        assertion_evidence.candidate != definition.scenario_set.candidate
+        or assertion_evidence.scenario_set_id != definition.scenario_set.scenario_set_id
+        or assertion_evidence.case_id != definition.scenario_set.cases[0].case_id
+        or assertion_evidence.provider != request.provider
+        or assertion_evidence.assertion_contract_sha256 != definition.assertion_contract_sha256
+    ):
+        observation = _blocked_observation(
+            definition, request, "selected_case_identity_mismatch", "assertion evidence does not bind the selected case"
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     outcome = await execute_provider_call(request, input_payload, adapter)
