@@ -108,6 +108,7 @@ def _selected_case(cases: list[object], case_id: str, mode: EvaluationMode) -> d
         not isinstance(modes, list)
         or not modes
         or not all(isinstance(item, str) and item in _SUPPORTED_MODES for item in modes)
+        or len(modes) != len(set(modes))
         or mode not in modes
     ):
         raise _contract_error("selected_case_mode_mismatch", "selected case does not declare the requested mode")
