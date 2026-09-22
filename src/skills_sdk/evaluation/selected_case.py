@@ -104,7 +104,12 @@ def _selected_case(cases: list[object], case_id: str, mode: EvaluationMode) -> d
         raise _contract_error("selected_case_not_found", "selected case must exist exactly once")
     case = cast(dict[str, object], matches[0])
     modes = case.get("eval_modes")
-    if not isinstance(modes, list) or mode not in modes:
+    if (
+        not isinstance(modes, list)
+        or not modes
+        or not all(isinstance(item, str) and item in _SUPPORTED_MODES for item in modes)
+        or mode not in modes
+    ):
         raise _contract_error("selected_case_mode_mismatch", "selected case does not declare the requested mode")
     return case
 
@@ -166,6 +171,8 @@ def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAss
     if (
         not isinstance(requirement_id, str)
         or not requirement_id.strip()
+        or requirement_id != requirement_id.strip()
+        or not _identity_is_public(requirement_id)
         or not isinstance(all_of, (list, tuple))
         or not isinstance(any_of, (list, tuple))
         or ("all_of" in raw and not all_of)
@@ -301,6 +308,7 @@ def _validated_observation(
     supplied: SelectedCaseJudgeEvidence,
     output_text: str,
     output_sha256: str,
+    provider_evidence_refs: tuple[str, ...],
 ) -> ScenarioObservationV2:
     case_id = definition.scenario_set.cases[0].case_id
     if (
@@ -327,11 +335,7 @@ def _validated_observation(
     deterministic = _deterministic_signals(output_text, definition.deterministic_assertions)
     case = definition.scenario_set.cases[0]
     judge_result_ref = f"judge-results/{supplied.judge_result_sha256}"
-    evidence_refs = (
-        supplied.evidence_refs
-        if judge_result_ref in supplied.evidence_refs
-        else (*supplied.evidence_refs, judge_result_ref)
-    )
+    evidence_refs = tuple(dict.fromkeys((*provider_evidence_refs, *supplied.evidence_refs, judge_result_ref)))
     return ScenarioObservationV2(
         candidate=supplied.candidate,
         scenario_set_id=supplied.scenario_set_id,
@@ -418,6 +422,7 @@ async def execute_selected_case(
             assertion_evidence,
             outcome.complete_text,
             outcome.public_result.output_sha256,
+            outcome.public_result.execution.evidence_refs,
         )
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 

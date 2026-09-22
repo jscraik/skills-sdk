@@ -31,6 +31,14 @@ class SelectedCaseJudgeEvidence(_ContractModel):
     raw_output_included: Literal[False] = False
     mutation_performed: Literal[False] = False
 
+    @field_validator("scenario_set_id", "case_id", "satisfied_assertion_ids", mode="before")
+    @classmethod
+    def identity_fields_must_already_be_normalized(cls, value: object) -> object:
+        values = value if isinstance(value, (list, tuple)) else (value,)
+        if any(isinstance(item, str) and item != item.strip() for item in values):
+            raise ValueError("selected-case judge identity fields must already be normalized")
+        return value
+
     @field_validator("output_sha256", "assertion_contract_sha256", "judge_result_sha256", mode="before")
     @classmethod
     def digests_must_already_be_normalized(cls, value: object) -> object:

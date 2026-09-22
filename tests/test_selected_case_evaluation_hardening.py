@@ -62,7 +62,7 @@ def test_existing_judge_result_ref_is_not_duplicated(tmp_path: Path) -> None:
     )
 
     assert receipt.status == "pass"
-    assert receipt.case_results[0].evidence_refs == (judge_result_ref,)
+    assert receipt.case_results[0].evidence_refs.count(judge_result_ref) == 1
 
 
 @pytest.mark.parametrize("missing_field", ["deterministic_checks", "forbidden_commands"])
@@ -91,3 +91,57 @@ def test_selected_case_accepts_explicit_empty_forbidden_commands(tmp_path: Path)
     definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
     assert definition.scenario_set.cases[0].forbidden_commands == ()
+
+
+def test_provider_output_evidence_survives_selected_case_receipt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = "reviewed behavior"
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition, request, input_payload, _adapter(request, output), _evidence(definition, request, output)
+        )
+    )
+    assert "evidence/provider-output.json" in receipt.case_results[0].evidence_refs
+
+
+@pytest.mark.parametrize("mode_list", [["release", "standard"], ["release", []], []])
+def test_selected_case_rejects_invalid_declared_modes(tmp_path: Path, mode_list: list[object]) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["eval_modes"] = mode_list
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="selected_case_mode_mismatch"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+@pytest.mark.parametrize("field", ["case_id", "scenario_set_id", "satisfied_assertion_ids"])
+def test_judge_identity_fields_reject_padding(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    if field == "satisfied_assertion_ids":
+        payload[field][0] = f" {payload[field][0]} "
+    else:
+        payload[field] = f" {payload[field]} "
+    with pytest.raises(ValueError, match="normalized"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+
+
+@pytest.mark.parametrize("requirement_id", ["ghp_secret", " preserve_behavior "])
+def test_selected_case_rejects_private_or_padded_requirement_ids(tmp_path: Path, requirement_id: str) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"] = [
+        {"type": "semantic_requirements", "requirements": [{"id": requirement_id, "all_of": ["behavior"]}]}
+    ]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid_acceptance_assertion"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
