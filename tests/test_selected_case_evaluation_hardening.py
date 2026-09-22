@@ -134,6 +134,23 @@ def test_judge_identity_fields_reject_padding(tmp_path: Path, field: str) -> Non
         SelectedCaseJudgeEvidence.model_validate(payload)
 
 
+@pytest.mark.parametrize("field", ["case_id", "scenario_set_id", "satisfied_assertion_ids"])
+def test_judge_identity_fields_reject_private_values_in_model_and_schema(tmp_path: Path, field: str) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    if field == "satisfied_assertion_ids":
+        payload[field][0] = "ghp_secret"
+    else:
+        payload[field] = "ghp_secret"
+    with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
 @pytest.mark.parametrize("requirement_id", ["ghp_secret", " preserve_behavior "])
 def test_selected_case_rejects_private_or_padded_requirement_ids(tmp_path: Path, requirement_id: str) -> None:
     package = _skill(tmp_path / "simplify")

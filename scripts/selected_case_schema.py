@@ -18,3 +18,13 @@ def append_selected_case_constraints(schema: dict[str, Any], filename: str) -> N
     )
     schema["properties"]["evidence_refs"]["uniqueItems"] = True
     schema["properties"]["satisfied_assertion_ids"]["uniqueItems"] = True
+    for field in ("case_id", "scenario_set_id"):
+        schema["properties"][field].setdefault("allOf", []).extend(
+            (
+                {"not": {"pattern": PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN}},
+                {"not": {"pattern": MACHINE_PATH_SCHEMA_PATTERN}},
+            )
+        )
+    schema["properties"]["satisfied_assertion_ids"]["items"].setdefault("allOf", []).extend(
+        ({"not": {"pattern": PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN}}, {"not": {"pattern": MACHINE_PATH_SCHEMA_PATTERN}})
+    )

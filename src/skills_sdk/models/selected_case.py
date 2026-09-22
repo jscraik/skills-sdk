@@ -37,6 +37,8 @@ class SelectedCaseJudgeEvidence(_ContractModel):
         values = value if isinstance(value, (list, tuple)) else (value,)
         if any(isinstance(item, str) and item != item.strip() for item in values):
             raise ValueError("selected-case judge identity fields must already be normalized")
+        if any(isinstance(item, str) and not _public_text_is_redaction_safe(item) for item in values):
+            raise ValueError("selected-case judge identity fields must not contain credential-shaped values")
         return value
 
     @field_validator("output_sha256", "assertion_contract_sha256", "judge_result_sha256", mode="before")
