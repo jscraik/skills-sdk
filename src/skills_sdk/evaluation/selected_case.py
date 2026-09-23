@@ -466,6 +466,13 @@ def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
     return cast(JsonValue, json.loads(json.dumps(normalized, ensure_ascii=False, allow_nan=False)))
 
 
+def _validated_judge_artifact(value: object) -> SelectedCaseJudgeEvidence:
+    """Validate raw host JSON and revalidate model instances alike."""
+    if isinstance(value, SelectedCaseJudgeEvidence):
+        value = value.model_dump(mode="json")
+    return SelectedCaseJudgeEvidence.model_validate(value)
+
+
 def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDefinition:
     """Revalidate a selected-case definition at the execution boundary."""
     try:
@@ -553,7 +560,7 @@ async def execute_selected_case(
     request: ProviderExecutionRequest,
     input_payload: JsonValue,
     adapter: TextProviderAdapter | None,
-    assertion_evidence: SelectedCaseJudgeEvidence | None,
+    assertion_evidence: object,
 ) -> EvaluationReceiptV2:
     """Execute one injected provider call and evaluate bound assertion evidence."""
 
@@ -603,8 +610,8 @@ async def execute_selected_case(
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     try:
-        assertion_evidence = SelectedCaseJudgeEvidence.model_validate(assertion_evidence.model_dump(mode="json"))
-    except (ValidationError, PydanticSerializationError):
+        assertion_evidence = _validated_judge_artifact(assertion_evidence)
+    except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
         observation = _blocked_observation(
             definition,
             request,

@@ -195,3 +195,36 @@ def test_case_id_string_subclass_is_frozen_before_selection(tmp_path: Path) -> N
     )
     assert selected.scenario_set.cases[0].case_id == "happy-diff"
     assert type(selected.scenario_set.cases[0].case_id) is str
+
+
+def test_raw_judge_mapping_is_validated_at_execution(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = "reviewed"
+    artifact = _evidence(definition, request, output).model_dump(mode="json")
+
+    receipt = asyncio.run(
+        execute_selected_case(definition, request, input_payload, _adapter(request, output), artifact)
+    )
+
+    assert receipt.status == "pass"
+
+
+@pytest.mark.parametrize("invalid", [123, {"schema_version": "selected-case-judge-evidence/v1"}])
+def test_malformed_judge_artifacts_return_typed_blocker(tmp_path: Path, invalid: object) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+
+    receipt = asyncio.run(
+        execute_selected_case(definition, request, input_payload, _adapter(request, "reviewed"), invalid)
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "invalid_judge_evidence"

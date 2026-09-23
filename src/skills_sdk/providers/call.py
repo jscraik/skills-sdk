@@ -318,10 +318,11 @@ async def _clock_wait_for(clock: _ClockBindings, awaitable: Awaitable[object], t
 def _validate_complete(value: object, limits: ProviderCallLimits) -> ProviderAdapterComplete:
     if not isinstance(value, ProviderAdapterComplete) or not isinstance(value.text, str):
         raise _contract_error("invalid_provider_event", "complete adapter returned an invalid result")
-    if len(_utf8_bytes(value.text)) > limits.output_bytes:
+    text = str.__str__(value.text)
+    if len(text) > limits.output_bytes or len(_utf8_bytes(text)) > limits.output_bytes:
         raise _contract_error("provider_output_too_large", "provider output exceeds the byte limit")
     return ProviderAdapterComplete(
-        text=value.text,
+        text=text,
         evidence_refs=value.evidence_refs,
         usage=_validate_usage(value.usage),
         cost=_validate_cost(value.cost),
