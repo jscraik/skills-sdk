@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import json
 import re
 import secrets
 from dataclasses import dataclass, field
@@ -311,9 +312,12 @@ def load_selected_case(
         forbidden_commands=forbidden,
         oracle="expected_signal",
     )
+    scenario_set_id = f"{validation.candidate.package_id}-{case_id}-{mode}"
+    if not _identity_is_public(scenario_set_id) or not _public_text_is_redaction_safe(scenario_set_id):
+        raise _contract_error("invalid_selected_case", "composed scenario set id must not contain private values")
     scenario_set = ScenarioSetV2(
         candidate=validation.candidate,
-        scenario_set_id=f"{validation.candidate.package_id}-{case_id}-{mode}",
+        scenario_set_id=scenario_set_id,
         release=False,
         cases=(selected,),
     )
@@ -351,7 +355,7 @@ def _blocked_observation(
     if any(not _public_text_is_redaction_safe(ref) for ref in evidence_refs):
         code = "private_provider_evidence_ref"
         message = "provider evidence references contain credential-shaped values"
-        evidence_refs = ("references/evals.yaml",)
+        evidence_refs = ()
     return ScenarioObservationV2(
         candidate=definition.scenario_set.candidate,
         scenario_set_id=definition.scenario_set.scenario_set_id,
@@ -448,6 +452,14 @@ def _request_matches_definition(
     )
 
 
+def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
+    """Freeze nested scalar subclasses before binding and provider dispatch."""
+    normalized = _normalize_json(
+        input_payload, depth=0, maximum_depth=DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth, active=set()
+    )
+    return cast(JsonValue, json.loads(json.dumps(normalized, ensure_ascii=False, allow_nan=False)))
+
+
 def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDefinition:
     """Revalidate a selected-case definition at the execution boundary."""
     try:
@@ -537,9 +549,7 @@ async def execute_selected_case(
         )
     ):
         raise _contract_error("invalid_provider_request", "provider identity contains private values")
-    normalized_payload = _normalize_json(
-        input_payload, depth=0, maximum_depth=DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth, active=set()
-    )
+    normalized_payload = _canonical_input_payload(input_payload)
     if not _request_matches_definition(definition, request, normalized_payload):
         observation = _blocked_observation(
             definition,

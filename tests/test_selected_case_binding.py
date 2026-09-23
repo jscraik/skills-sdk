@@ -7,9 +7,11 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 from jsonschema import Draft202012Validator
-from test_selected_case_evaluation import REVISION, _evidence, _prepared_request, _skill
+from test_selected_case_evaluation import REVISION, _case, _evidence, _prepared_request, _skill
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
@@ -74,3 +76,39 @@ def test_mutually_consistent_weakened_definition_cannot_replace_loaded_case(tmp_
 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
         asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
+
+
+def test_loader_rejects_private_composed_scenario_set_id(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "client")
+    skill_file = package / "SKILL.md"
+    skill_file.write_text(skill_file.read_text(encoding="utf-8").replace("simplify", "client"), encoding="utf-8")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["skill_name"] = "client"
+    payload["cases"] = [_case("secret", ["release"])]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="invalid_selected_case"):
+        load_selected_case(package, source_revision=REVISION, case_id="secret", mode="release")
+
+
+def test_nested_string_subclass_cannot_spoof_selected_prompt(tmp_path: Path) -> None:
+    class DeceptiveText(str):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+        __hash__ = str.__hash__
+
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    request = request.model_copy(update={"input_sha256": canonical_json_sha256({"prompt": "different"})})
+
+    receipt = asyncio.run(
+        execute_selected_case(definition, request, {"prompt": DeceptiveText("different")}, None, None)
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"

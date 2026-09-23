@@ -341,6 +341,7 @@ def test_private_provider_evidence_ref_returns_blocked_receipt(tmp_path: Path) -
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "private_provider_evidence_ref"
+    assert receipt.case_results[0].blocker.evidence_refs == ()
     assert "client_secret" not in receipt.model_dump_json()
 
 
@@ -694,6 +695,7 @@ def test_private_failure_evidence_ref_returns_redacted_blocker(tmp_path: Path) -
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "private_provider_evidence_ref"
+    assert receipt.case_results[0].blocker.evidence_refs == ()
     assert "client_secret" not in receipt.model_dump_json()
 
 
