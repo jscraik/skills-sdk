@@ -20,9 +20,10 @@ def append_selected_case_constraints(schema: dict[str, Any], filename: str) -> N
     )
     schema["properties"]["evidence_refs"]["uniqueItems"] = True
     schema["properties"]["satisfied_assertion_ids"]["uniqueItems"] = True
-    schema["$defs"]["PackageCandidateIdentity"]["properties"]["package_id"].setdefault("allOf", []).append(
-        {"not": {"pattern": PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN}}
-    )
+    candidate_fields = schema["$defs"]["PackageCandidateIdentity"]["properties"]
+    for field in ("package_id", "source_revision", "content_sha256"):
+        candidate_fields[field].setdefault("allOf", []).append({"pattern": _NORMALIZED_TEXT_PATTERN})
+    candidate_fields["package_id"]["allOf"].append({"not": {"pattern": PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN}})
     for field in ("provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest"):
         schema["$defs"]["ProviderIdentityV2"]["properties"][field].setdefault("allOf", []).extend(
             (

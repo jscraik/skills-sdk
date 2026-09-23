@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import replace
 from pathlib import Path
 
@@ -609,6 +609,40 @@ def test_judge_candidate_mapping_cannot_spoof_public_id(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="credential-shaped"):
         SelectedCaseJudgeEvidence.model_validate(payload)
+
+
+@pytest.mark.parametrize("container", [set, iter])
+def test_judge_assertion_id_iterables_cannot_publish_private_values(
+    tmp_path: Path, container: Callable[[list[str]], object]
+) -> None:
+    """Recheck every assertion ID after Pydantic normalizes iterable inputs."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["satisfied_assertion_ids"] = container(["ghp_secret"])
+
+    with pytest.raises(ValueError, match="normalized public strings"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+
+
+@pytest.mark.parametrize("field", ["source_revision", "content_sha256"])
+def test_judge_candidate_newline_digest_fields_match_schema(tmp_path: Path, field: str) -> None:
+    """Reject final-newline candidate bindings in both model and schema."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["candidate"][field] += "\n"
+
+    with pytest.raises(ValueError, match="normalized"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
 
 
 def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:

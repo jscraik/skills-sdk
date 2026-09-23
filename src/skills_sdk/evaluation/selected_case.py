@@ -38,6 +38,8 @@ _SEMANTIC_ASSERTIONS = {"discovery_question", "expected_signal", "semantic_requi
 _DETERMINISTIC_ASSERTIONS = {"contains", "must_not", "not_contains"}
 _SUPPORTED_MODES = {"smoke", "release"}
 _EXECUTION_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+_MAX_DETERMINISTIC_PATTERNS = 128
+_MAX_DETERMINISTIC_PATTERN_BYTES = 16_384
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +212,17 @@ def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAss
     return (f"{prefix}-{requirement_id}", "semantic_requirements", tuple(all_of), tuple(any_of))
 
 
+def _deterministic_patterns_are_bounded(
+    assertions: tuple[tuple[str, str, str], ...], commands: tuple[str, ...]
+) -> bool:
+    """Bound repeated scans over a provider output for one selected case."""
+    patterns = (*(item[2] for item in assertions), *commands)
+    return (
+        len(patterns) <= _MAX_DETERMINISTIC_PATTERNS
+        and sum(len(pattern.encode("utf-8")) for pattern in patterns) <= _MAX_DETERMINISTIC_PATTERN_BYTES
+    )
+
+
 def _category(value: object) -> Literal["happy", "pressure", "boundary", "regression"]:
     """Map supported package categories onto the evaluation-v2 contract."""
     if not isinstance(value, str):
@@ -262,6 +275,8 @@ def load_selected_case(
     if any(item != item.strip() for item in raw_forbidden):
         raise _contract_error("invalid_selected_case", "forbidden_commands must preserve exact text")
     forbidden = tuple(raw_forbidden)
+    if not _deterministic_patterns_are_bounded(deterministic, forbidden):
+        raise _contract_error("invalid_selected_case", "selected case deterministic checks exceed limits")
     prompt = case.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         raise _contract_error("invalid_selected_case", "selected case requires a prompt")
@@ -457,6 +472,8 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
             raise ValueError("selected case deterministic assertion type is unsupported")
         if any(not item[2].strip() for item in deterministic):
             raise ValueError("selected case deterministic assertion operand must not be empty")
+        if not _deterministic_patterns_are_bounded(deterministic, case.forbidden_commands):
+            raise ValueError("selected case deterministic checks exceed limits")
         public_values = (
             scenario_set.candidate.package_id,
             scenario_set.scenario_set_id,

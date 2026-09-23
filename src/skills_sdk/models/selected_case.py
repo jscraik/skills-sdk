@@ -112,6 +112,8 @@ class SelectedCaseJudgeEvidence(_ContractModel):
         """Require unique satisfied assertion identifiers."""
         if len(values) != len(set(values)):
             raise ValueError("selected-case judge assertion ids must be unique")
+        if any(value != value.strip() or not _public_text_is_redaction_safe(value) for value in values):
+            raise ValueError("selected-case judge assertion ids must be normalized public strings")
         return values
 
     @field_validator("evidence_refs")
