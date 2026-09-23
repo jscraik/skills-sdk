@@ -193,6 +193,15 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
         references = ", ".join(finding.evidence_refs)
         suffix = f" [{references}]" if references else ""
         print(f"  {finding.code}: {finding.message}{suffix}")
+    if command == "selected-case":
+        for case in result.case_results:
+            print(f"  case {case.case_id}: {case.status}")
+            if case.missing_signals:
+                print(f"    missing_signals: {', '.join(case.missing_signals)}")
+            if case.forbidden_commands_observed:
+                print(f"    forbidden_commands_observed: {', '.join(case.forbidden_commands_observed)}")
+            if case.blocker is not None:
+                print(f"    {case.blocker.code}: {case.blocker.message}")
 
 
 def _maintain_entrypoint(arguments: argparse.Namespace) -> int:

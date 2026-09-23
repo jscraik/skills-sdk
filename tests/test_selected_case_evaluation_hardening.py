@@ -477,6 +477,20 @@ def test_private_case_id_is_rejected_by_loader(tmp_path: Path) -> None:
         load_selected_case(package, source_revision=REVISION, case_id="client-secret", mode="release")
 
 
+def test_private_requirement_id_is_rejected_by_loader(tmp_path: Path) -> None:
+    """Keep requirement identity screening aligned with judge evidence."""
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    acceptance = payload["cases"][0]["acceptance"]
+    requirement = next(item for item in acceptance if item["type"] == "semantic_requirements")
+    requirement["requirements"][0]["id"] = "client-secret"
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="invalid_acceptance_assertion"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:
     """Prevent a forged scorer threshold from turning failure into success."""
     definition = load_selected_case(

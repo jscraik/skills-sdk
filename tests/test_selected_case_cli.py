@@ -106,3 +106,82 @@ def test_cli_rejects_malformed_supplied_final_output(tmp_path: Path, capsys: pyt
     assert exit_code == 2
     assert payload["code"] == "invalid_selected_case_input"
     assert payload["evidence_refs"] == []
+
+
+def test_cli_human_output_shows_case_blocker(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Render the nested case blocker in the default human-readable route."""
+    package = _skill(tmp_path / "simplify")
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    host_input = tmp_path / "missing-adapter.json"
+    host_input.write_text(
+        json.dumps({"request": request.model_dump(mode="json"), "input_payload": input_payload}), encoding="utf-8"
+    )
+
+    exit_code = main(
+        [
+            "eval",
+            "selected-case",
+            str(package),
+            "--source-revision",
+            REVISION,
+            "--case",
+            "happy-diff",
+            "--mode",
+            "release",
+            "--host-input",
+            str(host_input),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 2
+    assert "case happy-diff: blocked" in output
+    assert "provider_adapter_required" in output
+
+
+def test_cli_human_output_shows_failed_case_detail(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Render observed forbidden commands for a failing selected case."""
+    package = _skill(tmp_path / "simplify")
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output_text = "Preserve behavior; rm -rf is forbidden."
+    host_input = tmp_path / "failed-case.json"
+    host_input.write_text(
+        json.dumps(
+            {
+                "request": request.model_dump(mode="json"),
+                "input_payload": input_payload,
+                "adapter": {
+                    "descriptor": _adapter(request, output_text).descriptor.model_dump(mode="json"),
+                    "output_text": output_text,
+                    "evidence_refs": ["evidence/provider-output.json"],
+                },
+                "assertion_evidence": _evidence(definition, request, output_text).model_dump(mode="json"),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "eval",
+            "selected-case",
+            str(package),
+            "--source-revision",
+            REVISION,
+            "--case",
+            "happy-diff",
+            "--mode",
+            "release",
+            "--host-input",
+            str(host_input),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 2
+    assert "case happy-diff: fail" in output
+    assert "forbidden_commands_observed: rm -rf" in output

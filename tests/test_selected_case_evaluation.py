@@ -429,6 +429,7 @@ def test_missing_adapter_or_semantic_evidence_blocks_without_execution_claim(tmp
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "provider_adapter_required"
+    assert receipt.case_results[0].blocker.evidence_refs == ()
     assert receipt.case_results[0].observation_sha256 is None
 
 

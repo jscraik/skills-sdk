@@ -191,6 +191,7 @@ def _semantic_requirement(prefix: str, raw: dict[object, object]) -> SemanticAss
         or not requirement_id.strip()
         or requirement_id != requirement_id.strip()
         or not _identity_is_public(requirement_id)
+        or not _public_text_is_redaction_safe(requirement_id)
         or not isinstance(all_of, (list, tuple))
         or not isinstance(any_of, (list, tuple))
         or ("all_of" in raw and not all_of)
@@ -504,6 +505,7 @@ async def execute_selected_case(
             request,
             "provider_adapter_required",
             "adapter and assertion evidence are required",
+            (),
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     try:
