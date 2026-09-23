@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 from jsonschema import Draft202012Validator
-from test_selected_case_evaluation import REVISION, _case, _evidence, _prepared_request, _skill
+from test_selected_case_evaluation import REVISION, _adapter, _case, _evidence, _prepared_request, _skill
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
@@ -112,3 +112,56 @@ def test_nested_string_subclass_cannot_spoof_selected_prompt(tmp_path: Path) -> 
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
+
+
+@pytest.mark.parametrize("prompt_size,accepted", [(100_000, True), (270_000, False)])
+def test_selected_case_prompt_obeys_provider_input_limit(tmp_path: Path, prompt_size: int, accepted: bool) -> None:
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["prompt"] = "x" * prompt_size
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    if accepted:
+        assert load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    else:
+        with pytest.raises(ContractError, match="invalid_selected_case"):
+            load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_adapter_string_subclass_cannot_spoof_deterministic_signal(tmp_path: Path) -> None:
+    class DeceptiveOutput(str):
+        def casefold(self) -> str:
+            return "reviewed needle"
+
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"].append({"type": "contains", "value": "needle"})
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    output = DeceptiveOutput("reviewed")
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition, request, input_payload, _adapter(request, output), _evidence(definition, request, output)
+        )
+    )
+
+    assert receipt.status == "fail"
+
+
+def test_loaded_definition_rechecks_package_source_at_execution(tmp_path: Path) -> None:
+    package = _skill(tmp_path / "simplify")
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"] = payload["cases"][0]["acceptance"][1:]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="invalid_selected_case_definition"):
+        asyncio.run(execute_selected_case(definition, request, input_payload, None, None))

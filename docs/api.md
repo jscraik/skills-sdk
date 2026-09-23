@@ -159,6 +159,9 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   `load_selected_case` validates one case from package-local
   `references/evals.yaml`, including exact mode eligibility, and projects its
   existing acceptance declarations into a candidate-bound `ScenarioSetV2`.
+  It rejects prompts above the provider input limit. The package source must
+  remain available and unchanged through execution: `execute_selected_case`
+  reloads it and rejects a definition that no longer matches that source.
   `execute_selected_case` composes the existing `execute_provider_call` and
   `evaluate_scenario_set_v2` services for one injected adapter. Semantic
   assertion signals must be supplied through a `SelectedCaseJudgeEvidence`

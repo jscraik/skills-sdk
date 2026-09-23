@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import hmac
+import hashlib
 import json
 import re
-import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
@@ -43,7 +42,6 @@ _SUPPORTED_MODES = {"smoke", "release"}
 _EXECUTION_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _MAX_DETERMINISTIC_PATTERNS = 128
 _MAX_DETERMINISTIC_PATTERN_BYTES = 16_384
-_DEFINITION_SEAL_KEY = secrets.token_bytes(32)
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +52,9 @@ class SelectedCaseDefinition:
     scorer: ScorerProfile
     semantic_assertions: tuple[SemanticAssertion, ...]
     deterministic_assertions: tuple[tuple[str, str, str], ...]
-    _loaded_seal: bytes = field(default=b"", repr=False, compare=False)
+    _package_root: Path
+    _source_revision: str
+    _mode: EvaluationMode
 
     @property
     def semantic_signal_ids(self) -> tuple[str, ...]:
@@ -68,17 +68,6 @@ class SelectedCaseDefinition:
             {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in self.semantic_assertions
         ]
         return canonical_json_sha256(payload)
-
-
-def _definition_seal(definition: SelectedCaseDefinition) -> bytes:
-    """Bind the entire loaded projection independently of caller-supplied evidence."""
-    payload = {
-        "scenario_set": definition.scenario_set.model_dump(mode="json"),
-        "scorer": definition.scorer.model_dump(mode="json"),
-        "semantic_assertions": definition.semantic_assertions,
-        "deterministic_assertions": definition.deterministic_assertions,
-    }
-    return hmac.digest(_DEFINITION_SEAL_KEY, canonical_json_sha256(payload).encode("ascii"), "sha256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,6 +288,12 @@ def load_selected_case(
         raise _contract_error("invalid_selected_case", "selected case requires a prompt")
     if prompt != prompt.strip():
         raise _contract_error("invalid_selected_case", "selected case prompt must preserve exact text")
+    try:
+        prompt_bytes = len(json.dumps({"prompt": prompt}, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    except UnicodeError:
+        raise _contract_error("invalid_selected_case", "selected case prompt must be valid UTF-8") from None
+    if prompt_bytes > DEFAULT_PROVIDER_CALL_LIMITS.input_bytes:
+        raise _contract_error("invalid_selected_case", "selected case prompt exceeds provider input limit")
     if _EXECUTION_ID_PATTERN.fullmatch(case_id) is None:
         raise _contract_error("invalid_selected_case", "selected case id must use provider execution id syntax")
     if not _identity_is_public(case_id) or not _public_text_is_redaction_safe(case_id):
@@ -330,8 +325,9 @@ def load_selected_case(
         deterministic_checks_first=True,
         calibration_required=False,
     )
-    definition = SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic)
-    return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic, _definition_seal(definition))
+    return SelectedCaseDefinition(
+        scenario_set, scorer, semantic, deterministic, package_root.resolve(), source_revision, mode
+    )
 
 
 def _blocker(
@@ -395,6 +391,11 @@ def _validated_observation(
     provider_evidence_refs: tuple[str, ...],
 ) -> ScenarioObservationV2:
     """Bind provider output and judge evidence into a completed observation."""
+    output_text = str.__str__(output_text)
+    if hashlib.sha256(output_text.encode("utf-8")).hexdigest() != output_sha256:
+        return _blocked_observation(
+            definition, request, "invalid_provider_output", "provider output digest does not bind canonical text"
+        )
     case_id = definition.scenario_set.cases[0].case_id
     if (
         supplied.candidate != definition.scenario_set.candidate
@@ -463,10 +464,6 @@ def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
 def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDefinition:
     """Revalidate a selected-case definition at the execution boundary."""
     try:
-        if not definition._loaded_seal or not hmac.compare_digest(
-            definition._loaded_seal, _definition_seal(definition)
-        ):
-            raise ValueError("selected case no longer matches its loaded definition")
         scenario_set = ScenarioSetV2.model_validate(definition.scenario_set.model_dump(mode="json"))
         scorer = ScorerProfile.model_validate(definition.scorer.model_dump(mode="json"))
         semantic = TypeAdapter(tuple[SemanticAssertion, ...]).validate_python(definition.semantic_assertions)
@@ -517,8 +514,30 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
         )
         if not all(_public_text_is_redaction_safe(value) for value in public_values):
             raise ValueError("selected case projected fields contain private values")
-        return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic, definition._loaded_seal)
-    except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
+        reloaded = load_selected_case(
+            definition._package_root,
+            source_revision=definition._source_revision,
+            case_id=case.case_id,
+            mode=definition._mode,
+        )
+        if (
+            scenario_set != reloaded.scenario_set
+            or scorer != reloaded.scorer
+            or semantic != reloaded.semantic_assertions
+            or deterministic != reloaded.deterministic_assertions
+        ):
+            raise ValueError("selected case no longer matches its loaded source")
+        return reloaded
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        OSError,
+        RuntimeError,
+        ContractError,
+        ValidationError,
+        PydanticSerializationError,
+    ):
         raise _contract_error(
             "invalid_selected_case_definition", "selected-case definition failed revalidation"
         ) from None
