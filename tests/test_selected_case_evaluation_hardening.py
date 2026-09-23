@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator, Mapping
 from dataclasses import replace
 from pathlib import Path
 
@@ -579,6 +580,35 @@ def test_judge_provider_model_id_machine_path_matches_schema(tmp_path: Path) -> 
         SelectedCaseJudgeEvidence.model_validate(payload)
     schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
     assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
+def test_judge_candidate_mapping_cannot_spoof_public_id(tmp_path: Path) -> None:
+    """Screen the validated candidate, not an untrusted mapping's get method."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    actual = {**payload["candidate"], "package_id": "ghp_secret"}
+
+    class SpoofedCandidate(Mapping[str, object]):
+        def __iter__(self) -> Iterator[str]:
+            return iter(actual)
+
+        def __len__(self) -> int:
+            return len(actual)
+
+        def __getitem__(self, key: str) -> object:
+            return actual[key]
+
+        def get(self, key: str, default: object = None) -> object:
+            return "simplify" if key == "package_id" else actual.get(key, default)
+
+    payload["candidate"] = SpoofedCandidate()
+
+    with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
 
 
 def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:

@@ -43,6 +43,7 @@ class SelectedCaseJudgeEvidence(_ContractModel):
             except PydanticSerializationError:
                 raise ValueError("selected-case judge candidate failed revalidation") from None
         if isinstance(value, Mapping):
+            value = dict(value)
             for field in ("package_id", "source_revision", "content_sha256"):
                 item = value.get(field)
                 if isinstance(item, str) and item != item.strip():
@@ -50,7 +51,10 @@ class SelectedCaseJudgeEvidence(_ContractModel):
             package_id = value.get("package_id")
             if isinstance(package_id, str) and not _public_text_is_redaction_safe(package_id):
                 raise ValueError("selected-case judge candidate id must not contain credential-shaped values")
-            return PackageCandidateIdentity.model_validate(value)
+            candidate = PackageCandidateIdentity.model_validate(value)
+            if not _public_text_is_redaction_safe(candidate.package_id):
+                raise ValueError("selected-case judge candidate id must not contain credential-shaped values")
+            return candidate
         return value
 
     @field_validator("provider", "judge", mode="before")
