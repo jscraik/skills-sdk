@@ -563,6 +563,22 @@ def test_selected_case_rejects_private_nested_provider_identity(tmp_path: Path, 
     assert list(Draft202012Validator(schema).iter_errors(payload))
 
 
+def test_judge_provider_model_id_machine_path_matches_schema(tmp_path: Path) -> None:
+    """Keep judge model and schema aligned on machine-path-shaped identities."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["judge"]["model_id"] = "org/home/user"
+
+    with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
 def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:
     """Prevent a forged scorer threshold from turning failure into success."""
     definition = load_selected_case(
