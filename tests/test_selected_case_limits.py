@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from test_selected_case_evaluation import REVISION, _prepared_request, _skill
+from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepared_request, _skill
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
@@ -76,3 +76,29 @@ def test_selected_case_rejects_unencodable_deterministic_patterns(tmp_path: Path
 
     with pytest.raises(ContractError, match="invalid_selected_case"):
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_selected_case_evaluates_large_semantic_signal_set(tmp_path: Path) -> None:
+    """Preserve correct results when package acceptance has substantial fan-out."""
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["acceptance"].extend(
+        {"type": "expected_signal", "value": f"signal {index}"} for index in range(512)
+    )
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    definition = load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition,
+            request,
+            input_payload,
+            _adapter(request, "reviewed"),
+            _evidence(definition, request, "reviewed"),
+        )
+    )
+
+    assert receipt.status == "pass"

@@ -167,7 +167,9 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   assertion signals must be supplied through a `SelectedCaseJudgeEvidence`
   artifact bound to the candidate, scenario set, case, provider output digest,
   and a digest of the complete semantic assertion contract. The artifact also
-  identifies the judge adapter and its result digest; the service never derives
+  identifies the judge adapter and its result digest. The host must include the
+  portable `judge-results/<judge_result_sha256>` path in `evidence_refs`; the
+  SDK does not invent an artifact path. The service never derives
   semantic proof from keyword matches or an unreferenced boolean. Deterministic text
   absence or presence checks remain SDK-owned. Missing adapters, missing judge
   evidence, unavailable output, or identity mismatches return blocked

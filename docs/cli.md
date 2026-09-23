@@ -57,7 +57,9 @@ candidate-bound lanes:
   `assertion_evidence` members. `assertion_evidence` is a
   `selected-case-judge-evidence/v1` artifact that binds the complete semantic
   assertion contract, candidate, scenario set, case, provider output, judge
-  adapter, and judge-result digest. Omitting the adapter or assertion evidence
+  adapter, and judge-result digest. Its `evidence_refs` must include the
+  host-supplied `judge-results/<judge_result_sha256>` path; the SDK does not
+  create that artifact. Omitting the adapter or assertion evidence
   produces a typed blocker. This route does not discover provider executables,
   read credentials, select a model or profile, or establish live-model truth.
   Semantic signals must carry portable evidence references; the command does

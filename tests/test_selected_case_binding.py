@@ -228,3 +228,43 @@ def test_malformed_judge_artifacts_return_typed_blocker(tmp_path: Path, invalid:
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "invalid_judge_evidence"
+
+
+def test_judge_result_path_is_not_invented_for_host_evidence(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    evidence = _evidence(definition, request, "reviewed").model_copy(
+        update={"evidence_refs": ("evidence/assertion-review.json",)}
+    )
+
+    receipt = asyncio.run(
+        execute_selected_case(definition, request, input_payload, _adapter(request, "reviewed"), evidence)
+    )
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_result_ref_required"
+    assert all(not ref.startswith("judge-results/") for ref in receipt.case_results[0].evidence_refs)
+
+
+@pytest.mark.parametrize("payload_size,too_large", [(100_000, False), (1_000_000, True)])
+def test_selected_case_bounds_host_input_before_canonicalization(
+    tmp_path: Path, payload_size: int, too_large: bool
+) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": "x" * payload_size}
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+
+    if too_large:
+        with pytest.raises(ContractError, match="provider_input_too_large"):
+            asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+    else:
+        receipt = asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+        assert receipt.status == "blocked"
+        assert receipt.case_results[0].blocker is not None
+        assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"

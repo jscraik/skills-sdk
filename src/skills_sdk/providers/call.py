@@ -472,13 +472,16 @@ def _consume_chunk(
 ) -> None:
     if not isinstance(event.text, str):
         raise _contract_error("invalid_provider_event", "provider stream chunk must contain text")
-    chunk_bytes = _utf8_bytes(event.text)
+    text = str.__str__(event.text)
+    if len(text) > limits.chunk_bytes:
+        raise _contract_error("provider_chunk_too_large", "provider stream chunk exceeds the byte limit")
+    chunk_bytes = _utf8_bytes(text)
     if len(chunk_bytes) > limits.chunk_bytes:
         raise _contract_error("provider_chunk_too_large", "provider stream chunk exceeds the byte limit")
     if state.total_bytes + len(chunk_bytes) > limits.output_bytes:
         raise _contract_error("provider_output_too_large", "provider output exceeds the byte limit")
     state.total_bytes += len(chunk_bytes)
-    state.chunks.append(event.text)
+    state.chunks.append(text)
     state.events.append(
         {
             "kind": "chunk",

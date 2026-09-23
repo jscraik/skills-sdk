@@ -426,7 +426,11 @@ def _validated_observation(
     deterministic = _deterministic_signals(output_text, definition.deterministic_assertions)
     case = definition.scenario_set.cases[0]
     judge_result_ref = f"judge-results/{supplied.judge_result_sha256}"
-    evidence_refs = tuple(dict.fromkeys((*provider_evidence_refs, *supplied.evidence_refs, judge_result_ref)))
+    if judge_result_ref not in supplied.evidence_refs:
+        return _blocked_observation(
+            definition, request, "judge_result_ref_required", "judge result reference must be supplied by the host"
+        )
+    evidence_refs = tuple(dict.fromkeys((*provider_evidence_refs, *supplied.evidence_refs)))
     return ScenarioObservationV2(
         candidate=supplied.candidate,
         scenario_set_id=supplied.scenario_set_id,
@@ -460,6 +464,17 @@ def _request_matches_definition(
 
 def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
     """Freeze nested scalar subclasses before binding and provider dispatch."""
+    encoded_bytes = 0
+    try:
+        for part in json.JSONEncoder(sort_keys=True, separators=(",", ":")).iterencode(input_payload):
+            encoded_bytes += len(part.encode("utf-8"))
+            if encoded_bytes > DEFAULT_PROVIDER_CALL_LIMITS.input_bytes:
+                raise _contract_error("provider_input_too_large", "provider input exceeds the byte limit")
+    except ContractError:
+        raise
+    except (TypeError, ValueError, UnicodeError):
+        # Let the provider normalizer report malformed JSON values with its typed error.
+        pass
     normalized = _normalize_json(
         input_payload, depth=0, maximum_depth=DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth, active=set()
     )

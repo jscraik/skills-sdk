@@ -126,7 +126,7 @@ def _evidence(
         assertion_contract_sha256=definition.assertion_contract_sha256,
         judge=request.provider,
         satisfied_assertion_ids=definition.semantic_signal_ids,
-        evidence_refs=("evidence/assertion-review.json",),
+        evidence_refs=("evidence/assertion-review.json", f"judge-results/{'c' * 64}"),
         output_sha256=hashlib.sha256(output.encode()).hexdigest(),
         judge_result_sha256="c" * 64,
     )
@@ -694,7 +694,12 @@ def test_judge_result_digest_changes_receipt_identity(tmp_path: Path) -> None:
     request = _prepared_request(definition, input_payload)
     output = "behavior"
     first = _evidence(definition, request, output)
-    second = first.model_copy(update={"judge_result_sha256": "d" * 64})
+    second = first.model_copy(
+        update={
+            "judge_result_sha256": "d" * 64,
+            "evidence_refs": ("evidence/assertion-review.json", f"judge-results/{'d' * 64}"),
+        }
+    )
 
     receipts = [
         asyncio.run(execute_selected_case(definition, request, input_payload, _adapter(request, output), evidence))
