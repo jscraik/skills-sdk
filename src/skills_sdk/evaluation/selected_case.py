@@ -473,8 +473,9 @@ def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
     except ContractError:
         raise
     except (TypeError, ValueError, UnicodeError):
-        # Let the provider normalizer report malformed JSON values with its typed error.
-        pass
+        raise _contract_error(
+            "invalid_provider_input", "provider input must contain only JSON-compatible values"
+        ) from None
     normalized = _normalize_json(
         input_payload, depth=0, maximum_depth=DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth, active=set()
     )

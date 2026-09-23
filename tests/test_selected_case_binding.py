@@ -268,3 +268,23 @@ def test_selected_case_bounds_host_input_before_canonicalization(
         assert receipt.status == "blocked"
         assert receipt.case_results[0].blocker is not None
         assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
+
+
+def test_malformed_input_does_not_traverse_large_sibling(tmp_path: Path) -> None:
+    class TrackedList(list[str]):
+        traversed = False
+
+        def __iter__(self):
+            self.traversed = True
+            return super().__iter__()
+
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    large = TrackedList(["x"] * 300_000)
+    malformed = {"z": large, "a": object()}
+
+    with pytest.raises(ContractError, match="invalid_provider_input"):
+        asyncio.run(execute_selected_case(definition, request, malformed, None, None))
+    assert large.traversed is False
