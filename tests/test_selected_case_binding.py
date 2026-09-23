@@ -165,3 +165,33 @@ def test_loaded_definition_rechecks_package_source_at_execution(tmp_path: Path) 
 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
         asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+
+
+def test_mode_string_subclass_cannot_select_release_only_case_as_smoke(tmp_path: Path) -> None:
+    class DeceptiveMode(str):
+        def __eq__(self, other: object) -> bool:
+            return other == "release" or str.__eq__(self, other)
+
+        __hash__ = str.__hash__
+
+    package = _skill(tmp_path / "simplify")
+    with pytest.raises(ContractError, match="selected_case_mode_mismatch"):
+        load_selected_case(package, source_revision=REVISION, case_id="edge-empty-diff", mode=DeceptiveMode("smoke"))
+
+    selected = load_selected_case(package, source_revision=REVISION, case_id="edge-empty-diff", mode="release")
+    assert selected._mode == "release"
+
+
+def test_case_id_string_subclass_is_frozen_before_selection(tmp_path: Path) -> None:
+    class DeceptiveCaseId(str):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+        __hash__ = str.__hash__
+
+    package = _skill(tmp_path / "simplify")
+    selected = load_selected_case(
+        package, source_revision=REVISION, case_id=DeceptiveCaseId("happy-diff"), mode="release"
+    )
+    assert selected.scenario_set.cases[0].case_id == "happy-diff"
+    assert type(selected.scenario_set.cases[0].case_id) is str

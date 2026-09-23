@@ -249,10 +249,14 @@ def load_selected_case(
 ) -> SelectedCaseDefinition:
     """Load one validated package-local eval case without executing it."""
 
-    if not isinstance(mode, str) or mode not in _SUPPORTED_MODES:
+    if not isinstance(mode, str):
+        raise _contract_error("invalid_selected_case", "selected case mode is unsupported")
+    mode = cast(EvaluationMode, str.__str__(mode))
+    if mode not in _SUPPORTED_MODES:
         raise _contract_error("invalid_selected_case", "selected case mode is unsupported")
     if not isinstance(case_id, str):
         raise _contract_error("invalid_selected_case", "selected case id must use provider execution id syntax")
+    case_id = str.__str__(case_id)
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.status != "pass" or validation.candidate is None:
         raise _contract_error("package_validation_blocked", "selected-case evaluation requires a valid package")
