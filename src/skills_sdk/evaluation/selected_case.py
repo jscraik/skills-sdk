@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hmac
 import re
-from dataclasses import dataclass
+import secrets
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, cast
 
@@ -40,6 +42,7 @@ _SUPPORTED_MODES = {"smoke", "release"}
 _EXECUTION_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _MAX_DETERMINISTIC_PATTERNS = 128
 _MAX_DETERMINISTIC_PATTERN_BYTES = 16_384
+_DEFINITION_SEAL_KEY = secrets.token_bytes(32)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +53,7 @@ class SelectedCaseDefinition:
     scorer: ScorerProfile
     semantic_assertions: tuple[SemanticAssertion, ...]
     deterministic_assertions: tuple[tuple[str, str, str], ...]
+    _loaded_seal: bytes = field(default=b"", repr=False, compare=False)
 
     @property
     def semantic_signal_ids(self) -> tuple[str, ...]:
@@ -63,6 +67,17 @@ class SelectedCaseDefinition:
             {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in self.semantic_assertions
         ]
         return canonical_json_sha256(payload)
+
+
+def _definition_seal(definition: SelectedCaseDefinition) -> bytes:
+    """Bind the entire loaded projection independently of caller-supplied evidence."""
+    payload = {
+        "scenario_set": definition.scenario_set.model_dump(mode="json"),
+        "scorer": definition.scorer.model_dump(mode="json"),
+        "semantic_assertions": definition.semantic_assertions,
+        "deterministic_assertions": definition.deterministic_assertions,
+    }
+    return hmac.digest(_DEFINITION_SEAL_KEY, canonical_json_sha256(payload).encode("ascii"), "sha256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,7 +326,8 @@ def load_selected_case(
         deterministic_checks_first=True,
         calibration_required=False,
     )
-    return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic)
+    definition = SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic)
+    return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic, _definition_seal(definition))
 
 
 def _blocker(
@@ -435,6 +451,10 @@ def _request_matches_definition(
 def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDefinition:
     """Revalidate a selected-case definition at the execution boundary."""
     try:
+        if not definition._loaded_seal or not hmac.compare_digest(
+            definition._loaded_seal, _definition_seal(definition)
+        ):
+            raise ValueError("selected case no longer matches its loaded definition")
         scenario_set = ScenarioSetV2.model_validate(definition.scenario_set.model_dump(mode="json"))
         scorer = ScorerProfile.model_validate(definition.scorer.model_dump(mode="json"))
         semantic = TypeAdapter(tuple[SemanticAssertion, ...]).validate_python(definition.semantic_assertions)
@@ -485,7 +505,7 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
         )
         if not all(_public_text_is_redaction_safe(value) for value in public_values):
             raise ValueError("selected case projected fields contain private values")
-        return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic)
+        return SelectedCaseDefinition(scenario_set, scorer, semantic, deterministic, definition._loaded_seal)
     except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
         raise _contract_error(
             "invalid_selected_case_definition", "selected-case definition failed revalidation"
