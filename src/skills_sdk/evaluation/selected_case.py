@@ -289,9 +289,10 @@ def load_selected_case(
     if prompt != prompt.strip():
         raise _contract_error("invalid_selected_case", "selected case prompt must preserve exact text")
     try:
-        prompt_bytes = len(json.dumps({"prompt": prompt}, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        prompt.encode("utf-8")
     except UnicodeError:
         raise _contract_error("invalid_selected_case", "selected case prompt must be valid UTF-8") from None
+    prompt_bytes = len(json.dumps({"prompt": prompt}, sort_keys=True, separators=(",", ":")).encode("utf-8"))
     if prompt_bytes > DEFAULT_PROVIDER_CALL_LIMITS.input_bytes:
         raise _contract_error("invalid_selected_case", "selected case prompt exceeds provider input limit")
     if _EXECUTION_ID_PATTERN.fullmatch(case_id) is None:

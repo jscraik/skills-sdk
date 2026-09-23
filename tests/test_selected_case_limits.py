@@ -49,6 +49,19 @@ def test_forged_selected_case_cannot_exceed_deterministic_pattern_bytes(tmp_path
         asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
 
 
+def test_selected_case_rejects_unencodable_prompt_during_loading(tmp_path: Path) -> None:
+    """Reject a YAML-escaped lone surrogate before provider-input normalization."""
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    evals.write_text(
+        evals.read_text(encoding="utf-8").replace("prompt: Return a bounded review note.", 'prompt: "\\uD800"'),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ContractError, match="selected case prompt must be valid UTF-8"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
 @pytest.mark.parametrize("field", ["acceptance", "forbidden_commands"])
 def test_selected_case_rejects_unencodable_deterministic_patterns(tmp_path: Path, field: str) -> None:
     """Return a typed loader error for a YAML-escaped lone surrogate."""
