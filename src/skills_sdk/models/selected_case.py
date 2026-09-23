@@ -61,7 +61,19 @@ class SelectedCaseJudgeEvidence(_ContractModel):
                 value = value.model_dump(mode="json")
             except PydanticSerializationError:
                 raise ValueError("selected-case judge provider identity failed revalidation") from None
-        return ProviderIdentityV2.model_validate(value)
+        identity = ProviderIdentityV2.model_validate(value)
+        if not all(
+            _public_text_is_redaction_safe(item)
+            for item in (
+                identity.provider_id,
+                identity.model_id,
+                identity.version_or_digest,
+                identity.adapter_id,
+                identity.adapter_version_or_digest,
+            )
+        ):
+            raise ValueError("selected-case judge provider identity contains credential-shaped values")
+        return identity
 
     @field_validator("scenario_set_id", "case_id", "satisfied_assertion_ids", mode="before")
     @classmethod

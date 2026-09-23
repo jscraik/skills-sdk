@@ -22,7 +22,14 @@ from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, _identity_is_public
 from skills_sdk.models.safety import _public_text_is_redaction_safe
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
-from skills_sdk.providers import JsonValue, ProviderAdapterComplete, TextProviderAdapter, execute_provider_call
+from skills_sdk.providers import (
+    DEFAULT_PROVIDER_CALL_LIMITS,
+    JsonValue,
+    ProviderAdapterComplete,
+    TextProviderAdapter,
+    execute_provider_call,
+)
+from skills_sdk.providers.call import _normalize_json
 from skills_sdk.validation import validate_skill_package
 
 EvaluationMode = Literal["smoke", "release"]
@@ -250,7 +257,7 @@ def load_selected_case(
     raw_forbidden = raw_checks.get("forbidden_commands")
     if not isinstance(raw_forbidden, list) or not all(isinstance(item, str) and item.strip() for item in raw_forbidden):
         raise _contract_error("invalid_selected_case", "forbidden_commands must be a list of non-empty text")
-    if not all(_identity_is_public(item) for item in raw_forbidden):
+    if not all(_identity_is_public(item) and _public_text_is_redaction_safe(item) for item in raw_forbidden):
         raise _contract_error("invalid_selected_case", "forbidden_commands must not contain private values")
     if any(item != item.strip() for item in raw_forbidden):
         raise _contract_error("invalid_selected_case", "forbidden_commands must preserve exact text")
@@ -481,12 +488,27 @@ async def execute_selected_case(
         request = ProviderExecutionRequest.model_validate(request)
     except ValidationError:
         raise _contract_error("invalid_provider_request", "provider request failed revalidation") from None
-    if not _request_matches_definition(definition, request, input_payload):
+    if not all(
+        _public_text_is_redaction_safe(value)
+        for value in (
+            request.provider.provider_id,
+            request.provider.model_id,
+            request.provider.version_or_digest,
+            request.provider.adapter_id,
+            request.provider.adapter_version_or_digest,
+        )
+    ):
+        raise _contract_error("invalid_provider_request", "provider identity contains private values")
+    normalized_payload = _normalize_json(
+        input_payload, depth=0, maximum_depth=DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth, active=set()
+    )
+    if not _request_matches_definition(definition, request, normalized_payload):
         observation = _blocked_observation(
             definition,
             request,
             "selected_case_request_mismatch",
             "provider request does not bind the selected case",
+            (),
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     if request.status == "blocked":
@@ -530,7 +552,7 @@ async def execute_selected_case(
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     try:
-        outcome = await execute_provider_call(request, input_payload, adapter)
+        outcome = await execute_provider_call(request, normalized_payload, adapter)
     except ContractError as exc:
         if exc.code != "invalid_provider_failure":
             raise

@@ -491,6 +491,78 @@ def test_private_requirement_id_is_rejected_by_loader(tmp_path: Path) -> None:
         load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
 
 
+def test_private_forbidden_command_is_rejected_by_loader(tmp_path: Path) -> None:
+    """Reject projected forbidden commands that execution would not publish."""
+    package = _skill(tmp_path / "simplify")
+    evals = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals.read_text(encoding="utf-8"))
+    payload["cases"][0]["deterministic_checks"]["forbidden_commands"] = ["client-secret"]
+    evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ContractError, match="invalid_selected_case"):
+        load_selected_case(package, source_revision=REVISION, case_id="happy-diff", mode="release")
+
+
+def test_request_mismatch_has_no_package_evidence_ref(tmp_path: Path) -> None:
+    """A host request mismatch must not blame the package eval source."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": "different"}
+    request = _prepared_request(definition, input_payload)
+
+    receipt = asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
+    assert receipt.case_results[0].blocker.evidence_refs == ()
+
+
+def test_deceptive_dict_equality_cannot_bind_different_provider_input(tmp_path: Path) -> None:
+    """Canonicalize the payload before comparing it with the selected prompt."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+
+    class DeceptiveInput(dict[str, str]):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+    input_payload = DeceptiveInput(prompt="different", system="override")
+    request = _prepared_request(definition, input_payload)
+
+    receipt = asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
+
+
+@pytest.mark.parametrize(
+    "field", ["provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest"]
+)
+def test_selected_case_rejects_private_nested_provider_identity(tmp_path: Path, field: str) -> None:
+    """Screen ordinary schema-valid provider identities at the selected-case boundary."""
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    input_payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, input_payload)
+    provider = request.provider.model_copy(update={field: "client-secret"})
+    forged_request = request.model_copy(update={"provider": provider})
+
+    with pytest.raises(ContractError, match="invalid_provider_request"):
+        asyncio.run(execute_selected_case(definition, forged_request, input_payload, None, None))
+
+    payload = _evidence(definition, request, "reviewed").model_dump(mode="json")
+    payload["judge"][field] = "client-secret"
+    with pytest.raises(ValueError, match="credential-shaped"):
+        SelectedCaseJudgeEvidence.model_validate(payload)
+    schema = SchemaRegistry().load("selected-case-judge-evidence.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
 def test_forged_scorer_threshold_cannot_turn_failed_case_into_pass(tmp_path: Path) -> None:
     """Prevent a forged scorer threshold from turning failure into success."""
     definition = load_selected_case(
