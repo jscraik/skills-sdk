@@ -217,10 +217,11 @@ def _deterministic_patterns_are_bounded(
 ) -> bool:
     """Bound repeated scans over a provider output for one selected case."""
     patterns = (*(item[2] for item in assertions), *commands)
-    return (
-        len(patterns) <= _MAX_DETERMINISTIC_PATTERNS
-        and sum(len(pattern.encode("utf-8")) for pattern in patterns) <= _MAX_DETERMINISTIC_PATTERN_BYTES
-    )
+    try:
+        pattern_bytes = sum(len(pattern.encode("utf-8")) for pattern in patterns)
+    except UnicodeError:
+        return False
+    return len(patterns) <= _MAX_DETERMINISTIC_PATTERNS and pattern_bytes <= _MAX_DETERMINISTIC_PATTERN_BYTES
 
 
 def _category(value: object) -> Literal["happy", "pressure", "boundary", "regression"]:
