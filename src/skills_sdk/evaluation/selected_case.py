@@ -310,7 +310,7 @@ def _blocked_observation(
     request: ProviderExecutionRequest,
     code: str,
     message: str,
-    evidence_refs: tuple[str, ...] = ("references/evals.yaml",),
+    evidence_refs: tuple[str, ...] = (),
 ) -> ScenarioObservationV2:
     """Build a candidate-bound blocked observation for one selected case."""
     if not _public_text_is_redaction_safe(code):

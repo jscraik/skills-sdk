@@ -50,6 +50,7 @@ def test_unserializable_forged_judge_evidence_returns_typed_blocker(tmp_path: Pa
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "invalid_judge_evidence"
+    assert receipt.case_results[0].blocker.evidence_refs == ()
 
 
 def test_existing_judge_result_ref_is_not_duplicated(tmp_path: Path) -> None:
@@ -240,6 +241,7 @@ def test_mismatched_judge_binding_blocks_before_adapter_call(tmp_path: Path) -> 
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "selected_case_identity_mismatch"
+    assert receipt.case_results[0].blocker.evidence_refs == ()
 
 
 def test_forged_provider_request_is_rejected_before_blocked_receipt(tmp_path: Path) -> None:
