@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
 
@@ -274,7 +275,7 @@ def test_malformed_input_does_not_traverse_large_sibling(tmp_path: Path) -> None
     class TrackedList(list[str]):
         traversed = False
 
-        def __iter__(self):
+        def __iter__(self) -> Iterator[str]:
             self.traversed = True
             return super().__iter__()
 
@@ -288,3 +289,19 @@ def test_malformed_input_does_not_traverse_large_sibling(tmp_path: Path) -> None
     with pytest.raises(ContractError, match="invalid_provider_input"):
         asyncio.run(execute_selected_case(definition, request, malformed, None, None))
     assert large.traversed is False
+
+
+def test_deeply_nested_host_input_returns_typed_depth_error(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+    nested: list[object] = []
+    cursor = nested
+    for _ in range(1_100):
+        child: list[object] = []
+        cursor.append(child)
+        cursor = child
+
+    with pytest.raises(ContractError, match="provider_input_depth_exceeded"):
+        asyncio.run(execute_selected_case(definition, request, nested, None, None))

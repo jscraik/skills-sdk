@@ -472,6 +472,8 @@ def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
                 raise _contract_error("provider_input_too_large", "provider input exceeds the byte limit")
     except ContractError:
         raise
+    except RecursionError:
+        raise _contract_error("provider_input_depth_exceeded", "provider input exceeds the depth limit") from None
     except (TypeError, ValueError, UnicodeError):
         raise _contract_error(
             "invalid_provider_input", "provider input must contain only JSON-compatible values"
