@@ -464,9 +464,12 @@ def _request_matches_definition(
 
 def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
     """Freeze nested scalar subclasses before binding and provider dispatch."""
+    plain_payload = _plain_input_containers(
+        input_payload, depth=0, active=set(), remaining=[DEFAULT_PROVIDER_CALL_LIMITS.input_bytes]
+    )
     encoded_bytes = 0
     try:
-        for part in json.JSONEncoder(sort_keys=True, separators=(",", ":")).iterencode(input_payload):
+        for part in json.JSONEncoder(sort_keys=True, separators=(",", ":")).iterencode(plain_payload):
             encoded_bytes += len(part.encode("utf-8"))
             if encoded_bytes > DEFAULT_PROVIDER_CALL_LIMITS.input_bytes:
                 raise _contract_error("provider_input_too_large", "provider input exceeds the byte limit")
@@ -479,9 +482,45 @@ def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
             "invalid_provider_input", "provider input must contain only JSON-compatible values"
         ) from None
     normalized = _normalize_json(
-        input_payload, depth=0, maximum_depth=DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth, active=set()
+        plain_payload, depth=0, maximum_depth=DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth, active=set()
     )
+    normalized_bytes = 0
+    for part in json.JSONEncoder(sort_keys=True, separators=(",", ":")).iterencode(normalized):
+        normalized_bytes += len(part.encode("utf-8"))
+        if normalized_bytes > DEFAULT_PROVIDER_CALL_LIMITS.input_bytes:
+            raise _contract_error("provider_input_too_large", "provider input exceeds the byte limit")
     return cast(JsonValue, json.loads(json.dumps(normalized, ensure_ascii=False, allow_nan=False)))
+
+
+def _plain_input_containers(value: object, *, depth: int, active: set[int], remaining: list[int]) -> object:
+    """Bound traversal and strip container overrides before JSON encoding."""
+    remaining[0] -= 1
+    if remaining[0] < 0:
+        raise _contract_error("provider_input_too_large", "provider input exceeds the byte limit")
+    if depth > DEFAULT_PROVIDER_CALL_LIMITS.nesting_depth:
+        raise _contract_error("provider_input_depth_exceeded", "provider input exceeds the depth limit")
+    if not isinstance(value, (list, dict)):
+        if value is not None and not isinstance(value, (bool, int, float, str)):
+            raise _contract_error("invalid_provider_input", "provider input must contain only JSON-compatible values")
+        return value
+    identity = id(value)
+    if identity in active:
+        raise _contract_error("invalid_provider_input", "provider input contains a cyclic container")
+    active.add(identity)
+    try:
+        if isinstance(value, dict):
+            items = dict.items(value)
+            ordered = sorted(items) if all(isinstance(key, str) for key in dict.__iter__(value)) else items
+            return {
+                key: _plain_input_containers(item, depth=depth + 1, active=active, remaining=remaining)
+                for key, item in ordered
+            }
+        return [
+            _plain_input_containers(item, depth=depth + 1, active=active, remaining=remaining)
+            for item in list.__iter__(value)
+        ]
+    finally:
+        active.remove(identity)
 
 
 def _validated_judge_artifact(value: object) -> SelectedCaseJudgeEvidence:
@@ -573,6 +612,16 @@ def _revalidate_definition(definition: SelectedCaseDefinition) -> SelectedCaseDe
         ) from None
 
 
+def _missing_judge_ref_receipt(
+    definition: SelectedCaseDefinition, request: ProviderExecutionRequest
+) -> EvaluationReceiptV2:
+    """Block before provider dispatch when host judge evidence lacks its result reference."""
+    observation = _blocked_observation(
+        definition, request, "judge_result_ref_required", "judge result reference must be supplied by the host"
+    )
+    return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
+
+
 async def execute_selected_case(
     definition: SelectedCaseDefinition,
     request: ProviderExecutionRequest,
@@ -648,16 +697,18 @@ async def execute_selected_case(
             definition, request, "selected_case_identity_mismatch", "assertion evidence does not bind the selected case"
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
+    if f"judge-results/{assertion_evidence.judge_result_sha256}" not in assertion_evidence.evidence_refs:
+        return _missing_judge_ref_receipt(definition, request)
     try:
         outcome = await execute_provider_call(request, normalized_payload, adapter)
     except ContractError as exc:
-        if exc.code != "invalid_provider_failure":
+        if exc.code not in {"invalid_provider_failure", "provider_output_too_large"}:
             raise
         observation = _blocked_observation(
             definition,
             request,
-            "invalid_provider_failure",
-            "provider failure evidence failed boundary validation",
+            exc.code,
+            "provider execution could not produce available output",
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     if outcome.complete_text is None or outcome.public_result.output_sha256 is None:

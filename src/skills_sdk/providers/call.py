@@ -112,18 +112,19 @@ def _normalize_json(value: object, *, depth: int, maximum_depth: int, active: se
         try:
             if isinstance(value, list):
                 return [
-                    _normalize_json(item, depth=depth + 1, maximum_depth=maximum_depth, active=active) for item in value
+                    _normalize_json(item, depth=depth + 1, maximum_depth=maximum_depth, active=active)
+                    for item in list.__iter__(value)
                 ]
-            if not all(isinstance(key, str) for key in value):
+            if not all(isinstance(key, str) for key in dict.__iter__(value)):
                 raise _contract_error("invalid_provider_input", "provider input object keys must be strings")
             try:
-                for key in value:
+                for key in dict.__iter__(value):
                     key.encode("utf-8")
             except UnicodeEncodeError:
                 raise _contract_error("invalid_provider_input", "provider input keys must be valid UTF-8") from None
             return {
                 key: _normalize_json(item, depth=depth + 1, maximum_depth=maximum_depth, active=active)
-                for key, item in value.items()
+                for key, item in dict.items(value)
             }
         finally:
             active.remove(identity)

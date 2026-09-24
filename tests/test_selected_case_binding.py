@@ -241,13 +241,24 @@ def test_judge_result_path_is_not_invented_for_host_evidence(tmp_path: Path) -> 
         update={"evidence_refs": ("evidence/assertion-review.json",)}
     )
 
-    receipt = asyncio.run(
-        execute_selected_case(definition, request, input_payload, _adapter(request, "reviewed"), evidence)
-    )
+    class TrackedAdapter:
+        descriptor = _adapter(request, "reviewed").descriptor
+        called = False
+
+        async def complete(self, request: object, input_payload: object) -> None:
+            self.called = True
+            raise AssertionError("provider must not be called for missing judge result")
+
+        async def cleanup(self) -> None:
+            return None
+
+    adapter = TrackedAdapter()
+    receipt = asyncio.run(execute_selected_case(definition, request, input_payload, adapter, evidence))
 
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "judge_result_ref_required"
+    assert adapter.called is False
     assert all(not ref.startswith("judge-results/") for ref in receipt.case_results[0].evidence_refs)
 
 
@@ -305,3 +316,38 @@ def test_deeply_nested_host_input_returns_typed_depth_error(tmp_path: Path) -> N
 
     with pytest.raises(ContractError, match="provider_input_depth_exceeded"):
         asyncio.run(execute_selected_case(definition, request, nested, None, None))
+
+
+def test_mapping_subclass_cannot_expand_input_during_normalization(tmp_path: Path) -> None:
+    class ExpandingMapping(dict[str, object]):
+        def items(self) -> object:
+            raise AssertionError("overridden items must not be called")
+
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    payload = ExpandingMapping({"prompt": definition.scenario_set.cases[0].prompt})
+    request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
+
+    receipt = asyncio.run(execute_selected_case(definition, request, payload, None, None))
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "provider_adapter_required"
+
+
+def test_oversized_provider_output_returns_blocked_receipt(tmp_path: Path) -> None:
+    definition = load_selected_case(
+        _skill(tmp_path / "simplify"), source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    payload = {"prompt": definition.scenario_set.cases[0].prompt}
+    request = _prepared_request(definition, payload)
+    output = "x" * 1_100_000
+
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition, request, payload, _adapter(request, output), _evidence(definition, request, output)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "provider_output_too_large"
