@@ -2,7 +2,23 @@ from __future__ import annotations
 
 import pytest
 
+import skills_sdk.packaging
+import skills_sdk.validation
 from skills_sdk.cli.main import main
+
+
+@pytest.mark.parametrize("arguments", [["--help"], ["--version"], ["validate", "--help"], ["build", "--help"]])
+def test_discovery_does_not_invoke_package_services(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> None:
+    def unexpected_service_call(*args: object, **kwargs: object) -> None:
+        pytest.fail("CLI discovery invoked a package service")
+
+    monkeypatch.setattr(skills_sdk.validation, "validate_skill_package", unexpected_service_call)
+    monkeypatch.setattr(skills_sdk.packaging, "build_skill_package", unexpected_service_call)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(arguments)
+
+    assert exc_info.value.code == 0
 
 
 def test_help_exposes_boundary_only_cli(capsys: pytest.CaptureFixture[str]) -> None:
