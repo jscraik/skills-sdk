@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import stat
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from skills_sdk import __version__
 
@@ -28,6 +29,7 @@ class _UnsupportedContextRead(OSError):
 
 
 def _reject_duplicate_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Build a JSON object while rejecting duplicate member names."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -143,6 +145,17 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--scenario-set")
     quality.add_argument("--json", action="store_true", dest="json_output")
     quality.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    selected = evaluation_commands.add_parser(
+        "selected-case",
+        help="evaluate one package-local case through caller-supplied provider evidence",
+    )
+    selected.add_argument("package_root", type=Path)
+    selected.add_argument("--source-revision", required=True)
+    selected.add_argument("--case", required=True, dest="case_id")
+    selected.add_argument("--mode", choices=("smoke", "release"), required=True)
+    selected.add_argument("--host-input", type=Path, required=True)
+    selected.add_argument("--json", action="store_true", dest="json_output")
+    selected.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     tessl = commands.add_parser(
         "tessl",
         help="prepare or verify a Tessl candidate without publishing",
@@ -180,6 +193,15 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
         references = ", ".join(finding.evidence_refs)
         suffix = f" [{references}]" if references else ""
         print(f"  {finding.code}: {finding.message}{suffix}")
+    if command == "selected-case":
+        for case in result.case_results:
+            print(f"  case {case.case_id}: {case.status}")
+            if case.missing_signals:
+                print(f"    missing_signals: {', '.join(case.missing_signals)}")
+            if case.forbidden_commands_observed:
+                print(f"    forbidden_commands_observed: {', '.join(case.forbidden_commands_observed)}")
+            if case.blocker is not None:
+                print(f"    {case.blocker.code}: {case.blocker.message}")
 
 
 def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
@@ -216,6 +238,97 @@ def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
     return 0 if result.status in {"matching", "repaired"} else 2
 
 
+def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int:
+    """Print a selected-case blocker and return the blocked exit status."""
+    from skills_sdk.models.packaging import PackageReceiptBlocker
+
+    blocker = PackageReceiptBlocker(code=code, message=message)
+    if json_output:
+        print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
+    else:
+        print(f"selected-case: blocked\n  {blocker.code}: {blocker.message}")
+    return 2
+
+
+def _selected_case_host_input(path: Path) -> tuple[object, object, object | None, object | None]:
+    """Load the bounded host-supplied inputs for one selected-case run."""
+    payload = json.loads(
+        _read_intake_context(path).decode("utf-8"),
+        object_pairs_hook=_reject_duplicate_members,
+    )
+    if not isinstance(payload, dict) or set(payload) - {
+        "adapter",
+        "assertion_evidence",
+        "input_payload",
+        "request",
+    }:
+        raise ValueError("invalid selected-case host input")
+    return (
+        payload.get("request"),
+        payload.get("input_payload"),
+        payload.get("adapter"),
+        payload.get("assertion_evidence"),
+    )
+
+
+def _supplied_adapter(payload: object) -> object | None:
+    """Validate and construct the caller-supplied text adapter, if present."""
+    if payload is None:
+        return None
+    if not isinstance(payload, dict) or set(payload) != {"descriptor", "evidence_refs", "output_text"}:
+        raise ValueError("invalid supplied adapter")
+    from skills_sdk.evaluation import SuppliedTextProviderAdapter
+    from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
+
+    output_text = payload["output_text"]
+    evidence_refs = payload["evidence_refs"]
+    if not isinstance(output_text, str) or not isinstance(evidence_refs, list):
+        raise ValueError("invalid supplied adapter")
+    return SuppliedTextProviderAdapter(
+        descriptor=TextProviderAdapterDescriptor.model_validate(payload["descriptor"]),
+        text=output_text,
+        evidence_refs=tuple(evidence_refs),
+    )
+
+
+def _selected_case_eval(arguments: argparse.Namespace) -> int:
+    """Execute the selected-case CLI route and report its receipt."""
+    from pydantic import ValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.evaluation import execute_selected_case, load_selected_case
+    from skills_sdk.models.provider_execution import ProviderExecutionRequest
+    from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
+    from skills_sdk.providers import JsonValue, TextProviderAdapter
+
+    try:
+        definition = load_selected_case(
+            arguments.package_root,
+            source_revision=arguments.source_revision,
+            case_id=arguments.case_id,
+            mode=arguments.mode,
+        )
+        request_payload, input_payload, adapter_payload, evidence_payload = _selected_case_host_input(
+            arguments.host_input
+        )
+        request = ProviderExecutionRequest.model_validate(request_payload)
+        adapter = cast(TextProviderAdapter | None, _supplied_adapter(adapter_payload))
+        evidence = None if evidence_payload is None else SelectedCaseJudgeEvidence.model_validate(evidence_payload)
+        receipt = asyncio.run(
+            execute_selected_case(definition, request, cast(JsonValue, input_payload), adapter, evidence)
+        )
+    except ContractError as exc:
+        return _selected_case_blocker(exc.code, exc.message, json_output=arguments.json_output)
+    except (OSError, RecursionError, UnicodeDecodeError, ValueError, ValidationError):
+        return _selected_case_blocker(
+            "invalid_selected_case_input",
+            "selected-case host input failed validation",
+            json_output=arguments.json_output,
+        )
+    _print_result("selected-case", receipt, json_output=arguments.json_output)
+    return 0 if receipt.status == "pass" else 2
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     parser = build_parser()
@@ -246,6 +359,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         _print_result("scenario-quality", quality_result, json_output=arguments.json_output)
         return 0 if quality_result.status == "pass" else 2
+    if arguments.command == "eval" and arguments.eval_command == "selected-case":
+        return _selected_case_eval(arguments)
     if arguments.command not in {"intake", "validate", "build"}:
         return 0
     from skills_sdk.validation import SkillValidationPolicy

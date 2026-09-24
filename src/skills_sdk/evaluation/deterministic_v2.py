@@ -112,12 +112,14 @@ def _evaluate_case(case: ScenarioCaseV2, observation: ScenarioObservationV2) -> 
         )
     if observation.output_sha256 is None:
         raise ValueError("completed observation must contain output_sha256")
+    observed_signals = set(observation.observed_signals)
+    forbidden_commands = set(case.forbidden_commands)
     missing = (
-        tuple(signal for signal in case.expected_signals if signal not in set(observation.observed_signals))
+        tuple(signal for signal in case.expected_signals if signal not in observed_signals)
         if case.oracle == "expected_signal"
         else ()
     )
-    forbidden = tuple(command for command in observation.observed_commands if command in set(case.forbidden_commands))
+    forbidden = tuple(command for command in observation.observed_commands if command in forbidden_commands)
     mismatch = case.oracle == "exact_match" and observation.output_sha256 != case.expected_output_sha256
     status: Literal["pass", "fail"] = "fail" if missing or forbidden or mismatch else "pass"
     return ScenarioCaseResultV2(

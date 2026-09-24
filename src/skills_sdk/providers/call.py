@@ -112,18 +112,19 @@ def _normalize_json(value: object, *, depth: int, maximum_depth: int, active: se
         try:
             if isinstance(value, list):
                 return [
-                    _normalize_json(item, depth=depth + 1, maximum_depth=maximum_depth, active=active) for item in value
+                    _normalize_json(item, depth=depth + 1, maximum_depth=maximum_depth, active=active)
+                    for item in list.__iter__(value)
                 ]
-            if not all(isinstance(key, str) for key in value):
+            if not all(isinstance(key, str) for key in dict.__iter__(value)):
                 raise _contract_error("invalid_provider_input", "provider input object keys must be strings")
             try:
-                for key in value:
+                for key in dict.__iter__(value):
                     key.encode("utf-8")
             except UnicodeEncodeError:
                 raise _contract_error("invalid_provider_input", "provider input keys must be valid UTF-8") from None
             return {
                 key: _normalize_json(item, depth=depth + 1, maximum_depth=maximum_depth, active=active)
-                for key, item in value.items()
+                for key, item in dict.items(value)
             }
         finally:
             active.remove(identity)
@@ -318,10 +319,11 @@ async def _clock_wait_for(clock: _ClockBindings, awaitable: Awaitable[object], t
 def _validate_complete(value: object, limits: ProviderCallLimits) -> ProviderAdapterComplete:
     if not isinstance(value, ProviderAdapterComplete) or not isinstance(value.text, str):
         raise _contract_error("invalid_provider_event", "complete adapter returned an invalid result")
-    if len(_utf8_bytes(value.text)) > limits.output_bytes:
+    text = str.__str__(value.text)
+    if len(text) > limits.output_bytes or len(_utf8_bytes(text)) > limits.output_bytes:
         raise _contract_error("provider_output_too_large", "provider output exceeds the byte limit")
     return ProviderAdapterComplete(
-        text=value.text,
+        text=text,
         evidence_refs=value.evidence_refs,
         usage=_validate_usage(value.usage),
         cost=_validate_cost(value.cost),
@@ -471,13 +473,16 @@ def _consume_chunk(
 ) -> None:
     if not isinstance(event.text, str):
         raise _contract_error("invalid_provider_event", "provider stream chunk must contain text")
-    chunk_bytes = _utf8_bytes(event.text)
+    text = str.__str__(event.text)
+    if len(text) > limits.chunk_bytes:
+        raise _contract_error("provider_chunk_too_large", "provider stream chunk exceeds the byte limit")
+    chunk_bytes = _utf8_bytes(text)
     if len(chunk_bytes) > limits.chunk_bytes:
         raise _contract_error("provider_chunk_too_large", "provider stream chunk exceeds the byte limit")
     if state.total_bytes + len(chunk_bytes) > limits.output_bytes:
         raise _contract_error("provider_output_too_large", "provider output exceeds the byte limit")
     state.total_bytes += len(chunk_bytes)
-    state.chunks.append(event.text)
+    state.chunks.append(text)
     state.events.append(
         {
             "kind": "chunk",
