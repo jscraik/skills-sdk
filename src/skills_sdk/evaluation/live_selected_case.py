@@ -130,9 +130,9 @@ async def _judge_once(
         )[0]
         if isinstance(cleanup_result, CancelledError):
             raise cleanup_result
-        if isinstance(cleanup_result, TimeoutError) and failure is None:
+        if failure is None and isinstance(cleanup_result, TimeoutError):
             failure = "judge_cleanup_timeout"
-        elif (isinstance(cleanup_result, BaseException) or cleanup_result is not None) and failure is None:
+        elif failure is None and (isinstance(cleanup_result, BaseException) or cleanup_result is not None):
             failure = "judge_cleanup_failed"
     return evidence, failure
 
