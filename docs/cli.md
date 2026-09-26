@@ -65,6 +65,10 @@ candidate-bound lanes:
   Semantic signals must carry portable evidence references; the command does
   not infer them from keywords. Deterministic `contains`, `not_contains`, and
   `must_not` assertions are evaluated against the private supplied output.
+  This JSON CLI route is controlled supplied-output proof. Host-injected
+  provider-then-judge execution uses the Python
+  `execute_selected_case_with_judge` API; JSON input does not import arbitrary
+  provider or judge executables.
 - `package` names a reserved local contract lane and does not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.

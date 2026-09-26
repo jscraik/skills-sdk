@@ -144,6 +144,12 @@ changing their payload meaning.
 
 Selected-case orchestration reuses the existing v2 scenario, observation,
 provider, and evaluation receipt families without changing their wire shape.
+The additive `execute_selected_case_with_judge` Python API preserves the
+existing supplied-evidence route while allowing a host-injected provider call
+to finish before a host-injected judge sees its actual output. Both routes
+produce the same v2 receipt family; neither turns a logical judge-result
+reference into verified persisted content or proves a live provider when a
+supplied-text adapter is injected.
 Package-local case categories `edge` and `negative` project to the existing v2
 `boundary` category only inside this loader. Requested modes must already be
 declared by the selected case. Semantic assertion results remain external judge

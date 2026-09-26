@@ -165,7 +165,11 @@ scenario-quality` lazily invokes the separate read-only
 for a passing assessment or 2 for a blocked assessment. `eval selected-case`
 composes one package-local case with an injected bounded provider adapter and
 separately bound semantic assertion evidence; it does not own credentials,
-provider discovery, model selection, or semantic judging. `compare-copy`
+provider discovery, model selection, or semantic judging.
+The additive Python `execute_selected_case_with_judge` path calls one injected
+provider adapter before requesting evidence from an injected judge adapter;
+the JSON CLI remains a controlled supplied-output route. Neither path owns
+host credentials, adapter discovery, or judge-result storage. `compare-copy`
 performs two read-only validations and compares captured files.
 `maintain-entrypoint` checks an existing host entrypoint and permits a
 digest-bound replacement only with explicit `--apply`. The other lifecycle

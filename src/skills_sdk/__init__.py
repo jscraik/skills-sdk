@@ -80,6 +80,22 @@ def __getattr__(name: str) -> object:
             "assess_scenario_quality": assess_scenario_quality,
         }[name]
     if name in {
+        "SelectedCaseJudgeAdapter",
+        "SelectedCaseJudgeInput",
+        "execute_selected_case_with_judge",
+    }:
+        from skills_sdk.evaluation.live_selected_case import (
+            SelectedCaseJudgeAdapter,
+            SelectedCaseJudgeInput,
+            execute_selected_case_with_judge,
+        )
+
+        return {
+            "SelectedCaseJudgeAdapter": SelectedCaseJudgeAdapter,
+            "SelectedCaseJudgeInput": SelectedCaseJudgeInput,
+            "execute_selected_case_with_judge": execute_selected_case_with_judge,
+        }[name]
+    if name in {
         "SelectedCaseDefinition",
         "SuppliedTextProviderAdapter",
         "execute_selected_case",
@@ -160,7 +176,9 @@ __all__ = [
     "ScorerProfile",
     "SecurityScreeningResult",
     "SelectedCaseDefinition",
+    "SelectedCaseJudgeAdapter",
     "SelectedCaseJudgeEvidence",
+    "SelectedCaseJudgeInput",
     "SuppliedTextProviderAdapter",
     "TextProviderAdapterDescriptor",
     "ValueDecision",
@@ -171,6 +189,7 @@ __all__ = [
     "evaluate_scenario_set_v2",
     "execute_provider_call",
     "execute_selected_case",
+    "execute_selected_case_with_judge",
     "load_selected_case",
     "plan_runtime_install",
     "prepare_private_registry_candidate",
