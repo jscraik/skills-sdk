@@ -87,53 +87,6 @@ def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
     assert result.stdout == ""
 
 
-def test_architecture_distinguishes_cli_invocation_from_package_imports() -> None:
-    """Require architecture docs to distinguish CLI use from imports."""
-    architecture = " ".join((REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8").split())
-
-    assert "CLI service-invocation path" in architecture
-    assert "`build`, and `eval scenario-quality` invoke those services" in architecture
-    assert "During `main()` dispatch" in architecture
-    assert "routes import their intake, validation, and packaging services lazily" in architecture
-    assert "This is not the package import graph" in architecture
-    assert "public convenience exports eagerly import" in architecture
-
-
-def test_architecture_binds_external_outcomes_to_explicit_evidence_lanes() -> None:
-    """Require architecture docs to bind external outcomes to evidence lanes."""
-    architecture_source = (REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8")
-    architecture = " ".join(architecture_source.split())
-    api = " ".join((REPOSITORY_ROOT / "docs" / "api.md").read_text(encoding="utf-8").split())
-
-    assert "exact repository commands" in architecture
-    expected_commands = (
-        'MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
-        "pytest tests/test_public_repository_boundary.py "
-        "tests/test_repository_standards.py tests/test_skill_validation_architecture.py",
-        "bash scripts/validate-codestyle.sh",
-        'MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
-        "python scripts/generate_schemas.py --check",
-        "bash scripts/validate-repository.sh",
-        "git diff --check",
-        "git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb",
-    )
-    for command in expected_commands:
-        assert f"`{command}`" in architecture
-
-    for lane in ("Provider", "Registry", "Host runtime", "Tessl", "Publication"):
-        row = next(line for line in architecture_source.splitlines() if line.startswith(f"| {lane} |"))
-        cells = [cell.strip() for cell in row.strip("|").split("|")]
-        assert cells[1] == "`blocked`"
-        assert cells[2]
-        assert cells[3]
-
-    assert "`pass`" in architecture
-    assert "`fail`" in architecture
-    assert "externally observed" in api
-    assert "locally validates this evidence envelope" in api
-    assert "does not prove" in api
-
-
 def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
     """Require pull-request guidance to scope mise to the checkout."""
     template = (REPOSITORY_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")

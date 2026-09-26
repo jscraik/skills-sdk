@@ -259,6 +259,27 @@ with the journal; `blocked` remains non-mutating and `rolled_back` requires an
 applied mutation with every journal entry applied. Generic parsing keeps a
 rolled-back outcome blocked because rollback is not an installed success.
 
+## Workflow migration proof
+
+Before porting a workflow, identify the source revision, production consumer,
+supported input forms, policy declarations, and failure semantics. Use the
+source implementation and representative accepted and rejected cases to
+establish the expected behaviour before writing the SDK implementation.
+Do not infer compatibility from a destination policy or a similar model name.
+
+Exercise equivalent cases through the source and SDK public entrypoints.
+Retain synthetic, portable fixtures in the existing test family; never copy
+private package contents or machine paths. Cover declared policy values as
+well as effective defaults, alternative supported selector shapes, and
+malformed neighbours. Document deliberate differences and their consumer
+impact. If the source cannot run, record the exact blocker and the narrower
+source inspection or fixture evidence; do not claim executed parity.
+
+Local SDK proof, downstream consumer cutover, and Agent-Skills retirement
+remain separate outcomes. Required schema and compatibility checks still
+apply. Run `bash scripts/validate-repository.sh` and record `pass`, `fail`, or
+`blocked`; for `blocked`, record the concrete blocker and nearest fallback.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

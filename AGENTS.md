@@ -47,6 +47,10 @@ registry, or publication service.
   implementation fix does not by itself require an architecture read.
 - Read [`CODESTYLE.md`](CODESTYLE.md) before technical edits and
   [`CONTRIBUTING.md`](CONTRIBUTING.md) before commit or pull-request work.
+- Before public-contract changes or workflow migration, follow the acceptance
+  and review procedure in [`CONTRIBUTING.md`](CONTRIBUTING.md#contract-acceptance-and-review)
+  and the source-parity requirements in
+  [`docs/compatibility.md`](docs/compatibility.md#workflow-migration-proof).
 - Use [`docs/agent-entrypoint.md`](docs/agent-entrypoint.md) for the short
   first-run route, [`docs/cli.md`](docs/cli.md) for command behavior,
   [`docs/api.md`](docs/api.md) for contract families, and

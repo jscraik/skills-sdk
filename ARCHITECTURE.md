@@ -378,33 +378,9 @@ the exact CLI or Python path touched and record whether the result was `pass`,
 `fail`, or `blocked`; local evidence does not substitute for hosted, provider,
 runtime, or publication evidence.
 
-### Evidence for this architecture update
-
-The documentation-only capability-map update was checked with these exact
-repository commands:
-
-- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_repository_standards.py tests/test_skill_validation_architecture.py`
-  — `pass` (`84 passed`).
-- `bash scripts/validate-codestyle.sh` — `pass` (Ruff, MyPy, repository
-  standards, and Vale completed without findings).
-- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` —
-  `pass` (no generated-schema drift).
-- `bash scripts/validate-repository.sh` — `pass` (`1,443 passed`, `1 skipped`;
-  source distribution and wheel built successfully).
-- `git diff --check` — `pass`.
-- `git verify-commit 841ab6ebbff3ffd7bee4d1ff60ecbee0d11739eb` — `pass`
-  (good native ED25519 signature for the exact reconciliation commit).
-
-External outcome lanes remain blocked rather than inferred from those local
-checks:
-
-| Lane | Outcome | Concrete reason | Nearest meaningful fallback |
-| --- | --- | --- | --- |
-| Provider | `blocked` | The repository contains offline orchestration and envelopes, not a selected provider client, credentials, network transport, or an authorized real-provider call. | Provider-call conformance plus provider execution model and schema tests. |
-| Registry | `blocked` | Private-registry preparation performs no registry authentication, upload, or mutation. | Deterministic registry-preparation contract tests. |
-| Host runtime | `blocked` | Runtime lifecycle code plans transitions but has no host apply or rollback adapter. | Runtime-lock and installation-planning contract tests. |
-| Tessl | `blocked` | Tessl CLI routes are parse-only and no Tessl integration was executed. | CLI parser/help tests and candidate-bound local contract checks. |
-| Publication | `blocked` | Publication is external to the SDK and no destination or publication authority was supplied. | Local build, immutable receipt, and registry-preparation proof. |
+Historical results for the capability-map update are retained in the
+[instruction audit record](docs/workflow-remediation.md#retained-historical-architecture-evidence).
+They describe that earlier candidate and do not establish current readiness.
 
 ## Further reading
 
