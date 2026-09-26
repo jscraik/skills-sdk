@@ -14,6 +14,7 @@ import skills_sdk.evaluation.live_selected_case as live_selected_case
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation import (
     SelectedCaseDefinition,
+    SelectedCaseJudgeAdapter,
     SelectedCaseJudgeInput,
     execute_selected_case_with_judge,
     load_selected_case,
@@ -128,6 +129,105 @@ def test_judge_failure_blocks_and_cleans_up(tmp_path: Path) -> None:
     )
     assert receipt.status == "blocked"
     assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
+def test_first_judge_failure_survives_cleanup_failure(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _DoubleFailureJudge(_Judge):
+        async def cleanup(self) -> None:
+            self.events.append("judge_cleanup")
+            raise RuntimeError("private cleanup failure")
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition,
+            request,
+            payload,
+            _Provider(request, events),
+            _DoubleFailureJudge(request.provider, events, failure=True),
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_execution_failed"
+    assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
+@pytest.mark.parametrize("invalid_hook", ["judge", "cleanup"])
+def test_invalid_judge_signature_blocks_before_provider(tmp_path: Path, invalid_hook: str) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _WrongJudgeSignature:
+        identity = request.provider
+
+        async def judge(self) -> object:
+            raise AssertionError("must not be called")
+
+        async def cleanup(self) -> None:
+            raise AssertionError("must not be called")
+
+    class _WrongCleanupSignature:
+        identity = request.provider
+
+        async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
+            raise AssertionError("must not be called")
+
+        async def cleanup(self, state: object) -> None:
+            raise AssertionError("must not be called")
+
+    judge = cast(
+        SelectedCaseJudgeAdapter,
+        _WrongJudgeSignature() if invalid_hook == "judge" else _WrongCleanupSignature(),
+    )
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(definition, request, payload, _Provider(request, events), judge)
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_adapter_required"
+    assert events == []
+
+
+@pytest.mark.parametrize("forged_adapter_id", ["forged-adapter", object()])
+def test_judge_cannot_mutate_receipt_request_identity(tmp_path: Path, forged_adapter_id: object) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+    original_provider = request.provider.model_dump(mode="json")
+
+    class _MutatingJudge(_Judge):
+        async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
+            object.__setattr__(inputs.request.provider, "adapter_id", forged_adapter_id)
+            return await super().judge(inputs)
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _Provider(request, events), _MutatingJudge(request.provider, events)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "selected_case_request_mutated"
+    assert request.provider.model_dump(mode="json") == original_provider
+
+
+def test_provider_cannot_mutate_receipt_request_identity(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _MutatingProvider(_Provider):
+        async def complete(self, request: ProviderExecutionRequest, input_payload: object) -> ProviderAdapterComplete:
+            self.events.append("provider")
+            object.__setattr__(request.provider, "adapter_id", object())
+            return ProviderAdapterComplete(text=self.text)
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _MutatingProvider(request, events), _Judge(request.provider, events)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "invalid_provider_result"
+    assert events == ["provider", "provider_cleanup"]
 
 
 class _FailedProvider(_Provider):

@@ -62,6 +62,13 @@ def _blocked(definition: SelectedCaseDefinition, request: ProviderExecutionReque
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 
 
+def _request_matches_snapshot(request: ProviderExecutionRequest, snapshot: dict[str, object]) -> bool:
+    try:
+        return request.model_dump(mode="json") == snapshot
+    except (TypeError, ValueError, PydanticSerializationError):
+        return False
+
+
 def _judge_identity(judge: SelectedCaseJudgeAdapter | None) -> ProviderIdentityV2 | None:
     if judge is None:
         return None
@@ -69,6 +76,8 @@ def _judge_identity(judge: SelectedCaseJudgeAdapter | None) -> ProviderIdentityV
         identity = ProviderIdentityV2.model_validate(judge.identity.model_dump(mode="json"))
         if not inspect.iscoroutinefunction(judge.judge) or not inspect.iscoroutinefunction(judge.cleanup):
             return None
+        inspect.signature(judge.judge).bind(None)
+        inspect.signature(judge.cleanup).bind()
         fields = (
             identity.provider_id,
             identity.model_id,
@@ -121,9 +130,9 @@ async def _judge_once(
         )[0]
         if isinstance(cleanup_result, CancelledError):
             raise cleanup_result
-        if isinstance(cleanup_result, TimeoutError):
+        if isinstance(cleanup_result, TimeoutError) and failure is None:
             failure = "judge_cleanup_timeout"
-        elif isinstance(cleanup_result, BaseException) or cleanup_result is not None:
+        elif (isinstance(cleanup_result, BaseException) or cleanup_result is not None) and failure is None:
             failure = "judge_cleanup_failed"
     return evidence, failure
 
@@ -160,32 +169,43 @@ async def execute_selected_case_with_judge(
     judge_identity = _judge_identity(judge)
     if judge_identity is None or judge is None:
         return _blocked(definition, request, "judge_adapter_required")
+    request_payload = request.model_dump(mode="json")
+    stable_request = ProviderExecutionRequest.model_validate(request_payload)
     try:
         outcome = await execute_provider_call(request, payload, adapter)
     except ContractError as exc:
-        return _blocked(definition, request, exc.code)
+        return _blocked(definition, stable_request, exc.code)
+    if not _request_matches_snapshot(request, request_payload):
+        return _blocked(definition, stable_request, "selected_case_request_mutated")
     if not outcome.public_result.cleanup_succeeded:
-        return _blocked(definition, request, "provider_cleanup_failed")
+        return _blocked(definition, stable_request, "provider_cleanup_failed")
     output = outcome.complete_text
     digest = outcome.public_result.output_sha256
     if output is None or digest is None:
         failure = outcome.public_result.execution.blocker or outcome.public_result.execution.error
-        return _blocked(definition, request, failure.code if failure is not None else "provider_output_unavailable")
+        return _blocked(
+            definition, stable_request, failure.code if failure is not None else "provider_output_unavailable"
+        )
     if hashlib.sha256(output.encode("utf-8")).hexdigest() != digest:
-        return _blocked(definition, request, "invalid_provider_output")
+        return _blocked(definition, stable_request, "invalid_provider_output")
     refs = outcome.public_result.execution.evidence_refs
     if any(not _public_text_is_redaction_safe(ref) for ref in refs):
-        return _blocked(definition, request, "private_provider_evidence_ref")
-    raw_evidence, failure = await _judge_once(judge, definition, request, output, digest)
+        return _blocked(definition, stable_request, "private_provider_evidence_ref")
+    judge_request = ProviderExecutionRequest.model_validate(request_payload)
+    raw_evidence, failure = await _judge_once(judge, definition, judge_request, output, digest)
+    if not _request_matches_snapshot(request, request_payload) or not _request_matches_snapshot(
+        judge_request, request_payload
+    ):
+        return _blocked(definition, stable_request, "selected_case_request_mutated")
     if failure is not None:
-        return _blocked(definition, request, failure)
+        return _blocked(definition, stable_request, failure)
     try:
         evidence = _validated_judge_artifact(raw_evidence)
     except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
-        return _blocked(definition, request, "invalid_judge_evidence")
+        return _blocked(definition, stable_request, "invalid_judge_evidence")
     if evidence.judge != judge_identity:
-        return _blocked(definition, request, "judge_identity_mismatch")
-    observation = _validated_observation(definition, request, evidence, output, digest, refs)
+        return _blocked(definition, stable_request, "judge_identity_mismatch")
+    observation = _validated_observation(definition, stable_request, evidence, output, digest, refs)
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 
 
