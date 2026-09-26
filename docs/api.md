@@ -176,6 +176,16 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   evaluation receipts. `SuppliedTextProviderAdapter` is a no-I/O adapter for
   controlled host or test evidence. These APIs prove portable orchestration,
   not live-provider authorization, execution provenance, or model quality.
+  `execute_selected_case_with_judge` is an additive Python API for a host that
+  supplies both adapters. It validates the selected case and prepared request,
+  calls the provider once, then passes that actual private output and the
+  complete semantic assertions to a `SelectedCaseJudgeAdapter`. The SDK binds
+  returned judge evidence to the output digest and judge identity before its
+  deterministic scorer runs. Missing capabilities, unavailable output, failed
+  cleanup, judge failure, malformed evidence, and identity mismatches block.
+  The host owns credentials, transport, and judge-result persistence; the SDK
+  does not verify content behind a logical evidence reference. A supplied-text
+  provider remains controlled offline proof even through this API.
 - **Runtime-lock planning:** `RuntimeLock` (`runtime-lock/v1`) describes
   candidate-bound intended state for a logical user or project target. Each
   entry binds package and candidate identity, version, package digest, registry

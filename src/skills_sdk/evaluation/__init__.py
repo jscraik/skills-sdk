@@ -6,11 +6,14 @@ from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
 __all__ = [
     "ScenarioQualityPolicy",
     "SelectedCaseDefinition",
+    "SelectedCaseJudgeAdapter",
+    "SelectedCaseJudgeInput",
     "SuppliedTextProviderAdapter",
     "assess_scenario_quality",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_selected_case",
+    "execute_selected_case_with_judge",
     "load_selected_case",
 ]
 
@@ -23,6 +26,22 @@ def __getattr__(name: str) -> object:
         return {
             "ScenarioQualityPolicy": ScenarioQualityPolicy,
             "assess_scenario_quality": assess_scenario_quality,
+        }[name]
+    if name in {
+        "SelectedCaseJudgeAdapter",
+        "SelectedCaseJudgeInput",
+        "execute_selected_case_with_judge",
+    }:
+        from skills_sdk.evaluation.live_selected_case import (
+            SelectedCaseJudgeAdapter,
+            SelectedCaseJudgeInput,
+            execute_selected_case_with_judge,
+        )
+
+        return {
+            "SelectedCaseJudgeAdapter": SelectedCaseJudgeAdapter,
+            "SelectedCaseJudgeInput": SelectedCaseJudgeInput,
+            "execute_selected_case_with_judge": execute_selected_case_with_judge,
         }[name]
     if name in {
         "SelectedCaseDefinition",
