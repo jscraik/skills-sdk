@@ -277,7 +277,8 @@ source inspection or fixture evidence; do not claim executed parity.
 
 Local SDK proof, downstream consumer cutover, and Agent-Skills retirement
 remain separate outcomes. Required schema and compatibility checks still
-apply through the repository validation wrapper.
+apply. Run `bash scripts/validate-repository.sh` and record `pass`, `fail`, or
+`blocked`; for `blocked`, record the concrete blocker and nearest fallback.
 
 ## Separate evidence lanes
 
