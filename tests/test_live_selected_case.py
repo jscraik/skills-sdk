@@ -20,6 +20,7 @@ from skills_sdk.evaluation import (
     execute_selected_case_with_judge,
     load_selected_case,
 )
+from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
@@ -223,6 +224,30 @@ def test_judge_capability_access_failure_blocks_before_provider(tmp_path: Path, 
     assert events == []
 
 
+@pytest.mark.parametrize("stateful_hook", ["judge", "cleanup"])
+def test_judge_hooks_are_bound_once_before_provider(tmp_path: Path, stateful_hook: str) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _SingleReadJudge(_Judge):
+        reads = 0
+
+        def __getattribute__(self, name: str) -> object:
+            if name == stateful_hook:
+                reads = object.__getattribute__(self, "reads") + 1
+                object.__setattr__(self, "reads", reads)
+                if reads > 1:
+                    raise RuntimeError("host hook changed after preflight")
+            return object.__getattribute__(self, name)
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _Provider(request, events), _SingleReadJudge(request.provider, events)
+        )
+    )
+    assert receipt.status == "pass"
+    assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
 def test_forged_judge_limits_block_before_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     definition, payload, request, events = _setup(tmp_path)
     forged = replace(live_selected_case.DEFAULT_PROVIDER_CALL_LIMITS)
@@ -409,6 +434,54 @@ def test_judge_timeout_blocks_and_cleans_up(tmp_path: Path, monkeypatch: pytest.
     )
     assert receipt.status == "blocked"
     assert events == ["provider", "provider_cleanup", "judge_cleanup"]
+
+
+def test_judge_timeout_does_not_wait_for_uncooperative_cancellation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+    release = asyncio.Event()
+    cancelled = asyncio.Event()
+    finished = asyncio.Event()
+    monkeypatch.setattr(
+        live_selected_case,
+        "DEFAULT_PROVIDER_CALL_LIMITS",
+        replace(live_selected_case.DEFAULT_PROVIDER_CALL_LIMITS, overall_seconds=0.01),
+    )
+
+    class _UncooperativeJudge(_Judge):
+        async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
+            self.events.append("judge")
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                await release.wait()
+                finished.set()
+                return await super().judge(inputs)
+
+    async def run() -> tuple[EvaluationReceiptV2, bool, bool]:
+        task = asyncio.create_task(
+            execute_selected_case_with_judge(
+                definition, request, payload, _Provider(request, events), _UncooperativeJudge(request.provider, events)
+            )
+        )
+        try:
+            receipt = await asyncio.wait_for(task, timeout=0.5)
+            return receipt, not finished.is_set(), "judge_cleanup" in events
+        finally:
+            release.set()
+            await asyncio.sleep(0)
+
+    receipt, hook_live_at_return, cleanup_started_while_live = asyncio.run(run())
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_timeout"
+    assert cancelled.is_set()
+    assert hook_live_at_return
+    assert cleanup_started_while_live
+    assert events[:3] == ["provider", "provider_cleanup", "judge"]
+    assert "judge_cleanup" in events
 
 
 def test_mode_mismatch_rejects_before_host_execution(tmp_path: Path) -> None:

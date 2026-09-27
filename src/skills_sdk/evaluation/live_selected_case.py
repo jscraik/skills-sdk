@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import inspect
 from asyncio import CancelledError, gather
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
-from typing import Protocol
+from typing import Protocol, cast
 
 from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
@@ -58,6 +60,13 @@ class SelectedCaseJudgeAdapter(Protocol):
     async def cleanup(self) -> None: ...
 
 
+@dataclass(frozen=True, slots=True)
+class _JudgeBindings:
+    identity: ProviderIdentityV2
+    judge: Callable[[SelectedCaseJudgeInput], Awaitable[object]]
+    cleanup: Callable[[], Awaitable[None]]
+
+
 def _blocked(definition: SelectedCaseDefinition, request: ProviderExecutionRequest, code: str) -> EvaluationReceiptV2:
     observation = _blocked_observation(definition, request, code, f"selected-case {code}")
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
@@ -70,15 +79,17 @@ def _request_matches_snapshot(request: ProviderExecutionRequest, snapshot: dict[
         return False
 
 
-def _judge_identity(judge: SelectedCaseJudgeAdapter | None) -> ProviderIdentityV2 | None:
+def _judge_bindings(judge: SelectedCaseJudgeAdapter | None) -> _JudgeBindings | None:
     if judge is None:
         return None
     try:
         identity = ProviderIdentityV2.model_validate(judge.identity.model_dump(mode="json"))
-        if not inspect.iscoroutinefunction(judge.judge) or not inspect.iscoroutinefunction(judge.cleanup):
+        raw_judge = judge.judge
+        raw_cleanup = judge.cleanup
+        if not inspect.iscoroutinefunction(raw_judge) or not inspect.iscoroutinefunction(raw_cleanup):
             return None
-        inspect.signature(judge.judge).bind(None)
-        inspect.signature(judge.cleanup).bind()
+        inspect.signature(raw_judge).bind(None)
+        inspect.signature(raw_cleanup).bind()
         fields = (
             identity.provider_id,
             identity.model_id,
@@ -86,13 +97,44 @@ def _judge_identity(judge: SelectedCaseJudgeAdapter | None) -> ProviderIdentityV
             identity.adapter_id,
             identity.adapter_version_or_digest,
         )
-        return identity if all(_public_text_is_redaction_safe(value) for value in fields) else None
+        if not all(_public_text_is_redaction_safe(value) for value in fields):
+            return None
+        return _JudgeBindings(
+            identity=identity,
+            judge=cast(Callable[[SelectedCaseJudgeInput], Awaitable[object]], raw_judge),
+            cleanup=cast(Callable[[], Awaitable[None]], raw_cleanup),
+        )
     except (AttributeError, TypeError, ValueError, RuntimeError, ValidationError, PydanticSerializationError):
         return None
 
 
+def _consume_detached_judge_result(task: asyncio.Task[object]) -> None:
+    if task.cancelled():
+        return
+    try:
+        task.exception()
+    except CancelledError:
+        return
+
+
+async def _bounded_judge_wait(awaitable: Awaitable[object], seconds: float) -> object:
+    """Return at the deadline even when a host hook ignores cancellation."""
+    waiter = asyncio.create_task(DEFAULT_PROVIDER_CALL_CLOCK.wait_for(awaitable, seconds))
+    try:
+        done, _pending = await asyncio.wait({waiter}, timeout=seconds)
+        if waiter in done:
+            return waiter.result()
+        waiter.cancel()
+        waiter.add_done_callback(_consume_detached_judge_result)
+        raise TimeoutError
+    except CancelledError:
+        waiter.cancel()
+        waiter.add_done_callback(_consume_detached_judge_result)
+        raise
+
+
 async def _judge_once(
-    judge: SelectedCaseJudgeAdapter,
+    judge: _JudgeBindings,
     definition: SelectedCaseDefinition,
     request: ProviderExecutionRequest,
     output_text: str,
@@ -111,7 +153,7 @@ async def _judge_once(
     try:
         observed = (
             await gather(
-                DEFAULT_PROVIDER_CALL_CLOCK.wait_for(judge.judge(inputs), limits.overall_seconds),
+                _bounded_judge_wait(judge.judge(inputs), limits.overall_seconds),
                 return_exceptions=True,
             )
         )[0]
@@ -126,7 +168,7 @@ async def _judge_once(
     finally:
         cleanup_result = (
             await gather(
-                DEFAULT_PROVIDER_CALL_CLOCK.wait_for(judge.cleanup(), limits.cleanup_seconds),
+                _bounded_judge_wait(judge.cleanup(), limits.cleanup_seconds),
                 return_exceptions=True,
             )
         )[0]
@@ -168,8 +210,8 @@ async def execute_selected_case_with_judge(
         return _blocked(definition, request, "provider_request_blocked")
     if adapter is None:
         return _blocked(definition, request, "provider_adapter_required")
-    judge_identity = _judge_identity(judge)
-    if judge_identity is None or judge is None:
+    judge_bindings = _judge_bindings(judge)
+    if judge_bindings is None:
         return _blocked(definition, request, "judge_adapter_required")
     try:
         judge_limits = replace(DEFAULT_PROVIDER_CALL_LIMITS)
@@ -198,7 +240,7 @@ async def execute_selected_case_with_judge(
     if any(not _public_text_is_redaction_safe(ref) for ref in refs):
         return _blocked(definition, stable_request, "private_provider_evidence_ref")
     judge_request = ProviderExecutionRequest.model_validate(request_payload)
-    raw_evidence, failure = await _judge_once(judge, definition, judge_request, output, digest, judge_limits)
+    raw_evidence, failure = await _judge_once(judge_bindings, definition, judge_request, output, digest, judge_limits)
     if not _request_matches_snapshot(request, request_payload) or not _request_matches_snapshot(
         judge_request, request_payload
     ):
@@ -209,7 +251,7 @@ async def execute_selected_case_with_judge(
         evidence = _validated_judge_artifact(raw_evidence)
     except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
         return _blocked(definition, stable_request, "invalid_judge_evidence")
-    if evidence.judge != judge_identity:
+    if evidence.judge != judge_bindings.identity:
         return _blocked(definition, stable_request, "judge_identity_mismatch")
     observation = _validated_observation(definition, stable_request, evidence, output, digest, refs)
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
