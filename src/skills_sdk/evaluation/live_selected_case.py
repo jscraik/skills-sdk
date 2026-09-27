@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
+import re
 from asyncio import CancelledError, gather
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
@@ -75,6 +76,8 @@ def _blocked(
     *,
     runner: ProviderIdentityV2 | None = None,
 ) -> EvaluationReceiptV2:
+    if type(code) is not str or re.fullmatch(r"[a-z0-9_]+", code) is None or not _public_text_is_redaction_safe(code):
+        code = "invalid_provider_error_code"
     observation = _blocked_observation(definition, request, code, f"selected-case {code}", evidence_refs, runner=runner)
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 
@@ -212,7 +215,16 @@ async def execute_selected_case_with_judge(
     judge: SelectedCaseJudgeAdapter | None,
 ) -> EvaluationReceiptV2:
     """Execute one provider call, then judge its actual output before scoring."""
-    definition = _revalidate_definition(definition)
+
+    async def revalidate_definition() -> SelectedCaseDefinition:
+        return _revalidate_definition(definition)
+
+    observed_definition = (await gather(revalidate_definition(), return_exceptions=True))[0]
+    if isinstance(observed_definition, BaseException):
+        raise ContractError(
+            "invalid_selected_case_definition", "selected-case definition failed revalidation"
+        ) from None
+    definition = observed_definition
 
     async def revalidate_request() -> ProviderExecutionRequest:
         return ProviderExecutionRequest.model_validate(request)
