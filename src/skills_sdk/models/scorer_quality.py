@@ -58,7 +58,7 @@ class ScorerCalibrationAppliedPolicy(_ContractModel):
 
 class ScorerJudgeParameters(_ContractModel):
     model: NonEmptyText
-    temperature: float
+    temperature: float = Field(allow_inf_nan=False)
     trial_count: int = Field(ge=1)
 
 

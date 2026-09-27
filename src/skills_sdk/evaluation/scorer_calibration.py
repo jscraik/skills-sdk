@@ -40,6 +40,7 @@ _MANIFEST_FIELDS = {
     "raw_artifacts_dir",
     *_LIMITS,
 }
+_PARAMETER_FIELDS = {"model", "temperature", "trial_count"}
 
 
 def _finding(code: str, message: str, path: str = _MANIFEST) -> ScenarioQualityFinding:
@@ -103,6 +104,12 @@ def _manifest_findings(manifest: Mapping[str, object]) -> list[ScenarioQualityFi
     if threshold is None or not 0 < threshold <= 1:
         findings.append(_finding("threshold_valid", "threshold must be a number in (0, 1]"))
     parameters = manifest.get("parameters")
+    if isinstance(parameters, Mapping) and set(parameters) != _PARAMETER_FIELDS:
+        findings.append(
+            _finding(
+                "judge_parameters_fields", "judge parameters must contain exactly model, temperature, and trial_count"
+            )
+        )
     if (
         not isinstance(parameters, Mapping)
         or not _text(parameters.get("model"))
@@ -285,7 +292,7 @@ def _applied_policy(manifest: Mapping[str, object]) -> ScorerCalibrationAppliedP
 
 def _parameters(manifest: Mapping[str, object]) -> ScorerJudgeParameters | None:
     raw = manifest.get("parameters")
-    if not isinstance(raw, Mapping):
+    if not isinstance(raw, Mapping) or set(raw) != _PARAMETER_FIELDS:
         return None
     model = raw.get("model")
     temperature = _number(raw.get("temperature"))

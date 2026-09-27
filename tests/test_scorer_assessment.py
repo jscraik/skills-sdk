@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
-from skills_sdk.models.scorer_quality import ScorerCalibrationReceipt, ScorerQualityReceipt
+from skills_sdk.models.scorer_quality import ScorerCalibrationReceipt, ScorerJudgeParameters, ScorerQualityReceipt
 from skills_sdk.validation import validate_skill_package
 
 _PROBES = (
@@ -378,6 +378,30 @@ def test_unknown_manifest_policy_field_blocks(tmp_path: Path) -> None:
     blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
     assert blocked.status == "blocked"
     assert "unknown_calibration_bundle_field" in _codes(blocked)
+
+
+def test_unknown_nested_judge_parameter_blocks_then_recovers(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    manifest_path = package / "references" / "scorer-calibration" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["parameters"]["temperatur"] = 0.5
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "judge_parameters_fields" in _codes(blocked)
+    del manifest["parameters"]["temperatur"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    recovered = assess_scorer_calibration(package, source_revision=_REVISION_2)
+    assert recovered.status == "pass"
+    assert recovered.parameters is not None and recovered.parameters.temperature == 0
+
+
+@pytest.mark.parametrize("temperature", [float("nan"), float("inf"), float("-inf")])
+def test_public_judge_parameters_reject_nonfinite_temperature(temperature: float) -> None:
+    with pytest.raises(ValidationError):
+        ScorerJudgeParameters(model="local-fixture", temperature=temperature, trial_count=1)
+    accepted = ScorerJudgeParameters(model="local-fixture", temperature=0, trial_count=1)
+    assert ScorerJudgeParameters.model_validate_json(accepted.model_dump_json()) == accepted
 
 
 def test_package_validation_evidence_refs_are_preserved(tmp_path: Path) -> None:
