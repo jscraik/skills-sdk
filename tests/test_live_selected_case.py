@@ -357,6 +357,29 @@ def test_provider_failure_never_invokes_judge(tmp_path: Path) -> None:
         )
     )
     assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "rate_limited"
+    assert receipt.case_results[0].blocker.evidence_refs == ("provider/rate-limit.json",)
+    assert events == ["provider", "provider_cleanup"]
+
+
+def test_provider_failure_survives_cleanup_failure(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _DoubleFailureProvider(_FailedProvider):
+        async def cleanup(self) -> None:
+            self.events.append("provider_cleanup")
+            raise RuntimeError("private cleanup failure")
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _DoubleFailureProvider(request, events), _Judge(request.provider, events)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "rate_limited"
+    assert receipt.case_results[0].blocker.evidence_refs == ("provider/rate-limit.json",)
     assert events == ["provider", "provider_cleanup"]
 
 
@@ -439,6 +462,56 @@ def test_judge_cleanup_failure_blocks(tmp_path: Path) -> None:
     )
     assert receipt.status == "blocked"
     assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
+@pytest.mark.parametrize("cancelled_hook", ["judge", "cleanup"])
+def test_hook_origin_cancellation_is_a_typed_failure(tmp_path: Path, cancelled_hook: str) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _CancelledJudge(_Judge):
+        async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
+            if cancelled_hook == "judge":
+                self.events.append("judge")
+                raise asyncio.CancelledError
+            return await super().judge(inputs)
+
+        async def cleanup(self) -> None:
+            self.events.append("judge_cleanup")
+            if cancelled_hook == "cleanup":
+                raise asyncio.CancelledError
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _Provider(request, events), _CancelledJudge(request.provider, events)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    expected = "judge_execution_failed" if cancelled_hook == "judge" else "judge_cleanup_failed"
+    assert receipt.case_results[0].blocker.code == expected
+    assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
+def test_cleanup_origin_cancellation_does_not_hide_judge_failure(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _DoubleFailureJudge(_Judge):
+        async def cleanup(self) -> None:
+            self.events.append("judge_cleanup")
+            raise asyncio.CancelledError
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition,
+            request,
+            payload,
+            _Provider(request, events),
+            _DoubleFailureJudge(request.provider, events, failure=True),
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_execution_failed"
 
 
 def test_judge_timeout_blocks_and_cleans_up(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

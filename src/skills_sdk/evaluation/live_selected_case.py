@@ -173,8 +173,8 @@ async def _judge_once(
             )
         )[0]
         if isinstance(observed, CancelledError):
-            raise observed
-        if isinstance(observed, TimeoutError):
+            failure = "judge_execution_failed"
+        elif isinstance(observed, TimeoutError):
             failure = "judge_timeout"
         elif isinstance(observed, BaseException):
             failure = "judge_execution_failed"
@@ -187,9 +187,9 @@ async def _judge_once(
                 return_exceptions=True,
             )
         )[0]
-        if isinstance(cleanup_result, CancelledError):
-            raise cleanup_result
-        if failure is None and isinstance(cleanup_result, TimeoutError):
+        if failure is None and isinstance(cleanup_result, CancelledError):
+            failure = "judge_cleanup_failed"
+        elif failure is None and isinstance(cleanup_result, TimeoutError):
             failure = "judge_cleanup_timeout"
         elif failure is None and (isinstance(cleanup_result, BaseException) or cleanup_result is not None):
             failure = "judge_cleanup_failed"
@@ -246,14 +246,19 @@ async def execute_selected_case_with_judge(
         return _blocked(definition, stable_request, exc.code)
     if not _request_matches_snapshot(request, request_payload):
         return _blocked(definition, stable_request, "selected_case_request_mutated")
+    failure = outcome.public_result.execution.blocker or outcome.public_result.execution.error
     if not outcome.public_result.cleanup_succeeded:
+        if failure is not None:
+            return _blocked(definition, stable_request, failure.code, failure.evidence_refs)
         return _blocked(definition, stable_request, "provider_cleanup_failed")
     output = outcome.complete_text
     digest = outcome.public_result.output_sha256
     if output is None or digest is None:
-        failure = outcome.public_result.execution.blocker or outcome.public_result.execution.error
         return _blocked(
-            definition, stable_request, failure.code if failure is not None else "provider_output_unavailable"
+            definition,
+            stable_request,
+            failure.code if failure is not None else "provider_output_unavailable",
+            failure.evidence_refs if failure is not None else (),
         )
     if hashlib.sha256(output.encode("utf-8")).hexdigest() != digest:
         return _blocked(definition, stable_request, "invalid_provider_output")
