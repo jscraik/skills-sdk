@@ -20,6 +20,7 @@ from skills_sdk.evaluation.quality import _capture_evals, _ClosedLoader
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2, ScenarioObservationV2, ScenarioSetV2
 from skills_sdk.models.packaging import PackageManifestFile, PackageReceiptBlocker
+from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, _identity_is_public
 from skills_sdk.models.safety import _public_text_is_redaction_safe
@@ -348,6 +349,8 @@ def _blocked_observation(
     code: str,
     message: str,
     evidence_refs: tuple[str, ...] = (),
+    *,
+    runner: ProviderIdentityV2 | None = None,
 ) -> ScenarioObservationV2:
     """Build a candidate-bound blocked observation for one selected case."""
     if not _public_text_is_redaction_safe(code):
@@ -357,14 +360,15 @@ def _blocked_observation(
         code = "private_provider_evidence_ref"
         message = "provider evidence references contain credential-shaped values"
         evidence_refs = ()
+    bound_runner = runner if runner is not None else request.provider
     return ScenarioObservationV2(
         candidate=definition.scenario_set.candidate,
         scenario_set_id=definition.scenario_set.scenario_set_id,
         case_id=definition.scenario_set.cases[0].case_id,
         provider=request.provider,
         status="blocked",
-        runner_id=request.provider.adapter_id,
-        runner_version_or_digest=request.provider.adapter_version_or_digest,
+        runner_id=bound_runner.adapter_id,
+        runner_version_or_digest=bound_runner.adapter_version_or_digest,
         blocker=_blocker(code, message, evidence_refs),
     )
 
@@ -399,7 +403,12 @@ def _validated_observation(
     output_text = str.__str__(output_text)
     if hashlib.sha256(output_text.encode("utf-8")).hexdigest() != output_sha256:
         return _blocked_observation(
-            definition, request, "invalid_provider_output", "provider output digest does not bind canonical text"
+            definition,
+            request,
+            "invalid_provider_output",
+            "provider output digest does not bind canonical text",
+            provider_evidence_refs,
+            runner=supplied.judge,
         )
     case_id = definition.scenario_set.cases[0].case_id
     if (
@@ -415,6 +424,8 @@ def _validated_observation(
             request,
             "selected_case_identity_mismatch",
             "assertion evidence does not bind the executed output",
+            provider_evidence_refs,
+            runner=supplied.judge,
         )
     if not set(supplied.satisfied_assertion_ids) <= set(definition.semantic_signal_ids):
         return _blocked_observation(
@@ -422,13 +433,20 @@ def _validated_observation(
             request,
             "missing_semantic_evidence",
             "semantic assertions require bound evidence",
+            provider_evidence_refs,
+            runner=supplied.judge,
         )
     deterministic = _deterministic_signals(output_text, definition.deterministic_assertions)
     case = definition.scenario_set.cases[0]
     judge_result_ref = f"judge-results/{supplied.judge_result_sha256}"
     if judge_result_ref not in supplied.evidence_refs:
         return _blocked_observation(
-            definition, request, "judge_result_ref_required", "judge result reference must be supplied by the host"
+            definition,
+            request,
+            "judge_result_ref_required",
+            "judge result reference must be supplied by the host",
+            provider_evidence_refs,
+            runner=supplied.judge,
         )
     evidence_refs = tuple(dict.fromkeys((*provider_evidence_refs, *supplied.evidence_refs)))
     return ScenarioObservationV2(
@@ -502,6 +520,14 @@ def _plain_input_containers(value: object, *, depth: int, active: set[int], rema
     if not isinstance(value, (list, dict)):
         if value is not None and not isinstance(value, (bool, int, float, str)):
             raise _contract_error("invalid_provider_input", "provider input must contain only JSON-compatible values")
+        if isinstance(value, str):
+            return str.__str__(value)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return int.__int__(value)
+        if isinstance(value, float):
+            return float.__float__(value)
         return value
     identity = id(value)
     if identity in active:
@@ -510,7 +536,11 @@ def _plain_input_containers(value: object, *, depth: int, active: set[int], rema
     try:
         if isinstance(value, dict):
             items = dict.items(value)
-            ordered = sorted(items) if all(isinstance(key, str) for key in dict.__iter__(value)) else items
+            if any(not isinstance(key, str) for key in dict.__iter__(value)):
+                raise _contract_error("invalid_provider_input", "provider input must contain only string keys")
+            ordered = sorted(((str.__str__(key), item) for key, item in items), key=lambda pair: pair[0])
+            if len({key for key, _item in ordered}) != len(ordered):
+                raise _contract_error("invalid_provider_input", "provider input contains duplicate canonical keys")
             return {
                 key: _plain_input_containers(item, depth=depth + 1, active=active, remaining=remaining)
                 for key, item in ordered
