@@ -25,10 +25,15 @@ Before a commit or pull request, run `bash scripts/validate-repository.sh`;
 it already includes the codestyle check. Repeat or broaden checks only after a
 relevant change, failure, or unresolved concern.
 
-The `inventory --help` route is the first detailed contract route. Commands
-that prepare, publish, install, or activate a candidate remain separate
-evidence lanes; `tessl prepare` does not publish and `project` does not prove
-runtime behavior.
+The `inventory --help` route is the first detailed contract route. The SDK's
+target workflow owns agent-facing creation, update, checking, external intake,
+and installation orchestration, but this help route does not make those stages
+executable. Use [CLI command status](cli.md) to distinguish implemented routes
+from discovery-only names. Commands that prepare, publish, install, or activate
+a candidate remain separate evidence lanes; `tessl prepare` does not publish
+and `project` does not prove runtime behavior. Foundry holding is not SDK
+clearance. Verified OpenAI-provided plugins and OpenAI system skills remain on
+their provider-managed paths rather than this managed installation route.
 
 The standards and tool-pin contract is documented in
 [`CODESTYLE.md`](../CODESTYLE.md) and [`docs/standards.md`](standards.md).

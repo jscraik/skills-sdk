@@ -8,15 +8,24 @@ Skills SDK is the public, portable contract library and local tooling surface
 for Agent Skills. It currently implements package intake, validation, and build routes
 plus versioned security, evaluation, receipt, provider, distribution, and
 lifecycle contracts described in the repository documentation. It is the
-canonical destination for authoring and handoff tooling, but those executable
-routes remain incomplete and must not be assumed from the destination policy.
-It is not a package Foundry, runtime installer, provider client, distribution
-registry, or publication service.
+canonical owner of the agent-facing `SKILL.md`, references, and evaluation
+workflow for creating, updating, checking, and admitting external packages,
+then installing selected checked versions through supported registry and host
+adapters. Those executable routes remain incomplete and must not be assumed
+from ownership policy. The SDK does not hold candidate source as Foundry does,
+operate the Tessl registry, or claim an installed runtime from local receipts.
 
 ## Scope and boundaries
 
-- Keep the core independent of Agent-Skills, Tessl, Codex, and local runtime
-  filesystem layouts; integrations own explicit provider or host adapters.
+- Keep the reusable core independent of Agent-Skills, Tessl, Codex, and local
+  runtime filesystem layouts. SDK-owned integration layers orchestrate supported
+  provider, Tessl, and Codex adapters without importing them into the core.
+- Foundry holds candidates awaiting SDK processing; holding is not approval or
+  distribution and need not be permanent custody after processing. Managed,
+  non-exempt runtime copies come from SDK-checked private Tessl versions, not
+  directly from Foundry or Agent-Skills. Public release requires Jamie's
+  specific decision. Verify OpenAI-provided plugin and system-skill origin before
+  treating their provider-managed routes as exempt; preserve those routes.
 - Keep source, validation, runtime, provider, distribution, and publication
   evidence in separate lanes. Local contract proof does not establish hosted,
   installed, or published behavior.

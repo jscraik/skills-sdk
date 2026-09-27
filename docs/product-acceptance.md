@@ -13,16 +13,26 @@ release, provider, runtime, registry, distribution, or consumer truth.
 
 ## Acceptance matrix
 
+The target owner is the SDK agent-facing `SKILL.md`, references, and evaluation
+workflow for complete skill and plugin creation, updates, checks, external
+intake, and selected installation through SDK-owned Tessl and Codex adapters.
+Foundry holds unprocessed candidates; it does not clear or distribute them.
+Checked versions must be verified private in Tessl `jscraik` before becoming
+managed installation sources, and only Jamie can choose public release.
+Origin-verified OpenAI-provided plugins and system skills remain provider-managed
+and exempt. These are acceptance targets, not claims that the operations exist
+today. The portable core stays independent of those integration clients.
+
 | ID | Required outcome | Current evidence | Status | Next closure condition |
 | --- | --- | --- | --- | --- |
 | SDK-1 | Exact-revision disposition of the full Agent-Skills SDK surface | No durable module, symbol, and production-caller matrix is stored here. | `not_verified` | Import the independently reviewed classification as an exact-revision SDK record and resolve every entry to one allowed owner. |
 | SDK-2 | Executable portable lifecycle engines | Intake, validation, package construction, deterministic scoring, safety evidence contracts, registry preparation, and runtime planning exist. Whole-report orchestration and other temporary candidates are missing and cannot be counted. | `in_progress` | Close every named engine with durable implementation, public interface, conformance, and recovery proof. |
 | SDK-3 | Provider protocol and reference adapter | The SDK-3.1 offline executor, typed complete-or-stream adapter protocol, credential boundary, public evidence, and local conformance are implemented and verified below. No packaged reference adapter or real-provider evidence exists. | `verified_local` | Select and prove a packaged reference adapter, then separately close authorized real-provider and hosted Ubuntu evidence. |
-| SDK-4 | Runtime host protocol and transactional lifecycle | Candidate-bound planning and evidence models exist without host apply, rollback, discovery, activation, uninstall, or retirement mechanisms. | `in_progress` | Implement adapter-driven transactional lifecycle and prove it against an isolated fake host before any selected real runtime. |
-| SDK-5 | Registry adapter interfaces and selected implementations | Immutable local preparation exists without registry interaction, upload, promotion, deprecation, or revocation. | `in_progress` | Select a registry adapter and close offline idempotency and lifecycle conformance before separately authorized external proof. |
-| SDK-6 | Executable CLI and composable orchestration | `validate` and `build` execute; other advertised lifecycle routes remain parse-only. | `in_progress` | Connect only implemented services and prove stable JSON, exit, failure, and recovery behavior for every advertised selected route. |
+| SDK-4 | Runtime host protocol and transactional lifecycle | Candidate-bound planning and evidence models exist without package install, host apply, rollback, discovery, activation, uninstall, or retirement mechanisms. Existing-copy maintenance is narrower than installation. | `in_progress` | Implement SDK-owned Codex host integration and prove selected Tessl-version identity, discovery, behavior, rejection, and recovery without changing provider-managed exemptions. |
+| SDK-5 | Registry adapter interfaces and selected implementations | Immutable local preparation exists without Tessl registry interaction, private-visibility readback, upload, promotion, deprecation, or revocation. | `in_progress` | Implement SDK-owned Tessl integration; prove exact checked version and private `jscraik` readback before installation, with public release only by Jamie's decision. |
+| SDK-6 | Executable CLI and composable orchestration | `intake`, `validate`, `build`, `eval scenario-quality`, and `eval selected-case` execute locally; other advertised lifecycle routes remain parse-only. No complete create/update/external-intake/check/install workflow is established. | `in_progress` | Connect the agent-facing `SKILL.md`, references, and evaluation route to executable SDK orchestration and prove stable JSON, exit, failure, recovery, and complete-package behavior. |
 | SDK-7 | Independent product operations | Pinned Python tooling, schemas, tests, CI, and reproducible local builds exist. Release, supported matrix, fuzzing, benchmarks, signed artifacts, documentation publication, and maintained examples remain incomplete. | `in_progress` | Record selected matrices and thresholds, then close release and maintenance evidence without relying on Agent-Skills. |
-| SDK-8 | Released external-consumer proof and retirement | No released SDK consumer proof or completed Agent-Skills portable fallback retirement is stored here. | `not_verified` | Prove a maintained destination against a released SDK and complete its accepted parity, rollback, and retirement record. |
+| SDK-8 | Released external-consumer proof and retirement | No released SDK consumer, checked private Tessl version, selected Codex runtime installation, or completed Agent-Skills fallback retirement is proved here. | `not_verified` | Prove maintained consumers and non-exempt installed versions against a released SDK, preserve verified OpenAI exemptions, and complete parity, rollback, and retirement evidence. |
 
 None of these rows is complete. The matrix is not a completion percentage and
 does not change Foundry source custody, package rights, host policy, provider
