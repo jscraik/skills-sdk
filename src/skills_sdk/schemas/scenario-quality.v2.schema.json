@@ -349,7 +349,8 @@
   "required": [
     "scope",
     "status",
-    "scenario_count"
+    "scenario_count",
+    "effective_policy"
   ],
   "title": "ScenarioQualityReceiptV2",
   "type": "object"

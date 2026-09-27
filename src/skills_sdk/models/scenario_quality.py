@@ -87,7 +87,7 @@ class ScenarioQualityReceipt(_ContractModel):
 
 class ScenarioQualityReceiptV2(ScenarioQualityReceipt):
     schema_version: Literal["scenario-quality/v2"] = "scenario-quality/v2"
-    effective_policy: ScenarioQualityAppliedPolicyV2 = Field(default_factory=ScenarioQualityAppliedPolicyV2)
+    effective_policy: ScenarioQualityAppliedPolicyV2
 
     @model_validator(mode="after")
     def passing_active_set_has_ten_cases(self) -> ScenarioQualityReceiptV2:

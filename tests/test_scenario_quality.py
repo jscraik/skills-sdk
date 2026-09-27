@@ -224,6 +224,11 @@ def test_v2_selects_exactly_ten_from_larger_yaml_history(tmp_path: Path) -> None
     with pytest.raises(ValidationError):
         quality_module.ScenarioQualityReceiptV2.model_validate(forged)
     assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v2")).iter_errors(forged))
+    missing_policy = result.model_dump(mode="json")
+    del missing_policy["effective_policy"]
+    with pytest.raises(ValidationError):
+        quality_module.ScenarioQualityReceiptV2.model_validate(missing_policy)
+    assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v2")).iter_errors(missing_policy))
     assert assess_scenario_quality(root, source_revision=REVISION, contract_version="v2").status == "blocked"
     assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="release").status == "blocked"
 
