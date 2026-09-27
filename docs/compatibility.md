@@ -291,3 +291,34 @@ apply. Run `bash scripts/validate-repository.sh` and record `pass`, `fail`, or
 The SDK's local contract and schema checks do not prove provider execution,
 runtime installation, Tessl publication, or installed behavior. Those lanes
 must bind the same candidate identity and report their own evidence.
+
+## Tessl to Codex native-plugin compatibility question
+
+The SDK does not yet claim that a Tessl plugin archive can carry a complete
+Codex-native plugin. Tessl's documented plugin manifest selects skills, rules,
+commands, MCP metadata, and hooks; OpenAI's native plugin also requires its
+manifest and any referenced assets and executable resources. These are separate
+package and host contracts, not interchangeable plugin identities.
+
+With Tessl CLI 0.111.0, a disposable plugin containing a valid
+`.tessl-plugin/plugin.json`, `.codex-plugin/plugin.json`, one skill and reference,
+`hooks/hooks.json` and its script, `.mcp.json` and its referenced script, and an
+asset passes `tessl plugin lint` and `tessl plugin pack`. Archive inspection
+shows the skill, reference, hook files, and `.mcp.json`, but omits the Codex
+manifest, asset, and MCP script. The MCP metadata can therefore survive while
+its executable resource does not. An exploratory `include` array in the Tessl
+manifest did not alter the archive, despite lint passing; it is not a supported
+inclusion contract. An out-of-package `skills: ../skills` path was rejected,
+and restoring the valid path recovered a passing pack with the same omissions.
+
+Compatibility question for Tessl: what documented manifest field or package
+layout includes *all* referenced native-plugin resources, including
+`.codex-plugin/plugin.json`, assets, and scripts outside skill directories, in
+the versioned archive without changing their contents, relative paths, or
+executable modes? If that is supported, which Codex integration installs the
+complete archive as one plugin rather than only materializing its skills, MCP
+configuration, and hooks? Until both questions have tested answers, a local
+Tessl pack, SDK receipt, or install plan must not be labelled native-plugin
+preservation, Codex discovery, private-registry installation, or execution
+proof. Do not move unrelated resources into a synthetic skill merely to make
+the archive appear complete.
