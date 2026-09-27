@@ -266,6 +266,26 @@ def test_duplicate_held_out_example_and_forged_pass_rejected(tmp_path: Path) -> 
     assert "duplicate_calibration_example" in _codes(blocked)
 
 
+def test_whitespace_equivalent_held_out_ids_block_then_recover(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    bundle = package / "references" / "scorer-calibration"
+    examples = bundle / "examples.jsonl"
+    rows = [json.loads(line) for line in examples.read_text(encoding="utf-8").splitlines()]
+    duplicate = {**rows[0], "id": f" {rows[0]['id']} ", "raw_artifact": "raw/other.json"}
+    raw = {key: duplicate[key] for key in ("id", "predicted_label", "score")}
+    raw["scorer_id"] = "synthetic-skill.release-scorer"
+    (bundle / "raw" / "other.json").write_text(json.dumps(raw), encoding="utf-8")
+    examples.write_text("\n".join(json.dumps(row) for row in [*rows, duplicate]) + "\n", encoding="utf-8")
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "duplicate_calibration_example" in _codes(blocked)
+    duplicate["id"] = "distinct"
+    raw["id"] = "distinct"
+    (bundle / "raw" / "other.json").write_text(json.dumps(raw), encoding="utf-8")
+    examples.write_text("\n".join(json.dumps(row) for row in [*rows, duplicate]) + "\n", encoding="utf-8")
+    assert assess_scorer_calibration(package, source_revision=_REVISION_2).status == "pass"
+
+
 def test_bundle_scorer_identity_must_match_candidate_declaration(tmp_path: Path) -> None:
     package = _package(tmp_path)
     manifest_path = package / "references" / "scorer-calibration" / "manifest.json"

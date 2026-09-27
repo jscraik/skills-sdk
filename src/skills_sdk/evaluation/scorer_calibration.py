@@ -200,7 +200,7 @@ def _metrics(matrix: ScorerCalibrationMetrics) -> ScorerCalibrationRates:
 
 
 def _duplicate_findings(rows: list[dict[str, object]], examples_path: str) -> list[ScenarioQualityFinding]:
-    identifiers = [row.get("id") for row in rows if _text(row.get("id"))]
+    identifiers = [value.strip() for row in rows if isinstance((value := row.get("id")), str) and value.strip()]
     raw_paths = [row.get("raw_artifact") for row in rows if _text(row.get("raw_artifact"))]
     if len(identifiers) != len(set(identifiers)) or len(raw_paths) != len(set(raw_paths)):
         return [
