@@ -168,7 +168,7 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
             )
         else:
             probe_types.add(probe_type)
-        if not _expected_outcome(case):
+        if not _expected_outcome(case, _number(metadata.get("pass_threshold"))):
             findings.append(
                 _finding("calibration_expected_outcomes", "each calibration case needs a typed expected outcome")
             )
@@ -186,7 +186,7 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
     return findings
 
 
-def _expected_outcome(case: Mapping[object, object]) -> bool:
+def _expected_outcome(case: Mapping[object, object], threshold: float | None) -> bool:
     score = case.get("expected_score")
     score_number = _number(score)
     label = case.get("expected_label")
@@ -197,13 +197,24 @@ def _expected_outcome(case: Mapping[object, object]) -> bool:
         return False
     if direction is not None and direction != "short_correct_wins":
         return False
+    if (
+        score_number is not None
+        and label is not None
+        and threshold is not None
+        and label != ("pass" if score_number >= threshold else "fail")
+    ):
+        return False
     return score is not None or label is not None or direction is not None
 
 
 def assess_scorer_quality(package_root: Path, *, source_revision: str) -> ScorerQualityReceipt:
     """Assess declarations without claiming the held-out calibration ran here."""
     validation = validate_skill_package(package_root, source_revision=source_revision)
-    findings = [_finding(item.code, item.message) for item in validation.findings if item.severity == "blocker"]
+    findings = [
+        ScenarioQualityFinding(code=item.code, message=item.message, evidence_refs=item.evidence_refs)
+        for item in validation.findings
+        if item.severity == "blocker"
+    ]
     metadata: Mapping[object, object] = {}
     if validation.status == "pass":
         try:

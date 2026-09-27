@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
 from skills_sdk.models.scorer_quality import ScorerCalibrationReceipt, ScorerQualityReceipt
+from skills_sdk.validation import validate_skill_package
 
 _PROBES = (
     "obvious_correct",
@@ -340,3 +341,57 @@ def test_duplicate_rows_do_not_reread_artifacts(tmp_path: Path, monkeypatch: pyt
     blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
     assert "duplicate_calibration_example" in _codes(blocked)
     assert not raw_reads
+
+
+def test_boolean_raw_score_blocks(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    raw_path = package / "references" / "scorer-calibration" / "raw" / "correct.json"
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    raw["score"] = True
+    raw_path.write_text(json.dumps(raw), encoding="utf-8")
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "raw_artifacts_match_examples" in _codes(blocked)
+
+
+def test_declared_expected_score_and_label_must_agree(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    import yaml
+
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    case = payload["scorer_quality"]["calibration_cases"][1]
+    case["expected_score"] = 0.95
+    case["expected_label"] = "fail"
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    blocked = assess_scorer_quality(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "calibration_expected_outcomes" in _codes(blocked)
+
+
+def test_unknown_manifest_policy_field_blocks(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    manifest_path = package / "references" / "scorer-calibration" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["minimum_true_positive"] = 20
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "unknown_calibration_bundle_field" in _codes(blocked)
+
+
+def test_package_validation_evidence_refs_are_preserved(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    assets = package / "assets"
+    assets.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside", encoding="utf-8")
+    (assets / "linked.txt").symlink_to(outside)
+    source = validate_skill_package(package, source_revision=_REVISION_1)
+    original = {(item.code, item.evidence_refs) for item in source.findings if item.severity == "blocker"}
+    assert original
+    for receipt in (
+        assess_scorer_quality(package, source_revision=_REVISION_1),
+        assess_scorer_calibration(package, source_revision=_REVISION_1),
+    ):
+        assert original <= {(item.code, item.evidence_refs) for item in receipt.findings}

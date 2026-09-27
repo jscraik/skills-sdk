@@ -28,6 +28,18 @@ _LIMITS = {
     "max_false_positives": (0, 0),
     "max_false_negatives": (0, 0),
 }
+_MANIFEST_FIELDS = {
+    "schema_version",
+    "scorer_id",
+    "scorer_version_or_digest",
+    "prompt_version",
+    "threshold",
+    "split",
+    "parameters",
+    "examples_path",
+    "raw_artifacts_dir",
+    *_LIMITS,
+}
 
 
 def _finding(code: str, message: str, path: str = _MANIFEST) -> ScenarioQualityFinding:
@@ -78,6 +90,8 @@ def _bundle_path(value: object, default: str) -> str:
 
 def _manifest_findings(manifest: Mapping[str, object]) -> list[ScenarioQualityFinding]:
     findings: list[ScenarioQualityFinding] = []
+    if set(manifest) - _MANIFEST_FIELDS:
+        findings.append(_finding("unknown_calibration_bundle_field", "calibration bundle has unsupported fields"))
     if manifest.get("schema_version") != "skills-sdk.scorer-calibration-bundle.v1":
         findings.append(_finding("calibration_bundle_schema_version", "unsupported calibration bundle schema"))
     if manifest.get("split") != "held_out":
@@ -219,8 +233,10 @@ def _artifact_findings(
                 _finding("raw_artifacts_present", f"raw artifact unavailable: {type(exc).__name__}", examples_path)
             )
             continue
-        if any((raw.get(field) != row.get(field)) for field in ("id", "predicted_label", "score")) or (
-            raw.get("scorer_id") != manifest.get("scorer_id")
+        if (
+            _number(raw.get("score")) is None
+            or any(raw.get(field) != row.get(field) for field in ("id", "predicted_label", "score"))
+            or (raw.get("scorer_id") != manifest.get("scorer_id"))
         ):
             findings.append(_finding("raw_artifacts_match_examples", "raw artifact does not match example", path))
     return findings
@@ -288,7 +304,11 @@ def _parameters(manifest: Mapping[str, object]) -> ScorerJudgeParameters | None:
 def assess_scorer_calibration(package_root: Path, *, source_revision: str) -> ScorerCalibrationReceipt:
     """Assess supplied held-out artifacts; this function never executes a judge."""
     validation = validate_skill_package(package_root, source_revision=source_revision)
-    findings = [_finding(item.code, item.message) for item in validation.findings if item.severity == "blocker"]
+    findings = [
+        ScenarioQualityFinding(code=item.code, message=item.message, evidence_refs=item.evidence_refs)
+        for item in validation.findings
+        if item.severity == "blocker"
+    ]
     manifest: dict[str, object] = {}
     rows: list[dict[str, object]] = []
     if validation.status == "pass":
