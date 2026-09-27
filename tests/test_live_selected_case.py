@@ -253,6 +253,31 @@ def test_judge_capability_access_failure_blocks_before_provider(
     assert events == []
 
 
+@pytest.mark.parametrize("unavailable_member", ["identity", "judge", "cleanup"])
+def test_judge_binding_origin_cancellation_blocks_before_provider(tmp_path: Path, unavailable_member: str) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _CancelledBindingJudge(_Judge):
+        def __getattribute__(self, name: str) -> object:
+            if name == unavailable_member:
+                raise asyncio.CancelledError
+            return object.__getattribute__(self, name)
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition,
+            request,
+            payload,
+            _Provider(request, events),
+            _CancelledBindingJudge(request.provider, events),
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_adapter_required"
+    assert events == []
+
+
 @pytest.mark.parametrize("stateful_hook", ["judge", "cleanup"])
 def test_judge_hooks_are_bound_once_before_provider(tmp_path: Path, stateful_hook: str) -> None:
     definition, payload, request, events = _setup(tmp_path)

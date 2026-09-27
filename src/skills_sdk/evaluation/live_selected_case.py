@@ -92,8 +92,6 @@ async def _judge_bindings(judge: SelectedCaseJudgeAdapter | None) -> _JudgeBindi
         return judge.identity, judge.judge, judge.cleanup
 
     observed = (await gather(read_members(), return_exceptions=True))[0]
-    if isinstance(observed, CancelledError):
-        raise observed
     if isinstance(observed, BaseException) or not isinstance(observed, tuple) or len(observed) != 3:
         return None
     raw_identity, raw_judge, raw_cleanup = observed
