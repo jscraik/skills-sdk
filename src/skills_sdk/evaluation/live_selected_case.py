@@ -67,8 +67,13 @@ class _JudgeBindings:
     cleanup: Callable[[], Awaitable[None]]
 
 
-def _blocked(definition: SelectedCaseDefinition, request: ProviderExecutionRequest, code: str) -> EvaluationReceiptV2:
-    observation = _blocked_observation(definition, request, code, f"selected-case {code}")
+def _blocked(
+    definition: SelectedCaseDefinition,
+    request: ProviderExecutionRequest,
+    code: str,
+    evidence_refs: tuple[str, ...] = (),
+) -> EvaluationReceiptV2:
+    observation = _blocked_observation(definition, request, code, f"selected-case {code}", evidence_refs)
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 
 
@@ -79,13 +84,23 @@ def _request_matches_snapshot(request: ProviderExecutionRequest, snapshot: dict[
         return False
 
 
-def _judge_bindings(judge: SelectedCaseJudgeAdapter | None) -> _JudgeBindings | None:
+async def _judge_bindings(judge: SelectedCaseJudgeAdapter | None) -> _JudgeBindings | None:
     if judge is None:
         return None
+
+    async def read_members() -> tuple[object, object, object]:
+        return judge.identity, judge.judge, judge.cleanup
+
+    observed = (await gather(read_members(), return_exceptions=True))[0]
+    if isinstance(observed, CancelledError):
+        raise observed
+    if isinstance(observed, BaseException) or not isinstance(observed, tuple) or len(observed) != 3:
+        return None
+    raw_identity, raw_judge, raw_cleanup = observed
     try:
-        identity = ProviderIdentityV2.model_validate(judge.identity.model_dump(mode="json"))
-        raw_judge = judge.judge
-        raw_cleanup = judge.cleanup
+        if not isinstance(raw_identity, ProviderIdentityV2):
+            return None
+        identity = ProviderIdentityV2.model_validate(raw_identity.model_dump(mode="json"))
         if not inspect.iscoroutinefunction(raw_judge) or not inspect.iscoroutinefunction(raw_cleanup):
             return None
         inspect.signature(raw_judge).bind(None)
@@ -207,10 +222,16 @@ async def execute_selected_case_with_judge(
     if not _request_matches_definition(definition, request, payload):
         return _blocked(definition, request, "selected_case_request_mismatch")
     if request.status != "prepared":
-        return _blocked(definition, request, "provider_request_blocked")
+        blocker = request.blocker
+        return _blocked(
+            definition,
+            request,
+            blocker.code if blocker is not None else "provider_request_blocked",
+            blocker.evidence_refs if blocker is not None else request.evidence_refs,
+        )
     if adapter is None:
         return _blocked(definition, request, "provider_adapter_required")
-    judge_bindings = _judge_bindings(judge)
+    judge_bindings = await _judge_bindings(judge)
     if judge_bindings is None:
         return _blocked(definition, request, "judge_adapter_required")
     try:

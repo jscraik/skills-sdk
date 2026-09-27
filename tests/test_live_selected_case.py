@@ -23,7 +23,7 @@ from skills_sdk.evaluation import (
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
-from skills_sdk.models.provider_execution import ProviderExecutionRequest
+from skills_sdk.models.provider_execution import ProviderExecutionBlocker, ProviderExecutionRequest
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.providers import ProviderAdapterComplete, ProviderAdapterFailure
 
@@ -112,6 +112,32 @@ def test_request_mismatch_blocks_before_dispatch(tmp_path: Path) -> None:
     assert events == []
 
 
+def test_blocked_request_preserves_original_reason_and_refs(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+    blocked_request = request.model_copy(
+        update={
+            "status": "blocked",
+            "blocker": ProviderExecutionBlocker(
+                code="safety_unavailable", category="safety", evidence_refs=("safety/decision.json",)
+            ),
+        }
+    )
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition,
+            blocked_request,
+            payload,
+            _Provider(request, events),
+            _Judge(request.provider, events),
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "safety_unavailable"
+    assert receipt.case_results[0].blocker.evidence_refs == ("safety/decision.json",)
+    assert events == []
+
+
 def test_forged_private_provider_identity_rejects_before_dispatch(tmp_path: Path) -> None:
     definition, payload, request, events = _setup(tmp_path)
     provider = _Provider(request, events)
@@ -192,13 +218,16 @@ def test_invalid_judge_signature_blocks_before_provider(tmp_path: Path, invalid_
 
 
 @pytest.mark.parametrize("unavailable_member", ["identity", "judge", "cleanup"])
-def test_judge_capability_access_failure_blocks_before_provider(tmp_path: Path, unavailable_member: str) -> None:
+@pytest.mark.parametrize("failure_type", [RuntimeError, OSError, KeyError])
+def test_judge_capability_access_failure_blocks_before_provider(
+    tmp_path: Path, unavailable_member: str, failure_type: type[Exception]
+) -> None:
     definition, payload, request, events = _setup(tmp_path)
 
     class _UnavailableJudge:
         def __getattribute__(self, name: str) -> object:
             if name == unavailable_member:
-                raise RuntimeError("private unavailable configuration")
+                raise failure_type("private unavailable configuration")
             return object.__getattribute__(self, name)
 
         identity = request.provider
