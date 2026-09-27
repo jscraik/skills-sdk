@@ -412,10 +412,13 @@ def _release_sets(
             item.get("target_scenarios"),
             item.get("maximum_scenarios"),
         )
-        selected_active = active_v2 and item.get("id") == selected_set_id
-        allowed_budgets = (
-            {(10, 10, 10)} if selected_active else {(5, 8, 10), (10, 10, 10)} if active_v2 else {(5, 8, 10)}
-        )
+        selected = item.get("id") == selected_set_id
+        if selected:
+            allowed_budgets = {(10, 10, 10)} if active_v2 else {(5, 8, 10)}
+            expected_budget = "10/10/10" if active_v2 else "5/8/10"
+        else:
+            allowed_budgets = {(5, 8, 10), (10, 10, 10)}
+            expected_budget = "5/8/10 or 10/10/10"
         if (
             any(isinstance(value, bool) or not isinstance(value, int) for value in declared_budget)
             or declared_budget not in allowed_budgets
@@ -424,7 +427,7 @@ def _release_sets(
                 _finding(
                     "invalid_scenario_set",
                     "release scenario set budget must declare integer minimum/target/maximum values of "
-                    + ("10/10/10" if selected_active else "5/8/10 or 10/10/10" if active_v2 else "5/8/10"),
+                    + expected_budget,
                 )
             )
             continue

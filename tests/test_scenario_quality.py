@@ -194,6 +194,37 @@ def test_release_selector_accepts_canonical_flat_cases_shape(tmp_path: Path) -> 
     assert result.status == "pass"
 
 
+@pytest.mark.parametrize(
+    ("scenario_set_id", "expected_status"), [(None, "pass"), ("historical", "pass"), ("release", "blocked")]
+)
+def test_v1_budget_is_scoped_to_selected_set(tmp_path: Path, scenario_set_id: str | None, expected_status: str) -> None:
+    cases = [_case(f"case-{index}") for index in range(10)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [
+            _release_set([case["id"] for case in cases[:8]], set_id="historical"),
+            _release_set([case["id"] for case in cases], budget=(10, 10, 10)),
+        ],
+        "cases": cases,
+    }
+
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload), source_revision=REVISION, scenario_set_id=scenario_set_id
+    )
+
+    assert result.status == expected_status
+    if expected_status == "blocked":
+        assert any(
+            finding.code == "invalid_scenario_set" and finding.message.endswith("5/8/10") for finding in result.findings
+        )
+    else:
+        assert result.scenario_count == (8 if scenario_set_id else 10)
+        SchemaRegistry().validate("scenario-quality.v1", result.model_dump(mode="json"))
+
+
 def test_v2_selects_exactly_ten_from_larger_yaml_history(tmp_path: Path) -> None:
     cases = [_case(f"case-{index}") for index in range(12)]
     cases[8]["category"] = "pressure"
