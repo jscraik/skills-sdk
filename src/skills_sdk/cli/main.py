@@ -143,6 +143,7 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("package_root", type=Path)
     quality.add_argument("--source-revision")
     quality.add_argument("--scenario-set")
+    quality.add_argument("--contract-version", choices=("v1", "v2"), default="v1")
     quality.add_argument("--json", action="store_true", dest="json_output")
     quality.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     selected = evaluation_commands.add_parser(
@@ -356,6 +357,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             arguments.package_root,
             source_revision=arguments.source_revision or "",
             scenario_set_id=arguments.scenario_set,
+            contract_version=arguments.contract_version,
         )
         _print_result("scenario-quality", quality_result, json_output=arguments.json_output)
         return 0 if quality_result.status == "pass" else 2

@@ -2,7 +2,8 @@
 
 `assess_scenario_quality` and `skills-sdk eval scenario-quality` inspect one
 standalone package's `references/evals.yaml`. They produce deterministic
-`scenario-quality/v1` evidence without running a scenario, calling a provider,
+`scenario-quality/v1` or explicitly selected `scenario-quality/v2` evidence
+without running a scenario, calling a provider,
 reading a host registry, promoting artifacts, or mutating the package. Passing
 receipts are candidate-bound; early validation blockers may retain
 `candidate: null` when identity cannot be resolved.
@@ -46,6 +47,23 @@ characterized source. Changing them requires a new schema version and
 compatibility evidence. Every receipt records the minimum, target, maximum,
 and observed category counts so model and schema consumers can reproduce the
 decision.
+
+For the managed ten-active-scenario workflow, pass `--contract-version v2`
+and an explicit `--scenario-set`. The selected set must declare a 10/10/10
+minimum/target/maximum budget and name exactly ten unique cases in `cases` or
+`groups`; it still needs pressure-or-regression and negative-or-edge coverage.
+Other cases in `references/evals.yaml` remain historical definitions, not
+active cases. Markdown fixtures under `references/evals/` are not imported or
+activated automatically. A missing selector, duplicate ID, unknown ID, or
+non-ten population blocks with a `scenario-quality/v2` result. Correct the
+package definition and rerun against its new candidate digest; this command
+does not rewrite the package or execute any case. Version 1 remains unchanged.
+
+```bash
+skills-sdk eval scenario-quality ./skills/example \
+  --source-revision "<40-lowercase-hex>" \
+  --scenario-set active-v2 --contract-version v2 --json --robot
+```
 
 ```bash
 skills-sdk eval scenario-quality ./skills/example \

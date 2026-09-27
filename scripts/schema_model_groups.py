@@ -37,7 +37,7 @@ from skills_sdk.models.runtime_evidence import (
     RollbackOutcome,
     RuntimeOutcomeReceipt,
 )
-from skills_sdk.models.scenario_quality import ScenarioQualityReceipt
+from skills_sdk.models.scenario_quality import ScenarioQualityReceipt, ScenarioQualityReceiptV2
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 
 
@@ -56,6 +56,7 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (EvaluationReceiptV2, "evaluation-receipt.v2.schema.json"),
         (SelectedCaseJudgeEvidence, "selected-case-judge-evidence.v1.schema.json"),
         (ScenarioQualityReceipt, "scenario-quality.v1.schema.json"),
+        (ScenarioQualityReceiptV2, "scenario-quality.v2.schema.json"),
     )
 
 

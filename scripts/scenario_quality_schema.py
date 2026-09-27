@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 
-def append_scenario_quality_constraints(schema: dict[str, Any]) -> None:
+def append_scenario_quality_constraints(schema: dict[str, Any], *, active_v2: bool = False) -> None:
     """Project scenario-quality receipt state and scope invariants."""
 
     schema["allOf"] = [
@@ -44,13 +44,20 @@ def append_scenario_quality_constraints(schema: dict[str, Any]) -> None:
             },
             "then": {
                 "properties": {
-                    "scenario_count": {"minimum": 5, "maximum": 10},
+                    "scenario_count": {"minimum": 10 if active_v2 else 5, "maximum": 10},
                     "pressure_or_regression_count": {"minimum": 1},
                     "negative_or_edge_count": {"minimum": 1},
                 }
             },
         }
     )
+    if active_v2:
+        schema["allOf"].append(
+            {
+                "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},
+                "then": {"properties": {"scope": {"const": "release"}}},
+            }
+        )
 
 
 __all__ = ["append_scenario_quality_constraints"]

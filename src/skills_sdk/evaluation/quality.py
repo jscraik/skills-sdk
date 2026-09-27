@@ -7,7 +7,7 @@ import os
 import re
 import stat
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal, cast
 
@@ -15,8 +15,10 @@ import yaml
 
 from skills_sdk.models.scenario_quality import (
     ScenarioQualityAppliedPolicy,
+    ScenarioQualityAppliedPolicyV2,
     ScenarioQualityFinding,
     ScenarioQualityReceipt,
+    ScenarioQualityReceiptV2,
 )
 from skills_sdk.models.validation import SkillPackageValidation
 from skills_sdk.validation import validate_skill_package
@@ -384,7 +386,11 @@ def _load_evals_payload(
 
 
 def _release_sets(
-    payload: Mapping[object, object], findings: list[ScenarioQualityFinding]
+    payload: Mapping[object, object],
+    findings: list[ScenarioQualityFinding],
+    *,
+    active_v2: bool = False,
+    selected_set_id: str | None = None,
 ) -> list[Mapping[object, object]]:
     raw_sets = payload.get("release_scenario_sets")
     if raw_sets is None:
@@ -406,17 +412,19 @@ def _release_sets(
             item.get("target_scenarios"),
             item.get("maximum_scenarios"),
         )
-        if any(
-            isinstance(value, bool) or not isinstance(value, int) for value in declared_budget
-        ) or declared_budget != (
-            5,
-            8,
-            10,
+        selected_active = active_v2 and item.get("id") == selected_set_id
+        allowed_budgets = (
+            {(10, 10, 10)} if selected_active else {(5, 8, 10), (10, 10, 10)} if active_v2 else {(5, 8, 10)}
+        )
+        if (
+            any(isinstance(value, bool) or not isinstance(value, int) for value in declared_budget)
+            or declared_budget not in allowed_budgets
         ):
             findings.append(
                 _finding(
                     "invalid_scenario_set",
-                    "release scenario set budget must declare integer minimum/target/maximum values of 5/8/10",
+                    "release scenario set budget must declare integer minimum/target/maximum values of "
+                    + ("10/10/10" if selected_active else "5/8/10 or 10/10/10" if active_v2 else "5/8/10"),
                 )
             )
             continue
@@ -461,32 +469,71 @@ def _release_set_case_ids(release_set: Mapping[object, object]) -> list[str]:
     return [cast(str, value) for value in cast(list[object], release_set["cases"])]
 
 
+def _versioned_receipt(
+    receipt: ScenarioQualityReceipt, contract_version: Literal["v1", "v2"]
+) -> ScenarioQualityReceipt | ScenarioQualityReceiptV2:
+    if contract_version == "v1":
+        return receipt
+    return ScenarioQualityReceiptV2.model_validate(
+        {
+            **receipt.model_dump(mode="json"),
+            "schema_version": "scenario-quality/v2",
+            "effective_policy": ScenarioQualityAppliedPolicyV2().model_dump(mode="json"),
+        }
+    )
+
+
+def _select_release_cases(
+    cases: list[object],
+    release_sets: list[Mapping[object, object]],
+    scenario_set_id: str | None,
+    findings: list[ScenarioQualityFinding],
+) -> list[object]:
+    if scenario_set_id is None:
+        return cases
+    matching_sets = [item for item in release_sets if item.get("id") == scenario_set_id]
+    selected_ids = _release_set_case_ids(matching_sets[0]) if len(matching_sets) == 1 else []
+    if not selected_ids:
+        findings.append(_finding("invalid_scenario_set", "selected release scenario set is missing or empty"))
+        return []
+    by_id = {case["id"]: case for case in cases if isinstance(case, Mapping) and _text(case.get("id"))}
+    unknown = [item for item in selected_ids if item not in by_id]
+    if unknown:
+        findings.append(
+            _finding("unknown_scenario_id", f"release scenario set contains unknown ids: {', '.join(unknown)}")
+        )
+    return [by_id[item] for item in selected_ids if item in by_id]
+
+
 def assess_scenario_quality(
     package_root: Path,
     *,
     source_revision: str,
     scenario_set_id: str | None = None,
     policy: ScenarioQualityPolicy | None = None,
-) -> ScenarioQualityReceipt:
+    contract_version: Literal["v1", "v2"] = "v1",
+) -> ScenarioQualityReceipt | ScenarioQualityReceiptV2:
+    if contract_version not in {"v1", "v2"}:
+        raise ValueError("unsupported scenario quality contract version")
+    if contract_version == "v2" and policy is not None:
+        raise ValueError("scenario-quality/v2 uses a fixed ten-case policy")
     active_policy = policy or ScenarioQualityPolicy()
-    effective_policy = ScenarioQualityAppliedPolicy(
-        minimum_release_cases=active_policy.minimum_release_cases,
-        target_release_cases=active_policy.target_release_cases,
-        maximum_release_cases=active_policy.maximum_release_cases,
-        minimum_pressure_or_regression=active_policy.minimum_pressure_or_regression,
-        minimum_negative_or_edge=active_policy.minimum_negative_or_edge,
-    )
+    effective_policy = ScenarioQualityAppliedPolicy.model_validate(asdict(active_policy))
     selector_invalid = scenario_set_id is not None and (
         not _text(scenario_set_id) or scenario_set_id != scenario_set_id.strip()
     )
     valid_scenario_set_id = scenario_set_id if not selector_invalid else None
     validation = validate_skill_package(package_root, source_revision=source_revision)
     if validation.candidate is None or validation.status == "blocked":
-        return _blocked_validation_receipt(validation, valid_scenario_set_id, effective_policy)
+        return _versioned_receipt(
+            _blocked_validation_receipt(validation, valid_scenario_set_id, effective_policy), contract_version
+        )
     manifest = next((item for item in validation.files if item.path == _EVALS_PATH), None)
     findings: list[ScenarioQualityFinding] = []
     payload: object = None
     payload_loaded = False
+    if contract_version == "v2" and scenario_set_id is None:
+        findings.append(_finding("active_scenario_set_required", "v2 requires an explicit active scenario set"))
     if selector_invalid:
         findings.append(_finding("invalid_scenario_set", "scenario set identifier must be non-empty text"))
     elif manifest is None:
@@ -496,28 +543,21 @@ def assess_scenario_quality(
         payload = _load_evals_payload(package_root, manifest.sha256, findings)
         payload_loaded = len(findings) == before_load_findings
     cases = _document_cases(payload, validation.candidate.package_id, findings) if payload_loaded else []
-    release_sets = _release_sets(payload, findings) if isinstance(payload, Mapping) else []
+    release_sets = (
+        _release_sets(
+            payload,
+            findings,
+            active_v2=contract_version == "v2",
+            selected_set_id=valid_scenario_set_id,
+        )
+        if isinstance(payload, Mapping)
+        else []
+    )
     raw_ids = [case.get("id") for case in cases if isinstance(case, Mapping) and _text(case.get("id"))]
     if len(raw_ids) != len(set(raw_ids)):
         findings.append(_finding("duplicate_scenario_id", "scenario ids must be unique"))
-    selected = cases
     scope: Literal["all", "release"] = "release" if valid_scenario_set_id else "all"
-    if valid_scenario_set_id and isinstance(payload, Mapping):
-        selected_ids: list[str] | None = None
-        matching_sets = [item for item in release_sets if item.get("id") == valid_scenario_set_id]
-        if len(matching_sets) == 1:
-            selected_ids = _release_set_case_ids(matching_sets[0])
-        if not selected_ids:
-            findings.append(_finding("invalid_scenario_set", "selected release scenario set is missing or empty"))
-            selected = []
-        else:
-            by_id = {case["id"]: case for case in cases if isinstance(case, Mapping) and _text(case.get("id"))}
-            unknown = [item for item in selected_ids if item not in by_id]
-            if unknown:
-                findings.append(
-                    _finding("unknown_scenario_id", f"release scenario set contains unknown ids: {', '.join(unknown)}")
-                )
-            selected = [by_id[item] for item in selected_ids if item in by_id]
+    selected = _select_release_cases(cases, release_sets, valid_scenario_set_id, findings)
     selected_ids = [case.get("id") for case in selected if isinstance(case, Mapping) and _text(case.get("id"))]
     if len(selected_ids) != len(set(selected_ids)):
         findings.append(_finding("duplicate_scenario_id", "scenario ids must be unique"))
@@ -557,6 +597,8 @@ def assess_scenario_quality(
                     f"release scenario set permits at most {active_policy.maximum_release_cases} cases",
                 )
             )
+        if contract_version == "v2" and len(selected) != 10:
+            findings.append(_finding("active_case_count", "active scenario set requires exactly ten cases"))
         if pressure_or_regression_count < active_policy.minimum_pressure_or_regression:
             findings.append(
                 _finding("release_pressure_floor", "release scenario set requires pressure or regression coverage")
@@ -566,7 +608,7 @@ def assess_scenario_quality(
                 _finding("release_negative_floor", "release scenario set requires negative or edge coverage")
             )
     findings.sort(key=lambda item: (item.case_id or "", item.code, item.message))
-    return ScenarioQualityReceipt(
+    receipt = ScenarioQualityReceipt(
         candidate=validation.candidate,
         scenario_set_id=valid_scenario_set_id,
         scope=scope,
@@ -577,6 +619,7 @@ def assess_scenario_quality(
         effective_policy=effective_policy,
         findings=tuple(findings),
     )
+    return _versioned_receipt(receipt, contract_version)
 
 
 __all__ = ["ScenarioQualityPolicy", "assess_scenario_quality"]

@@ -29,6 +29,7 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --scenario-set active-v2 --contract-version v2 --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
 
@@ -52,6 +53,9 @@ candidate-bound lanes:
 
 - `inventory` is read-only source-inventory intent.
 - `eval scenario-quality` performs read-only package-local definition checks.
+  Its default v1 contract retains the 5/8/10 release-set policy. Explicit
+  `--contract-version v2 --scenario-set <id>` selects exactly ten active cases
+  without loading historical Markdown fixtures or executing cases.
 - `eval selected-case` loads one declared case for the requested mode, runs a
   caller-supplied bounded text adapter, validates separately supplied semantic
   assertion evidence against the candidate, case, provider, and output digest,
