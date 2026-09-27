@@ -29,6 +29,7 @@ from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.safety import _public_text_is_redaction_safe
+from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.providers import (
     DEFAULT_PROVIDER_CALL_CLOCK,
     DEFAULT_PROVIDER_CALL_LIMITS,
@@ -163,10 +164,17 @@ async def _judge_once(
         assertion_contract_sha256=definition.assertion_contract_sha256,
         assertions=definition.semantic_assertions,
     )
+
+    async def invoke_judge() -> object:
+        return await judge.judge(inputs)
+
+    async def invoke_cleanup() -> None:
+        return await judge.cleanup()
+
     try:
         observed = (
             await gather(
-                _bounded_judge_wait(judge.judge(inputs), limits.overall_seconds),
+                _bounded_judge_wait(invoke_judge(), limits.overall_seconds),
                 return_exceptions=True,
             )
         )[0]
@@ -181,7 +189,7 @@ async def _judge_once(
     finally:
         cleanup_result = (
             await gather(
-                _bounded_judge_wait(judge.cleanup(), limits.cleanup_seconds),
+                _bounded_judge_wait(invoke_cleanup(), limits.cleanup_seconds),
                 return_exceptions=True,
             )
         )[0]
@@ -192,6 +200,10 @@ async def _judge_once(
         elif failure is None and (isinstance(cleanup_result, BaseException) or cleanup_result is not None):
             failure = "judge_cleanup_failed"
     return evidence, failure
+
+
+async def _convert_judge_evidence(value: object) -> SelectedCaseJudgeEvidence:
+    return _validated_judge_artifact(value)
 
 
 async def execute_selected_case_with_judge(
@@ -270,13 +282,13 @@ async def execute_selected_case_with_judge(
     ):
         return _blocked(definition, stable_request, "selected_case_request_mutated")
     if failure is not None:
-        return _blocked(definition, stable_request, failure)
-    try:
-        evidence = _validated_judge_artifact(raw_evidence)
-    except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
-        return _blocked(definition, stable_request, "invalid_judge_evidence")
+        return _blocked(definition, stable_request, failure, refs)
+    converted = (await gather(_convert_judge_evidence(raw_evidence), return_exceptions=True))[0]
+    if isinstance(converted, BaseException):
+        return _blocked(definition, stable_request, "invalid_judge_evidence", refs)
+    evidence = converted
     if evidence.judge != judge_bindings.identity:
-        return _blocked(definition, stable_request, "judge_identity_mismatch")
+        return _blocked(definition, stable_request, "judge_identity_mismatch", refs)
     observation = _validated_observation(definition, stable_request, evidence, output, digest, refs)
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 

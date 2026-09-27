@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Awaitable, Coroutine
 from dataclasses import replace
 from pathlib import Path
@@ -439,6 +440,30 @@ def test_judge_evidence_must_bind_actual_output(tmp_path: Path) -> None:
     assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
 
 
+def test_judge_evidence_serializer_failure_blocks_with_provider_provenance(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _BrokenEvidence(SelectedCaseJudgeEvidence):
+        def model_dump(self, *args: object, **kwargs: object) -> dict[str, object]:
+            raise OSError("private serializer failure")
+
+    class _BrokenSerializerJudge(_Judge):
+        async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
+            evidence = cast(SelectedCaseJudgeEvidence, await super().judge(inputs))
+            return _BrokenEvidence.model_construct(**evidence.model_dump(mode="python"))
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _Provider(request, events), _BrokenSerializerJudge(request.provider, events)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "invalid_judge_evidence"
+    assert "evidence/provider-result.json" in receipt.case_results[0].blocker.evidence_refs
+    assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
 def test_judge_identity_mismatch_blocks(tmp_path: Path) -> None:
     definition, payload, request, events = _setup(tmp_path)
     other = request.provider.model_copy(update={"adapter_id": "other-adapter"})
@@ -489,6 +514,38 @@ def test_judge_cleanup_failure_blocks(tmp_path: Path) -> None:
     assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
 
 
+@pytest.mark.parametrize("failed_hook", ["judge", "cleanup"])
+def test_sync_awaitable_factory_failure_blocks_with_provider_provenance(tmp_path: Path, failed_hook: str) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _SyncFailureJudge(_Judge):
+        @inspect.markcoroutinefunction
+        def judge(self, inputs: SelectedCaseJudgeInput) -> Awaitable[object]:
+            if failed_hook == "judge":
+                self.events.append("judge")
+                raise OSError("private judge setup failure")
+            return super().judge(inputs)
+
+        @inspect.markcoroutinefunction
+        def cleanup(self) -> Awaitable[None]:
+            if failed_hook == "cleanup":
+                self.events.append("judge_cleanup")
+                raise OSError("private cleanup setup failure")
+            return super().cleanup()
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _Provider(request, events), _SyncFailureJudge(request.provider, events)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    expected = "judge_execution_failed" if failed_hook == "judge" else "judge_cleanup_failed"
+    assert receipt.case_results[0].blocker.code == expected
+    assert "evidence/provider-result.json" in receipt.case_results[0].blocker.evidence_refs
+    assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
 @pytest.mark.parametrize("cancelled_hook", ["judge", "cleanup"])
 def test_hook_origin_cancellation_is_a_typed_failure(tmp_path: Path, cancelled_hook: str) -> None:
     definition, payload, request, events = _setup(tmp_path)
@@ -514,6 +571,7 @@ def test_hook_origin_cancellation_is_a_typed_failure(tmp_path: Path, cancelled_h
     assert receipt.case_results[0].blocker is not None
     expected = "judge_execution_failed" if cancelled_hook == "judge" else "judge_cleanup_failed"
     assert receipt.case_results[0].blocker.code == expected
+    assert "evidence/provider-result.json" in receipt.case_results[0].blocker.evidence_refs
     assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
 
 
