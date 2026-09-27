@@ -311,6 +311,16 @@ manifest did not alter the archive, despite lint passing; it is not a supported
 inclusion contract. An out-of-package `skills: ../skills` path was rejected,
 and restoring the valid path recovered a passing pack with the same omissions.
 
+To reproduce the archive comparison from the disposable fixture parent, run
+`tar -tzf skills-sdk-v4-fixture.tgz`. Its complete listing was
+`.tessl-plugin/plugin.json`, `skills/fixture-skill/SKILL.md`,
+`skills/fixture-skill/references/example.md`, `hooks/session_start.py`,
+`hooks/hooks.json`, `.mcp.json`, and `tile.json`. The fixture source also
+contained `.codex-plugin/plugin.json`, `assets/icon.txt`, and `scripts/mcp.js`;
+none appeared in that archive listing. This is an archive-content observation,
+not a claim that the existing Tessl-format wrapper for skill evaluation is
+absent or unusable.
+
 Compatibility question for Tessl: what documented manifest field or package
 layout includes *all* referenced native-plugin resources, including
 `.codex-plugin/plugin.json`, assets, and scripts outside skill directories, in
