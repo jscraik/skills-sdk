@@ -78,8 +78,9 @@ The intended managed installation source is an exact SDK-checked version in
 Jamie's private Tessl `jscraik` workspace, not Foundry or Agent-Skills files.
 No current CLI route publishes, reads back, or installs such a version. Only
 Jamie chooses a public release. Origin-verified OpenAI-provided plugins and
-OpenAI system skills are exempt from SDK processing and keep their
-provider-managed loading path.
+OpenAI system skills keep their provider-managed loading and installation
+routes. That route exemption does not waive applicable SDK checks or evidence
+when those packages separately enter an SDK workflow.
 
 Run `bash scripts/validate-repository.sh` for the repository's complete local
 schema, lint, test, build, and diff checks. Do not pass credentials or machine

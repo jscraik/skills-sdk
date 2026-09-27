@@ -41,7 +41,7 @@ series. The implemented local commands are `intake`, `validate`, `build`,
 `eval scenario-quality`, `eval selected-case`, `compare-copy`, and
 `maintain-entrypoint`. Comparison is read-only. Maintenance is read-only by
 default and requires explicit `--apply` to change an existing host file. The
-other lifecycle names, including `inventory`, other `eval` routes, `package`,
+other lifecycle names, including `inventory`, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
