@@ -15,7 +15,7 @@ from test_selected_case_evaluation import REVISION, _adapter, _case, _evidence, 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
+from skills_sdk.evaluation.selected_case import _canonical_input_payload, execute_selected_case, load_selected_case
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 
 
@@ -351,3 +351,29 @@ def test_oversized_provider_output_returns_blocked_receipt(tmp_path: Path) -> No
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "provider_output_too_large"
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_canonical_input_rejects_duplicate_string_keys(nested: bool) -> None:
+    class DistinctKey(str):
+        def __eq__(self, other: object) -> bool:
+            return self is other
+
+        __hash__ = str.__hash__
+
+    payload = {DistinctKey("prompt"): "first", DistinctKey("prompt"): "second"}
+    assert len(payload) == 2
+    with pytest.raises(ContractError, match="invalid_provider_input"):
+        _canonical_input_payload({"nested": [payload]} if nested else payload)
+
+
+def test_canonical_input_preserves_unique_string_keys_and_values() -> None:
+    class HostString(str):
+        def __str__(self) -> str:
+            return "overridden"
+
+    payload = {HostString("z"): [HostString("value"), 1, True, None], HostString("a"): {"b": 2.5}}
+    normalized = _canonical_input_payload(payload)
+    assert normalized == {"a": {"b": 2.5}, "z": ["value", 1, True, None]}
+    assert isinstance(normalized, dict)
+    assert list(normalized) == ["a", "z"]

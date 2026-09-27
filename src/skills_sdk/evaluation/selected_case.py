@@ -531,6 +531,8 @@ def _plain_input_containers(value: object, *, depth: int, active: set[int], rema
             if any(not isinstance(key, str) for key in dict.__iter__(value)):
                 raise _contract_error("invalid_provider_input", "provider input must contain only string keys")
             ordered = sorted(((str.__str__(key), item) for key, item in items), key=lambda pair: pair[0])
+            if len({key for key, _item in ordered}) != len(ordered):
+                raise _contract_error("invalid_provider_input", "provider input contains duplicate canonical keys")
             return {
                 key: _plain_input_containers(item, depth=depth + 1, active=active, remaining=remaining)
                 for key, item in ordered
