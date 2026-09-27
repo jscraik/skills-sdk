@@ -52,6 +52,7 @@ def append_scenario_quality_constraints(schema: dict[str, Any], *, active_v2: bo
         }
     )
     if active_v2:
+        schema["allOf"][-1]["then"]["required"] = ["pressure_or_regression_count", "negative_or_edge_count"]
         schema["allOf"].append(
             {
                 "if": {"properties": {"status": {"const": "pass"}}, "required": ["status"]},

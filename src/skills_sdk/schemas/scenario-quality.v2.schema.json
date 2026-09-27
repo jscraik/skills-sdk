@@ -39,35 +39,37 @@
       "properties": {
         "maximum_release_cases": {
           "const": 10,
-          "default": 10,
           "title": "Maximum Release Cases",
           "type": "integer"
         },
         "minimum_negative_or_edge": {
           "const": 1,
-          "default": 1,
           "title": "Minimum Negative Or Edge",
           "type": "integer"
         },
         "minimum_pressure_or_regression": {
           "const": 1,
-          "default": 1,
           "title": "Minimum Pressure Or Regression",
           "type": "integer"
         },
         "minimum_release_cases": {
           "const": 10,
-          "default": 10,
           "title": "Minimum Release Cases",
           "type": "integer"
         },
         "target_release_cases": {
           "const": 10,
-          "default": 10,
           "title": "Target Release Cases",
           "type": "integer"
         }
       },
+      "required": [
+        "minimum_release_cases",
+        "target_release_cases",
+        "maximum_release_cases",
+        "minimum_pressure_or_regression",
+        "minimum_negative_or_edge"
+      ],
       "title": "ScenarioQualityAppliedPolicyV2",
       "type": "object"
     },
@@ -229,7 +231,11 @@
             "maximum": 10,
             "minimum": 10
           }
-        }
+        },
+        "required": [
+          "pressure_or_regression_count",
+          "negative_or_edge_count"
+        ]
       }
     },
     {

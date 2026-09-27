@@ -35,11 +35,11 @@ class ScenarioQualityAppliedPolicy(_ContractModel):
 
 
 class ScenarioQualityAppliedPolicyV2(_ContractModel):
-    minimum_release_cases: Literal[10] = 10
-    target_release_cases: Literal[10] = 10
-    maximum_release_cases: Literal[10] = 10
-    minimum_pressure_or_regression: Literal[1] = 1
-    minimum_negative_or_edge: Literal[1] = 1
+    minimum_release_cases: Literal[10]
+    target_release_cases: Literal[10]
+    maximum_release_cases: Literal[10]
+    minimum_pressure_or_regression: Literal[1]
+    minimum_negative_or_edge: Literal[1]
 
 
 class ScenarioQualityReceipt(_ContractModel):

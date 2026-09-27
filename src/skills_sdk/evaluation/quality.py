@@ -481,7 +481,13 @@ def _versioned_receipt(
         {
             **receipt.model_dump(mode="json"),
             "schema_version": "scenario-quality/v2",
-            "effective_policy": ScenarioQualityAppliedPolicyV2().model_dump(mode="json"),
+            "effective_policy": ScenarioQualityAppliedPolicyV2(
+                minimum_release_cases=10,
+                target_release_cases=10,
+                maximum_release_cases=10,
+                minimum_pressure_or_regression=1,
+                minimum_negative_or_edge=1,
+            ).model_dump(mode="json"),
         }
     )
 
