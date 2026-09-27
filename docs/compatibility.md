@@ -184,7 +184,8 @@ generic receipt dispatch remains unchanged.
 active release-set selector and exactly ten selected cases. It requires
 `effective_policy` on the wire, including in blocked receipts, so consumers
 can inspect the applied 10/10/10 budget rather than infer it from a model
-default. Additional YAML cases and nonselected historical release sets remain
+default. All five `effective_policy` fields are required on the wire.
+Additional YAML cases and nonselected historical release sets remain
 source material, not active cases; Markdown fixtures are not imported
 automatically. The v1 policy, schema, and default CLI behavior remain
 unchanged, and generic `parse_receipt` still rejects both scenario-quality
