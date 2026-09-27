@@ -180,6 +180,17 @@ pressure-or-regression case, and one negative-or-edge case. The generated Draft
 2020-12 schema and Pydantic model enforce identical policy evidence. Existing
 generic receipt dispatch remains unchanged.
 
+`scenario-quality/v2` is an opt-in registry-only family with an explicit
+active release-set selector and exactly ten selected cases. It requires
+`effective_policy` on the wire, including in blocked receipts, so consumers
+can inspect the applied 10/10/10 budget rather than infer it from a model
+default. All five `effective_policy` fields are required on the wire.
+Additional YAML cases and nonselected historical release sets remain
+source material, not active cases; Markdown fixtures are not imported
+automatically. The v1 policy, schema, and default CLI behavior remain
+unchanged, and generic `parse_receipt` still rejects both scenario-quality
+versions as unsupported receipt families.
+
 `registry-identity/v1` and `registry-preparation/v1` are additive contracts.
 Registry identity fields reject credential-shaped values at component
 boundaries while permitting ordinary identifiers that merely contain similar

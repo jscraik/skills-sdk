@@ -194,6 +194,142 @@ def test_release_selector_accepts_canonical_flat_cases_shape(tmp_path: Path) -> 
     assert result.status == "pass"
 
 
+@pytest.mark.parametrize(
+    ("scenario_set_id", "expected_status"), [(None, "pass"), ("historical", "pass"), ("release", "blocked")]
+)
+def test_v1_budget_is_scoped_to_selected_set(tmp_path: Path, scenario_set_id: str | None, expected_status: str) -> None:
+    cases = [_case(f"case-{index}") for index in range(10)]
+    cases[6]["category"] = "pressure"
+    cases[7]["category"] = "edge"
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [
+            _release_set([case["id"] for case in cases[:8]], set_id="historical"),
+            _release_set([case["id"] for case in cases], budget=(10, 10, 10)),
+        ],
+        "cases": cases,
+    }
+
+    result = assess_scenario_quality(
+        _skill(tmp_path / "example", payload), source_revision=REVISION, scenario_set_id=scenario_set_id
+    )
+
+    assert result.status == expected_status
+    if expected_status == "blocked":
+        assert any(
+            finding.code == "invalid_scenario_set" and finding.message.endswith("5/8/10") for finding in result.findings
+        )
+    else:
+        assert result.scenario_count == (8 if scenario_set_id else 10)
+        SchemaRegistry().validate("scenario-quality.v1", result.model_dump(mode="json"))
+
+
+def test_v2_selects_exactly_ten_from_larger_yaml_history(tmp_path: Path) -> None:
+    cases = [_case(f"case-{index}") for index in range(12)]
+    cases[8]["category"] = "pressure"
+    cases[9]["category"] = "edge"
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [
+            _release_set([case["id"] for case in cases[:8]], set_id="historical"),
+            _release_set([case["id"] for case in cases[:10]], budget=(10, 10, 10)),
+        ],
+        "cases": cases,
+    }
+    root = _skill(tmp_path / "example", payload)
+    historical = root / "references/evals"
+    historical.mkdir()
+    (historical / "old-case.md").write_text("# Retained historical fixture\n", encoding="utf-8")
+
+    result = assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="release", contract_version="v2")
+
+    assert result.status == "pass"
+    assert result.schema_version == "scenario-quality/v2"
+    assert result.scenario_count == 10
+    assert result.effective_policy.target_release_cases == 10
+    SchemaRegistry().validate("scenario-quality.v2", result.model_dump(mode="json"))
+    forged = result.model_dump(mode="json")
+    forged["scenario_count"] = 9
+    with pytest.raises(ValidationError):
+        quality_module.ScenarioQualityReceiptV2.model_validate(forged)
+    assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v2")).iter_errors(forged))
+    empty_policy = result.model_dump(mode="json")
+    empty_policy["effective_policy"] = {}
+    invalid_payloads = [empty_policy]
+    for field in ("effective_policy", "pressure_or_regression_count", "negative_or_edge_count"):
+        missing_field = result.model_dump(mode="json")
+        del missing_field[field]
+        invalid_payloads.append(missing_field)
+    for invalid_payload in invalid_payloads:
+        with pytest.raises(ValidationError):
+            quality_module.ScenarioQualityReceiptV2.model_validate(invalid_payload)
+        assert list(Draft202012Validator(SchemaRegistry().load("scenario-quality.v2")).iter_errors(invalid_payload))
+    assert assess_scenario_quality(root, source_revision=REVISION, contract_version="v2").status == "blocked"
+    assert assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="release").status == "blocked"
+
+
+@pytest.mark.parametrize("selected_count", [9, 11])
+def test_v2_rejects_non_ten_active_populations(tmp_path: Path, selected_count: int) -> None:
+    cases = [_case(f"case-{index}") for index in range(selected_count)]
+    cases[-2]["category"] = "pressure"
+    cases[-1]["category"] = "edge"
+    root = _skill(
+        tmp_path / "example",
+        {
+            "schema_version": "2.0",
+            "skill_name": "example",
+            "release_scenario_sets": [_release_set([case["id"] for case in cases], budget=(10, 10, 10))],
+            "cases": cases,
+        },
+    )
+
+    result = assess_scenario_quality(root, source_revision=REVISION, scenario_set_id="release", contract_version="v2")
+
+    assert result.status == "blocked"
+    assert result.scenario_count == selected_count
+    assert "active_case_count" in {finding.code for finding in result.findings}
+
+
+def test_v2_duplicate_selection_blocks_and_correction_retries_through_cli(tmp_path: Path) -> None:
+    cases = [_case(f"case-{index}") for index in range(10)]
+    cases[8]["category"] = "pressure"
+    cases[9]["category"] = "edge"
+    selected_ids = [case["id"] for case in cases]
+    payload = {
+        "schema_version": "2.0",
+        "skill_name": "example",
+        "release_scenario_sets": [_release_set([*selected_ids[:9], selected_ids[8]], budget=(10, 10, 10))],
+        "cases": cases,
+    }
+    root = _skill(tmp_path / "example", payload)
+    command = [
+        "skills-sdk",
+        "eval",
+        "scenario-quality",
+        str(root),
+        "--source-revision",
+        REVISION,
+        "--scenario-set",
+        "release",
+        "--contract-version",
+        "v2",
+        "--json",
+        "--robot",
+    ]
+
+    blocked = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
+    assert blocked.returncode == 2
+    assert "duplicate_scenario_id" in {item["code"] for item in json.loads(blocked.stdout)["findings"]}
+
+    payload["release_scenario_sets"] = [_release_set(selected_ids, budget=(10, 10, 10))]
+    (root / "references/evals.yaml").write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    passed = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
+    assert passed.returncode == 0, passed.stdout
+    assert json.loads(passed.stdout)["scenario_count"] == 10
+
+
 def test_malformed_yaml_aliases_duplicate_keys_and_invalid_revision_block(tmp_path: Path) -> None:
     for name, text in (
         ("malformed", "schema_version: [unterminated\n"),

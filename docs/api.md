@@ -68,6 +68,8 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   with the applied release thresholds bound in `effective_policy`, and never
   supplies observations or claims that a scenario ran. See
   [scenario definition quality](scenario-quality.md) for its input and policy.
+  Explicit `contract_version="v2"` returns `ScenarioQualityReceiptV2` with
+  a required ten-case active release set; the default v1 result is unchanged.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
 - **Registry preparation:** `RegistryIdentity`, `RegistryPreparationRequest`,

@@ -111,8 +111,10 @@ from skills_sdk.models.safety import (
 )
 from skills_sdk.models.scenario_quality import (
     ScenarioQualityAppliedPolicy,
+    ScenarioQualityAppliedPolicyV2,
     ScenarioQualityFinding,
     ScenarioQualityReceipt,
+    ScenarioQualityReceiptV2,
 )
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
@@ -203,8 +205,10 @@ __all__ = [
     "ScenarioObservation",
     "ScenarioObservationV2",
     "ScenarioQualityAppliedPolicy",
+    "ScenarioQualityAppliedPolicyV2",
     "ScenarioQualityFinding",
     "ScenarioQualityReceipt",
+    "ScenarioQualityReceiptV2",
     "ScenarioSet",
     "ScenarioSetV2",
     "ScorerProfile",

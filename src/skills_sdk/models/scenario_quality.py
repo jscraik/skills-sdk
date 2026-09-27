@@ -34,6 +34,14 @@ class ScenarioQualityAppliedPolicy(_ContractModel):
     minimum_negative_or_edge: Literal[1] = 1
 
 
+class ScenarioQualityAppliedPolicyV2(_ContractModel):
+    minimum_release_cases: Literal[10]
+    target_release_cases: Literal[10]
+    maximum_release_cases: Literal[10]
+    minimum_pressure_or_regression: Literal[1]
+    minimum_negative_or_edge: Literal[1]
+
+
 class ScenarioQualityReceipt(_ContractModel):
     schema_version: Literal["scenario-quality/v1"] = "scenario-quality/v1"
     candidate: PackageCandidateIdentity | None = None
@@ -77,4 +85,21 @@ class ScenarioQualityReceipt(_ContractModel):
         return self
 
 
-__all__ = ["ScenarioQualityAppliedPolicy", "ScenarioQualityFinding", "ScenarioQualityReceipt"]
+class ScenarioQualityReceiptV2(ScenarioQualityReceipt):
+    schema_version: Literal["scenario-quality/v2"] = "scenario-quality/v2"
+    effective_policy: ScenarioQualityAppliedPolicyV2
+
+    @model_validator(mode="after")
+    def passing_active_set_has_ten_cases(self) -> ScenarioQualityReceiptV2:
+        if self.status == "pass" and (self.scope != "release" or self.scenario_count != 10):
+            raise ValueError("passing active scenario quality requires one explicit set of ten cases")
+        return self
+
+
+__all__ = [
+    "ScenarioQualityAppliedPolicy",
+    "ScenarioQualityAppliedPolicyV2",
+    "ScenarioQualityFinding",
+    "ScenarioQualityReceipt",
+    "ScenarioQualityReceiptV2",
+]

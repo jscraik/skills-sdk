@@ -721,8 +721,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_evaluation_result_constraints(schema, filename)
     elif filename in {"evaluation-receipt.v1.schema.json", "evaluation-receipt.v2.schema.json"}:
         _append_evaluation_receipt_constraints(schema, filename)
-    elif filename == "scenario-quality.v1.schema.json":
-        append_scenario_quality_constraints(schema)
+    elif filename in {"scenario-quality.v1.schema.json", "scenario-quality.v2.schema.json"}:
+        append_scenario_quality_constraints(schema, active_v2=filename == "scenario-quality.v2.schema.json")
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
     elif filename == "skill-package-intake.v1.schema.json":
