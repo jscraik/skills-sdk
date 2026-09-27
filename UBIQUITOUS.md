@@ -123,7 +123,11 @@ _Avoid_: candidate holding, registry service, completed migration
 The holding location for skill and plugin candidates awaiting SDK processing,
 including rejected or blocked candidates with reasons. Holding does not grant
 SDK clearance, installation, or distribution, and need not be permanent custody
-after processing. It must not duplicate reusable SDK lifecycle tooling.
+after processing. The frozen inventory `admit_to_foundry` value remains an
+intended, source-, rights-, and assessment-gated disposition for Foundry
+collection membership; it does not mean that holding alone granted admission
+or that any filesystem or registry mutation occurred. It must not duplicate
+reusable SDK lifecycle tooling.
 _Avoid_: SDK contract library, Agent-Skills migration source
 
 **Agent-Skills migration source**:
