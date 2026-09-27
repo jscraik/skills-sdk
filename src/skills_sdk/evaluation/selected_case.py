@@ -399,7 +399,11 @@ def _validated_observation(
     output_text = str.__str__(output_text)
     if hashlib.sha256(output_text.encode("utf-8")).hexdigest() != output_sha256:
         return _blocked_observation(
-            definition, request, "invalid_provider_output", "provider output digest does not bind canonical text"
+            definition,
+            request,
+            "invalid_provider_output",
+            "provider output digest does not bind canonical text",
+            provider_evidence_refs,
         )
     case_id = definition.scenario_set.cases[0].case_id
     if (
@@ -415,6 +419,7 @@ def _validated_observation(
             request,
             "selected_case_identity_mismatch",
             "assertion evidence does not bind the executed output",
+            provider_evidence_refs,
         )
     if not set(supplied.satisfied_assertion_ids) <= set(definition.semantic_signal_ids):
         return _blocked_observation(
@@ -422,13 +427,18 @@ def _validated_observation(
             request,
             "missing_semantic_evidence",
             "semantic assertions require bound evidence",
+            provider_evidence_refs,
         )
     deterministic = _deterministic_signals(output_text, definition.deterministic_assertions)
     case = definition.scenario_set.cases[0]
     judge_result_ref = f"judge-results/{supplied.judge_result_sha256}"
     if judge_result_ref not in supplied.evidence_refs:
         return _blocked_observation(
-            definition, request, "judge_result_ref_required", "judge result reference must be supplied by the host"
+            definition,
+            request,
+            "judge_result_ref_required",
+            "judge result reference must be supplied by the host",
+            provider_evidence_refs,
         )
     evidence_refs = tuple(dict.fromkeys((*provider_evidence_refs, *supplied.evidence_refs)))
     return ScenarioObservationV2(

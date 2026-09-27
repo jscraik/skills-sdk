@@ -279,6 +279,23 @@ def test_judge_binding_origin_cancellation_blocks_before_provider(tmp_path: Path
     assert events == []
 
 
+def test_judge_identity_serialization_failure_blocks_before_provider(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _UnserializableIdentity(ProviderIdentityV2):
+        def model_dump(self, *args: object, **kwargs: object) -> dict[str, object]:
+            raise OSError("private serializer failure")
+
+    judge = _Judge(_UnserializableIdentity.model_construct(**request.provider.model_dump()), events)
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(definition, request, payload, _Provider(request, events), judge)
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_adapter_required"
+    assert events == []
+
+
 @pytest.mark.parametrize("stateful_hook", ["judge", "cleanup"])
 def test_judge_hooks_are_bound_once_before_provider(tmp_path: Path, stateful_hook: str) -> None:
     definition, payload, request, events = _setup(tmp_path)
@@ -437,6 +454,8 @@ def test_judge_evidence_must_bind_actual_output(tmp_path: Path) -> None:
         )
     )
     assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert "evidence/provider-result.json" in receipt.case_results[0].blocker.evidence_refs
     assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
 
 

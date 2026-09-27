@@ -89,14 +89,8 @@ async def _judge_bindings(judge: SelectedCaseJudgeAdapter | None) -> _JudgeBindi
     if judge is None:
         return None
 
-    async def read_members() -> tuple[object, object, object]:
-        return judge.identity, judge.judge, judge.cleanup
-
-    observed = (await gather(read_members(), return_exceptions=True))[0]
-    if isinstance(observed, BaseException) or not isinstance(observed, tuple) or len(observed) != 3:
-        return None
-    raw_identity, raw_judge, raw_cleanup = observed
-    try:
+    async def read_bindings() -> _JudgeBindings | None:
+        raw_identity, raw_judge, raw_cleanup = judge.identity, judge.judge, judge.cleanup
         if not isinstance(raw_identity, ProviderIdentityV2):
             return None
         identity = ProviderIdentityV2.model_validate(raw_identity.model_dump(mode="json"))
@@ -118,8 +112,11 @@ async def _judge_bindings(judge: SelectedCaseJudgeAdapter | None) -> _JudgeBindi
             judge=cast(Callable[[SelectedCaseJudgeInput], Awaitable[object]], raw_judge),
             cleanup=cast(Callable[[], Awaitable[None]], raw_cleanup),
         )
-    except (AttributeError, TypeError, ValueError, RuntimeError, ValidationError, PydanticSerializationError):
+
+    observed = (await gather(read_bindings(), return_exceptions=True))[0]
+    if isinstance(observed, BaseException):
         return None
+    return observed
 
 
 def _consume_detached_judge_result(task: asyncio.Task[object]) -> None:
