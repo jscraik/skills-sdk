@@ -101,8 +101,9 @@ operational contracts.
   validates adapter-supplied evidence and does not run a scanner or review.
 - Changing provider execution envelopes: start with
   `ProviderExecutionRequest` and `ProviderExecutionResult` in
-  `src/skills_sdk/models/provider_execution.py`; external adapters still own
-  provider calls, credentials, and provider-result truth.
+  `src/skills_sdk/models/provider_execution.py`; injected transport adapters
+  supply credentials and provider-result truth, while supported integration
+  remains an SDK orchestration responsibility.
 - Changing offline provider-call orchestration: start with
   `execute_provider_call` in `src/skills_sdk/providers/call.py`, then follow its
   additive contracts in `src/skills_sdk/models/provider_call.py`. Injected
@@ -110,8 +111,9 @@ operational contracts.
   orchestration and public evidence.
 - Changing runtime-lock planning: follow `plan_runtime_install` in
   `src/skills_sdk/lifecycle/planning.py` and the versioned models in
-  `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
-  rollback, discovery, activation, and runtime-outcome evidence.
+  `src/skills_sdk/models/lifecycle.py`; a future SDK-owned host integration
+  must coordinate apply, rollback, discovery, activation, and runtime-outcome
+  evidence through an explicit Codex adapter.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
@@ -246,10 +248,11 @@ docstrings and the linked API or CLI guides.
 - Host maintenance depends on read-only validation helpers, never the reverse.
   It accepts local paths outside portable receipt contracts and does not
   implement the package-installation or runtime-lock planning protocols.
-- The CLI service-invocation paths are
+- The CLI service-invocation paths include
   `CLI -> intake/validation/packaging -> models/core` and
-  `CLI -> evaluation/quality -> validation/models/core`: `intake`, `validate`,
-  `build`, and `eval scenario-quality` invoke those services. `compare-copy`
+  `CLI -> evaluation/quality/selected_case -> validation/models/core`:
+  `intake`, `validate`, `build`, `eval scenario-quality`, and
+  `eval selected-case` invoke those services. `compare-copy`
   also composes validation, while `maintain-entrypoint` invokes the explicit
   host adapter. The remaining reserved routes stay parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
