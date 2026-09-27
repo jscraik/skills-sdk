@@ -146,6 +146,15 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--contract-version", choices=("v1", "v2"), default="v1")
     quality.add_argument("--json", action="store_true", dest="json_output")
     quality.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    for name, help_text in (
+        ("scorer-quality", "assess candidate scorer declarations without executing a judge"),
+        ("scorer-calibration", "assess candidate-bound held-out scorer artifacts"),
+    ):
+        scorer = evaluation_commands.add_parser(name, help=help_text)
+        scorer.add_argument("package_root", type=Path)
+        scorer.add_argument("--source-revision", required=True)
+        scorer.add_argument("--json", action="store_true", dest="json_output")
+        scorer.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     selected = evaluation_commands.add_parser(
         "selected-case",
         help="evaluate one package-local case through caller-supplied provider evidence",
@@ -174,7 +183,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
     """Return findings suitable for the human-readable command output."""
-    if command in {"validate", "scenario-quality"}:
+    if command in {"validate", "scenario-quality", "scorer-quality", "scorer-calibration"}:
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 
@@ -363,6 +372,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0 if quality_result.status == "pass" else 2
     if arguments.command == "eval" and arguments.eval_command == "selected-case":
         return _selected_case_eval(arguments)
+    if arguments.command == "eval" and arguments.eval_command in {"scorer-quality", "scorer-calibration"}:
+        from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
+
+        assessor = assess_scorer_quality if arguments.eval_command == "scorer-quality" else assess_scorer_calibration
+        receipt = assessor(arguments.package_root, source_revision=arguments.source_revision)
+        _print_result(arguments.eval_command, receipt, json_output=arguments.json_output)
+        return 0 if receipt.status == "pass" else 2
     if arguments.command not in {"intake", "validate", "build"}:
         return 0
     from skills_sdk.validation import SkillValidationPolicy

@@ -297,6 +297,31 @@ remain separate outcomes. Required schema and compatibility checks still
 apply. Run `bash scripts/validate-repository.sh` and record `pass`, `fail`, or
 `blocked`; for `blocked`, record the concrete blocker and nearest fallback.
 
+### Scorer assessment extraction
+
+At Agent-Skills source revision `532962c65ef0549d16168c0e899c9cb8dc032188`,
+`build_scorer_quality_receipt` checks `references/evals.yaml` scorer metadata
+and six calibration probe declarations; `build_scorer_calibration_receipt`
+checks a held-out bundle manifest, JSONL examples, raw artifacts, threshold,
+coverage, and false positives. The SDK's `assess_scorer_quality` and
+`assess_scorer_calibration` retain those accepted/rejected distinctions through
+candidate-bound public services and CLI routes. The SDK deliberately rejects
+YAML aliases and duplicate keys through its existing bounded loader, requires
+raw artifacts to be in the declared directory and validated candidate, rejects
+duplicate held-out ids and artifact paths or string-coerced numeric limits, and
+requires the bundle scorer identity to agree with a valid declaration. These
+are stricter safety and binding checks than the source preview. Both systems
+assess caller-supplied artifacts; neither executes a live judge or proves
+external artifact provenance. The ten active managed scenarios are unchanged.
+The SDK receipts intentionally replace the source preview's query, local
+paths, pass-check list, and acceptance-trace strings with candidate identity,
+portable blocker findings, applied calibration policy, retained judge
+parameters, and confusion-derived rates. Source `preview` maps to SDK `pass`;
+source `blocked` remains `blocked`. Expected scores outside `[0, 1]` are also
+blocked by the SDK's stricter typed outcome check.
+This extraction covers scorer quality and held-out calibration only; it does
+not complete the nine-area evaluation workflow or downstream consumer cutover.
+
 ## Separate evidence lanes
 
 The SDK's local contract and schema checks do not prove provider execution,

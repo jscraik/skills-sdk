@@ -1,0 +1,360 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "ScenarioQualityFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ScenarioQualityFinding",
+      "type": "object"
+    },
+    "ScorerCalibrationAppliedPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "max_false_negatives": {
+          "minimum": 0,
+          "title": "Max False Negatives",
+          "type": "integer"
+        },
+        "max_false_positives": {
+          "minimum": 0,
+          "title": "Max False Positives",
+          "type": "integer"
+        },
+        "minimum_examples": {
+          "minimum": 1,
+          "title": "Minimum Examples",
+          "type": "integer"
+        },
+        "minimum_true_negatives": {
+          "minimum": 1,
+          "title": "Minimum True Negatives",
+          "type": "integer"
+        },
+        "minimum_true_positives": {
+          "minimum": 1,
+          "title": "Minimum True Positives",
+          "type": "integer"
+        },
+        "threshold": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold",
+        "minimum_examples",
+        "minimum_true_positives",
+        "minimum_true_negatives",
+        "max_false_positives",
+        "max_false_negatives"
+      ],
+      "title": "ScorerCalibrationAppliedPolicy",
+      "type": "object"
+    },
+    "ScorerCalibrationMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "fn": {
+          "minimum": 0,
+          "title": "Fn",
+          "type": "integer"
+        },
+        "fp": {
+          "minimum": 0,
+          "title": "Fp",
+          "type": "integer"
+        },
+        "tn": {
+          "minimum": 0,
+          "title": "Tn",
+          "type": "integer"
+        },
+        "tp": {
+          "minimum": 0,
+          "title": "Tp",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tp",
+        "tn",
+        "fp",
+        "fn"
+      ],
+      "title": "ScorerCalibrationMetrics",
+      "type": "object"
+    },
+    "ScorerCalibrationRates": {
+      "additionalProperties": false,
+      "properties": {
+        "accuracy": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accuracy"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Precision"
+        },
+        "tnr": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tnr"
+        },
+        "tpr": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tpr"
+        }
+      },
+      "title": "ScorerCalibrationRates",
+      "type": "object"
+    },
+    "ScorerJudgeParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "temperature": {
+          "title": "Temperature",
+          "type": "number"
+        },
+        "trial_count": {
+          "minimum": 1,
+          "title": "Trial Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "temperature",
+        "trial_count"
+      ],
+      "title": "ScorerJudgeParameters",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/scorer-calibration.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "confusion_matrix": {
+      "$ref": "#/$defs/ScorerCalibrationMetrics"
+    },
+    "effective_policy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScorerCalibrationAppliedPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "example_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Example Count",
+      "type": "integer"
+    },
+    "execution_performed": {
+      "const": false,
+      "default": false,
+      "title": "Execution Performed",
+      "type": "boolean"
+    },
+    "findings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ScenarioQualityFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "metrics": {
+      "$ref": "#/$defs/ScorerCalibrationRates"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "network_used": {
+      "const": false,
+      "default": false,
+      "title": "Network Used",
+      "type": "boolean"
+    },
+    "parameters": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScorerJudgeParameters"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "prompt_version": {
+      "default": "",
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "scorer-calibration/v1",
+      "default": "scorer-calibration/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scorer_id": {
+      "default": "",
+      "title": "Scorer Id",
+      "type": "string"
+    },
+    "scorer_version_or_digest": {
+      "default": "",
+      "title": "Scorer Version Or Digest",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "ScorerCalibrationReceipt",
+  "type": "object"
+}

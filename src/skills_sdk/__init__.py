@@ -60,7 +60,13 @@ from skills_sdk.models import (
     ScenarioQualityReceiptV2,
     ScenarioSet,
     ScenarioSetV2,
+    ScorerCalibrationAppliedPolicy,
+    ScorerCalibrationMetrics,
+    ScorerCalibrationRates,
+    ScorerCalibrationReceipt,
+    ScorerJudgeParameters,
     ScorerProfile,
+    ScorerQualityReceipt,
     SecurityScreeningResult,
     SelectedCaseJudgeEvidence,
     TextProviderAdapterDescriptor,
@@ -80,6 +86,13 @@ def __getattr__(name: str) -> object:
         return {
             "ScenarioQualityPolicy": ScenarioQualityPolicy,
             "assess_scenario_quality": assess_scenario_quality,
+        }[name]
+    if name in {"assess_scorer_quality", "assess_scorer_calibration"}:
+        from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
+
+        return {
+            "assess_scorer_quality": assess_scorer_quality,
+            "assess_scorer_calibration": assess_scorer_calibration,
         }[name]
     if name in {
         "SelectedCaseJudgeAdapter",
@@ -177,7 +190,13 @@ __all__ = [
     "ScenarioQualityReceiptV2",
     "ScenarioSet",
     "ScenarioSetV2",
+    "ScorerCalibrationAppliedPolicy",
+    "ScorerCalibrationMetrics",
+    "ScorerCalibrationRates",
+    "ScorerCalibrationReceipt",
+    "ScorerJudgeParameters",
     "ScorerProfile",
+    "ScorerQualityReceipt",
     "SecurityScreeningResult",
     "SelectedCaseDefinition",
     "SelectedCaseJudgeAdapter",
@@ -189,6 +208,8 @@ __all__ = [
     "ValueDecisionV2",
     "__version__",
     "assess_scenario_quality",
+    "assess_scorer_calibration",
+    "assess_scorer_quality",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_provider_call",

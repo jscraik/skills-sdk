@@ -70,6 +70,14 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   [scenario definition quality](scenario-quality.md) for its input and policy.
   Explicit `contract_version="v2"` returns `ScenarioQualityReceiptV2` with
   a required ten-case active release set; the default v1 result is unchanged.
+  `assess_scorer_quality` and `assess_scorer_calibration` are separate,
+  candidate-bound read-only services. Their `ScorerQualityReceipt` and
+  `ScorerCalibrationReceipt` check, respectively, strict scorer declarations
+  and supplied held-out examples plus raw scorer artifacts. Calibration
+  verifies scorer identity, thresholds, coverage, and false positives while
+  retaining the applied policy, judge parameters, confusion matrix, and rates.
+  Neither service runs a judge, turns declared probe IDs into execution evidence, or
+  expands the active scenario set.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
 - **Registry preparation:** `RegistryIdentity`, `RegistryPreparationRequest`,
