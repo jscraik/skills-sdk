@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from skills_sdk.evaluation.quality import _ClosedLoader
+from skills_sdk.evaluation.quality import _TOP_FIELDS, _ClosedLoader
 from skills_sdk.evaluation.scorer_artifacts import read_candidate_artifact
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding
 from skills_sdk.models.scorer_quality import ScorerQualityReceipt
@@ -159,9 +159,10 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
         probe_type = case.get("probe_type")
         case_id = case.get("id")
         if isinstance(case_id, str) and case_id.strip():
-            if case_id in case_ids:
+            normalized_id = case_id.strip()
+            if normalized_id in case_ids:
                 findings.append(_finding("duplicate_calibration_case", "calibration case ids must be unique"))
-            case_ids.add(case_id)
+            case_ids.add(normalized_id)
         if not _text(case_id) or not isinstance(probe_type, str) or probe_type not in _PROBES:
             findings.append(
                 _finding("invalid_calibration_case", "calibration case needs an id and supported probe_type")
@@ -220,6 +221,13 @@ def assess_scorer_quality(package_root: Path, *, source_revision: str) -> Scorer
         try:
             raw = read_candidate_artifact(package_root, validation, _EVALS)
             payload = yaml.load(raw.decode("utf-8"), Loader=_ClosedLoader)
+            if isinstance(payload, Mapping):
+                if set(payload) - _TOP_FIELDS:
+                    findings.append(_finding("unsupported_evals_field", "evals.yaml has unsupported fields"))
+                if payload.get("schema_version") != "2.0":
+                    findings.append(_finding("unsupported_evals_schema", "evals.yaml schema_version must be 2.0"))
+                if validation.candidate is not None and payload.get("skill_name") != validation.candidate.package_id:
+                    findings.append(_finding("skill_name_mismatch", "evals.yaml skill_name must match the candidate"))
             if not isinstance(payload, Mapping) or not isinstance(payload.get("scorer_quality"), Mapping):
                 findings.append(
                     _finding("scorer_quality_declared", "references/evals.yaml must declare scorer_quality")

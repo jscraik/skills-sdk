@@ -404,6 +404,48 @@ def test_public_judge_parameters_reject_nonfinite_temperature(temperature: float
     assert ScorerJudgeParameters.model_validate_json(accepted.model_dump_json()) == accepted
 
 
+@pytest.mark.parametrize(
+    ("field", "invalid", "code"),
+    [
+        ("schema_version", "9.0", "unsupported_evals_schema"),
+        ("skill_name", "wrong-skill", "skill_name_mismatch"),
+    ],
+)
+def test_enclosing_evals_contract_blocks_then_recovers(tmp_path: Path, field: str, invalid: str, code: str) -> None:
+    package = _package(tmp_path)
+    import yaml
+
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    original = payload[field]
+    payload[field] = invalid
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    blocked = assess_scorer_quality(package, source_revision=_REVISION_1)
+    calibration = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == calibration.status == "blocked"
+    assert code in _codes(blocked)
+    payload[field] = original
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert assess_scorer_quality(package, source_revision=_REVISION_2).status == "pass"
+
+
+def test_normalized_duplicate_probe_ids_block_then_recover(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    import yaml
+
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    cases = payload["scorer_quality"]["calibration_cases"]
+    cases[1]["id"] = f" {cases[0]['id']} "
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    blocked = assess_scorer_quality(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "duplicate_calibration_case" in _codes(blocked)
+    cases[1]["id"] = "distinct-probe"
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert assess_scorer_quality(package, source_revision=_REVISION_2).status == "pass"
+
+
 def test_package_validation_evidence_refs_are_preserved(tmp_path: Path) -> None:
     package = _package(tmp_path)
     assets = package / "assets"
