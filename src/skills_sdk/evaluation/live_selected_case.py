@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 from asyncio import CancelledError, gather
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from pydantic import ValidationError
@@ -31,6 +31,7 @@ from skills_sdk.providers import (
     DEFAULT_PROVIDER_CALL_CLOCK,
     DEFAULT_PROVIDER_CALL_LIMITS,
     JsonValue,
+    ProviderCallLimits,
     TextProviderAdapter,
     execute_provider_call,
 )
@@ -86,7 +87,7 @@ def _judge_identity(judge: SelectedCaseJudgeAdapter | None) -> ProviderIdentityV
             identity.adapter_version_or_digest,
         )
         return identity if all(_public_text_is_redaction_safe(value) for value in fields) else None
-    except (AttributeError, TypeError, ValueError, ValidationError, PydanticSerializationError):
+    except (AttributeError, TypeError, ValueError, RuntimeError, ValidationError, PydanticSerializationError):
         return None
 
 
@@ -96,6 +97,7 @@ async def _judge_once(
     request: ProviderExecutionRequest,
     output_text: str,
     output_sha256: str,
+    limits: ProviderCallLimits,
 ) -> tuple[object | None, str | None]:
     evidence: object | None = None
     failure: str | None = None
@@ -109,7 +111,7 @@ async def _judge_once(
     try:
         observed = (
             await gather(
-                DEFAULT_PROVIDER_CALL_CLOCK.wait_for(judge.judge(inputs), DEFAULT_PROVIDER_CALL_LIMITS.overall_seconds),
+                DEFAULT_PROVIDER_CALL_CLOCK.wait_for(judge.judge(inputs), limits.overall_seconds),
                 return_exceptions=True,
             )
         )[0]
@@ -124,7 +126,7 @@ async def _judge_once(
     finally:
         cleanup_result = (
             await gather(
-                DEFAULT_PROVIDER_CALL_CLOCK.wait_for(judge.cleanup(), DEFAULT_PROVIDER_CALL_LIMITS.cleanup_seconds),
+                DEFAULT_PROVIDER_CALL_CLOCK.wait_for(judge.cleanup(), limits.cleanup_seconds),
                 return_exceptions=True,
             )
         )[0]
@@ -169,6 +171,10 @@ async def execute_selected_case_with_judge(
     judge_identity = _judge_identity(judge)
     if judge_identity is None or judge is None:
         return _blocked(definition, request, "judge_adapter_required")
+    try:
+        judge_limits = replace(DEFAULT_PROVIDER_CALL_LIMITS)
+    except (AttributeError, TypeError, ValueError):
+        return _blocked(definition, request, "invalid_judge_limits")
     request_payload = request.model_dump(mode="json")
     stable_request = ProviderExecutionRequest.model_validate(request_payload)
     try:
@@ -192,7 +198,7 @@ async def execute_selected_case_with_judge(
     if any(not _public_text_is_redaction_safe(ref) for ref in refs):
         return _blocked(definition, stable_request, "private_provider_evidence_ref")
     judge_request = ProviderExecutionRequest.model_validate(request_payload)
-    raw_evidence, failure = await _judge_once(judge, definition, judge_request, output, digest)
+    raw_evidence, failure = await _judge_once(judge, definition, judge_request, output, digest, judge_limits)
     if not _request_matches_snapshot(request, request_payload) or not _request_matches_snapshot(
         judge_request, request_payload
     ):

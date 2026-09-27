@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Coroutine
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -186,6 +187,55 @@ def test_invalid_judge_signature_blocks_before_provider(tmp_path: Path, invalid_
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "judge_adapter_required"
+    assert events == []
+
+
+@pytest.mark.parametrize("unavailable_member", ["identity", "judge", "cleanup"])
+def test_judge_capability_access_failure_blocks_before_provider(tmp_path: Path, unavailable_member: str) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _UnavailableJudge:
+        def __getattribute__(self, name: str) -> object:
+            if name == unavailable_member:
+                raise RuntimeError("private unavailable configuration")
+            return object.__getattribute__(self, name)
+
+        identity = request.provider
+
+        async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
+            raise AssertionError("must not be called")
+
+        async def cleanup(self) -> None:
+            raise AssertionError("must not be called")
+
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition,
+            request,
+            payload,
+            _Provider(request, events),
+            cast(SelectedCaseJudgeAdapter, _UnavailableJudge()),
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "judge_adapter_required"
+    assert events == []
+
+
+def test_forged_judge_limits_block_before_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+    forged = replace(live_selected_case.DEFAULT_PROVIDER_CALL_LIMITS)
+    object.__setattr__(forged, "overall_seconds", 3600.0)
+    monkeypatch.setattr(live_selected_case, "DEFAULT_PROVIDER_CALL_LIMITS", forged)
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, payload, _Provider(request, events), _Judge(request.provider, events)
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "invalid_judge_limits"
     assert events == []
 
 
