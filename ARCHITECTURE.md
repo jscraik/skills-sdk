@@ -9,16 +9,28 @@ The package also defines secret-free provider execution envelopes and bounded
 offline orchestration through an injected adapter, prepares
 local private-registry receipts, and plans intended runtime-lock transitions.
 Real-provider transports and credentials, host apply or rollback, registry
-interaction, and publication remain outside the core package.
+interaction, and publication remain outside the portable core. Supported
+integration adapters and their end-to-end orchestration are SDK-owned future
+work, not responsibilities left to Agent-Skills or Foundry.
 
 ## Product ownership and migration
 
-Skills SDK is the canonical home for reusable skill creation, validation,
-hardening, evaluation, repair, evidence, and handoff tooling. Skills Foundry is
-the destination for retained packages that pass the applicable admission
-workflow. Agent-Skills is only a migration source while those two destinations
-are separated; new lifecycle behavior must not be added there when it belongs
-in the SDK.
+Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
+and executable tooling to create, update, check, and admit external skills and
+plugins, then orchestrate installation of selected checked versions through
+supported Tessl and Codex adapters. This is target ownership, not a claim that
+all routes currently execute. Skills Foundry holds candidates awaiting SDK
+processing, including blocked candidates; its custody does not grant approval,
+distribution, or installation and need not be permanent after processing.
+Agent-Skills is only a migration source; new SDK lifecycle behavior must not
+be added there.
+
+The target managed path is candidate holding/intake, SDK checking, private
+Tessl `jscraik` registry version, and selected Codex runtime copy. Only Jamie
+decides public release. Verify origin before exempting OpenAI-provided plugins
+or OpenAI system skills; keep their provider-managed loading paths intact.
+None of these registry, installation, or exemption outcomes is proved by the
+current local SDK contracts.
 
 Moving a stage means moving its executable behavior, versioned contracts,
 tests, fixtures, schemas, documentation, and evidence production together. A
@@ -34,8 +46,8 @@ Agent-Skills can be retired after all of these conditions are true:
 2. Model/provider execution remains behind explicit adapters while evaluation
    and judging contracts, observations, receipts, and handoff evidence remain
    portable SDK surfaces.
-3. Foundry admission and package retention consume SDK contracts without
-   owning or duplicating lifecycle logic.
+3. Foundry candidate holding and intake consume SDK contracts without owning
+   or duplicating lifecycle logic or treating held status as SDK clearance.
 4. Repository-wide searches and clean-room tests show no active Agent-Skills
    imports, subprocess calls, filesystem assumptions, or required fixtures.
 5. Every former Agent-Skills command and document has a verified SDK/Foundry
@@ -57,7 +69,7 @@ and hosted check run for the exact commit:
 | --- | --- |
 | Independent SDK lifecycle entrypoints | Exact CLI/API commands, typed result or blocker families, focused tests, and the passing canonical repository-gate run. |
 | Portable evaluation and judging | Candidate and scenario identities, provider request/result references, observations, evaluation receipt, and handoff evidence with matching digests. |
-| Foundry separation | Foundry admission/retention consumer proof against released SDK contracts, plus dependency inspection showing no duplicated lifecycle implementation. |
+| Foundry separation | Candidate holding/intake consumer proof against released SDK contracts, including blocked-candidate preservation and no implied clearance, plus dependency inspection showing no duplicated lifecycle implementation. |
 | No active Agent-Skills dependency | Clean-room SDK and Foundry runs plus repository-search output covering imports, subprocess calls, filesystem paths, and fixtures. |
 | Replacement or retirement coverage | A reviewed inventory mapping every former command and document to its SDK/Foundry entrypoint and proof, or to an explicit retirement decision. |
 
@@ -89,8 +101,9 @@ operational contracts.
   validates adapter-supplied evidence and does not run a scanner or review.
 - Changing provider execution envelopes: start with
   `ProviderExecutionRequest` and `ProviderExecutionResult` in
-  `src/skills_sdk/models/provider_execution.py`; external adapters still own
-  provider calls, credentials, and provider-result truth.
+  `src/skills_sdk/models/provider_execution.py`; injected transport adapters
+  supply credentials and provider-result truth, while supported integration
+  remains an SDK orchestration responsibility.
 - Changing offline provider-call orchestration: start with
   `execute_provider_call` in `src/skills_sdk/providers/call.py`, then follow its
   additive contracts in `src/skills_sdk/models/provider_call.py`. Injected
@@ -98,8 +111,9 @@ operational contracts.
   orchestration and public evidence.
 - Changing runtime-lock planning: follow `plan_runtime_install` in
   `src/skills_sdk/lifecycle/planning.py` and the versioned models in
-  `src/skills_sdk/models/lifecycle.py`; host adapters still own apply,
-  rollback, discovery, activation, and runtime-outcome evidence.
+  `src/skills_sdk/models/lifecycle.py`; a future SDK-owned host integration
+  must coordinate apply, rollback, discovery, activation, and runtime-outcome
+  evidence through an explicit Codex adapter.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
 - Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
@@ -154,7 +168,7 @@ Local candidate-bound contracts
     +--> lifecycle/planning.py
     |    (intended runtime-lock transition only; no host mutation)
     |
-    +--> provider, host-runtime, registry, and publication adapters
+    +--> SDK-owned provider, host-runtime, and registry integrations (planned)
          (separate external action and evidence lanes)
 ```
 
@@ -234,10 +248,11 @@ docstrings and the linked API or CLI guides.
 - Host maintenance depends on read-only validation helpers, never the reverse.
   It accepts local paths outside portable receipt contracts and does not
   implement the package-installation or runtime-lock planning protocols.
-- The CLI service-invocation paths are
+- The CLI service-invocation paths include
   `CLI -> intake/validation/packaging -> models/core` and
-  `CLI -> evaluation/quality -> validation/models/core`: `intake`, `validate`,
-  `build`, and `eval scenario-quality` invoke those services. `compare-copy`
+  `CLI -> evaluation/quality/selected_case -> validation/models/core`:
+  `intake`, `validate`, `build`, `eval scenario-quality`, and
+  `eval selected-case` invoke those services. `compare-copy`
   also composes validation, while `maintain-entrypoint` invokes the explicit
   host adapter. The remaining reserved routes stay parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
@@ -245,8 +260,9 @@ docstrings and the linked API or CLI guides.
   evaluation, distribution, lifecycle, and their model dependencies. Those
   Python API services otherwise follow
   `evaluation/distribution/lifecycle -> models/core`; the reserved CLI routes
-  do not call them. Provider clients, host-runtime adapters, registry clients,
-  and publication adapters remain external boundaries.
+  do not call them. Provider transports, host-runtime and registry operations
+  remain outside the portable core; supported adapters and orchestration belong
+  to SDK integration layers when implemented.
 
 ## Architectural invariants
 
@@ -283,16 +299,16 @@ single module:
   schema names. It applies additional Pydantic semantic checks only for
   registered families; other packaged resources are loaded directly with a
   Draft 2020-12 validator, as described in the [API guide](docs/api.md).
-- **Core ownership stays portable.** The package contains no implicit import
+- **Core ownership stays portable.** The core contains no implicit import
   of Agent-Skills, Tessl, Codex, a provider account, a host runtime, or a
-  machine-specific filesystem layout. External adapters must supply their own
-  candidate-bound evidence.
+  machine-specific filesystem layout. SDK-owned integrations must collect
+  candidate-bound evidence from external adapters.
 - **Evidence lanes do not collapse.** A local validation or receipt proves
   only its local lane. It does not prove hosted checks, provider acceptance,
   runtime installation, registry publication, or installed behavior.
 - **Runtime planning is intended state only.** `RuntimeLock` and `InstallPlan`
   bind package, registry, target, file, and digest identities while retaining
-  `mutation_performed: false`. A future host adapter owns apply and rollback
+  `mutation_performed: false`. A future SDK-owned host integration owns apply and rollback
   journals, race handling, installation results, discovery, activation, and
   runtime-outcome evidence.
 

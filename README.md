@@ -14,7 +14,7 @@ transition with `plan_runtime_install`. The plan is portable and
 mutation-free: it does not resolve host paths, write a lock, install files,
 execute rollback, or prove discovery, activation, or runtime behavior. Package
 installation, runtime-lock application, rollback, discovery, and activation
-belong to a future host adapter and separate evidence contracts. The narrower
+require future SDK-owned host integration and separate evidence contracts. The narrower
 existing-copy comparison and maintenance routes are documented in
 [`docs/runtime-copy-integration.md`](docs/runtime-copy-integration.md).
 
@@ -38,30 +38,42 @@ existing-copy comparison and maintenance routes are documented in
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
 series. The implemented local commands are `intake`, `validate`, `build`,
-`eval scenario-quality`, `compare-copy`, and `maintain-entrypoint`. Comparison
-is read-only. Maintenance is read-only by default and requires explicit
-`--apply` to change an existing host file. The other lifecycle names, including
-`inventory`, the remaining `eval` routes, `package`,
+`eval scenario-quality`, `eval selected-case`, `compare-copy`, and
+`maintain-entrypoint`. Comparison is read-only. Maintenance is read-only by
+default and requires explicit `--apply` to change an existing host file. The
+other lifecycle names, including `inventory`, `package`,
 `project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
 anything, mutate a runtime, or publish to a registry.
 
-Skills SDK is the canonical destination for the skill lifecycle workflow:
-authoring and intake guidance, validation and security checks, scenario design,
-model-backed evaluation and judging contracts, evidence review, repair, and
-handoff. Agent-Skills is a transitional migration source and must not become a
-runtime, test, documentation, or release dependency. Skills Foundry owns the
-retained skill packages admitted by that workflow; it does not own the
-lifecycle tooling.
+Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
+and executable orchestration for skill and plugin creation, updates, checks,
+external intake, and installation of selected checked versions. Its reusable
+core stays portable; supported Tessl and Codex adapters remain SDK integration
+responsibilities, not core dependencies. Most of this end-to-end route is still
+planned, not implemented. Agent-Skills is a transitional migration source and
+must not become a runtime, test, documentation, or release dependency. Skills
+Foundry holds candidates awaiting SDK processing, including blocked candidates;
+holding is not SDK clearance, installation, distribution, or a requirement for
+permanent post-processing custody.
+
+The target managed flow is Foundry holding or new authoring/external intake,
+then SDK checking, a checked private version in Jamie's Tessl `jscraik`
+workspace, then selected Codex runtime copies sourced from that version in
+`~/.codex/skills` or `~/.codex/plugins` as applicable.
+Neither a local receipt nor the current `tessl prepare` route proves this flow.
+Only Jamie chooses a public release. Verified OpenAI-provided plugins and
+OpenAI system skills remain on their provider-managed paths; names, locations,
+and compatible formats alone do not establish an exemption.
 
 The migration is complete only when the SDK provides independently usable
-routes and proof for those lifecycle stages, Foundry can retain the resulting
-packages without importing Agent-Skills, and every remaining Agent-Skills
+routes and proof for those lifecycle stages, Foundry can hold candidates
+without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
 CLI names above remain honest discovery boundaries except for the implemented
-`intake`, `validate`, `build`, `eval scenario-quality`, `compare-copy`, and
-`maintain-entrypoint` routes.
+`intake`, `validate`, `build`, `eval scenario-quality`, `eval selected-case`,
+`compare-copy`, and `maintain-entrypoint` routes.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
 required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
 decision.
@@ -117,9 +129,10 @@ decision.
 - A prompt-free CLI contract with JSON output and stable exit behavior for the
   implemented commands.
 
-The SDK does not own canonical package source, real-provider transport or
-credentials, runtime projection or installation, Tessl or other registry
-publication, or installed behavior. Those are separate lanes and must supply
+The SDK core does not own canonical package source, real-provider credentials
+or transport, registry operation, or host mutation. SDK-owned adapters must
+orchestrate selected registry and runtime paths when implemented; their
+external outcomes remain separate lanes and must supply
 their own evidence for the same candidate identity. See
 [`docs/compatibility.md`](docs/compatibility.md) for the compatibility policy
 and evidence boundary.

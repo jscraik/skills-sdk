@@ -10,7 +10,9 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 ```
 
 The CLI exposes these routes. Existing-copy maintenance is the only route
-below that permits a host write, and requires explicit `--apply`:
+below that permits a host write, and requires explicit `--apply`. The names
+do not by themselves implement the SDK's target create, update, check,
+external-intake, private Tessl delivery, or Codex installation workflow:
 
 ```text
 inventory   intake   validate   build   eval   package   project   verify
@@ -19,7 +21,8 @@ compare-copy   maintain-entrypoint
 ```
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
-`intake`, `validate`, and `build` routes are implemented local commands:
+`intake`, `validate`, `build`, `eval scenario-quality`, and `eval selected-case`
+are implemented local commands:
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk intake ./skills/example --context ./intake-context.json --json --robot
@@ -43,7 +46,7 @@ manifest, without writing into the package. The generic parser continues to
 accept `package-receipt/v1` for compatibility. A blocked build may have
 `candidate: null` when the source identity cannot be resolved.
 `--json` emits the versioned contract. `--robot` is an accepted no-op that
-reserves the prompt-free automation contract. The remaining routes are stable
+reserves the prompt-free automation contract. Other routes remain stable
 discovery boundaries while their deeper implementations are built in separate,
 candidate-bound lanes:
 
@@ -70,6 +73,14 @@ candidate-bound lanes:
   installed behavior.
 - `tessl prepare` and `tessl verify` name preparation and verification only;
   neither publishes or changes registry state.
+
+The intended managed installation source is an exact SDK-checked version in
+Jamie's private Tessl `jscraik` workspace, not Foundry or Agent-Skills files.
+No current CLI route publishes, reads back, or installs such a version. Only
+Jamie chooses a public release. Origin-verified OpenAI-provided plugins and
+OpenAI system skills keep their provider-managed loading and installation
+routes. That route exemption does not waive applicable SDK checks or evidence
+when those packages separately enter an SDK workflow.
 
 Run `bash scripts/validate-repository.sh` for the repository's complete local
 schema, lint, test, build, and diff checks. Do not pass credentials or machine

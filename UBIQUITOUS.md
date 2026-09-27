@@ -110,18 +110,24 @@ _Avoid_: installed package, provider artifact
 ### Boundaries and actors
 
 **Skills SDK**:
-The canonical owner and destination for portable skill lifecycle contracts and
-tooling: authoring, validation, hardening, evaluation, repair, evidence, and
-handoff. At the provider-call boundary, it owns bounded local orchestration and
-public evidence; the injected adapter owns real-provider transport and external
-truth. Only routes documented as implemented may be treated as executable;
-destination ownership does not prove that every migration stage is complete.
-_Avoid_: retained package collection, installed runtime, completed migration
+The canonical owner of the agent-facing `SKILL.md`, references, evaluation
+workflow, and executable tooling for creation, updates, checking, external
+intake, and installation orchestration through supported Tessl and Codex
+adapters. Its portable core owns contracts and bounded local provider-call
+orchestration; adapters own external transport and observed outcomes. Only
+routes documented as implemented may be treated as executable; target
+ownership does not prove registry or installed-runtime state.
+_Avoid_: candidate holding, registry service, completed migration
 
 **Skills Foundry**:
-The owner of retained skill packages and their admission and collection state.
-It consumes SDK contracts at an explicit boundary and must not duplicate or own
-the reusable lifecycle tooling.
+The holding location for skill and plugin candidates awaiting SDK processing,
+including rejected or blocked candidates with reasons. Holding does not grant
+SDK clearance, installation, or distribution, and need not be permanent custody
+after processing. The frozen inventory `admit_to_foundry` value remains an
+intended, source-, rights-, and assessment-gated disposition for Foundry
+collection membership; it does not mean that holding alone granted admission
+or that any filesystem or registry mutation occurred. It must not duplicate
+reusable SDK lifecycle tooling.
 _Avoid_: SDK contract library, Agent-Skills migration source
 
 **Agent-Skills migration source**:
@@ -183,7 +189,7 @@ _Avoid_: build, runtime projection, source admission
 - A **Boundary route** may lead to a provider, **Runtime projection**, or
   **Publication lane**, but it does not establish that downstream state.
 - **Skills SDK** owns reusable lifecycle contracts and tooling; **Skills
-  Foundry** owns retained packages; **Agent-Skills migration source** is retired
+  Foundry** holds candidates awaiting processing; **Agent-Skills migration source** is retired
   only after both destinations pass their documented independence evidence and
   required behavior has replacement-or-retirement coverage.
 
@@ -214,11 +220,11 @@ Run the checkout-scoped commands below from the repository checkout root so
 | --- | --- |
 | “Validate this skill” | Run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate "<package-root>" --source-revision "<40-lowercase-hex>" --json --robot`; for an invocation that reaches the validator, treat exit `0` as a passing result and exit `2` as a typed blocker. Argparse also uses exit `2` for malformed invocations before a versioned result exists. |
 | “Build this package” | Run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build "<package-root>" --source-revision "<40-lowercase-hex>" --json --robot`; for an invocation that reaches the builder, call the result a candidate-bound receipt, not an archive or publication. Argparse rejects malformed invocations before a versioned receipt exists. |
-| “Make it available” | First name the target lane. Use `validate` or `build` for local contract proof; hand installation, provider execution, and publication to their owning adapter or registry workflow. |
+| “Make it available” | First name the target lane. Local `validate` or `build` proves only a candidate contract. The intended SDK integration path checks the exact version, publishes it privately to Tessl `jscraik`, and installs selected non-exempt versions into Codex; these latter operations are not implemented by the current CLI. Only Jamie may select public release. |
 | “Check the schemas” | Run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` for generated-schema drift. For hand-maintained resources, also run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py`. Then use `SchemaRegistry` or the documented Draft 2020-12 validator for the payload family. |
 | “Is it verified?” | Identify the evidence lane and candidate identity, then inspect that lane's result; a local receipt alone does not prove runtime, provider, registry, or hosted state. |
 | “Move this workflow into the SDK” | Move the portable lifecycle behavior, contracts, schemas, tests, documentation, and evidence production together; do not leave a wrapper or required checkout dependency on Agent-Skills. |
-| “Put this skill in the Foundry” | Apply the Foundry-owned admission and retention workflow using SDK contracts; do not move reusable lifecycle tooling into the retained package collection. |
+| “Put this skill in the Foundry” | Hold the candidate and provenance for SDK processing without treating custody as clearance, installation, distribution, or permanent post-processing ownership. |
 | “Retire Agent-Skills” | Require the documented clean-room SDK and Foundry independence evidence plus replacement-or-retirement coverage; documentary ownership alone is not a retirement pass. |
 
 ## Example Dialogue
