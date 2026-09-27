@@ -512,6 +512,14 @@ def _plain_input_containers(value: object, *, depth: int, active: set[int], rema
     if not isinstance(value, (list, dict)):
         if value is not None and not isinstance(value, (bool, int, float, str)):
             raise _contract_error("invalid_provider_input", "provider input must contain only JSON-compatible values")
+        if isinstance(value, str):
+            return str.__str__(value)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return int.__int__(value)
+        if isinstance(value, float):
+            return float.__float__(value)
         return value
     identity = id(value)
     if identity in active:
@@ -520,7 +528,9 @@ def _plain_input_containers(value: object, *, depth: int, active: set[int], rema
     try:
         if isinstance(value, dict):
             items = dict.items(value)
-            ordered = sorted(items) if all(isinstance(key, str) for key in dict.__iter__(value)) else items
+            if any(not isinstance(key, str) for key in dict.__iter__(value)):
+                raise _contract_error("invalid_provider_input", "provider input must contain only string keys")
+            ordered = sorted(((str.__str__(key), item) for key, item in items), key=lambda pair: pair[0])
             return {
                 key: _plain_input_containers(item, depth=depth + 1, active=active, remaining=remaining)
                 for key, item in ordered

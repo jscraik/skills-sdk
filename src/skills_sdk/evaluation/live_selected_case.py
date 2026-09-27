@@ -10,7 +10,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from typing import Protocol, cast
 
-from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.errors import ContractError
@@ -212,10 +211,14 @@ async def execute_selected_case_with_judge(
 ) -> EvaluationReceiptV2:
     """Execute one provider call, then judge its actual output before scoring."""
     definition = _revalidate_definition(definition)
-    try:
-        request = ProviderExecutionRequest.model_validate(request)
-    except ValidationError:
+
+    async def revalidate_request() -> ProviderExecutionRequest:
+        return ProviderExecutionRequest.model_validate(request)
+
+    observed_request = (await gather(revalidate_request(), return_exceptions=True))[0]
+    if isinstance(observed_request, BaseException):
         raise ContractError("invalid_provider_request", "provider request failed revalidation") from None
+    request = observed_request
     provider_fields = (
         request.provider.provider_id,
         request.provider.model_id,

@@ -149,6 +149,40 @@ def test_forged_private_provider_identity_rejects_before_dispatch(tmp_path: Path
     assert events == []
 
 
+def test_request_serializer_failure_is_typed_before_dispatch(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _UnserializableRequest(ProviderExecutionRequest):
+        def model_dump(self, *args: object, **kwargs: object) -> dict[str, object]:
+            raise OSError("private serializer failure")
+
+    broken = _UnserializableRequest.model_construct(**request.model_dump())
+    with pytest.raises(ContractError, match="invalid_provider_request"):
+        asyncio.run(
+            execute_selected_case_with_judge(
+                definition, broken, payload, _Provider(request, events), _Judge(request.provider, events)
+            )
+        )
+    assert events == []
+
+
+def test_input_string_subclass_is_canonicalized_before_dispatch(tmp_path: Path) -> None:
+    definition, payload, request, events = _setup(tmp_path)
+
+    class _HostString(str):
+        def encode(self, *args: object, **kwargs: object) -> bytes:
+            raise OSError("private host failure")
+
+    host_payload = {"prompt": _HostString(payload["prompt"])}
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition, request, host_payload, _Provider(request, events), _Judge(request.provider, events)
+        )
+    )
+    assert receipt.status == "pass"
+    assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
+
+
 def test_judge_failure_blocks_and_cleans_up(tmp_path: Path) -> None:
     definition, payload, request, events = _setup(tmp_path)
     receipt = asyncio.run(
