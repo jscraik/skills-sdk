@@ -191,6 +191,7 @@ def test_judge_failure_blocks_and_cleans_up(tmp_path: Path) -> None:
         )
     )
     assert receipt.status == "blocked"
+    assert receipt.case_results[0].runner_id == request.provider.adapter_id
     assert events == ["provider", "provider_cleanup", "judge", "judge_cleanup"]
 
 
@@ -468,6 +469,9 @@ def test_provider_cleanup_failure_never_invokes_judge(tmp_path: Path) -> None:
         )
     )
     assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker is not None
+    assert receipt.case_results[0].blocker.code == "provider_cleanup_failed"
+    assert "evidence/provider-result.json" in receipt.case_results[0].blocker.evidence_refs
     assert events == ["provider", "provider_cleanup"]
 
 

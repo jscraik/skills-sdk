@@ -72,8 +72,10 @@ def _blocked(
     request: ProviderExecutionRequest,
     code: str,
     evidence_refs: tuple[str, ...] = (),
+    *,
+    runner: ProviderIdentityV2 | None = None,
 ) -> EvaluationReceiptV2:
-    observation = _blocked_observation(definition, request, code, f"selected-case {code}", evidence_refs)
+    observation = _blocked_observation(definition, request, code, f"selected-case {code}", evidence_refs, runner=runner)
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 
 
@@ -256,11 +258,19 @@ async def execute_selected_case_with_judge(
         return _blocked(definition, stable_request, exc.code)
     if not _request_matches_snapshot(request, request_payload):
         return _blocked(definition, stable_request, "selected_case_request_mutated")
+    try:
+        outcome.public_result.execution.validate_against_request(stable_request)
+    except ValueError:
+        return _blocked(
+            definition, stable_request, "selected_case_request_mutated", outcome.public_result.execution.evidence_refs
+        )
     failure = outcome.public_result.execution.blocker or outcome.public_result.execution.error
     if not outcome.public_result.cleanup_succeeded:
         if failure is not None:
             return _blocked(definition, stable_request, failure.code, failure.evidence_refs)
-        return _blocked(definition, stable_request, "provider_cleanup_failed")
+        return _blocked(
+            definition, stable_request, "provider_cleanup_failed", outcome.public_result.execution.evidence_refs
+        )
     output = outcome.complete_text
     digest = outcome.public_result.output_sha256
     if output is None or digest is None:
@@ -280,15 +290,17 @@ async def execute_selected_case_with_judge(
     if not _request_matches_snapshot(request, request_payload) or not _request_matches_snapshot(
         judge_request, request_payload
     ):
-        return _blocked(definition, stable_request, "selected_case_request_mutated")
+        return _blocked(
+            definition, stable_request, "selected_case_request_mutated", refs, runner=judge_bindings.identity
+        )
     if failure is not None:
-        return _blocked(definition, stable_request, failure, refs)
+        return _blocked(definition, stable_request, failure, refs, runner=judge_bindings.identity)
     converted = (await gather(_convert_judge_evidence(raw_evidence), return_exceptions=True))[0]
     if isinstance(converted, BaseException):
-        return _blocked(definition, stable_request, "invalid_judge_evidence", refs)
+        return _blocked(definition, stable_request, "invalid_judge_evidence", refs, runner=judge_bindings.identity)
     evidence = converted
     if evidence.judge != judge_bindings.identity:
-        return _blocked(definition, stable_request, "judge_identity_mismatch", refs)
+        return _blocked(definition, stable_request, "judge_identity_mismatch", refs, runner=judge_bindings.identity)
     observation = _validated_observation(definition, stable_request, evidence, output, digest, refs)
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 

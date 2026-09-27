@@ -20,6 +20,7 @@ from skills_sdk.evaluation.quality import _capture_evals, _ClosedLoader
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2, ScenarioObservationV2, ScenarioSetV2
 from skills_sdk.models.packaging import PackageManifestFile, PackageReceiptBlocker
+from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, _identity_is_public
 from skills_sdk.models.safety import _public_text_is_redaction_safe
@@ -348,6 +349,8 @@ def _blocked_observation(
     code: str,
     message: str,
     evidence_refs: tuple[str, ...] = (),
+    *,
+    runner: ProviderIdentityV2 | None = None,
 ) -> ScenarioObservationV2:
     """Build a candidate-bound blocked observation for one selected case."""
     if not _public_text_is_redaction_safe(code):
@@ -357,14 +360,15 @@ def _blocked_observation(
         code = "private_provider_evidence_ref"
         message = "provider evidence references contain credential-shaped values"
         evidence_refs = ()
+    bound_runner = runner if runner is not None else request.provider
     return ScenarioObservationV2(
         candidate=definition.scenario_set.candidate,
         scenario_set_id=definition.scenario_set.scenario_set_id,
         case_id=definition.scenario_set.cases[0].case_id,
         provider=request.provider,
         status="blocked",
-        runner_id=request.provider.adapter_id,
-        runner_version_or_digest=request.provider.adapter_version_or_digest,
+        runner_id=bound_runner.adapter_id,
+        runner_version_or_digest=bound_runner.adapter_version_or_digest,
         blocker=_blocker(code, message, evidence_refs),
     )
 
@@ -404,6 +408,7 @@ def _validated_observation(
             "invalid_provider_output",
             "provider output digest does not bind canonical text",
             provider_evidence_refs,
+            runner=supplied.judge,
         )
     case_id = definition.scenario_set.cases[0].case_id
     if (
@@ -420,6 +425,7 @@ def _validated_observation(
             "selected_case_identity_mismatch",
             "assertion evidence does not bind the executed output",
             provider_evidence_refs,
+            runner=supplied.judge,
         )
     if not set(supplied.satisfied_assertion_ids) <= set(definition.semantic_signal_ids):
         return _blocked_observation(
@@ -428,6 +434,7 @@ def _validated_observation(
             "missing_semantic_evidence",
             "semantic assertions require bound evidence",
             provider_evidence_refs,
+            runner=supplied.judge,
         )
     deterministic = _deterministic_signals(output_text, definition.deterministic_assertions)
     case = definition.scenario_set.cases[0]
@@ -439,6 +446,7 @@ def _validated_observation(
             "judge_result_ref_required",
             "judge result reference must be supplied by the host",
             provider_evidence_refs,
+            runner=supplied.judge,
         )
     evidence_refs = tuple(dict.fromkeys((*provider_evidence_refs, *supplied.evidence_refs)))
     return ScenarioObservationV2(
