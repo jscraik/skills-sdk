@@ -126,6 +126,20 @@
       "title": "Network Used",
       "type": "boolean"
     },
+    "pass_threshold": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pass Threshold"
+    },
     "schema_version": {
       "const": "scorer-quality/v1",
       "default": "scorer-quality/v1",

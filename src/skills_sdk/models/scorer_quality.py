@@ -17,6 +17,7 @@ class ScorerQualityReceipt(_ContractModel):
     status: Literal["pass", "blocked"]
     scorer_id: str = ""
     scorer_version_or_digest: str = ""
+    pass_threshold: float | None = Field(default=None, gt=0, le=1)
     calibration_probe_count: int = Field(default=0, ge=0)
     findings: tuple[ScenarioQualityFinding, ...] = ()
     mutation_performed: Literal[False] = False
@@ -31,6 +32,7 @@ class ScorerQualityReceipt(_ContractModel):
             or self.calibration_probe_count < 6
             or not self.scorer_id.strip()
             or not self.scorer_version_or_digest.strip()
+            or self.pass_threshold is None
         ):
             raise ValueError("passing scorer quality requires a candidate, probes, and no findings")
         if self.status == "blocked" and not self.findings:

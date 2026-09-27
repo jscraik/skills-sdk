@@ -145,6 +145,7 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
     if not isinstance(cases, list) or not cases:
         return [*findings, _finding("calibration_cases_present", "calibration cases are required")]
     probe_types: set[str] = set()
+    case_ids: set[str] = set()
     for case in cases:
         if not isinstance(case, Mapping) or set(case) - {
             "id",
@@ -156,7 +157,12 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
             findings.append(_finding("invalid_calibration_case", "calibration case has unsupported structure"))
             continue
         probe_type = case.get("probe_type")
-        if not _text(case.get("id")) or not isinstance(probe_type, str) or probe_type not in _PROBES:
+        case_id = case.get("id")
+        if isinstance(case_id, str) and case_id.strip():
+            if case_id in case_ids:
+                findings.append(_finding("duplicate_calibration_case", "calibration case ids must be unique"))
+            case_ids.add(case_id)
+        if not _text(case_id) or not isinstance(probe_type, str) or probe_type not in _PROBES:
             findings.append(
                 _finding("invalid_calibration_case", "calibration case needs an id and supported probe_type")
             )
@@ -218,6 +224,11 @@ def assess_scorer_quality(package_root: Path, *, source_revision: str) -> Scorer
         status="blocked" if findings else "pass",
         scorer_id=str(metadata.get("scorer_id") or ""),
         scorer_version_or_digest=str(metadata.get("scorer_version_or_digest") or ""),
+        pass_threshold=(
+            threshold
+            if (threshold := _number(metadata.get("pass_threshold"))) is not None and 0 < threshold <= 1
+            else None
+        ),
         calibration_probe_count=len(cases) if isinstance(cases, list) else 0,
         findings=tuple(findings),
     )

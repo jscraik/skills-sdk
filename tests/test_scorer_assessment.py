@@ -118,6 +118,7 @@ def test_accepted_candidate_bound_quality_and_held_out_artifacts(tmp_path: Path)
     assert quality.status == calibration.status == "pass"
     assert quality.candidate == calibration.candidate
     assert quality.calibration_probe_count == 6
+    assert quality.pass_threshold == 0.9
     assert calibration.confusion_matrix.model_dump() == {"tp": 1, "tn": 1, "fp": 0, "fn": 0}
     assert calibration.metrics.model_dump() == {"tpr": 1.0, "tnr": 1.0, "precision": 1.0, "accuracy": 1.0}
     assert calibration.parameters is not None and calibration.parameters.trial_count == 1
@@ -272,3 +273,70 @@ def test_bundle_scorer_identity_must_match_candidate_declaration(tmp_path: Path)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
     assert "scorer_identity_mismatch" in _codes(blocked)
+
+
+def test_bundle_threshold_must_match_candidate_declaration(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    manifest_path = package / "references" / "scorer-calibration" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["threshold"] = 0.99
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "scorer_identity_mismatch" in _codes(blocked)
+
+
+def test_duplicate_declared_probe_ids_block(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    import yaml
+
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    payload["scorer_quality"]["calibration_cases"][1]["id"] = "obvious_correct"
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    blocked = assess_scorer_quality(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "duplicate_calibration_case" in _codes(blocked)
+
+
+@pytest.mark.parametrize("target", ["manifest", "examples", "raw"])
+def test_deeply_nested_json_returns_typed_blocker(tmp_path: Path, target: str) -> None:
+    package = _package(tmp_path)
+    bundle = package / "references" / "scorer-calibration"
+    nested = "[" * 20000 + "0" + "]" * 20000
+    if target == "manifest":
+        (bundle / "manifest.json").write_text('{"extra":' + nested + "}", encoding="utf-8")
+    elif target == "examples":
+        (bundle / "examples.jsonl").write_text('{"extra":' + nested + "}\n", encoding="utf-8")
+    else:
+        (bundle / "raw" / "correct.json").write_text('{"extra":' + nested + "}", encoding="utf-8")
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    expected = {
+        "manifest": "calibration_bundle_parse",
+        "examples": "calibration_examples_parse",
+        "raw": "raw_artifacts_present",
+    }
+    assert expected[target] in _codes(blocked)
+
+
+def test_duplicate_rows_do_not_reread_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    package = _package(tmp_path)
+    examples = package / "references" / "scorer-calibration" / "examples.jsonl"
+    rows = examples.read_text(encoding="utf-8").splitlines()
+    examples.write_text("\n".join([*rows, *([rows[0]] * 1000)]) + "\n", encoding="utf-8")
+
+    from skills_sdk.evaluation import scorer_calibration
+
+    original = scorer_calibration.read_candidate_artifact
+    raw_reads: list[str] = []
+
+    def tracked(root: Path, validation: object, path: str) -> bytes:
+        if "/raw/" in path:
+            raw_reads.append(path)
+        return original(root, validation, path)
+
+    monkeypatch.setattr(scorer_calibration, "read_candidate_artifact", tracked)
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert "duplicate_calibration_example" in _codes(blocked)
+    assert not raw_reads

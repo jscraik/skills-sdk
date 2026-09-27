@@ -57,7 +57,10 @@ def _json_object(payload: bytes) -> dict[str, object]:
             result[key] = value
         return result
 
-    loaded = json.loads(payload.decode("utf-8"), object_pairs_hook=unique)
+    try:
+        loaded = json.loads(payload.decode("utf-8"), object_pairs_hook=unique)
+    except RecursionError as exc:
+        raise ValueError("json_nesting_exceeded") from exc
     if not isinstance(loaded, dict):
         raise ValueError("json_root_not_object")
     return loaded
@@ -299,8 +302,10 @@ def assess_scorer_calibration(package_root: Path, *, source_revision: str) -> Sc
             raw_dir = _bundle_path(manifest.get("raw_artifacts_dir"), "raw")
             rows, parse_findings = _read_examples(package_root, validation, examples_path)
             findings.extend(parse_findings)
-            findings.extend(_duplicate_findings(rows, examples_path))
-            findings.extend(_artifact_findings(package_root, validation, rows, manifest, examples_path, raw_dir))
+            duplicates = _duplicate_findings(rows, examples_path)
+            findings.extend(duplicates)
+            if not duplicates:
+                findings.extend(_artifact_findings(package_root, validation, rows, manifest, examples_path, raw_dir))
         except ValueError:
             findings.append(_finding("calibration_examples_parse", "examples path is unsafe"))
     matrix = _matrix(rows)
@@ -315,6 +320,7 @@ def assess_scorer_calibration(package_root: Path, *, source_revision: str) -> Sc
             or (
                 manifest.get("scorer_id") != declared.scorer_id
                 or manifest.get("scorer_version_or_digest") != declared.scorer_version_or_digest
+                or _number(manifest.get("threshold")) != declared.pass_threshold
             )
         ):
             findings.append(
