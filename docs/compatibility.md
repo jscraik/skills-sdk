@@ -319,6 +319,9 @@ portable blocker findings, applied calibration policy, retained judge
 parameters, and confusion-derived rates. Source `preview` maps to SDK `pass`;
 source `blocked` remains `blocked`. Expected scores outside `[0, 1]` are also
 blocked by the SDK's stricter typed outcome check.
+The SDK also binds each expected outcome to its probe type: obvious-correct
+must pass, rejection probes must fail, and the comparative verbosity probe
+must declare `short_correct_wins` rather than a single-case score or label.
 This extraction covers scorer quality and held-out calibration only; it does
 not complete the nine-area evaluation workflow or downstream consumer cutover.
 

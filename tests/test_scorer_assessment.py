@@ -57,7 +57,9 @@ def _package(root: Path) -> Path:
         "deterministic_checks_first": True,
         "segmentation_fields": ["category", "claim_ids", "eval_modes"],
         "calibration_cases": [
-            {"id": probe, "probe_type": probe, "expected_label": "pass" if probe == "obvious_correct" else "fail"}
+            {"id": probe, "probe_type": probe, "expected_direction": "short_correct_wins"}
+            if probe == "short_correct_vs_verbose_wrong"
+            else {"id": probe, "probe_type": probe, "expected_label": "pass" if probe == "obvious_correct" else "fail"}
             for probe in _PROBES
         ],
     }
@@ -628,6 +630,50 @@ def test_declared_expected_score_and_label_must_agree(tmp_path: Path) -> None:
     blocked = assess_scorer_quality(package, source_revision=_REVISION_1)
     assert blocked.status == "blocked"
     assert "calibration_expected_outcomes" in _codes(blocked)
+
+
+@pytest.mark.parametrize("probe_type", _PROBES)
+def test_calibration_probe_outcome_must_match_type_then_recovers(tmp_path: Path, probe_type: str) -> None:
+    package = _package(tmp_path)
+    import yaml
+
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    case = next(item for item in payload["scorer_quality"]["calibration_cases"] if item["probe_type"] == probe_type)
+    original = dict(case)
+    case.pop("expected_label", None)
+    case.pop("expected_direction", None)
+    case["expected_label"] = "fail" if probe_type == "obvious_correct" else "pass"
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    blocked = assess_scorer_quality(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "calibration_expected_outcomes" in _codes(blocked)
+    case.clear()
+    case.update(original)
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert assess_scorer_quality(package, source_revision=_REVISION_2).status == "pass"
+
+
+def test_calibration_score_only_and_direction_are_probe_bound(tmp_path: Path) -> None:
+    package = _package(tmp_path)
+    import yaml
+
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    wrong = next(
+        item for item in payload["scorer_quality"]["calibration_cases"] if item["probe_type"] == "obvious_wrong"
+    )
+    wrong.pop("expected_label")
+    wrong["expected_score"] = 1.0
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert "calibration_expected_outcomes" in _codes(assess_scorer_quality(package, source_revision=_REVISION_1))
+    wrong["expected_score"] = 0.0
+    wrong["expected_direction"] = "short_correct_wins"
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert "calibration_expected_outcomes" in _codes(assess_scorer_quality(package, source_revision=_REVISION_2))
+    wrong.pop("expected_direction")
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert assess_scorer_quality(package, source_revision="3" * 40).status == "pass"
 
 
 def test_unknown_manifest_policy_field_blocks(tmp_path: Path) -> None:

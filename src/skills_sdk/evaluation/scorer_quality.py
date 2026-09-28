@@ -169,10 +169,8 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
             )
         else:
             probe_types.add(probe_type)
-        if not _expected_outcome(case, _number(metadata.get("pass_threshold"))):
-            findings.append(
-                _finding("calibration_expected_outcomes", "each calibration case needs a typed expected outcome")
-            )
+        if not _expected_outcome(case, probe_type, _number(metadata.get("pass_threshold"))):
+            findings.append(_finding("calibration_expected_outcomes", "calibration outcome must match its probe type"))
     if probe_types != _PROBES:
         findings.append(_finding("calibration_probe_coverage", "all six scorer calibration probes are required"))
     bias = metadata.get("bias_probes", [])
@@ -187,7 +185,7 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
     return findings
 
 
-def _expected_outcome(case: Mapping[object, object], threshold: float | None) -> bool:
+def _expected_outcome(case: Mapping[object, object], probe_type: object, threshold: float | None) -> bool:
     score = case.get("expected_score")
     score_number = _number(score)
     label = case.get("expected_label")
@@ -196,16 +194,16 @@ def _expected_outcome(case: Mapping[object, object], threshold: float | None) ->
         return False
     if label is not None and (not isinstance(label, str) or label not in {"pass", "fail"}):
         return False
-    if direction is not None and direction != "short_correct_wins":
+    if probe_type == "short_correct_vs_verbose_wrong":
+        return direction == "short_correct_wins" and score is None and label is None
+    if probe_type not in _PROBES or direction is not None or (score is None and label is None):
         return False
-    if (
-        score_number is not None
-        and label is not None
-        and threshold is not None
-        and label != ("pass" if score_number >= threshold else "fail")
-    ):
+    expected_label = "pass" if probe_type == "obvious_correct" else "fail"
+    if label is not None and label != expected_label:
         return False
-    return score is not None or label is not None or direction is not None
+    return score_number is None or (
+        threshold is not None and ("pass" if score_number >= threshold else "fail") == expected_label
+    )
 
 
 def assess_scorer_quality(package_root: Path, *, source_revision: str) -> ScorerQualityReceipt:
