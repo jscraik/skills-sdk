@@ -13,7 +13,14 @@ from pydantic import ValidationError
 
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
-from skills_sdk.models.scorer_quality import ScorerCalibrationReceipt, ScorerJudgeParameters, ScorerQualityReceipt
+from skills_sdk.models.scorer_quality import (
+    ScorerCalibrationAppliedPolicy,
+    ScorerCalibrationMetrics,
+    ScorerCalibrationRates,
+    ScorerCalibrationReceipt,
+    ScorerJudgeParameters,
+    ScorerQualityReceipt,
+)
 from skills_sdk.validation import validate_skill_package
 
 _PROBES = (
@@ -284,6 +291,71 @@ def test_whitespace_equivalent_held_out_ids_block_then_recover(tmp_path: Path) -
     (bundle / "raw" / "other.json").write_text(json.dumps(raw), encoding="utf-8")
     examples.write_text("\n".join(json.dumps(row) for row in [*rows, duplicate]) + "\n", encoding="utf-8")
     assert assess_scorer_calibration(package, source_revision=_REVISION_2).status == "pass"
+
+
+def test_artifact_path_alias_blocks_before_raw_reads_then_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = _package(tmp_path)
+    bundle = package / "references" / "scorer-calibration"
+    examples = bundle / "examples.jsonl"
+    rows = [json.loads(line) for line in examples.read_text(encoding="utf-8").splitlines()]
+    alias = {**rows[0], "id": "other", "raw_artifact": "raw//correct.json"}
+    examples.write_text("\n".join(json.dumps(row) for row in [*rows, alias]) + "\n", encoding="utf-8")
+
+    from skills_sdk.evaluation import scorer_calibration
+
+    original = scorer_calibration.read_candidate_artifact
+    raw_reads: list[str] = []
+
+    def tracked(root: Path, validation: object, path: str) -> bytes:
+        if "/raw/" in path:
+            raw_reads.append(path)
+        return original(root, validation, path)
+
+    monkeypatch.setattr(scorer_calibration, "read_candidate_artifact", tracked)
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert "duplicate_calibration_example" in _codes(blocked)
+    assert not raw_reads
+    _bundle(package)
+    assert assess_scorer_calibration(package, source_revision=_REVISION_2).status == "pass"
+
+
+@pytest.mark.parametrize(
+    ("model", "payload"),
+    [
+        (ScorerCalibrationMetrics, {"tp": True, "tn": 1, "fp": 0, "fn": 0}),
+        (
+            ScorerCalibrationAppliedPolicy,
+            {
+                "threshold": 0.9,
+                "minimum_examples": True,
+                "minimum_true_positives": 1,
+                "minimum_true_negatives": 1,
+                "max_false_positives": 0,
+                "max_false_negatives": 0,
+            },
+        ),
+        (ScorerJudgeParameters, {"model": "local", "temperature": 0, "trial_count": True}),
+        (ScorerCalibrationRates, {"tpr": True}),
+        (
+            ScorerQualityReceipt,
+            {
+                "status": "blocked",
+                "findings": [{"code": "fixture", "message": "fixture"}],
+                "calibration_probe_count": True,
+            },
+        ),
+        (
+            ScorerCalibrationReceipt,
+            {"status": "blocked", "findings": [{"code": "fixture", "message": "fixture"}], "example_count": True},
+        ),
+    ],
+)
+def test_public_scorer_numeric_fields_reject_boolean(model: type, payload: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
 
 
 def test_bundle_scorer_identity_must_match_candidate_declaration(tmp_path: Path) -> None:

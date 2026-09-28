@@ -17,8 +17,8 @@ class ScorerQualityReceipt(_ContractModel):
     status: Literal["pass", "blocked"]
     scorer_id: str = ""
     scorer_version_or_digest: str = ""
-    pass_threshold: float | None = Field(default=None, gt=0, le=1)
-    calibration_probe_count: int = Field(default=0, ge=0)
+    pass_threshold: float | None = Field(default=None, gt=0, le=1, strict=True)
+    calibration_probe_count: int = Field(default=0, ge=0, strict=True)
     findings: tuple[ScenarioQualityFinding, ...] = ()
     mutation_performed: Literal[False] = False
     network_used: Literal[False] = False
@@ -41,32 +41,32 @@ class ScorerQualityReceipt(_ContractModel):
 
 
 class ScorerCalibrationMetrics(_ContractModel):
-    tp: int = Field(ge=0)
-    tn: int = Field(ge=0)
-    fp: int = Field(ge=0)
-    fn: int = Field(ge=0)
+    tp: int = Field(ge=0, strict=True)
+    tn: int = Field(ge=0, strict=True)
+    fp: int = Field(ge=0, strict=True)
+    fn: int = Field(ge=0, strict=True)
 
 
 class ScorerCalibrationAppliedPolicy(_ContractModel):
-    threshold: float = Field(gt=0, le=1)
-    minimum_examples: int = Field(ge=1)
-    minimum_true_positives: int = Field(ge=1)
-    minimum_true_negatives: int = Field(ge=1)
-    max_false_positives: int = Field(ge=0)
-    max_false_negatives: int = Field(ge=0)
+    threshold: float = Field(gt=0, le=1, strict=True)
+    minimum_examples: int = Field(ge=1, strict=True)
+    minimum_true_positives: int = Field(ge=1, strict=True)
+    minimum_true_negatives: int = Field(ge=1, strict=True)
+    max_false_positives: int = Field(ge=0, strict=True)
+    max_false_negatives: int = Field(ge=0, strict=True)
 
 
 class ScorerJudgeParameters(_ContractModel):
     model: NonEmptyText
-    temperature: float = Field(allow_inf_nan=False)
-    trial_count: int = Field(ge=1)
+    temperature: float = Field(allow_inf_nan=False, strict=True)
+    trial_count: int = Field(ge=1, strict=True)
 
 
 class ScorerCalibrationRates(_ContractModel):
-    tpr: float | None = Field(default=None, ge=0, le=1)
-    tnr: float | None = Field(default=None, ge=0, le=1)
-    precision: float | None = Field(default=None, ge=0, le=1)
-    accuracy: float | None = Field(default=None, ge=0, le=1)
+    tpr: float | None = Field(default=None, ge=0, le=1, strict=True)
+    tnr: float | None = Field(default=None, ge=0, le=1, strict=True)
+    precision: float | None = Field(default=None, ge=0, le=1, strict=True)
+    accuracy: float | None = Field(default=None, ge=0, le=1, strict=True)
 
 
 class ScorerCalibrationReceipt(_ContractModel):
@@ -77,7 +77,7 @@ class ScorerCalibrationReceipt(_ContractModel):
     scorer_version_or_digest: str = ""
     prompt_version: str = ""
     parameters: ScorerJudgeParameters | None = None
-    example_count: int = Field(default=0, ge=0)
+    example_count: int = Field(default=0, ge=0, strict=True)
     effective_policy: ScorerCalibrationAppliedPolicy | None = None
     confusion_matrix: ScorerCalibrationMetrics = Field(
         default_factory=lambda: ScorerCalibrationMetrics(tp=0, tn=0, fp=0, fn=0)
