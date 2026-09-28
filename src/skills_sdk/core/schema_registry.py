@@ -143,7 +143,11 @@ class SchemaRegistry:
             key=lambda error: tuple(str(part) for part in error.path),
         )
         if errors:
-            details = tuple(error.message for error in errors)
+            details = (
+                tuple(f"schema constraint failed: {error.validator}" for error in errors)
+                if name == "pr-sweep-validation.v1"
+                else tuple(error.message for error in errors)
+            )
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details)
         self._validate_registered_model(name, normalized_payload)
 
@@ -415,11 +419,15 @@ class SchemaRegistry:
             from skills_sdk.models.validation import SkillPackageValidation
 
             model = SkillPackageValidation
+        elif name == "pr-sweep-validation.v1":
+            from skills_sdk.models.pr_sweep import PrSweepValidationResult
+
+            model = PrSweepValidationResult
         else:
             return
 
         try:
-            if name in {"runtime-copy-comparison.v1", "entrypoint-maintenance-result.v1"}:
+            if name in {"runtime-copy-comparison.v1", "entrypoint-maintenance-result.v1", "pr-sweep-validation.v1"}:
                 model.model_validate_json(json.dumps(payload))
             else:
                 model.model_validate(payload)

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepValidationResult
 from skills_sdk.validation import validate_pr_sweep_dirty_closeout, validate_recurring_findings
@@ -268,6 +269,14 @@ def test_recurring_occurrences_bind_pull_identity_and_recover(tmp_path: Path, re
     assert validate_recurring_findings(path).status == "pass"
 
 
+def test_recurring_accepts_same_repository_actions_run_evidence(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.json"
+    payload = _ledger()
+    payload["classes"][0]["occurrences"][0]["evidence_ref"] = "https://github.com/jscraik/example/actions/runs/12345"
+    _write_ledger(path, payload)
+    assert validate_recurring_findings(path).status == "pass"
+
+
 @pytest.mark.parametrize("payload", ['{"schema_version":1,"schema_version":1,"classes":[]}', '{"classes":NaN}'])
 def test_recurring_rejects_noncanonical_json(tmp_path: Path, payload: str) -> None:
     path = tmp_path / "ledger.json"
@@ -334,6 +343,76 @@ def test_dirty_result_model_rejects_false_pass_accounting() -> None:
         )
 
 
+def test_dirty_result_requires_inspection_and_registry_coverage() -> None:
+    with pytest.raises(ValueError):
+        PrSweepValidationResult(kind="dirty_closeout", status="pass")
+    forged = PrSweepValidationResult(
+        kind="dirty_closeout",
+        status="pass",
+        dirty_state=PrSweepDirtyState(unstaged_paths=("x",), dirty_paths=("x",)),
+        ledgered_paths=("x",),
+    ).model_dump(mode="json")
+    forged["ledgered_paths"] = ["y"]
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("pr-sweep-validation.v1", forged)
+
+
+@pytest.mark.parametrize("path", ["/absolute/file", "C:\\unsafe\\file", "../escape"])
+def test_dirty_result_rejects_nonportable_paths_in_model_and_registry(path: str) -> None:
+    with pytest.raises(ValueError):
+        PrSweepDirtyState(unstaged_paths=(path,), dirty_paths=(path,))
+    valid = PrSweepValidationResult(kind="dirty_closeout", status="pass", dirty_state=PrSweepDirtyState()).model_dump(
+        mode="json"
+    )
+    valid["ledgered_paths"] = [path]
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("pr-sweep-validation.v1", valid)
+
+
+def test_dirty_closeout_blocks_clean_filter_without_executing_it(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    sentinel = tmp_path / "filter-ran"
+    _git(repo, "config", "filter.evil.clean", f"touch {sentinel}")
+    (repo / ".gitattributes").write_text("tracked.txt filter=evil\n", encoding="utf-8")
+    (repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "clean_filter_present"
+    assert not sentinel.exists()
+
+
+@pytest.mark.parametrize(
+    "flag,clear", [("--assume-unchanged", "--no-assume-unchanged"), ("--skip-worktree", "--no-skip-worktree")]
+)
+def test_dirty_closeout_blocks_index_hidden_changes_then_recovers(tmp_path: Path, flag: str, clear: str) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "update-index", flag, "tracked.txt")
+    (repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+    blocked = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert blocked.status == "blocked"
+    assert blocked.findings[0].code == "index_visibility_flags"
+    _git(repo, "update-index", clear, "tracked.txt")
+    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "fail"
+    (repo / "tracked.txt").write_text("initial\n", encoding="utf-8")
+    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "pass"
+
+
+def test_dirty_closeout_ignores_inherited_alternate_git_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    primary = _repo(tmp_path)
+    alternate = tmp_path / "alternate"
+    alternate.mkdir()
+    _git(alternate, "init")
+    (primary / "tracked.txt").write_text("changed\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_DIR", str(alternate / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(alternate))
+    result = validate_pr_sweep_dirty_closeout(primary, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.dirty_paths == ("tracked.txt",)
+
+
 def test_dirty_ledger_ignores_unrecognized_notes(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     (repo / "tracked.txt").write_text("edited\n", encoding="utf-8")
@@ -375,3 +454,25 @@ def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path)
     assert result.status == "fail"
     assert result.dirty_state is not None
     assert "module" in result.dirty_state.dirty_paths
+
+
+def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
+    source = _repo(tmp_path)
+    parent = tmp_path / "parent-filter"
+    parent.mkdir()
+    _git(parent, "init")
+    subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
+        cwd=parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    sentinel = tmp_path / "submodule-filter-ran"
+    _git(parent / "module", "config", "filter.evil.clean", f"touch {sentinel}")
+    (parent / "module" / ".gitattributes").write_text("tracked.txt filter=evil\n", encoding="utf-8")
+    (parent / "module" / "tracked.txt").write_text("changed\n", encoding="utf-8")
+    result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "clean_filter_present"
+    assert not sentinel.exists()

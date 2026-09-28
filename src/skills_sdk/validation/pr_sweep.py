@@ -63,12 +63,13 @@ def _occurrence_reference_matches(item: dict[str, Any]) -> bool:
     if reference.startswith("https://github.com/"):
         parsed = urlsplit(reference)
         parts = parsed.path.strip("/").split("/")
-        if parsed.netloc != "github.com" or parsed.query or parsed.fragment or len(parts) != 4:
+        if parsed.netloc != "github.com" or parsed.query or parsed.fragment or len(parts) < 4:
             return False
         if f"{parts[0]}/{parts[1]}" != item["repository"]:
             return False
         if parts[2] == "pull":
-            return parts[3] == str(item["pull_request"])
+            return len(parts) == 4 and parts[3] == str(item["pull_request"])
+        return len(parts) == 5 and parts[2:4] == ["actions", "runs"]
     return True
 
 
@@ -200,40 +201,80 @@ def _recognized_paths(value: Any) -> set[str]:
     return set()
 
 
+def _git_environment() -> dict[str, str]:
+    discovery_keys = {"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key in discovery_keys}
+
+
+def _run_git(repo_root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-c", "core.fsmonitor=false", "--no-optional-locks", *args],
+        cwd=repo_root,
+        env=_git_environment(),
+        input=input_text,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+
+
+def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | None, str | None]:
+    """Reject index or attributes that can hide dirt or execute a clean filter."""
+    if depth > 8:
+        return "git_status_unavailable", "submodule nesting exceeds safe inspection depth"
+    tracked = _run_git(repo_root, "ls-files", "-v", "-z")
+    if tracked.returncode != 0:
+        return "git_status_unavailable", "could not inspect tracked Git paths"
+    records = [record for record in tracked.stdout.split("\0") if record]
+    if any(len(record) < 3 or record[1] != " " for record in records):
+        return "git_status_unavailable", "could not parse tracked Git paths"
+    if any(record[0].islower() or record[0] == "S" for record in records):
+        return "index_visibility_flags", "index visibility flags prevent a trustworthy clean result"
+    staged = _run_git(repo_root, "ls-files", "--stage", "-z")
+    if staged.returncode != 0:
+        return "git_status_unavailable", "could not inspect tracked Git modes"
+    for record in staged.stdout.split("\0"):
+        if not record.startswith("160000 "):
+            continue
+        _, separator, path = record.partition("\t")
+        if not separator:
+            return "git_status_unavailable", "could not parse tracked Git modes"
+        submodule_root = repo_root / path
+        if submodule_root.is_symlink():
+            return "git_status_unavailable", "submodule path is not safe to inspect"
+        if (submodule_root / ".git").exists():
+            blocker_code, blocker_message = _git_status_preflight(submodule_root, depth=depth + 1)
+            if blocker_code is not None:
+                return blocker_code, blocker_message
+    paths = [record[2:] for record in records]
+    if paths:
+        attributes = _run_git(repo_root, "check-attr", "-z", "--stdin", "filter", input_text="\0".join(paths) + "\0")
+        if attributes.returncode != 0:
+            return "git_status_unavailable", "could not inspect tracked Git attributes"
+        fields = attributes.stdout.split("\0")
+        if fields[-1] != "" or (len(fields) - 1) % 3 != 0:
+            return "git_status_unavailable", "could not parse tracked Git attributes"
+        if any(value not in {"unspecified", "unset"} for value in fields[2:-1:3]):
+            return "clean_filter_present", "tracked Git filter attributes prevent read-only status inspection"
+    return None, None
+
+
 def validate_pr_sweep_dirty_closeout(
     repo_root: Path, *, ledger_path: Path | None = None, require_clean: bool = False
 ) -> PrSweepValidationResult:
     """Account for primary-checkout dirt; never equate a ledger with cleanliness."""
     try:
-        top_level = subprocess.run(
-            ["git", "-c", "core.fsmonitor=false", "--no-optional-locks", "rev-parse", "--show-toplevel"],
-            cwd=repo_root,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=30,
-        )
+        top_level = _run_git(repo_root, "rev-parse", "--show-toplevel")
         if top_level.returncode != 0 or Path(top_level.stdout.strip()).resolve() != repo_root.resolve():
             return _failure(
                 "dirty_closeout", "blocked", "invalid_repo_root", "supplied root is not a worktree top level"
             )
-        completed = subprocess.run(
-            [
-                "git",
-                "-c",
-                "core.fsmonitor=false",
-                "--no-optional-locks",
-                "status",
-                "--porcelain=v1",
-                "-z",
-                "--untracked-files=all",
-                "--ignore-submodules=none",
-            ],
-            cwd=repo_root,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=30,
+        blocker_code, blocker_message = _git_status_preflight(repo_root)
+        if blocker_code is not None and blocker_message is not None:
+            return _failure("dirty_closeout", "blocked", blocker_code, blocker_message)
+        completed = _run_git(
+            repo_root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"
         )
     except (OSError, UnicodeError, RuntimeError, subprocess.TimeoutExpired):
         return _failure("dirty_closeout", "blocked", "git_status_unavailable", "could not inspect Git dirty state")

@@ -11,10 +11,15 @@
     "status": {"enum": ["pass", "fail", "blocked"]},
     "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
     "dirty_state": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/dirty_state"}]},
-    "ledgered_paths": {"type": "array", "items": {"type": "string"}},
-    "unledgered_paths": {"type": "array", "items": {"type": "string"}}
+    "ledgered_paths": {"type": "array", "items": {"$ref": "#/$defs/portable_path"}},
+    "unledgered_paths": {"type": "array", "items": {"$ref": "#/$defs/portable_path"}}
   },
   "$defs": {
+    "portable_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?![^/]*:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\r\\n]+$"
+    },
     "finding": {
       "type": "object",
       "additionalProperties": false,
@@ -29,10 +34,10 @@
       "additionalProperties": false,
       "required": ["staged_paths", "unstaged_paths", "untracked_paths", "dirty_paths"],
       "properties": {
-        "staged_paths": {"type": "array", "items": {"type": "string"}},
-        "unstaged_paths": {"type": "array", "items": {"type": "string"}},
-        "untracked_paths": {"type": "array", "items": {"type": "string"}},
-        "dirty_paths": {"type": "array", "items": {"type": "string"}}
+        "staged_paths": {"type": "array", "items": {"$ref": "#/$defs/portable_path"}},
+        "unstaged_paths": {"type": "array", "items": {"$ref": "#/$defs/portable_path"}},
+        "untracked_paths": {"type": "array", "items": {"$ref": "#/$defs/portable_path"}},
+        "dirty_paths": {"type": "array", "items": {"$ref": "#/$defs/portable_path"}}
       }
     }
   },
@@ -48,7 +53,11 @@
     },
     {
       "if": {"properties": {"kind": {"const": "dirty_closeout"}, "status": {"const": "pass"}}},
-      "then": {"properties": {"unledgered_paths": {"maxItems": 0}}}
+      "then": {"properties": {"dirty_state": {"$ref": "#/$defs/dirty_state"}, "unledgered_paths": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "dirty_closeout"}, "status": {"const": "fail"}}},
+      "then": {"properties": {"dirty_state": {"$ref": "#/$defs/dirty_state"}}}
     },
     {
       "if": {"properties": {"status": {"const": "pass"}, "dirty_state": {"type": "object", "properties": {"dirty_paths": {"minItems": 1}}, "required": ["dirty_paths"]}}},

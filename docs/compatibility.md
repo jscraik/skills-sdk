@@ -299,15 +299,31 @@ apply. Run `bash scripts/validate-repository.sh` and record `pass`, `fail`, or
 
 ## Separate evidence lanes
 
-The PR-sweep validators replace two Agent-Skills local checks at the SDK API
-and CLI boundary: recurring-finding ledger validation and primary-checkout
-dirty-closeout accounting. The former retains the source ledger's schema
-version and three-occurrence guardrail semantics; the latter preserves the
-distinction between ledgered dirt and a clean checkout. The SDK requires an
-explicit repository root instead of deriving Agent-Skills as a default root.
-It does not run the source environment wrapper, hosted PR review, readiness
-receipt, thread resolution, merge, or cleanup. Installing and repointing the
-consumer skill remains separate cutover proof.
+The PR-sweep validators provide portable SDK API and CLI equivalents for two
+Agent-Skills local checks. Source assessment is pinned to Agent-Skills revision
+`532962c65ef0549d16168c0e899c9cb8dc032188`:
+`Skills/agent-ops/pr-green-sweep/scripts/validate_recurring_findings.py` and
+`Infrastructure/scripts/validation-and-linting/validate_pr_sweep_dirty_closeout.py`.
+The source recurring-finding test family
+`Infrastructure/tests/test_pr_green_sweep_recurring_findings.py` passed 12 cases
+using the SDK test interpreter with bytecode and pytest cache writes disabled.
+On one disposable Git fixture, the source and SDK dirty-closeout CLIs both
+returned pass for clean, fail with `primary_worktree_dirty` for a modified
+tracked file, then pass after restoration. SDK regression fixtures separately
+cover the recurring guardrail's accepted, rejected, and corrected forms.
+This is bounded source-parity evidence, not consumer cutover or full PR-sweep
+workflow equivalence.
+
+The recurring validator retains the source ledger's schema version and
+three-occurrence guardrail semantics. The dirty validator retains the
+distinction between ledgered dirt and a clean checkout. Deliberate differences:
+the SDK requires an explicit repository root, returns versioned portable
+results with exit `2` for rejected or blocked input instead of the source
+scripts' exit `1`, redacts host paths and untrusted values, and blocks unsafe
+Git status inspection rather than executing configured helpers. It does not
+run the source environment wrapper, hosted PR review, readiness receipt,
+thread resolution, merge, or cleanup. Installing and repointing the consumer
+skill remains separate cutover proof.
 
 
 The SDK's local contract and schema checks do not prove provider execution,
