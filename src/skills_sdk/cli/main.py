@@ -99,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
     for name, help_text in COMMAND_HELP.items():
-        if name in {"intake", "validate", "build", "eval"}:
+        if name in {"intake", "validate", "build", "eval", "verify"}:
             continue
         commands.add_parser(name, help=help_text, description=help_text)
     compare = commands.add_parser("compare-copy", help="compare validated source and runtime file bytes without writes")
@@ -166,6 +166,18 @@ def build_parser() -> argparse.ArgumentParser:
     selected.add_argument("--host-input", type=Path, required=True)
     selected.add_argument("--json", action="store_true", dest="json_output")
     selected.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    verify = commands.add_parser("verify", help=COMMAND_HELP["verify"], description=COMMAND_HELP["verify"])
+    verify_commands = verify.add_subparsers(dest="verify_command", title="verify commands", required=True)
+    recurring = verify_commands.add_parser("recurring-findings", help="validate a PR-sweep recurring-finding ledger")
+    recurring.add_argument("ledger", type=Path)
+    recurring.add_argument("--json", action="store_true", dest="json_output")
+    recurring.add_argument("--robot", action="store_true")
+    closeout = verify_commands.add_parser("pr-sweep-dirty-closeout", help="validate primary-checkout dirty state")
+    closeout.add_argument("--repo-root", type=Path, required=True)
+    closeout.add_argument("--ledger", type=Path)
+    closeout.add_argument("--require-clean", action="store_true")
+    closeout.add_argument("--json", action="store_true", dest="json_output")
+    closeout.add_argument("--robot", action="store_true")
     tessl = commands.add_parser(
         "tessl",
         help="prepare or verify a Tessl candidate without publishing",
@@ -343,6 +355,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.command == "verify":
+        from skills_sdk.validation import validate_pr_sweep_dirty_closeout, validate_recurring_findings
+
+        if arguments.verify_command == "recurring-findings":
+            verification = validate_recurring_findings(arguments.ledger)
+        else:
+            verification = validate_pr_sweep_dirty_closeout(
+                arguments.repo_root, ledger_path=arguments.ledger, require_clean=arguments.require_clean
+            )
+        if arguments.json_output:
+            print(json.dumps(verification.model_dump(mode="json"), sort_keys=True))
+        else:
+            print(f"verify {arguments.verify_command}: {verification.status}")
+            for finding in verification.findings:
+                print(f"  {finding.code}: {finding.message}")
+        return 0 if verification.status == "pass" else 2
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)
     if arguments.command == "compare-copy":

@@ -69,6 +69,7 @@ from skills_sdk.models.packaging import (
     PackageReceiptBlocker,
     PackageReceiptV2,
 )
+from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
 from skills_sdk.models.provider_call import (
     ProviderCallPublicResult,
@@ -175,6 +176,9 @@ __all__ = [
     "PackageSourceKind",
     "PackageType",
     "PluginIdentity",
+    "PrSweepDirtyState",
+    "PrSweepFinding",
+    "PrSweepValidationResult",
     "ProviderCallPublicResult",
     "ProviderCostObservation",
     "ProviderExecutionBlocker",

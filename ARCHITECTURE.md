@@ -256,7 +256,7 @@ docstrings and the linked API or CLI guides.
   `CLI -> intake/validation/packaging -> models/core` and
   `CLI -> evaluation/quality/selected_case -> validation/models/core`:
   `intake`, `validate`, `build`, `eval scenario-quality`, and
-  `eval selected-case` invoke those services. `compare-copy`
+  `eval selected-case`, and the two `verify` PR-sweep checks invoke those services. `compare-copy`
   also composes validation, while `maintain-entrypoint` invokes the explicit
   host adapter. The remaining reserved routes stay parse-only. This is not
   the package import graph. Importing `skills_sdk.cli.main` first initializes
