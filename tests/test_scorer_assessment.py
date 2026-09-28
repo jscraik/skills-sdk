@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
 from skills_sdk.models.package import PackageCandidateIdentity
+from skills_sdk.models.scenario_quality import ScenarioQualityFinding
 from skills_sdk.models.scorer_quality import (
     ScorerCalibrationAppliedPolicy,
     ScorerCalibrationMetrics,
@@ -400,6 +401,21 @@ def test_forged_candidate_identity_cannot_pass_scorer_receipt(tmp_path: Path, as
     with pytest.raises(ValidationError):
         type(accepted).model_validate(payload)
     assert type(accepted).model_validate(accepted.model_dump(mode="json")) == accepted
+
+
+@pytest.mark.parametrize("receipt_type", [ScorerQualityReceipt, ScorerCalibrationReceipt])
+def test_forged_finding_cannot_enter_blocked_scorer_receipt(receipt_type: type) -> None:
+    valid = ScenarioQualityFinding(code="fixture", message="fixture", evidence_refs=("references/evals.yaml",))
+    assert receipt_type(status="blocked", findings=(valid,)).status == "blocked"
+    for forged in (
+        ScenarioQualityFinding.model_construct(code="BAD", message="fixture"),
+        ScenarioQualityFinding.model_construct(code="fixture", message=""),
+        ScenarioQualityFinding.model_construct(
+            code="fixture", message="fixture", evidence_refs=(str(Path(Path.cwd().anchor, "raw.json")),)
+        ),
+    ):
+        with pytest.raises(ValidationError):
+            receipt_type(status="blocked", findings=(forged,))
 
 
 @pytest.mark.parametrize(
