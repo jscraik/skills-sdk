@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
+from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.scorer_quality import (
     ScorerCalibrationAppliedPolicy,
     ScorerCalibrationMetrics,
@@ -386,6 +387,19 @@ def test_forged_nested_calibration_model_cannot_pass(tmp_path: Path, field: str,
     with pytest.raises(ValidationError):
         ScorerCalibrationReceipt.model_validate(payload)
     assert ScorerCalibrationReceipt.model_validate(accepted.model_dump(mode="json")) == accepted
+
+
+@pytest.mark.parametrize("assess", [assess_scorer_quality, assess_scorer_calibration])
+def test_forged_candidate_identity_cannot_pass_scorer_receipt(tmp_path: Path, assess: object) -> None:
+    accepted = assess(_package(tmp_path), source_revision=_REVISION_1)
+    assert accepted.status == "pass"
+    payload = accepted.model_dump(mode="json")
+    payload["candidate"] = PackageCandidateIdentity.model_construct(
+        package_id="BAD", source_revision="x", content_sha256="y"
+    )
+    with pytest.raises(ValidationError):
+        type(accepted).model_validate(payload)
+    assert type(accepted).model_validate(accepted.model_dump(mode="json")) == accepted
 
 
 @pytest.mark.parametrize(

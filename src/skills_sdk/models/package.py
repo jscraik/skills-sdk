@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints, field_validator, model_validator
+from pydantic import ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from skills_sdk.models.inventory import (
     GitRevision,
@@ -59,6 +59,8 @@ class PackageLifecycleState(StrEnum):
 
 class PackageCandidateIdentity(_ContractModel):
     """Immutable identity shared by intake and downstream proof receipts."""
+
+    model_config = ConfigDict(revalidate_instances="always")
 
     schema_version: Literal["package-candidate/v1"] = "package-candidate/v1"
     package_id: PackageId
