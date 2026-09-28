@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepValidationResult
 from skills_sdk.validation import validate_pr_sweep_dirty_closeout, validate_recurring_findings
 
 
@@ -250,3 +252,126 @@ def test_deep_ledgers_and_looped_repo_root_return_typed_results(tmp_path: Path) 
     blocked = validate_pr_sweep_dirty_closeout(loop)
     assert blocked.status == "blocked"
     assert blocked.findings[0].code == "git_status_unavailable"
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["https://github.com/other/repo/pull/999", "https://github.com/other/repo/actions/runs/999"],
+)
+def test_recurring_occurrences_bind_pull_identity_and_recover(tmp_path: Path, reference: str) -> None:
+    path = tmp_path / "ledger.json"
+    payload = _ledger()
+    payload["classes"][0]["occurrences"][0]["evidence_ref"] = reference
+    _write_ledger(path, payload)
+    assert validate_recurring_findings(path).status == "fail"
+    _write_ledger(path, _ledger())
+    assert validate_recurring_findings(path).status == "pass"
+
+
+@pytest.mark.parametrize("payload", ['{"schema_version":1,"schema_version":1,"classes":[]}', '{"classes":NaN}'])
+def test_recurring_rejects_noncanonical_json(tmp_path: Path, payload: str) -> None:
+    path = tmp_path / "ledger.json"
+    path.write_text(payload, encoding="utf-8")
+    assert validate_recurring_findings(path).findings[0].code == "ledger_unreadable"
+
+
+def test_recurring_schema_errors_do_not_echo_host_input(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.json"
+    secret = str(tmp_path / "private-marker")
+    _write_ledger(path, {"schema_version": 1, "classes": [], "unexpected": secret})
+    result = validate_recurring_findings(path)
+    assert result.status == "fail"
+    assert secret not in result.model_dump_json()
+
+
+@pytest.mark.parametrize("reference", ["../private.txt:12", "C:\\private.txt:12"])
+def test_recurring_rejects_unsafe_local_evidence(tmp_path: Path, reference: str) -> None:
+    path = tmp_path / "ledger.json"
+    payload = _ledger()
+    payload["classes"][0]["guardrail"]["artifact_ref"] = reference
+    _write_ledger(path, payload)
+    assert validate_recurring_findings(path).status == "fail"
+
+
+def test_ledger_reader_rejects_fifo_and_symlink_without_hanging(tmp_path: Path) -> None:
+    fifo = tmp_path / "ledger.fifo"
+    os.mkfifo(fifo)
+    assert validate_recurring_findings(fifo).findings[0].code == "ledger_unreadable"
+    source = tmp_path / "source.json"
+    _write_ledger(source, _ledger())
+    link = tmp_path / "link.json"
+    link.symlink_to(source)
+    assert validate_recurring_findings(link).findings[0].code == "ledger_unreadable"
+
+
+def test_dirty_closeout_does_not_run_fsmonitor(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    sentinel = tmp_path / "monitor-ran"
+    hook = tmp_path / "monitor.sh"
+    hook.write_text(f"#!/bin/sh\ntouch '{sentinel}'\nexit 0\n", encoding="utf-8")
+    hook.chmod(0o755)
+    _git(repo, "config", "core.fsmonitor", str(hook))
+    assert validate_pr_sweep_dirty_closeout(repo).status == "pass"
+    assert not sentinel.exists()
+
+
+def test_dirty_closeout_rename_with_unstaged_edit_reports_destination_only(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "mv", "tracked.txt", "renamed.txt")
+    (repo / "renamed.txt").write_text("edited\n", encoding="utf-8")
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ("renamed.txt",)
+    assert result.dirty_state.staged_paths == ("renamed.txt", "tracked.txt")
+
+
+def test_dirty_result_model_rejects_false_pass_accounting() -> None:
+    with pytest.raises(ValueError):
+        PrSweepValidationResult(
+            kind="dirty_closeout",
+            status="pass",
+            dirty_state=PrSweepDirtyState(unstaged_paths=("changed.txt",), dirty_paths=("changed.txt",)),
+        )
+
+
+def test_dirty_ledger_ignores_unrecognized_notes(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").write_text("edited\n", encoding="utf-8")
+    ledger = tmp_path / "dirty.json"
+    _write_ledger(ledger, {"notes": ["https://example.invalid/path"], "paths": ["tracked.txt"]})
+    result = validate_pr_sweep_dirty_closeout(repo, ledger_path=ledger)
+    assert result.status == "pass"
+    assert result.ledgered_paths == ("tracked.txt",)
+
+
+def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path) -> None:
+    source = _repo(tmp_path)
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    _git(parent, "init")
+    subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
+        cwd=parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(parent, "add", ".")
+    _git(
+        parent,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.test",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "submodule",
+    )
+    _git(parent, "config", "submodule.module.ignore", "all")
+    (parent / "module" / "tracked.txt").write_text("changed\n", encoding="utf-8")
+    result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert "module" in result.dirty_state.dirty_paths

@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
+import stat
 import subprocess
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -22,16 +26,74 @@ def _failure(kind: str, status: str, code: str, message: str) -> PrSweepValidati
     )
 
 
+def _unique_members(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON member")
+        result[key] = value
+    return result
+
+
+def _reject_constant(value: str) -> None:
+    raise ValueError("non-finite JSON number")
+
+
+def _read_ledger(path: Path) -> Any:
+    """Read bounded regular JSON input without following a final symlink."""
+    flags = os.O_RDONLY | os.O_NONBLOCK
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise OSError("no-follow file opening is unavailable")
+    descriptor = os.open(path, flags | os.O_NOFOLLOW)
+    try:
+        mode = os.fstat(descriptor).st_mode
+        if not stat.S_ISREG(mode):
+            raise ValueError("ledger is not a regular file")
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            data = stream.read(2 * 1024 * 1024 + 1)
+        if len(data) > 2 * 1024 * 1024:
+            raise ValueError("ledger exceeds size limit")
+        return json.loads(data.decode("utf-8"), object_pairs_hook=_unique_members, parse_constant=_reject_constant)
+    finally:
+        os.close(descriptor)
+
+
+def _occurrence_reference_matches(item: dict[str, Any]) -> bool:
+    reference = item["evidence_ref"]
+    if reference.startswith("https://github.com/"):
+        parsed = urlsplit(reference)
+        parts = parsed.path.strip("/").split("/")
+        if parsed.netloc != "github.com" or parsed.query or parsed.fragment or len(parts) != 4:
+            return False
+        if f"{parts[0]}/{parts[1]}" != item["repository"]:
+            return False
+        if parts[2] == "pull":
+            return parts[3] == str(item["pull_request"])
+    return True
+
+
+def _local_evidence_reference_is_safe(reference: str) -> bool:
+    match = re.fullmatch(r"(.+):([0-9]+)", reference)
+    if match is None:
+        return True
+    try:
+        require_portable_relative_path(match.group(1))
+    except ContractError:
+        return False
+    return True
+
+
 def validate_recurring_findings(ledger_path: Path) -> PrSweepValidationResult:
     """Validate one supplied ledger without changing it or executing a reviewer."""
     try:
-        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+        ledger = _read_ledger(ledger_path)
+    except (OSError, UnicodeError, ValueError, RecursionError):
         return _failure("recurring_findings", "fail", "ledger_unreadable", "could not read or parse ledger JSON")
     schema = SchemaRegistry().load("pr-sweep-recurring-findings.v1")
     try:
         errors = [
-            error.message for error in Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(ledger)
+            f"ledger schema constraint failed: {error.validator}"
+            for error in Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(ledger)
         ]
     except RecursionError:
         return _failure("recurring_findings", "fail", "ledger_schema", "ledger structure exceeds validation depth")
@@ -41,6 +103,13 @@ def validate_recurring_findings(ledger_path: Path) -> PrSweepValidationResult:
             status="fail",
             findings=tuple(PrSweepFinding(code="ledger_schema", message=message) for message in sorted(errors)),
         )
+
+    for finding in ledger["classes"]:
+        references = [item["evidence_ref"] for item in finding["occurrences"]]
+        guardrail = finding["guardrail"]
+        references.append(guardrail.get("artifact_ref", guardrail.get("blocker_ref", "")))
+        if any(not _local_evidence_reference_is_safe(ref) for ref in references):
+            errors.append("ledger contains an unsafe local evidence reference")
 
     seen_ids: set[str] = set()
     seen_fingerprints: set[str] = set()
@@ -60,6 +129,8 @@ def validate_recurring_findings(ledger_path: Path) -> PrSweepValidationResult:
         occurrence_keys = {(item["repository"], item["pull_request"], item["evidence_ref"]) for item in occurrences}
         if len(occurrence_keys) != len(occurrences):
             errors.append(f"duplicate occurrence evidence: {class_id}")
+        if any(not _occurrence_reference_matches(item) for item in occurrences):
+            errors.append(f"occurrence evidence does not match repository and pull request: {class_id}")
         expected_eligible = len(occurrences) < 3 or finding["guardrail"]["status"] == "validated"
         if finding["merge_eligible"] != expected_eligible:
             errors.append(f"merge_eligible must be {str(expected_eligible).lower()}: {class_id}")
@@ -93,7 +164,7 @@ def _parse_porcelain(output: str) -> PrSweepDirtyState:
         if status[0] != " ":
             staged.update(paths)
         if status[1] != " ":
-            unstaged.update(paths)
+            unstaged.add(path)
     return PrSweepDirtyState(
         staged_paths=tuple(sorted(staged)),
         unstaged_paths=tuple(sorted(unstaged)),
@@ -104,10 +175,7 @@ def _parse_porcelain(output: str) -> PrSweepDirtyState:
 
 def _ledger_paths(value: Any) -> set[str]:
     paths: set[str] = set()
-    if isinstance(value, str):
-        if "/" in value or value.startswith("."):
-            paths.add(value)
-    elif isinstance(value, list):
+    if isinstance(value, list):
         for item in value:
             paths.update(_ledger_paths(item))
     elif isinstance(value, dict):
@@ -138,7 +206,7 @@ def validate_pr_sweep_dirty_closeout(
     """Account for primary-checkout dirt; never equate a ledger with cleanliness."""
     try:
         top_level = subprocess.run(
-            ["git", "--no-optional-locks", "rev-parse", "--show-toplevel"],
+            ["git", "-c", "core.fsmonitor=false", "--no-optional-locks", "rev-parse", "--show-toplevel"],
             cwd=repo_root,
             text=True,
             capture_output=True,
@@ -150,7 +218,17 @@ def validate_pr_sweep_dirty_closeout(
                 "dirty_closeout", "blocked", "invalid_repo_root", "supplied root is not a worktree top level"
             )
         completed = subprocess.run(
-            ["git", "--no-optional-locks", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            [
+                "git",
+                "-c",
+                "core.fsmonitor=false",
+                "--no-optional-locks",
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+                "--ignore-submodules=none",
+            ],
             cwd=repo_root,
             text=True,
             capture_output=True,
@@ -168,8 +246,8 @@ def validate_pr_sweep_dirty_closeout(
     findings: list[PrSweepFinding] = []
     if ledger_path is not None:
         try:
-            ledgered = _ledger_paths(json.loads(ledger_path.read_text(encoding="utf-8")))
-        except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+            ledgered = _ledger_paths(_read_ledger(ledger_path))
+        except (OSError, UnicodeError, ValueError, RecursionError):
             findings.append(
                 PrSweepFinding(code="ledger_unreadable", message="could not read or parse dirty-worktree ledger JSON")
             )

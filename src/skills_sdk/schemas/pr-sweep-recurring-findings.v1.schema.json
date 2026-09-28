@@ -13,7 +13,7 @@
     "evidence_ref": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(https://github\\.com/[^/]+/[^/]+/(pull|actions/runs)/[0-9]+|[^/].+:[0-9]+|[a-z][a-z0-9_-]*:[^\\s]+)$"
+      "pattern": "^(https://github\\.com/[^/]+/[^/]+/(pull|actions/runs)/[0-9]+|(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])[A-Za-z0-9_.-]*(?:/(?:[A-Za-z0-9_-]|\\.[A-Za-z0-9_-])[A-Za-z0-9_.-]*)*:[0-9]+|[a-z][a-z0-9_-]*:[A-Za-z0-9_.-]+)$"
     },
     "occurrence": {
       "type": "object",

@@ -44,7 +44,15 @@
     },
     {
       "if": {"properties": {"kind": {"const": "recurring_findings"}}},
-      "then": {"properties": {"dirty_state": {"type": "null"}}}
+      "then": {"properties": {"dirty_state": {"type": "null"}, "ledgered_paths": {"maxItems": 0}, "unledgered_paths": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "dirty_closeout"}, "status": {"const": "pass"}}},
+      "then": {"properties": {"unledgered_paths": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"status": {"const": "pass"}, "dirty_state": {"type": "object", "properties": {"dirty_paths": {"minItems": 1}}, "required": ["dirty_paths"]}}},
+      "then": {"properties": {"ledgered_paths": {"minItems": 1}}}
     }
   ]
 }

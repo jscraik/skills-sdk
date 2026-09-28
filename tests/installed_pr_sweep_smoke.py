@@ -50,6 +50,7 @@ def _ledger(eligible: bool) -> dict[str, object]:
 
 def main() -> int:
     assert "agent-skills" not in str(Path(skills_sdk.__file__).resolve())
+    assert "site-packages" in str(Path(skills_sdk.__file__).resolve())
     with TemporaryDirectory(prefix="sdk-pr-sweep-smoke-") as directory:
         root = Path(directory)
         ledger = root / "recurring.json"

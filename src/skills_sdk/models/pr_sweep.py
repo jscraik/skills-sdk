@@ -26,6 +26,13 @@ class PrSweepDirtyState(BaseModel):
     untracked_paths: tuple[str, ...] = ()
     dirty_paths: tuple[str, ...] = ()
 
+    @model_validator(mode="after")
+    def paths_match_categories(self) -> Self:
+        categorized = set(self.staged_paths) | set(self.unstaged_paths) | set(self.untracked_paths)
+        if set(self.dirty_paths) != categorized:
+            raise ValueError("dirty paths must equal the union of staged, unstaged, and untracked paths")
+        return self
+
 
 class PrSweepValidationResult(BaseModel):
     """Versioned result for one non-mutating PR-sweep guardrail."""
@@ -45,6 +52,14 @@ class PrSweepValidationResult(BaseModel):
             raise ValueError("passing validation requires no findings; failure requires findings")
         if self.kind == "recurring_findings" and self.dirty_state is not None:
             raise ValueError("recurring-findings validation cannot report Git dirty state")
+        if self.kind == "recurring_findings" and (self.ledgered_paths or self.unledgered_paths):
+            raise ValueError("recurring-findings validation cannot report dirty-worktree paths")
+        if self.kind == "dirty_closeout" and self.dirty_state is not None:
+            unledgered = set(self.dirty_state.dirty_paths) - set(self.ledgered_paths)
+            if set(self.unledgered_paths) != unledgered:
+                raise ValueError("unledgered paths must equal dirty paths minus ledgered paths")
+            if self.status == "pass" and unledgered:
+                raise ValueError("passing dirty closeout requires all dirty paths to be ledgered")
         return self
 
 
