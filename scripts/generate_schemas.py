@@ -20,6 +20,7 @@ from schema_model_groups import (
     provider_execution_schema_models,
     runtime_lifecycle_schema_models,
 )
+from scorer_receipt_schema import append_scorer_receipt_constraints
 from selected_case_schema import append_selected_case_constraints
 
 from skills_sdk.models.inventory import (
@@ -201,7 +202,6 @@ def _append_registry_preparation_constraints(schema: dict[str, Any]) -> None:
 
 def _append_risk_constraints(schema: dict[str, Any]) -> None:
     """Add JSON-Schema-expressible risk invariants to the generated contract."""
-
     schema["properties"]["sensor_ids"]["uniqueItems"] = True
     schema["properties"]["sensors"]["uniqueItems"] = True
     schema["properties"]["sensor_ids"]["items"]["pattern"] = _NORMALIZED_TEXT_PATTERN
@@ -279,7 +279,6 @@ def _append_risk_constraints(schema: dict[str, Any]) -> None:
 
 def _append_security_constraints(schema: dict[str, Any]) -> None:
     """Add JSON-Schema-expressible security invariants to the generated contract."""
-
     schema["properties"]["scanned_paths"]["items"]["pattern"] = _PORTABLE_PATH_PATTERN
     schema["properties"]["sensor_ids"]["items"]["pattern"] = _NORMALIZED_TEXT_PATTERN
     schema["properties"]["sensor_ids"]["uniqueItems"] = True
@@ -362,7 +361,6 @@ def _append_security_constraints(schema: dict[str, Any]) -> None:
 
 def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> None:
     """Project evaluation policy invariants into the committed schemas."""
-
     if filename in {"scenario-set.v1.schema.json", "scenario-set.v2.schema.json"}:
         case_name = "ScenarioCase" if filename.endswith("v1.schema.json") else "ScenarioCaseV2"
         scenario_case_properties = schema["$defs"][case_name]["properties"]
@@ -723,6 +721,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_evaluation_receipt_constraints(schema, filename)
     elif filename in {"scenario-quality.v1.schema.json", "scenario-quality.v2.schema.json"}:
         append_scenario_quality_constraints(schema, active_v2=filename == "scenario-quality.v2.schema.json")
+    elif filename in {"scorer-quality.v1.schema.json", "scorer-calibration.v1.schema.json"}:
+        append_scorer_receipt_constraints(schema, filename)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
     elif filename == "skill-package-intake.v1.schema.json":

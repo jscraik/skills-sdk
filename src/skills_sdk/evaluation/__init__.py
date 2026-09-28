@@ -10,6 +10,8 @@ __all__ = [
     "SelectedCaseJudgeInput",
     "SuppliedTextProviderAdapter",
     "assess_scenario_quality",
+    "assess_scorer_calibration",
+    "assess_scorer_quality",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_selected_case",
@@ -27,6 +29,14 @@ def __getattr__(name: str) -> object:
             "ScenarioQualityPolicy": ScenarioQualityPolicy,
             "assess_scenario_quality": assess_scenario_quality,
         }[name]
+    if name == "assess_scorer_quality":
+        from skills_sdk.evaluation.scorer_quality import assess_scorer_quality
+
+        return assess_scorer_quality
+    if name == "assess_scorer_calibration":
+        from skills_sdk.evaluation.scorer_calibration import assess_scorer_calibration
+
+        return assess_scorer_calibration
     if name in {
         "SelectedCaseJudgeAdapter",
         "SelectedCaseJudgeInput",

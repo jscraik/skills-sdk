@@ -116,6 +116,14 @@ from skills_sdk.models.scenario_quality import (
     ScenarioQualityReceipt,
     ScenarioQualityReceiptV2,
 )
+from skills_sdk.models.scorer_quality import (
+    ScorerCalibrationAppliedPolicy,
+    ScorerCalibrationMetrics,
+    ScorerCalibrationRates,
+    ScorerCalibrationReceipt,
+    ScorerJudgeParameters,
+    ScorerQualityReceipt,
+)
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
@@ -211,7 +219,13 @@ __all__ = [
     "ScenarioQualityReceiptV2",
     "ScenarioSet",
     "ScenarioSetV2",
+    "ScorerCalibrationAppliedPolicy",
+    "ScorerCalibrationMetrics",
+    "ScorerCalibrationRates",
+    "ScorerCalibrationReceipt",
+    "ScorerJudgeParameters",
     "ScorerProfile",
+    "ScorerQualityReceipt",
     "SecurityFinding",
     "SecurityScreeningResult",
     "SelectedCaseJudgeEvidence",

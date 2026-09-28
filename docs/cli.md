@@ -21,7 +21,8 @@ compare-copy   maintain-entrypoint
 ```
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
-`intake`, `validate`, `build`, `eval scenario-quality`, and `eval selected-case`
+`intake`, `validate`, `build`, `eval scenario-quality`, `eval scorer-quality`,
+`eval scorer-calibration`, and `eval selected-case`
 are implemented local commands:
 
 ```bash
@@ -30,13 +31,15 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --scenario-set active-v2 --contract-version v2 --json --robot
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scorer-quality ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scorer-calibration ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
 
-All five commands are non-interactive and non-mutating. For an invocation that
+All seven commands are non-interactive and non-mutating. For an invocation that
 reaches a service, exit `0` means intake normalized with an `admit` decision,
-validation passed, a receipt was built, or the `eval scenario-quality`
-assessment passed. Exit `2` means a structured blocker, blocked receipt, or
+validation passed, a receipt was built, or a scenario/scorer assessment
+passed. Exit `2` means a structured blocker, blocked receipt, or
 normalized non-admit intake decision was returned. Intake decision blocker
 codes remain visible in both JSON and human output. Malformed invocations are
 rejected by `argparse` with exit `2` before a versioned result exists.
@@ -56,6 +59,17 @@ candidate-bound lanes:
   Its default v1 contract retains the 5/8/10 release-set policy. Explicit
   `--contract-version v2 --scenario-set <id>` selects exactly ten active cases
   without loading historical Markdown fixtures or executing cases.
+- `eval scorer-quality` checks the candidate's `references/evals.yaml`
+  `scorer_quality` declaration, including six probe types, judge parameters,
+  rationale-audit samples, segmentation, and strict field types. It emits a
+  `scorer-quality/v1` receipt; declared probes are not executed calibration.
+- `eval scorer-calibration` checks the candidate's held-out
+  `references/scorer-calibration/manifest.json`, JSONL examples, and matching
+  raw scorer artifacts. It enforces threshold consistency, minimum positive
+  and negative coverage, false-positive and false-negative limits, and scorer
+  identity agreement with the valid declaration. It emits a
+  `scorer-calibration/v1` receipt. The SDK reads supplied artifacts but neither
+  runs a judge nor proves their external provenance.
 - `eval selected-case` loads one declared case for the requested mode, runs a
   caller-supplied bounded text adapter, validates separately supplied semantic
   assertion evidence against the candidate, case, provider, and output digest,

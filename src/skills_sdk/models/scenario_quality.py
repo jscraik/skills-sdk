@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, _ContractModel
@@ -13,6 +13,8 @@ from skills_sdk.models.packaging import BlockerCode
 
 
 class ScenarioQualityFinding(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
     code: BlockerCode
     message: NonEmptyText
     case_id: NonEmptyText | None = None
