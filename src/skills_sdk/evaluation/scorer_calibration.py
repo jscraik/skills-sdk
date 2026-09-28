@@ -7,7 +7,7 @@ import math
 from collections.abc import Mapping
 from pathlib import Path
 
-from skills_sdk.evaluation.scorer_artifacts import read_candidate_artifact
+from skills_sdk.evaluation.scorer_artifacts import index_candidate_files, read_candidate_artifact
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding
 from skills_sdk.models.scorer_quality import (
     ScorerCalibrationAppliedPolicy,
@@ -62,6 +62,9 @@ def _number(value: object) -> float | None:
 
 
 def _json_object(payload: bytes) -> dict[str, object]:
+    def reject_constant(value: str) -> object:
+        raise ValueError(f"nonstandard_json_constant:{value}")
+
     def unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
         result: dict[str, object] = {}
         for key, value in pairs:
@@ -71,7 +74,7 @@ def _json_object(payload: bytes) -> dict[str, object]:
         return result
 
     try:
-        loaded = json.loads(payload.decode("utf-8"), object_pairs_hook=unique)
+        loaded = json.loads(payload.decode("utf-8"), object_pairs_hook=unique, parse_constant=reject_constant)
     except RecursionError as exc:
         raise ValueError("json_nesting_exceeded") from exc
     if not isinstance(loaded, dict):
@@ -223,6 +226,7 @@ def _artifact_findings(
     raw_dir: str,
 ) -> list[ScenarioQualityFinding]:
     findings: list[ScenarioQualityFinding] = []
+    file_index = index_candidate_files(validation)
     threshold = _number(manifest.get("threshold"))
     for row in rows:
         findings.extend(_row_findings(row, examples_path))
@@ -239,7 +243,7 @@ def _artifact_findings(
             path = _bundle_path(row.get("raw_artifact"), "")
             if not path.startswith(raw_dir + "/"):
                 raise ValueError("raw_artifact_outside_declared_dir")
-            raw = _json_object(read_candidate_artifact(root, validation, path))
+            raw = _json_object(read_candidate_artifact(root, validation, path, file_index=file_index))
         except (OSError, UnicodeError, ValueError) as exc:
             findings.append(
                 _finding("raw_artifacts_present", f"raw artifact unavailable: {type(exc).__name__}", examples_path)

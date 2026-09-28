@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from skills_sdk.models.inventory import NonEmptyText, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
@@ -41,6 +41,8 @@ class ScorerQualityReceipt(_ContractModel):
 
 
 class ScorerCalibrationMetrics(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
     tp: int = Field(ge=0, strict=True)
     tn: int = Field(ge=0, strict=True)
     fp: int = Field(ge=0, strict=True)
@@ -48,6 +50,8 @@ class ScorerCalibrationMetrics(_ContractModel):
 
 
 class ScorerCalibrationAppliedPolicy(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
     threshold: float = Field(gt=0, le=1, strict=True)
     minimum_examples: int = Field(ge=1, strict=True)
     minimum_true_positives: int = Field(ge=1, strict=True)
@@ -57,12 +61,16 @@ class ScorerCalibrationAppliedPolicy(_ContractModel):
 
 
 class ScorerJudgeParameters(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
     model: NonEmptyText
     temperature: float = Field(allow_inf_nan=False, strict=True)
     trial_count: int = Field(ge=1, strict=True)
 
 
 class ScorerCalibrationRates(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
     tpr: float | None = Field(default=None, ge=0, le=1, strict=True)
     tnr: float | None = Field(default=None, ge=0, le=1, strict=True)
     precision: float | None = Field(default=None, ge=0, le=1, strict=True)

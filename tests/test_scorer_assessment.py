@@ -308,10 +308,10 @@ def test_artifact_path_alias_blocks_before_raw_reads_then_recovers(
     original = scorer_calibration.read_candidate_artifact
     raw_reads: list[str] = []
 
-    def tracked(root: Path, validation: object, path: str) -> bytes:
+    def tracked(root: Path, validation: object, path: str, **kwargs: object) -> bytes:
         if "/raw/" in path:
             raw_reads.append(path)
-        return original(root, validation, path)
+        return original(root, validation, path, **kwargs)
 
     monkeypatch.setattr(scorer_calibration, "read_candidate_artifact", tracked)
     blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
@@ -356,6 +356,91 @@ def test_artifact_path_alias_blocks_before_raw_reads_then_recovers(
 def test_public_scorer_numeric_fields_reject_boolean(model: type, payload: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         model.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "forged"),
+    [
+        ("confusion_matrix", ScorerCalibrationMetrics.model_construct(tp=True, tn=True, fp=False, fn=False)),
+        (
+            "effective_policy",
+            ScorerCalibrationAppliedPolicy.model_construct(
+                threshold=0.9,
+                minimum_examples=True,
+                minimum_true_positives=1,
+                minimum_true_negatives=1,
+                max_false_positives=0,
+                max_false_negatives=0,
+            ),
+        ),
+        ("parameters", ScorerJudgeParameters.model_construct(model="local", temperature=0, trial_count=True)),
+        ("metrics", ScorerCalibrationRates.model_construct(tpr=True, tnr=1.0, precision=1.0, accuracy=1.0)),
+    ],
+)
+def test_forged_nested_calibration_model_cannot_pass(tmp_path: Path, field: str, forged: object) -> None:
+    package = _package(tmp_path)
+    accepted = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert accepted.status == "pass"
+    payload = accepted.model_dump(mode="json")
+    payload[field] = forged
+    with pytest.raises(ValidationError):
+        ScorerCalibrationReceipt.model_validate(payload)
+    assert ScorerCalibrationReceipt.model_validate(accepted.model_dump(mode="json")) == accepted
+
+
+@pytest.mark.parametrize(
+    ("location", "constant", "expected_code"),
+    [
+        ("manifest.json", "NaN", "calibration_bundle_parse"),
+        ("examples.jsonl", "Infinity", "calibration_examples_parse"),
+        ("raw/correct.json", "-Infinity", "raw_artifacts_present"),
+    ],
+)
+def test_nonstandard_json_constant_blocks_then_recovers(
+    tmp_path: Path, location: str, constant: str, expected_code: str
+) -> None:
+    package = _package(tmp_path)
+    bundle = package / "references" / "scorer-calibration"
+    path = bundle / location
+    text = path.read_text(encoding="utf-8")
+    if location == "examples.jsonl":
+        first, rest = text.split("\n", 1)
+        text = first[:-1] + f', "supplemental": {constant}}}' + "\n" + rest
+    else:
+        text = text[:-1] + f', "supplemental": {constant}}}'
+    path.write_text(text, encoding="utf-8")
+    blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
+    assert blocked.status == "blocked"
+    assert expected_code in _codes(blocked)
+    _bundle(package)
+    assert assess_scorer_calibration(package, source_revision=_REVISION_2).status == "pass"
+
+
+def test_raw_artifact_reads_share_one_candidate_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    package = _package(tmp_path)
+    from skills_sdk.evaluation import scorer_calibration
+
+    original_index = scorer_calibration.index_candidate_files
+    original_read = scorer_calibration.read_candidate_artifact
+    indexes: list[object] = []
+    raw_indexes: list[object] = []
+
+    def tracked_index(validation: object) -> object:
+        index = original_index(validation)
+        indexes.append(index)
+        return index
+
+    def tracked_read(root: Path, validation: object, path: str, **kwargs: object) -> bytes:
+        if "/raw/" in path:
+            raw_indexes.append(kwargs.get("file_index"))
+        return original_read(root, validation, path, **kwargs)
+
+    monkeypatch.setattr(scorer_calibration, "index_candidate_files", tracked_index)
+    monkeypatch.setattr(scorer_calibration, "read_candidate_artifact", tracked_read)
+    assert assess_scorer_calibration(package, source_revision=_REVISION_1).status == "pass"
+    assert len(indexes) == 1
+    assert len(raw_indexes) == 2
+    assert all(index is indexes[0] for index in raw_indexes)
 
 
 def test_bundle_scorer_identity_must_match_candidate_declaration(tmp_path: Path) -> None:
@@ -424,10 +509,10 @@ def test_duplicate_rows_do_not_reread_artifacts(tmp_path: Path, monkeypatch: pyt
     original = scorer_calibration.read_candidate_artifact
     raw_reads: list[str] = []
 
-    def tracked(root: Path, validation: object, path: str) -> bytes:
+    def tracked(root: Path, validation: object, path: str, **kwargs: object) -> bytes:
         if "/raw/" in path:
             raw_reads.append(path)
-        return original(root, validation, path)
+        return original(root, validation, path, **kwargs)
 
     monkeypatch.setattr(scorer_calibration, "read_candidate_artifact", tracked)
     blocked = assess_scorer_calibration(package, source_revision=_REVISION_1)
