@@ -265,6 +265,34 @@ def test_judge_parameters_rationale_and_schema_validation(tmp_path: Path) -> Non
     registry.validate("scorer-quality.v1", recovered.model_dump(mode="json"))
 
 
+@pytest.mark.parametrize(("field", "value"), [("model", "other-judge"), ("temperature", 0.5), ("trial_count", 2)])
+def test_held_out_judge_parameters_match_declaration_then_recover(tmp_path: Path, field: str, value: object) -> None:
+    package = _package(tmp_path)
+    import yaml
+
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    payload["scorer_quality"]["scorer_type"] = "llm_judge"
+    payload["scorer_quality"]["parameters"] = {"model": "local-fixture", "temperature": 0, "trial_count": 1}
+    payload["scorer_quality"]["rationale_audit"] = {"required": True, "sampled_count": 3}
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    declared = assess_scorer_quality(package, source_revision=_REVISION_1)
+    assert declared.status == "pass"
+    assert declared.parameters is not None and declared.parameters.model == "local-fixture"
+    assert assess_scorer_calibration(package, source_revision=_REVISION_1).status == "pass"
+
+    manifest_path = package / "references" / "scorer-calibration" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["parameters"][field] = value
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    rejected = assess_scorer_calibration(package, source_revision=_REVISION_2)
+    assert rejected.status == "blocked"
+    assert "judge_parameters_mismatch" in _codes(rejected)
+    manifest["parameters"] = {"model": "local-fixture", "temperature": 0, "trial_count": 1}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    assert assess_scorer_calibration(package, source_revision="3" * 40).status == "pass"
+
+
 def test_present_optional_deterministic_judge_fields_still_validate(tmp_path: Path) -> None:
     package = _package(tmp_path)
     import yaml

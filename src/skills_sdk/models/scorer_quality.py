@@ -11,12 +11,21 @@ from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding
 
 
+class ScorerJudgeParameters(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
+    model: NonEmptyText
+    temperature: float = Field(allow_inf_nan=False, strict=True)
+    trial_count: int = Field(ge=1, strict=True)
+
+
 class ScorerQualityReceipt(_ContractModel):
     schema_version: Literal["scorer-quality/v1"] = "scorer-quality/v1"
     candidate: PackageCandidateIdentity | None = None
     status: Literal["pass", "blocked"]
     scorer_id: str = ""
     scorer_version_or_digest: str = ""
+    parameters: ScorerJudgeParameters | None = None
     pass_threshold: float | None = Field(default=None, gt=0, le=1, strict=True)
     calibration_probe_count: int = Field(default=0, ge=0, strict=True)
     findings: tuple[ScenarioQualityFinding, ...] = ()
@@ -58,14 +67,6 @@ class ScorerCalibrationAppliedPolicy(_ContractModel):
     minimum_true_negatives: int = Field(ge=1, strict=True)
     max_false_positives: int = Field(ge=0, strict=True)
     max_false_negatives: int = Field(ge=0, strict=True)
-
-
-class ScorerJudgeParameters(_ContractModel):
-    model_config = ConfigDict(revalidate_instances="always")
-
-    model: NonEmptyText
-    temperature: float = Field(allow_inf_nan=False, strict=True)
-    trial_count: int = Field(ge=1, strict=True)
 
 
 class ScorerCalibrationRates(_ContractModel):

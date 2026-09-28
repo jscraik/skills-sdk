@@ -362,6 +362,10 @@ def assess_scorer_calibration(package_root: Path, *, source_revision: str) -> Sc
             findings.append(
                 _finding("scorer_identity_mismatch", "held-out bundle must match valid scorer declarations")
             )
+        elif declared.parameters is not None and _parameters(manifest) != declared.parameters:
+            findings.append(
+                _finding("judge_parameters_mismatch", "held-out judge parameters must match scorer declarations")
+            )
     return ScorerCalibrationReceipt(
         candidate=validation.candidate,
         status="blocked" if findings else "pass",

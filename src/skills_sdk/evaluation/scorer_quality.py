@@ -5,13 +5,14 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 import yaml
 
 from skills_sdk.evaluation.quality import _TOP_FIELDS, _ClosedLoader
 from skills_sdk.evaluation.scorer_artifacts import read_candidate_artifact
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding
-from skills_sdk.models.scorer_quality import ScorerQualityReceipt
+from skills_sdk.models.scorer_quality import ScorerJudgeParameters, ScorerQualityReceipt
 from skills_sdk.validation import validate_skill_package
 
 _EVALS = "references/evals.yaml"
@@ -95,6 +96,16 @@ def _valid_parameters(value: object) -> bool:
         and isinstance(value.get("trial_count"), int)
         and not isinstance(value.get("trial_count"), bool)
         and value["trial_count"] >= 1
+    )
+
+
+def _declared_parameters(value: object) -> ScorerJudgeParameters | None:
+    if not _valid_parameters(value) or not isinstance(value, Mapping):
+        return None
+    return ScorerJudgeParameters(
+        model=cast(str, value["model"]),
+        temperature=cast(float, _number(value["temperature"])),
+        trial_count=cast(int, value["trial_count"]),
     )
 
 
@@ -241,6 +252,7 @@ def assess_scorer_quality(package_root: Path, *, source_revision: str) -> Scorer
         status="blocked" if findings else "pass",
         scorer_id=str(metadata.get("scorer_id") or ""),
         scorer_version_or_digest=str(metadata.get("scorer_version_or_digest") or ""),
+        parameters=_declared_parameters(metadata.get("parameters")),
         pass_threshold=(
             threshold
             if (threshold := _number(metadata.get("pass_threshold"))) is not None and 0 < threshold <= 1

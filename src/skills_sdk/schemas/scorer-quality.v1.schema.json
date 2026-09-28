@@ -79,6 +79,32 @@
       ],
       "title": "ScenarioQualityFinding",
       "type": "object"
+    },
+    "ScorerJudgeParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "temperature": {
+          "title": "Temperature",
+          "type": "number"
+        },
+        "trial_count": {
+          "minimum": 1,
+          "title": "Trial Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "temperature",
+        "trial_count"
+      ],
+      "title": "ScorerJudgeParameters",
+      "type": "object"
     }
   },
   "$id": "https://schemas.skills-sdk.dev/scorer-quality.v1.schema.json",
@@ -196,6 +222,17 @@
       "default": false,
       "title": "Network Used",
       "type": "boolean"
+    },
+    "parameters": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScorerJudgeParameters"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "pass_threshold": {
       "anyOf": [
