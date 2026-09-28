@@ -20,6 +20,8 @@ MAX_JSON_NESTING_DEPTH = 100
 
 SCHEMA_NAMES = frozenset(
     {
+        "pr-sweep-recurring-findings.v1",
+        "pr-sweep-validation.v1",
         "blocker.v1",
         "package-identity.v1",
         "package-inventory-set.v1",

@@ -319,6 +319,23 @@ structural and model-level bindings. The context schema is registered as
 
 ## Schema validation
 
+`validate_recurring_findings(ledger_path)` and
+`validate_pr_sweep_dirty_closeout(repo_root, ledger_path=None,
+require_clean=False)` are read-only services exported by `skills_sdk.validation`
+and the package root. They return `PrSweepValidationResult` with version
+`pr-sweep-validation/v1`, a `pass`, `fail`, or `blocked` status, and actionable
+findings. The dirty-closeout result also separates staged, unstaged, untracked,
+ledgered, and unledgered repository-relative paths. A ledger never satisfies
+`require_clean` for a dirty checkout. These services neither fetch hosted PR
+state nor execute any merge or cleanup action.
+
+The supplied recurring ledger is `schema_version: 1` and is checked against
+`pr-sweep-recurring-findings.v1`; serialized results can be checked with
+`SchemaRegistry().validate("pr-sweep-validation.v1", result.model_dump(mode="json"))`.
+Schema validity does not itself prove the recurring-finding fingerprint or
+guardrail rule; use the service for those semantic checks.
+
+
 Use `SchemaRegistry` for packaged JSON Schema structural validation. It also
 applies model-level semantic invariants for the supported contract families:
 

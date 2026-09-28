@@ -299,6 +299,17 @@ apply. Run `bash scripts/validate-repository.sh` and record `pass`, `fail`, or
 
 ## Separate evidence lanes
 
+The PR-sweep validators replace two Agent-Skills local checks at the SDK API
+and CLI boundary: recurring-finding ledger validation and primary-checkout
+dirty-closeout accounting. The former retains the source ledger's schema
+version and three-occurrence guardrail semantics; the latter preserves the
+distinction between ledgered dirt and a clean checkout. The SDK requires an
+explicit repository root instead of deriving Agent-Skills as a default root.
+It does not run the source environment wrapper, hosted PR review, readiness
+receipt, thread resolution, merge, or cleanup. Installing and repointing the
+consumer skill remains separate cutover proof.
+
+
 The SDK's local contract and schema checks do not prove provider execution,
 runtime installation, Tessl publication, or installed behavior. Those lanes
 must bind the same candidate identity and report their own evidence.

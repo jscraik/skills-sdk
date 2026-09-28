@@ -31,6 +31,9 @@ from skills_sdk.models import (
     ProviderIdentity,
     ProviderIdentityV2,
     ProviderUsageMetadata,
+    PrSweepDirtyState,
+    PrSweepFinding,
+    PrSweepValidationResult,
     RecommendedMechanism,
     RegistryIdentity,
     RegistryPreparationBlocker,
@@ -74,6 +77,13 @@ __version__ = "0.1.0"
 
 def __getattr__(name: str) -> object:
     """Load optional public evaluation exports only when requested."""
+    if name in {"validate_pr_sweep_dirty_closeout", "validate_recurring_findings"}:
+        from skills_sdk.validation.pr_sweep import validate_pr_sweep_dirty_closeout, validate_recurring_findings
+
+        return {
+            "validate_pr_sweep_dirty_closeout": validate_pr_sweep_dirty_closeout,
+            "validate_recurring_findings": validate_recurring_findings,
+        }[name]
     if name in {"ScenarioQualityPolicy", "assess_scenario_quality"}:
         from skills_sdk.evaluation.quality import ScenarioQualityPolicy, assess_scenario_quality
 
@@ -138,6 +148,9 @@ __all__ = [
     "PackageSafetyEvidenceReference",
     "PackageSafetyFinding",
     "PackageSafetyReviewer",
+    "PrSweepDirtyState",
+    "PrSweepFinding",
+    "PrSweepValidationResult",
     "ProviderCallPublicResult",
     "ProviderCostObservation",
     "ProviderExecutionBlocker",
@@ -197,4 +210,6 @@ __all__ = [
     "load_selected_case",
     "plan_runtime_install",
     "prepare_private_registry_candidate",
+    "validate_pr_sweep_dirty_closeout",
+    "validate_recurring_findings",
 ]

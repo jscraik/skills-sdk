@@ -101,3 +101,25 @@ The explicit `compare-copy` and `maintain-entrypoint` routes are documented in
 [Runtime copy integration](runtime-copy-integration.md). Comparison is read-only.
 Entrypoint maintenance requires `--apply` for a digest-bound change to an
 existing host file; it is not the reserved `project` package-installation route.
+
+## PR-sweep verification
+
+The implemented `verify` subcommands inspect supplied local evidence without
+contacting GitHub, resolving threads, changing a checkout, or authorizing a merge:
+
+```bash
+skills-sdk verify recurring-findings ./recurring-ledger.json --json --robot
+skills-sdk verify pr-sweep-dirty-closeout --repo-root ./primary-checkout --ledger ./dirty-ledger.json --json --robot
+skills-sdk verify pr-sweep-dirty-closeout --repo-root ./primary-checkout --require-clean --json --robot
+```
+
+The recurring-finding command checks the ledger schema, normalized-invariant
+fingerprints, duplicate identities and occurrences, and the three-occurrence
+guardrail rule. The dirty-closeout command requires the explicit worktree top
+level and reads `git status` there without optional Git locks. A complete
+ledger permits non-destructive accounting only;
+`--require-clean` still fails if any staged, unstaged, or untracked path exists.
+Both commands return `pr-sweep-validation/v1`: exit `0` for `pass` and `2` for
+`fail` or `blocked`. Host paths are input arguments; the result contains only
+repository-relative dirty paths. The skill's hosted checks, review, receipt,
+authorization, and merge gates remain separate.
