@@ -6,9 +6,11 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -133,6 +135,58 @@ def test_accepted_candidate_bound_quality_and_held_out_artifacts(tmp_path: Path)
     assert calibration.metrics.model_dump() == {"tpr": 1.0, "tnr": 1.0, "precision": 1.0, "accuracy": 1.0}
     assert calibration.parameters is not None and calibration.parameters.trial_count == 1
     assert not quality.execution_performed and not calibration.execution_performed
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "assess"),
+    [
+        ("scorer-quality.v1", assess_scorer_quality),
+        ("scorer-calibration.v1", assess_scorer_calibration),
+    ],
+)
+def test_standalone_scorer_schemas_enforce_receipt_state(
+    tmp_path: Path, schema_name: str, assess: Callable[..., ScorerQualityReceipt | ScorerCalibrationReceipt]
+) -> None:
+    package = _package(tmp_path)
+    schema = SchemaRegistry().load(schema_name)
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    receipt = assess(package, source_revision=_REVISION_1)
+    assert receipt.status == "pass"
+    accepted = receipt.model_dump(mode="json")
+    assert validator.is_valid(accepted)
+    required_fields = ["candidate", "scorer_id", "scorer_version_or_digest"]
+    required_fields += (
+        ["calibration_probe_count", "pass_threshold"]
+        if schema_name == "scorer-quality.v1"
+        else [
+            "example_count",
+            "effective_policy",
+            "parameters",
+            "prompt_version",
+        ]
+    )
+    for field in required_fields:
+        malformed = {key: value for key, value in accepted.items() if key != field}
+        assert not validator.is_valid(malformed), field
+        with pytest.raises(ValidationError):
+            type(receipt).model_validate(malformed)
+    for malformed in ({"status": "pass"}, {"status": "blocked"}, {**accepted, "candidate": None}):
+        assert not validator.is_valid(malformed)
+        with pytest.raises(ValidationError):
+            type(receipt).model_validate(malformed)
+    blocked = {"status": "blocked", "findings": [{"code": "invalid_input", "message": "invalid input"}]}
+    assert validator.is_valid(blocked)
+    assert type(receipt).model_validate(blocked).status == "blocked"
+    whitespace_finding = {"status": "blocked", "findings": [{"code": "invalid_input", "message": " "}]}
+    assert not validator.is_valid(whitespace_finding)
+    with pytest.raises(ValidationError):
+        type(receipt).model_validate(whitespace_finding)
+    if schema_name == "scorer-calibration.v1":
+        whitespace_model = {**accepted, "parameters": {**accepted["parameters"], "model": " "}}
+        assert not validator.is_valid(whitespace_model)
+        with pytest.raises(ValidationError):
+            type(receipt).model_validate(whitespace_model)
 
 
 def test_false_positive_rejected_then_corrected(tmp_path: Path) -> None:
