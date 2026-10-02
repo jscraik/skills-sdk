@@ -351,26 +351,31 @@ def _selected_case_eval(arguments: argparse.Namespace) -> int:
     return 0 if receipt.status == "pass" else 2
 
 
+def _verify(arguments: argparse.Namespace) -> int:
+    """Run a selected verification and render its result."""
+    from skills_sdk.validation import validate_pr_sweep_dirty_closeout, validate_recurring_findings
+
+    if arguments.verify_command == "recurring-findings":
+        verification = validate_recurring_findings(arguments.ledger)
+    else:
+        verification = validate_pr_sweep_dirty_closeout(
+            arguments.repo_root, ledger_path=arguments.ledger, require_clean=arguments.require_clean
+        )
+    if arguments.json_output:
+        print(json.dumps(verification.model_dump(mode="json"), sort_keys=True))
+    else:
+        print(f"verify {arguments.verify_command}: {verification.status}")
+        for finding in verification.findings:
+            print(f"  {finding.code}: {finding.message}")
+    return 0 if verification.status == "pass" else 2
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
     if arguments.command == "verify":
-        from skills_sdk.validation import validate_pr_sweep_dirty_closeout, validate_recurring_findings
-
-        if arguments.verify_command == "recurring-findings":
-            verification = validate_recurring_findings(arguments.ledger)
-        else:
-            verification = validate_pr_sweep_dirty_closeout(
-                arguments.repo_root, ledger_path=arguments.ledger, require_clean=arguments.require_clean
-            )
-        if arguments.json_output:
-            print(json.dumps(verification.model_dump(mode="json"), sort_keys=True))
-        else:
-            print(f"verify {arguments.verify_command}: {verification.status}")
-            for finding in verification.findings:
-                print(f"  {finding.code}: {finding.message}")
-        return 0 if verification.status == "pass" else 2
+        return _verify(arguments)
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)
     if arguments.command == "compare-copy":
