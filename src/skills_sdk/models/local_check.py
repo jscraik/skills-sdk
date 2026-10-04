@@ -40,8 +40,10 @@ class LocalCheckStage(_ContractModel):
 
     @model_validator(mode="after")
     def name_matches_receipt(self) -> LocalCheckStage:
-        if not isinstance(self.receipt, dict(_STAGE_TYPES)[self.name]):
+        receipt_type = dict(_STAGE_TYPES)[self.name]
+        if not isinstance(self.receipt, receipt_type):
             raise ValueError("local-check stage name must match its receipt type")
+        receipt_type.model_validate(self.receipt.model_dump(mode="json", warnings="error"))
         return self
 
 

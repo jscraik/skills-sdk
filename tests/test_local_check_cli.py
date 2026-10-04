@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 from test_scorer_assessment import _package
 
@@ -129,6 +130,11 @@ def test_local_check_envelope_rejects_unknown_fields_and_false_success(
         registry.validate("local-check.v1", {**accepted, "unknown": True})
     with pytest.raises(ContractError):
         registry.validate("local-check.v1", {**accepted, "stages": accepted["stages"][:-1]})
+    direct = Draft202012Validator(registry.load("local-check.v1"))
+    assert direct.is_valid(accepted)
+    assert not direct.is_valid({"status": "local_checks_passed"})
+    assert not direct.is_valid({**accepted, "stages": accepted["stages"][:-1]})
+    assert not direct.is_valid({**accepted, "stages": list(reversed(accepted["stages"]))})
 
 
 def test_local_check_envelope_rejects_earlier_blocker_before_candidate_change(
@@ -158,6 +164,17 @@ def test_local_check_revalidates_altered_stage_instances(tmp_path: Path, capsys:
     accepted = LocalCheckResult.model_validate(json.loads(capsys.readouterr().out))
     forged = accepted.stages[1].model_copy(update={"receipt": accepted.stages[3].receipt})
     stages = (accepted.stages[0], forged, *accepted.stages[2:])
+    with pytest.raises(ValidationError):
+        LocalCheckResult(status="local_checks_passed", candidate=accepted.candidate, stages=stages)
+
+
+def test_local_check_revalidates_altered_receipt_instances(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    package, context = _fixture(tmp_path)
+    assert main(_command(package, context)) == 0
+    accepted = LocalCheckResult.model_validate(json.loads(capsys.readouterr().out))
+    forged_receipt = accepted.stages[3].receipt.model_copy(update={"calibration_probe_count": 0})
+    forged_stage = accepted.stages[3].model_copy(update={"receipt": forged_receipt})
+    stages = (*accepted.stages[:3], forged_stage, accepted.stages[4])
     with pytest.raises(ValidationError):
         LocalCheckResult(status="local_checks_passed", candidate=accepted.candidate, stages=stages)
 

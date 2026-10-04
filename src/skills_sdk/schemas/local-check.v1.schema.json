@@ -1,4 +1,5 @@
 {
+  "$comment": "Use SchemaRegistry.validate for candidate equality, intake admission, first-blocker semantics, and nested receipt invariants; JSON Schema cannot compare arbitrary stage fields.",
   "$defs": {
     "IntakeChecks": {
       "additionalProperties": false,
@@ -1449,6 +1450,1036 @@
   "$id": "https://schemas.skills-sdk.dev/local-check.v1.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "properties": {
+        "stages": {
+          "items": false,
+          "maxItems": 5,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/LocalCheckStage"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "intake"
+                    },
+                    "receipt": {
+                      "$ref": "#/$defs/SkillPackageIntakeReceipt"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "receipt"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/LocalCheckStage"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "validate"
+                    },
+                    "receipt": {
+                      "$ref": "#/$defs/SkillPackageValidation"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "receipt"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/LocalCheckStage"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "scenario-quality"
+                    },
+                    "receipt": {
+                      "$ref": "#/$defs/ScenarioQualityReceiptV2"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "receipt"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/LocalCheckStage"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "scorer-quality"
+                    },
+                    "receipt": {
+                      "$ref": "#/$defs/ScorerQualityReceipt"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "receipt"
+                  ]
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/LocalCheckStage"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "scorer-calibration"
+                    },
+                    "receipt": {
+                      "$ref": "#/$defs/ScorerCalibrationReceipt"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "receipt"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "local_checks_passed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocked_stage": {
+            "type": "null"
+          },
+          "blocker": {
+            "type": "null"
+          },
+          "candidate": {
+            "$ref": "#/$defs/PackageCandidateIdentity"
+          },
+          "stages": {
+            "maxItems": 5,
+            "minItems": 5,
+            "prefixItems": [
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "intake"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageIntakeReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "normalized"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "validate"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageValidation"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scenario-quality"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScenarioQualityReceiptV2"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scorer-quality"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScorerQualityReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scorer-calibration"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScorerCalibrationReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "else": {
+        "properties": {
+          "blocker": {
+            "type": "null"
+          },
+          "stages": {
+            "minItems": 1
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "blocked_stage": {
+            "const": "context"
+          }
+        },
+        "required": [
+          "blocked_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocker": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PackageReceiptBlocker"
+              },
+              {
+                "properties": {
+                  "code": {
+                    "const": "unsupported_context_read"
+                  }
+                }
+              }
+            ]
+          },
+          "candidate": {
+            "type": "null"
+          },
+          "stages": {
+            "maxItems": 0
+          },
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "blocked_stage": {
+            "const": "candidate_changed"
+          }
+        },
+        "required": [
+          "blocked_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "minItems": 2
+          },
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "blocked_stage": {
+            "const": "intake"
+          }
+        },
+        "required": [
+          "blocked_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "maxItems": 1,
+            "minItems": 1,
+            "prefixItems": [
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "intake"
+                      },
+                      "receipt": {
+                        "$ref": "#/$defs/SkillPackageIntakeReceipt"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "blocked_stage": {
+            "const": "validate"
+          }
+        },
+        "required": [
+          "blocked_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "intake"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageIntakeReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "normalized"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "validate"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageValidation"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "blocked"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "blocked_stage": {
+            "const": "scenario-quality"
+          }
+        },
+        "required": [
+          "blocked_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "intake"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageIntakeReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "normalized"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "validate"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageValidation"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scenario-quality"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScenarioQualityReceiptV2"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "blocked"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "blocked_stage": {
+            "const": "scorer-quality"
+          }
+        },
+        "required": [
+          "blocked_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "intake"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageIntakeReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "normalized"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "validate"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageValidation"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scenario-quality"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScenarioQualityReceiptV2"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scorer-quality"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScorerQualityReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "blocked"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "blocked_stage": {
+            "const": "scorer-calibration"
+          }
+        },
+        "required": [
+          "blocked_stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "maxItems": 5,
+            "minItems": 5,
+            "prefixItems": [
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "intake"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageIntakeReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "normalized"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "validate"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/SkillPackageValidation"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scenario-quality"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScenarioQualityReceiptV2"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scorer-quality"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScorerQualityReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "pass"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/LocalCheckStage"
+                  },
+                  {
+                    "properties": {
+                      "name": {
+                        "const": "scorer-calibration"
+                      },
+                      "receipt": {
+                        "allOf": [
+                          {
+                            "$ref": "#/$defs/ScorerCalibrationReceipt"
+                          },
+                          {
+                            "properties": {
+                              "status": {
+                                "const": "blocked"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "receipt"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "blocked"
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "blocked_stage": {
       "anyOf": [
@@ -1552,8 +2583,26 @@
     }
   },
   "required": [
-    "status"
+    "schema_version",
+    "workflow",
+    "status",
+    "candidate",
+    "blocked_stage",
+    "stages",
+    "blocker",
+    "promotion_authorized",
+    "mutation_performed",
+    "network_used",
+    "execution_performed"
   ],
   "title": "LocalCheckResult",
-  "type": "object"
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "stage candidates must match the intake candidate",
+      "intake admission and first-blocker ordering must hold",
+      "nested receipt models must satisfy their semantic invariants"
+    ]
+  }
 }

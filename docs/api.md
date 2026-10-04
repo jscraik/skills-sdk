@@ -332,6 +332,10 @@ The agent-facing `skills-sdk check-local` CLI emits the registry-only
 `SchemaRegistry().validate("local-check.v1", payload)` to check its ordered,
 candidate-bound stage receipts and blocked-stage semantics. It does not
 execute provider evaluations or authorize package promotion.
+Direct Draft 2020-12 validation checks the required envelope fields, state,
+stage count, order, and receipt families. Candidate equality, intake
+admission, first-blocker ordering, and nested receipt invariants require
+`SchemaRegistry.validate` and its semantic model check.
 
 ## Schema validation
 

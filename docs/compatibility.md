@@ -336,6 +336,9 @@ not complete the nine-area evaluation workflow or downstream consumer cutover.
 read-only intake-to-check slice. Its generated schema and Pydantic model bind
 the candidate, stage names and receipt types, blocked stage, and no-promotion
 flags; validate serialized output with `SchemaRegistry().validate("local-check.v1", payload)`.
+The generated Draft 2020-12 schema enforces wire-visible fields and stage
+shape; candidate equality and nested receipt invariants still require the
+registry's semantic validator, as declared by the schema metadata.
 Unsupported safe context reads produce an empty-stage blocked envelope with
 an `unsupported_context_read` typed blocker. The existing stage receipt
 versions and generic `parse_receipt` dispatch do not change. A local pass is
