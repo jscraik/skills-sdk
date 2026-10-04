@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import ConfigDict, model_validator
 
 from skills_sdk.models.intake import SkillPackageIntakeReceipt
 from skills_sdk.models.inventory import _ContractModel
@@ -33,6 +33,8 @@ _STAGE_TYPES = (
 
 
 class LocalCheckStage(_ContractModel):
+    model_config = ConfigDict(revalidate_instances="always")
+
     name: StageName
     receipt: StageReceipt
 
@@ -79,18 +81,18 @@ class LocalCheckResult(_ContractModel):
         mismatches = [
             index for index, stage in enumerate(self.stages[1:], 1) if stage.receipt.candidate != self.candidate
         ]
-        if self.blocked_stage == "candidate_changed":
-            if self.status != "blocked" or mismatches != [len(self.stages) - 1]:
-                raise ValueError("candidate_changed must stop at the first mismatched stage")
-            return self
-        if mismatches:
-            raise ValueError("local-check stage candidates must match intake")
         if len(self.stages) > 1 and (
             intake.status != "normalized" or intake.decision is None or intake.decision.decision.value != "admit"
         ):
             raise ValueError("later checks require an admit intake")
         if any(stage.receipt.status != "pass" for stage in self.stages[1:-1]):
             raise ValueError("local check must stop at the first blocked check")
+        if self.blocked_stage == "candidate_changed":
+            if self.status != "blocked" or mismatches != [len(self.stages) - 1]:
+                raise ValueError("candidate_changed must stop at the first mismatched stage")
+            return self
+        if mismatches:
+            raise ValueError("local-check stage candidates must match intake")
         if self.status == "local_checks_passed":
             if self.blocked_stage is not None or len(self.stages) != len(_STAGE_TYPES) or self.candidate is None:
                 raise ValueError("passing local check requires every stage and a candidate")

@@ -7,12 +7,14 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import ValidationError
 from test_scorer_assessment import _package
 
 from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scorer_quality
+from skills_sdk.models.local_check import LocalCheckResult
 
 REVISION = "1" * 40
 
@@ -129,6 +131,37 @@ def test_local_check_envelope_rejects_unknown_fields_and_false_success(
         registry.validate("local-check.v1", {**accepted, "stages": accepted["stages"][:-1]})
 
 
+def test_local_check_envelope_rejects_earlier_blocker_before_candidate_change(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    package, context = _fixture(tmp_path)
+    command = _command(package, context)
+    assert main(command) == 0
+    accepted = json.loads(capsys.readouterr().out)
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    payload["release_scenario_sets"][0]["target_scenarios"] = 8
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert main(command) == 2
+    blocked = json.loads(capsys.readouterr().out)
+    later_stage = accepted["stages"][3]
+    later_stage["receipt"]["candidate"]["content_sha256"] = "0" * 64
+    blocked["stages"].append(later_stage)
+    blocked["blocked_stage"] = "candidate_changed"
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v1", blocked)
+
+
+def test_local_check_revalidates_altered_stage_instances(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    package, context = _fixture(tmp_path)
+    assert main(_command(package, context)) == 0
+    accepted = LocalCheckResult.model_validate(json.loads(capsys.readouterr().out))
+    forged = accepted.stages[1].model_copy(update={"receipt": accepted.stages[3].receipt})
+    stages = (accepted.stages[0], forged, *accepted.stages[2:])
+    with pytest.raises(ValidationError):
+        LocalCheckResult(status="local_checks_passed", candidate=accepted.candidate, stages=stages)
+
+
 def test_local_check_safe_context_read_unavailable_is_typed_blocker(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -162,6 +195,31 @@ def test_local_check_stops_before_evaluation_on_non_admit_intake(
     assert [stage["name"] for stage in blocked["stages"]] == ["intake"]
     assert blocked["stages"][0]["receipt"]["decision"]["decision"] == "needs_owner_decision"
     assert blocked["promotion_authorized"] is False
+
+
+def test_local_check_human_output_explains_blocked_intake_and_check(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    package, context = _fixture(tmp_path)
+    command = _command(package, context)[:-1]
+    payload = json.loads(context.read_text(encoding="utf-8"))
+    payload["checks"]["owner_unchanged"] = False
+    context.write_text(json.dumps(payload), encoding="utf-8")
+    assert main(command) == 2
+    intake_output = capsys.readouterr().out
+    assert "decision: needs_owner_decision" in intake_output
+    assert "decision_blocker:" in intake_output
+    payload["checks"]["owner_unchanged"] = True
+    context.write_text(json.dumps(payload), encoding="utf-8")
+    evals_path = package / "references" / "evals.yaml"
+    evals_path.write_text(
+        evals_path.read_text(encoding="utf-8").replace("short_correct_wins", "verbose_wrong_wins"),
+        encoding="utf-8",
+    )
+    assert main(command) == 2
+    check_output = capsys.readouterr().out
+    assert "blocked_stage: scorer-quality" in check_output
+    assert "calibration_expected_outcomes:" in check_output
 
 
 def test_local_check_rejects_candidate_change_between_stages(
@@ -216,10 +274,16 @@ def test_local_check_stops_at_scorer_stage_and_recovers(
 
 @pytest.mark.parametrize(
     ("label", "score", "expected_status"),
-    [("fail", 0.2, "pass"), ("pass", 0.2, "blocked"), ("fail", 0.95, "blocked")],
+    [
+        ("fail", 0.2, "pass"),
+        ("pass", 0.2, "blocked"),
+        ("fail", 0.95, "blocked"),
+        ("fail", None, "blocked"),
+        (None, 0.2, "blocked"),
+    ],
 )
 def test_directional_probe_accepts_consistent_losing_candidate_outcome(
-    tmp_path: Path, label: str, score: float, expected_status: str
+    tmp_path: Path, label: str | None, score: float | None, expected_status: str
 ) -> None:
     package = _package(tmp_path)
     evals_path = package / "references" / "evals.yaml"

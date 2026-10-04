@@ -208,6 +208,7 @@ def _expected_outcome(case: Mapping[object, object], probe_type: object, thresho
     if probe_type == "short_correct_vs_verbose_wrong":
         return (
             direction == "short_correct_wins"
+            and ((label is None) == (score is None))
             and label in {None, "fail"}
             and (score_number is None or (threshold is not None and score_number < threshold))
         )

@@ -398,6 +398,18 @@ def _emit_local_check(
             print(f"  {name}: {receipt.status}")
         if blocked_stage:
             print(f"  blocked_stage: {blocked_stage}")
+        if stages and blocked_stage and blocked_stage != "candidate_changed":
+            final_receipt = stages[-1][1]
+            decision = getattr(final_receipt, "decision", None)
+            if decision is not None:
+                print(f"  decision: {decision.decision.value}")
+                for code in decision.blocker_codes:
+                    print(f"  decision_blocker: {code}")
+            for finding in getattr(final_receipt, "findings", ()):
+                print(f"  {finding.code}: {finding.message}")
+            final_blocker = getattr(final_receipt, "blocker", None)
+            if final_blocker is not None:
+                print(f"  {final_blocker.code}: {final_blocker.message}")
         if blocker is not None:
             print(f"  {blocker.code}: {blocker.message}")
     return 2 if blocked_stage else 0

@@ -64,6 +64,8 @@ does not execute scenarios or a judge, admit a package, publish to Tessl, or
 install a runtime copy. Correct the input and rerun to obtain a fresh
 candidate-bound result. The context must carry truthful source, owner, rights,
 and check evidence; a synthetic context cannot prove real provenance.
+Human output retains the blocked intake decision and blocker codes, or the
+blocked check's finding codes and messages, as well as the stage status.
 `--json` emits the versioned contract for individual routes. `--robot` is an accepted no-op that
 reserves the prompt-free automation contract. Other routes remain stable
 discovery boundaries while their deeper implementations are built in separate,
