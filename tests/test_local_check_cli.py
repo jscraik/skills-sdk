@@ -206,6 +206,17 @@ def test_local_check_safe_context_read_unavailable_is_typed_blocker(
     assert blocked["blocker"]["code"] == "unsupported_context_read"
 
 
+def test_local_check_revalidates_forged_context_blocker() -> None:
+    """Reject a typed blocker carrying a non-portable evidence reference."""
+    from skills_sdk.models.local_check import LocalCheckResult
+    from skills_sdk.models.packaging import PackageReceiptBlocker
+
+    blocker = PackageReceiptBlocker(code="unsupported_context_read", message="context unavailable")
+    forged = blocker.model_copy(update={"evidence_refs": ((Path.cwd() / "host").as_posix(),)})
+    with pytest.raises(ValidationError):
+        LocalCheckResult(status="blocked", blocked_stage="context", blocker=forged)
+
+
 def test_local_check_stops_before_evaluation_on_non_admit_intake(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

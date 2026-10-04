@@ -73,6 +73,7 @@ class LocalCheckResult(_ContractModel):
                 or self.blocker.code != "unsupported_context_read"
             ):
                 raise ValueError("context blocker requires no candidate or stages")
+            PackageReceiptBlocker.model_validate(self.blocker.model_dump(mode="json", warnings="error"))
             return self
         if not self.stages or self.blocker is not None:
             raise ValueError("stage results require an intake stage and no context blocker")
