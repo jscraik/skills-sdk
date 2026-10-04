@@ -18,6 +18,7 @@ Reuse a prepared environment. For CLI discovery, run only the help needed:
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk inventory --help
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk check-local --help
 ```
 
 For focused checks while editing, run `bash scripts/validate-codestyle.sh`.

@@ -323,8 +323,11 @@ For judge scorers, the quality receipt retains declared model, temperature,
 and trial count; held-out bundles must match those parameters as well as scorer
 identity and threshold. A mismatch yields a typed blocker, not calibration proof.
 The SDK also binds each expected outcome to its probe type: obvious-correct
-must pass, rejection probes must fail, and the comparative verbosity probe
-must declare `short_correct_wins` rather than a single-case score or label.
+must pass, and rejection probes must fail. The comparative verbosity probe
+must declare `short_correct_wins`; it may also declare the losing verbose
+candidate as `fail` with a score below the pass threshold. This preserves the
+source's combined direction and losing-candidate evidence. A contradictory
+label, score, or direction remains blocked, and no judge is executed here.
 This extraction covers scorer quality and held-out calibration only; it does
 not complete the nine-area evaluation workflow or downstream consumer cutover.
 

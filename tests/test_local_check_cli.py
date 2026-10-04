@@ -1,0 +1,200 @@
+"""One candidate-bound offline intake-to-check journey through the public CLI."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+import yaml
+from test_scorer_assessment import _package
+
+from skills_sdk.cli.main import main
+from skills_sdk.evaluation import assess_scorer_quality
+
+REVISION = "1" * 40
+
+
+def _fixture(root: Path) -> tuple[Path, Path]:
+    package = _package(root)
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    ids = [f"case-{index}" for index in range(10)]
+    payload["release_scenario_sets"] = [
+        {
+            "id": "active-ten",
+            "minimum_scenarios": 10,
+            "target_scenarios": 10,
+            "maximum_scenarios": 10,
+            "groups": {"regular": ids[:8], "safety": ids[8:]},
+        }
+    ]
+    payload["cases"] = [
+        {
+            "id": case_id,
+            "category": "pressure" if index >= 8 else "edge" if index == 7 else "happy",
+            "unit": "local check",
+            "given": "A complete candidate is supplied.",
+            "should": "Assess package-local evidence without executing a provider.",
+            "realistic": True,
+            "why_realistic": "Maintainers need a bounded preflight before any live evaluation.",
+            "prompt": "Review this bounded candidate.",
+            "reproduce": "skills-sdk check-local example",
+            "eval_modes": ["release"],
+            "deterministic_checks": {"forbidden_commands": ["rm -rf"]},
+            "acceptance": [{"type": "expected_signal", "value": "bounded result"}],
+        }
+        for index, case_id in enumerate(ids)
+    ]
+    evals_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    context = root / "context.json"
+    context.write_text(
+        json.dumps(
+            {
+                "schema_version": "skill-package-intake-context/v1",
+                "source_repository": "jscraik/skills-sdk",
+                "source_revision": REVISION,
+                "source_path": "tests/fixtures/synthetic-skill",
+                "source_kind": "git",
+                "owner": {
+                    "schema_version": "package-owner/v1",
+                    "owner": "sdk-tests",
+                    "maintainer": "sdk-tests",
+                    "ownership_state": "canonical",
+                    "rights": {
+                        "basis": "authored",
+                        "license": "Apache-2.0",
+                        "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md",
+                    },
+                },
+                "checks": {"identity": True, "provenance": True, "rights": True, "owner_unchanged": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return package, context
+
+
+def _command(package: Path, context: Path) -> list[str]:
+    return ["check-local", str(package), "--context", str(context), "--scenario-set", "active-ten", "--json"]
+
+
+def test_local_check_accepts_rejects_and_recovers_without_promotion(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    package, context = _fixture(tmp_path)
+    command = _command(package, context)
+    assert main(command) == 0
+    accepted = json.loads(capsys.readouterr().out)
+    assert accepted["status"] == "local_checks_passed"
+    assert [stage["name"] for stage in accepted["stages"]] == [
+        "intake",
+        "validate",
+        "scenario-quality",
+        "scorer-quality",
+        "scorer-calibration",
+    ]
+    assert len({stage["receipt"]["candidate"]["content_sha256"] for stage in accepted["stages"]}) == 1
+    assert accepted["promotion_authorized"] is accepted["execution_performed"] is False
+
+    evals_path = package / "references" / "evals.yaml"
+    original = evals_path.read_text(encoding="utf-8")
+    payload = yaml.safe_load(original)
+    payload["release_scenario_sets"][0]["target_scenarios"] = 8
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    assert main(command) == 2
+    rejected = json.loads(capsys.readouterr().out)
+    assert rejected["blocked_stage"] == "scenario-quality"
+    assert [stage["name"] for stage in rejected["stages"]] == ["intake", "validate", "scenario-quality"]
+    evals_path.write_text(original, encoding="utf-8")
+    assert main(command) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "local_checks_passed"
+
+
+def test_local_check_stops_before_evaluation_on_non_admit_intake(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    package, context = _fixture(tmp_path)
+    payload = json.loads(context.read_text(encoding="utf-8"))
+    payload["checks"]["owner_unchanged"] = False
+    context.write_text(json.dumps(payload), encoding="utf-8")
+    assert main(_command(package, context)) == 2
+    blocked = json.loads(capsys.readouterr().out)
+    assert blocked["blocked_stage"] == "intake"
+    assert [stage["name"] for stage in blocked["stages"]] == ["intake"]
+    assert blocked["stages"][0]["receipt"]["decision"]["decision"] == "needs_owner_decision"
+    assert blocked["promotion_authorized"] is False
+
+
+def test_local_check_rejects_candidate_change_between_stages(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import skills_sdk.validation as validation
+
+    package, context = _fixture(tmp_path)
+    original_validate = validation.validate_skill_package
+
+    def changed_candidate(*args: object, **kwargs: object) -> object:
+        entrypoint = package / "SKILL.md"
+        entrypoint.write_text(entrypoint.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        return original_validate(*args, **kwargs)
+
+    monkeypatch.setattr(validation, "validate_skill_package", changed_candidate)
+    assert main(_command(package, context)) == 2
+    blocked = json.loads(capsys.readouterr().out)
+    assert blocked["blocked_stage"] == "candidate_changed"
+    assert [stage["name"] for stage in blocked["stages"]] == ["intake", "validate"]
+    assert blocked["promotion_authorized"] is False
+
+
+@pytest.mark.parametrize(
+    ("file_name", "mutate", "blocked_stage"),
+    [
+        ("references/evals.yaml", "invalid_direction", "scorer-quality"),
+        ("references/scorer-calibration/manifest.json", "wrong_scorer", "scorer-calibration"),
+    ],
+)
+def test_local_check_stops_at_scorer_stage_and_recovers(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], file_name: str, mutate: str, blocked_stage: str
+) -> None:
+    package, context = _fixture(tmp_path)
+    path = package / file_name
+    original = path.read_text(encoding="utf-8")
+    if mutate == "invalid_direction":
+        path.write_text(original.replace("short_correct_wins", "verbose_wrong_wins"), encoding="utf-8")
+    else:
+        payload = json.loads(original)
+        payload["scorer_id"] = "other-scorer"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    command = _command(package, context)
+    assert main(command) == 2
+    blocked = json.loads(capsys.readouterr().out)
+    assert blocked["blocked_stage"] == blocked_stage
+    assert blocked["stages"][-1]["receipt"]["status"] == "blocked"
+    path.write_text(original, encoding="utf-8")
+    assert main(command) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "local_checks_passed"
+
+
+@pytest.mark.parametrize(
+    ("label", "score", "expected_status"),
+    [("fail", 0.2, "pass"), ("pass", 0.2, "blocked"), ("fail", 0.95, "blocked")],
+)
+def test_directional_probe_accepts_consistent_losing_candidate_outcome(
+    tmp_path: Path, label: str, score: float, expected_status: str
+) -> None:
+    package = _package(tmp_path)
+    evals_path = package / "references" / "evals.yaml"
+    payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
+    case = next(
+        item
+        for item in payload["scorer_quality"]["calibration_cases"]
+        if item["probe_type"] == "short_correct_vs_verbose_wrong"
+    )
+    case.update(expected_label=label, expected_score=score)
+    evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    result = assess_scorer_quality(package, source_revision=REVISION)
+    assert result.status == expected_status
+    assert ("calibration_expected_outcomes" in {finding.code for finding in result.findings}) is (
+        expected_status == "blocked"
+    )

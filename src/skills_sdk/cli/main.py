@@ -5,7 +5,7 @@ import asyncio
 import json
 import os
 import stat
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -14,6 +14,7 @@ from skills_sdk import __version__
 COMMAND_HELP = {
     "inventory": "inspect a read-only source inventory",
     "intake": "run read-only package intake and normalization",
+    "check-local": "run read-only intake and candidate-bound local checks",
     "validate": "run package contract validation",
     "build": "build an immutable package candidate",
     "eval": "run candidate-bound evaluation lanes",
@@ -99,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
     for name, help_text in COMMAND_HELP.items():
-        if name in {"intake", "validate", "build", "eval", "verify"}:
+        if name in {"intake", "check-local", "validate", "build", "eval", "verify"}:
             continue
         commands.add_parser(name, help=help_text, description=help_text)
     compare = commands.add_parser("compare-copy", help="compare validated source and runtime file bytes without writes")
@@ -137,6 +138,12 @@ def build_parser() -> argparse.ArgumentParser:
     intake.add_argument("--max-reference-depth", type=int)
     intake.add_argument("--json", action="store_true", dest="json_output")
     intake.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    local_check = commands.add_parser("check-local", help=COMMAND_HELP["check-local"])
+    local_check.add_argument("package_root", type=Path)
+    local_check.add_argument("--context", type=Path, required=True)
+    local_check.add_argument("--scenario-set", required=True)
+    local_check.add_argument("--json", action="store_true", dest="json_output")
+    local_check.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     evaluation = commands.add_parser("eval", help=COMMAND_HELP["eval"], description=COMMAND_HELP["eval"])
     evaluation_commands = evaluation.add_subparsers(dest="eval_command", title="eval commands", required=True)
     quality = evaluation_commands.add_parser("scenario-quality", help="assess package-local scenario definitions")
@@ -370,10 +377,86 @@ def _verify(arguments: argparse.Namespace) -> int:
     return 0 if verification.status == "pass" else 2
 
 
+def _emit_local_check(stages: list[tuple[str, Any]], *, blocked_stage: str | None, json_output: bool) -> int:
+    """Expose existing typed receipts without promoting a local check to admission."""
+    candidate = stages[0][1].candidate
+    payload = {
+        "workflow": "local-check",
+        "status": "blocked" if blocked_stage else "local_checks_passed",
+        "candidate": candidate.model_dump(mode="json") if candidate is not None else None,
+        "blocked_stage": blocked_stage,
+        "stages": [{"name": name, "receipt": receipt.model_dump(mode="json")} for name, receipt in stages],
+        "promotion_authorized": False,
+        "mutation_performed": False,
+        "network_used": False,
+        "execution_performed": False,
+    }
+    if json_output:
+        print(json.dumps(payload, sort_keys=True))
+    else:
+        print(f"local-check: {payload['status']}")
+        for name, receipt in stages:
+            print(f"  {name}: {receipt.status}")
+        if blocked_stage:
+            print(f"  blocked_stage: {blocked_stage}")
+    return 2 if blocked_stage else 0
+
+
+def _local_check(arguments: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """Compose read-only, candidate-bound local checks in fail-closed order."""
+    from pydantic import ValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.evaluation import assess_scenario_quality, assess_scorer_calibration, assess_scorer_quality
+    from skills_sdk.intake import intake_skill_package
+    from skills_sdk.models.intake import SkillPackageIntakeContext
+    from skills_sdk.validation import validate_skill_package
+
+    try:
+        context_payload = json.loads(
+            _read_intake_context(arguments.context).decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_members,
+        )
+        SchemaRegistry().validate("skill-package-intake-context.v1", context_payload)
+        context = SkillPackageIntakeContext.model_validate(context_payload)
+    except _UnsupportedContextRead:
+        parser.error("safe intake context reads are unavailable")
+    except (ContractError, OSError, RecursionError, UnicodeDecodeError, ValueError, ValidationError):
+        parser.error("invalid intake context")
+    root = arguments.package_root
+    revision = context.source_revision
+    intake = intake_skill_package(root, context)
+    stages: list[tuple[str, Any]] = [("intake", intake)]
+    if intake.status != "normalized" or intake.decision is None or intake.decision.decision.value != "admit":
+        return _emit_local_check(stages, blocked_stage="intake", json_output=arguments.json_output)
+    checks: tuple[tuple[str, Callable[[], Any]], ...] = (
+        ("validate", lambda: validate_skill_package(root, source_revision=revision)),
+        (
+            "scenario-quality",
+            lambda: assess_scenario_quality(
+                root, source_revision=revision, scenario_set_id=arguments.scenario_set, contract_version="v2"
+            ),
+        ),
+        ("scorer-quality", lambda: assess_scorer_quality(root, source_revision=revision)),
+        ("scorer-calibration", lambda: assess_scorer_calibration(root, source_revision=revision)),
+    )
+    for name, check in checks:
+        receipt = check()
+        stages.append((name, receipt))
+        if receipt.candidate != intake.candidate:
+            return _emit_local_check(stages, blocked_stage="candidate_changed", json_output=arguments.json_output)
+        if receipt.status != "pass":
+            return _emit_local_check(stages, blocked_stage=name, json_output=arguments.json_output)
+    return _emit_local_check(stages, blocked_stage=None, json_output=arguments.json_output)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.command == "check-local":
+        return _local_check(arguments, parser)
     if arguments.command == "verify":
         return _verify(arguments)
     if arguments.command == "maintain-entrypoint":
