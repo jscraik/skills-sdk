@@ -20,6 +20,7 @@ REVISION = "1" * 40
 
 
 def _fixture(root: Path) -> tuple[Path, Path]:
+    """Write a synthetic ten-case package and intake context, returning their paths."""
     package = _package(root)
     evals_path = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
@@ -80,12 +81,14 @@ def _fixture(root: Path) -> tuple[Path, Path]:
 
 
 def _command(package: Path, context: Path) -> list[str]:
+    """Build JSON CLI arguments for the fixture's explicit ten-case scenario set."""
     return ["check-local", str(package), "--context", str(context), "--scenario-set", "active-ten", "--json"]
 
 
 def test_local_check_accepts_rejects_and_recovers_without_promotion(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Verify scenario-count rejection and recovery preserve candidate binding and deny promotion."""
     package, context = _fixture(tmp_path)
     command = _command(package, context)
     assert main(command) == 0
@@ -121,6 +124,7 @@ def test_local_check_accepts_rejects_and_recovers_without_promotion(
 def test_local_check_envelope_rejects_unknown_fields_and_false_success(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Reject unknown envelope fields and success claims with incomplete stage evidence."""
     package, context = _fixture(tmp_path)
     assert main(_command(package, context)) == 0
     accepted = json.loads(capsys.readouterr().out)
@@ -165,11 +169,13 @@ def test_local_check_revalidates_altered_stage_instances(tmp_path: Path, capsys:
 def test_local_check_safe_context_read_unavailable_is_typed_blocker(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Return a typed context blocker when safe context reads are unavailable."""
     import skills_sdk.cli.main as cli
 
     package, context = _fixture(tmp_path)
 
     def unavailable(_: Path) -> bytes:
+        """Simulate a platform that cannot safely read the intake context."""
         raise cli._UnsupportedContextRead("unsupported")
 
     monkeypatch.setattr(cli, "_read_intake_context", unavailable)
@@ -185,6 +191,7 @@ def test_local_check_safe_context_read_unavailable_is_typed_blocker(
 def test_local_check_stops_before_evaluation_on_non_admit_intake(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Stop after intake when an ownership change requires an owner decision."""
     package, context = _fixture(tmp_path)
     payload = json.loads(context.read_text(encoding="utf-8"))
     payload["checks"]["owner_unchanged"] = False
@@ -225,12 +232,14 @@ def test_local_check_human_output_explains_blocked_intake_and_check(
 def test_local_check_rejects_candidate_change_between_stages(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Block validation when the package changes after intake."""
     import skills_sdk.validation as validation
 
     package, context = _fixture(tmp_path)
     original_validate = validation.validate_skill_package
 
     def changed_candidate(*args: object, **kwargs: object) -> object:
+        """Mutate the entrypoint before validation to produce a different candidate digest."""
         entrypoint = package / "SKILL.md"
         entrypoint.write_text(entrypoint.read_text(encoding="utf-8") + "\n", encoding="utf-8")
         return original_validate(*args, **kwargs)
@@ -253,6 +262,7 @@ def test_local_check_rejects_candidate_change_between_stages(
 def test_local_check_stops_at_scorer_stage_and_recovers(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], file_name: str, mutate: str, blocked_stage: str
 ) -> None:
+    """Stop at the failing scorer stage and recover after its input is restored."""
     package, context = _fixture(tmp_path)
     path = package / file_name
     original = path.read_text(encoding="utf-8")
@@ -285,6 +295,7 @@ def test_local_check_stops_at_scorer_stage_and_recovers(
 def test_directional_probe_accepts_consistent_losing_candidate_outcome(
     tmp_path: Path, label: str | None, score: float | None, expected_status: str
 ) -> None:
+    """Accept a consistent losing-candidate outcome and reject contradictory labels or scores."""
     package = _package(tmp_path)
     evals_path = package / "references" / "evals.yaml"
     payload = yaml.safe_load(evals_path.read_text(encoding="utf-8"))
