@@ -323,10 +323,26 @@ For judge scorers, the quality receipt retains declared model, temperature,
 and trial count; held-out bundles must match those parameters as well as scorer
 identity and threshold. A mismatch yields a typed blocker, not calibration proof.
 The SDK also binds each expected outcome to its probe type: obvious-correct
-must pass, rejection probes must fail, and the comparative verbosity probe
-must declare `short_correct_wins` rather than a single-case score or label.
+must pass, and rejection probes must fail. The comparative verbosity probe
+must declare `short_correct_wins`; it may also declare the losing verbose
+candidate as `fail` with a score below the pass threshold. This preserves the
+source's combined direction and losing-candidate evidence. Label and score
+must be supplied together when either is present. A partial or contradictory
+label, score, or direction remains blocked, and no judge is executed here.
 This extraction covers scorer quality and held-out calibration only; it does
 not complete the nine-area evaluation workflow or downstream consumer cutover.
+
+`local-check/v1` is an additive registry-only CLI envelope for the ordered,
+read-only intake-to-check slice. Its generated schema and Pydantic model bind
+the candidate, stage names and receipt types, blocked stage, and no-promotion
+flags; validate serialized output with `SchemaRegistry().validate("local-check.v1", payload)`.
+The generated Draft 2020-12 schema enforces wire-visible fields and stage
+shape; candidate equality and nested receipt invariants still require the
+registry's semantic validator, as declared by the schema metadata.
+Unsupported safe context reads produce an empty-stage blocked envelope with
+an `unsupported_context_read` typed blocker. The existing stage receipt
+versions and generic `parse_receipt` dispatch do not change. A local pass is
+not external admission, live execution, publication, or installation proof.
 
 ## Separate evidence lanes
 

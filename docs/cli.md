@@ -11,22 +11,23 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 
 The CLI exposes these routes. Existing-copy maintenance is the only route
 below that permits a host write, and requires explicit `--apply`. The names
-do not by themselves implement the SDK's target create, update, check,
+do not by themselves implement the SDK's target create, update, full check,
 external-intake, private Tessl delivery, or Codex installation workflow:
 
 ```text
-inventory   intake   validate   build   eval   package   project   verify
+inventory   intake   check-local   validate   build   eval   package   project   verify
 tessl prepare   tessl verify
 compare-copy   maintain-entrypoint
 ```
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
-`intake`, `validate`, `build`, `eval scenario-quality`, `eval scorer-quality`,
+`intake`, `check-local`, `validate`, `build`, `eval scenario-quality`, `eval scorer-quality`,
 `eval scorer-calibration`, and `eval selected-case`
 are implemented local commands:
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk intake ./skills/example --context ./intake-context.json --json --robot
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk check-local ./skills/example --context ./intake-context.json --scenario-set active-v2 --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
@@ -36,7 +37,7 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
 
-All seven commands are non-interactive and non-mutating. For an invocation that
+All eight commands are non-interactive and non-mutating. For an invocation that
 reaches a service, exit `0` means intake normalized with an `admit` decision,
 validation passed, a receipt was built, or a scenario/scorer assessment
 passed. Exit `2` means a structured blocker, blocked receipt, or
@@ -49,7 +50,23 @@ a candidate-bound `package-receipt/v2` whose digest covers the canonical
 manifest, without writing into the package. The generic parser continues to
 accept `package-receipt/v1` for compatibility. A blocked build may have
 `candidate: null` when the source identity cannot be resolved.
-`--json` emits the versioned contract. `--robot` is an accepted no-op that
+`check-local` composes intake, package validation, an explicit ten-case v2
+scenario set, scorer-quality declarations, and held-out scorer calibration in
+that order. It stops at the first non-admit decision, blocked receipt, or
+candidate-identity change. Its `local-check/v1` JSON envelope carries each
+stage's existing versioned receipt, the candidate, and the blocked stage;
+validate it with `SchemaRegistry().validate("local-check.v1", payload)`.
+If safe descriptor-relative context reads are unavailable, it returns exit
+`2` with a `blocked` envelope, `blocked_stage: context`, no stages, and the
+same typed `unsupported_context_read` blocker used by `intake`. Exit `0` means only
+`local_checks_passed`. `promotion_authorized` is always `false`: this command
+does not execute scenarios or a judge, admit a package, publish to Tessl, or
+install a runtime copy. Correct the input and rerun to obtain a fresh
+candidate-bound result. The context must carry truthful source, owner, rights,
+and check evidence; a synthetic context cannot prove real provenance.
+Human output retains the blocked intake decision and blocker codes, or the
+blocked check's finding codes and messages, as well as the stage status.
+`--json` emits the versioned contract for individual routes. `--robot` is an accepted no-op that
 reserves the prompt-free automation contract. Other routes remain stable
 discovery boundaries while their deeper implementations are built in separate,
 candidate-bound lanes:

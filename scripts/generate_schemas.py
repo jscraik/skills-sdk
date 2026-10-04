@@ -8,6 +8,7 @@ from typing import Any
 
 import package_safety_schema
 from intake_schema import append_intake_constraints
+from local_check_schema import append_local_check_constraints
 from package_archive_schema import append_package_archive_constraints
 from provider_execution_schema import append_provider_execution_constraints
 from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
@@ -440,7 +441,6 @@ def _append_evaluation_constraints(schema: dict[str, Any], filename: str) -> Non
 
 def _append_evaluation_result_constraints(schema: dict[str, Any], filename: str) -> None:
     """Project result status invariants while marking model-only comparisons."""
-
     properties = schema["properties"]
     properties["evidence_refs"]["uniqueItems"] = True
     if filename in {"scenario-observation.v1.schema.json", "scenario-observation.v2.schema.json"}:
@@ -531,7 +531,6 @@ def _append_evaluation_result_constraints(schema: dict[str, Any], filename: str)
 
 def _append_evaluation_receipt_constraints(schema: dict[str, Any], filename: str) -> None:
     """Project receipt status invariants and mark cross-object model checks."""
-
     properties = schema["properties"]
     properties["case_results"]["uniqueItems"] = True
     properties["completed_calibration_probe_ids"]["uniqueItems"] = True
@@ -603,7 +602,6 @@ def _append_evaluation_receipt_constraints(schema: dict[str, Any], filename: str
 
 def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> None:
     """Require the typed blocker whenever a v2 value decision needs review."""
-
     target = schema if filename == "package-inventory.v2.schema.json" else schema["$defs"]["PackageInventoryRecordV2"]
     target["allOf"] = [
         *target.get("allOf", []),
@@ -723,6 +721,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         append_scenario_quality_constraints(schema, active_v2=filename == "scenario-quality.v2.schema.json")
     elif filename in {"scorer-quality.v1.schema.json", "scorer-calibration.v1.schema.json"}:
         append_scorer_receipt_constraints(schema, filename)
+    elif filename == "local-check.v1.schema.json":
+        append_local_check_constraints(schema)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
     elif filename == "skill-package-intake.v1.schema.json":

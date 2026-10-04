@@ -197,6 +197,7 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
 
 
 def _expected_outcome(case: Mapping[object, object], probe_type: object, threshold: float | None) -> bool:
+    """Check that declared labels, scores, and direction agree with the probe and threshold."""
     score = case.get("expected_score")
     score_number = _number(score)
     label = case.get("expected_label")
@@ -206,7 +207,12 @@ def _expected_outcome(case: Mapping[object, object], probe_type: object, thresho
     if label is not None and (not isinstance(label, str) or label not in {"pass", "fail"}):
         return False
     if probe_type == "short_correct_vs_verbose_wrong":
-        return direction == "short_correct_wins" and score is None and label is None
+        return (
+            direction == "short_correct_wins"
+            and ((label is None) == (score is None))
+            and label in {None, "fail"}
+            and (score_number is None or (threshold is not None and score_number < threshold))
+        )
     if probe_type not in _PROBES or direction is not None or (score is None and label is None):
         return False
     expected_label = "pass" if probe_type == "obvious_correct" else "fail"

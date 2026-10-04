@@ -327,6 +327,16 @@ structural and model-level bindings. The context schema is registered as
 `skill-package-intake-context.v1`; neither family is supported by the generic
 `parse_receipt` function.
 
+The agent-facing `skills-sdk check-local` CLI emits the registry-only
+`local-check/v1` envelope. Use
+`SchemaRegistry().validate("local-check.v1", payload)` to check its ordered,
+candidate-bound stage receipts and blocked-stage semantics. It does not
+execute provider evaluations or authorize package promotion.
+Direct Draft 2020-12 validation checks the required envelope fields, state,
+stage count, order, and receipt families. Candidate equality, intake
+admission, first-blocker ordering, and nested receipt invariants require
+`SchemaRegistry.validate` and its semantic model check.
+
 ## Schema validation
 
 `validate_recurring_findings(ledger_path)` and
