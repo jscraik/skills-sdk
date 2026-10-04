@@ -53,8 +53,12 @@ accept `package-receipt/v1` for compatibility. A blocked build may have
 `check-local` composes intake, package validation, an explicit ten-case v2
 scenario set, scorer-quality declarations, and held-out scorer calibration in
 that order. It stops at the first non-admit decision, blocked receipt, or
-candidate-identity change. Its JSON envelope carries each stage's existing
-versioned receipt, the candidate, and the blocked stage; exit `0` means only
+candidate-identity change. Its `local-check/v1` JSON envelope carries each
+stage's existing versioned receipt, the candidate, and the blocked stage;
+validate it with `SchemaRegistry().validate("local-check.v1", payload)`.
+If safe descriptor-relative context reads are unavailable, it returns exit
+`2` with a `blocked` envelope, `blocked_stage: context`, no stages, and the
+same typed `unsupported_context_read` blocker used by `intake`. Exit `0` means only
 `local_checks_passed`. `promotion_authorized` is always `false`: this command
 does not execute scenarios or a judge, admit a package, publish to Tessl, or
 install a runtime copy. Correct the input and rerun to obtain a fresh

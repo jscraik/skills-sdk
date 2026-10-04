@@ -331,6 +331,15 @@ label, score, or direction remains blocked, and no judge is executed here.
 This extraction covers scorer quality and held-out calibration only; it does
 not complete the nine-area evaluation workflow or downstream consumer cutover.
 
+`local-check/v1` is an additive registry-only CLI envelope for the ordered,
+read-only intake-to-check slice. Its generated schema and Pydantic model bind
+the candidate, stage names and receipt types, blocked stage, and no-promotion
+flags; validate serialized output with `SchemaRegistry().validate("local-check.v1", payload)`.
+Unsupported safe context reads produce an empty-stage blocked envelope with
+an `unsupported_context_read` typed blocker. The existing stage receipt
+versions and generic `parse_receipt` dispatch do not change. A local pass is
+not external admission, live execution, publication, or installation proof.
+
 ## Separate evidence lanes
 
 The PR-sweep validators provide portable SDK API and CLI equivalents for two

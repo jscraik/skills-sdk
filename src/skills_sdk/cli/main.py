@@ -377,28 +377,29 @@ def _verify(arguments: argparse.Namespace) -> int:
     return 0 if verification.status == "pass" else 2
 
 
-def _emit_local_check(stages: list[tuple[str, Any]], *, blocked_stage: str | None, json_output: bool) -> int:
+def _emit_local_check(
+    stages: list[tuple[str, Any]], *, blocked_stage: str | None, json_output: bool, blocker: Any = None
+) -> int:
     """Expose existing typed receipts without promoting a local check to admission."""
-    candidate = stages[0][1].candidate
-    payload = {
-        "workflow": "local-check",
-        "status": "blocked" if blocked_stage else "local_checks_passed",
-        "candidate": candidate.model_dump(mode="json") if candidate is not None else None,
-        "blocked_stage": blocked_stage,
-        "stages": [{"name": name, "receipt": receipt.model_dump(mode="json")} for name, receipt in stages],
-        "promotion_authorized": False,
-        "mutation_performed": False,
-        "network_used": False,
-        "execution_performed": False,
-    }
+    from skills_sdk.models.local_check import LocalCheckResult, LocalCheckStage
+
+    result = LocalCheckResult(
+        status="blocked" if blocked_stage else "local_checks_passed",
+        candidate=stages[0][1].candidate if stages else None,
+        blocked_stage=blocked_stage,
+        stages=tuple(LocalCheckStage(name=name, receipt=receipt) for name, receipt in stages),
+        blocker=blocker,
+    )
     if json_output:
-        print(json.dumps(payload, sort_keys=True))
+        print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"local-check: {payload['status']}")
+        print(f"local-check: {result.status}")
         for name, receipt in stages:
             print(f"  {name}: {receipt.status}")
         if blocked_stage:
             print(f"  blocked_stage: {blocked_stage}")
+        if blocker is not None:
+            print(f"  {blocker.code}: {blocker.message}")
     return 2 if blocked_stage else 0
 
 
@@ -421,7 +422,14 @@ def _local_check(arguments: argparse.Namespace, parser: argparse.ArgumentParser)
         SchemaRegistry().validate("skill-package-intake-context.v1", context_payload)
         context = SkillPackageIntakeContext.model_validate(context_payload)
     except _UnsupportedContextRead:
-        parser.error("safe intake context reads are unavailable")
+        from skills_sdk.models.packaging import PackageReceiptBlocker
+
+        blocker = PackageReceiptBlocker(
+            code="unsupported_context_read",
+            message="safe descriptor-relative intake context reads are unavailable",
+            evidence_refs=("docs/compatibility.md",),
+        )
+        return _emit_local_check([], blocked_stage="context", json_output=arguments.json_output, blocker=blocker)
     except (ContractError, OSError, RecursionError, UnicodeDecodeError, ValueError, ValidationError):
         parser.error("invalid intake context")
     root = arguments.package_root

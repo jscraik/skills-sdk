@@ -10,6 +10,8 @@ import yaml
 from test_scorer_assessment import _package
 
 from skills_sdk.cli.main import main
+from skills_sdk.core.errors import ContractError
+from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scorer_quality
 
 REVISION = "1" * 40
@@ -86,6 +88,8 @@ def test_local_check_accepts_rejects_and_recovers_without_promotion(
     command = _command(package, context)
     assert main(command) == 0
     accepted = json.loads(capsys.readouterr().out)
+    assert accepted["schema_version"] == "local-check/v1"
+    SchemaRegistry().validate("local-check.v1", accepted)
     assert accepted["status"] == "local_checks_passed"
     assert [stage["name"] for stage in accepted["stages"]] == [
         "intake",
@@ -104,11 +108,45 @@ def test_local_check_accepts_rejects_and_recovers_without_promotion(
     evals_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
     assert main(command) == 2
     rejected = json.loads(capsys.readouterr().out)
+    SchemaRegistry().validate("local-check.v1", rejected)
     assert rejected["blocked_stage"] == "scenario-quality"
     assert [stage["name"] for stage in rejected["stages"]] == ["intake", "validate", "scenario-quality"]
     evals_path.write_text(original, encoding="utf-8")
     assert main(command) == 0
     assert json.loads(capsys.readouterr().out)["status"] == "local_checks_passed"
+
+
+def test_local_check_envelope_rejects_unknown_fields_and_false_success(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    package, context = _fixture(tmp_path)
+    assert main(_command(package, context)) == 0
+    accepted = json.loads(capsys.readouterr().out)
+    registry = SchemaRegistry()
+    with pytest.raises(ContractError):
+        registry.validate("local-check.v1", {**accepted, "unknown": True})
+    with pytest.raises(ContractError):
+        registry.validate("local-check.v1", {**accepted, "stages": accepted["stages"][:-1]})
+
+
+def test_local_check_safe_context_read_unavailable_is_typed_blocker(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import skills_sdk.cli.main as cli
+
+    package, context = _fixture(tmp_path)
+
+    def unavailable(_: Path) -> bytes:
+        raise cli._UnsupportedContextRead("unsupported")
+
+    monkeypatch.setattr(cli, "_read_intake_context", unavailable)
+    assert main(_command(package, context)) == 2
+    blocked = json.loads(capsys.readouterr().out)
+    SchemaRegistry().validate("local-check.v1", blocked)
+    assert blocked["status"] == "blocked"
+    assert blocked["blocked_stage"] == "context"
+    assert blocked["stages"] == []
+    assert blocked["blocker"]["code"] == "unsupported_context_read"
 
 
 def test_local_check_stops_before_evaluation_on_non_admit_intake(
