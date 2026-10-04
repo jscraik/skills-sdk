@@ -40,6 +40,7 @@ class LocalCheckStage(_ContractModel):
 
     @model_validator(mode="after")
     def name_matches_receipt(self) -> LocalCheckStage:
+        """Reject a stage whose receipt type or internal evidence is invalid."""
         receipt_type = dict(_STAGE_TYPES)[self.name]
         if not isinstance(self.receipt, receipt_type):
             raise ValueError("local-check stage name must match its receipt type")
@@ -62,6 +63,7 @@ class LocalCheckResult(_ContractModel):
 
     @model_validator(mode="after")
     def status_matches_stage_evidence(self) -> LocalCheckResult:
+        """Validate stage order, candidate binding, and evidence for the reported outcome."""
         if self.blocked_stage == "context":
             if (
                 self.status != "blocked"

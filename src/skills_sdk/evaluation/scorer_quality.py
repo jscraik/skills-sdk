@@ -197,6 +197,7 @@ def _probe_findings(metadata: Mapping[object, object]) -> list[ScenarioQualityFi
 
 
 def _expected_outcome(case: Mapping[object, object], probe_type: object, threshold: float | None) -> bool:
+    """Check that declared labels, scores, and direction agree with the probe and threshold."""
     score = case.get("expected_score")
     score_number = _number(score)
     label = case.get("expected_label")
