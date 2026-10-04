@@ -89,6 +89,10 @@ def append_local_check_constraints(schema: dict[str, Any]) -> None:
             "if": {"properties": {"blocked_stage": {"const": "candidate_changed"}}, "required": ["blocked_stage"]},
             "then": {"properties": {"status": {"const": "blocked"}, "stages": {"minItems": 2}}},
         },
+        {
+            "if": {"properties": {"status": {"const": "blocked"}}, "required": ["status"]},
+            "then": {"properties": {"blocked_stage": {"type": "string"}}},
+        },
     ]
     for index, (name, receipt_type) in enumerate(_STAGES, 1):
         schema["allOf"].append(

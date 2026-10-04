@@ -139,6 +139,7 @@ def test_local_check_envelope_rejects_unknown_fields_and_false_success(
     assert not direct.is_valid({"status": "local_checks_passed"})
     assert not direct.is_valid({**accepted, "stages": accepted["stages"][:-1]})
     assert not direct.is_valid({**accepted, "stages": list(reversed(accepted["stages"]))})
+    assert not direct.is_valid({**accepted, "status": "blocked"})
 
 
 def test_local_check_envelope_rejects_earlier_blocker_before_candidate_change(

@@ -1846,6 +1846,25 @@
     {
       "if": {
         "properties": {
+          "status": {
+            "const": "blocked"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blocked_stage": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "blocked_stage": {
             "const": "intake"
           }
