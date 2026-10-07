@@ -286,7 +286,12 @@ and syntax checks behind explicit `check_reference_content`; semantic title,
 description, coverage and source-accuracy review remain separate work.
 Binary references are deliberately excluded from text checks, rather than
 requiring every resource to decode as UTF-8. JSON rejects non-standard numeric
-constants. YAML uses syntax events, not object construction, so custom tags and
+constants and validates large integer tokens without numeric conversion.
+Markdown suffixes listed in the API contract receive the same checks as `.md`;
+leading UTF-8 BOMs are not content. The opt-in text check has an eight-MiB
+per-reference parsing budget with a typed `reference_content_limit` blocker.
+This does not bound the preceding package capture or waive source safety.
+YAML uses syntax events, not object construction, so custom tags and
 multiple documents remain valid reference formats. This deliberately differs
 from the source's single-document constructor; syntax acceptance is not safety
 clearance. Required files are explicit policy,

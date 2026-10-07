@@ -28,6 +28,10 @@ _ALLOWED_FRONTMATTER: Final[frozenset[str]] = frozenset(
 _PACKAGE_ID_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _SOURCE_REVISION_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{40}$")
 _MAX_PACKAGE_DIRECTORY_DEPTH: Final[int] = 64
+_MAX_REFERENCE_TEXT_BYTES: Final[int] = 8_388_608
+_TEXT_REFERENCE_SUFFIXES: Final[frozenset[str]] = frozenset(
+    {".md", ".markdown", ".mdown", ".mkd", ".mkdn", ".mdwn", ".mdtxt", ".mdtext", ".txt", ".json", ".yaml", ".yml"}
+)
 
 
 class _UnsupportedSafeTraversal(OSError):
@@ -72,10 +76,12 @@ def _reject_json_constant(value: str) -> None:
 def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
     """Check textual reference bytes, not semantic accuracy or external links."""
     suffix = Path(path).suffix.lower()
-    if suffix not in {".md", ".txt", ".json", ".yaml", ".yml"}:
+    if suffix not in _TEXT_REFERENCE_SUFFIXES:
         return []
+    if len(payload) > _MAX_REFERENCE_TEXT_BYTES:
+        return [_finding("reference_content_limit", "textual reference exceeds the eight MiB parsing limit", path)]
     try:
-        text = payload.decode("utf-8")
+        text = payload.decode("utf-8-sig")
         if not text.strip():
             return [_finding("empty_reference", "textual reference must contain content", path)]
         if suffix == ".json":

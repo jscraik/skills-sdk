@@ -16,7 +16,13 @@ portable relative paths to be readable regular files in the captured manifest.
 `check_reference_content=True` checks UTF-8 and nonempty content for Markdown,
 text, JSON and YAML references, plus JSON/YAML syntax. Binary references remain
 valid resources. These checks reuse the bytes that bind the candidate; they
-do not follow symlinks or reread files outside the package.
+do not follow symlinks or reread files outside the package. Recognized Markdown
+suffixes are `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, `.mdtxt` and
+`.mdtext`; suffix matching is case-insensitive. A leading UTF-8 BOM is ignored
+when checking textual content. Each textual reference is limited to eight MiB
+before decoding or parsing; larger inputs return `reference_content_limit`.
+This bounds the syntax parser input, not the earlier package byte capture or
+total host memory usage.
 JSON rejects non-standard constants such as `NaN` and `Infinity`. YAML syntax
 validation accepts application-defined tags and multiple documents without
 constructing tagged objects; it does not establish application validity or safety.

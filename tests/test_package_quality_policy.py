@@ -47,6 +47,10 @@ def test_required_file_rejection_and_corrected_input(tmp_path: Path) -> None:
     ("name", "payload", "code", "corrected"),
     [
         ("guide.md", b" \n", "empty_reference", b"# Guide\n"),
+        ("guide.markdown", b" \n", "empty_reference", b"# Guide\n"),
+        ("guide.markdown", b"\xff", "invalid_reference_utf8", b"# Guide\n"),
+        ("guide.md", b"\xef\xbb\xbf \n", "empty_reference", b"\xef\xbb\xbf# Guide\n"),
+        ("guide.txt", b"\xef\xbb\xbf", "empty_reference", b"\xef\xbb\xbfUse the example.\n"),
         ("guide.txt", b"\xff", "invalid_reference_utf8", b"Use the supplied fixture.\n"),
         ("data.json", b"{", "invalid_reference_format", b'{"example": true}'),
         ("data.json", b"NaN", "invalid_reference_format", b"null"),
@@ -84,6 +88,40 @@ def test_yaml_syntax_accepts_tags_and_multiple_documents(tmp_path: Path, payload
     )
     assert result.status == "pass"
     assert reference.read_text() == payload
+
+
+def test_reference_text_budget_blocks_then_recovers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _package(tmp_path)
+    reference = root / "references/example.json"
+    limit = 8_388_608
+    oversized = b'"' + b"a" * (limit - 1) + b'"'
+    reference.write_bytes(oversized)
+    policy = SkillValidationPolicy(check_reference_content=True)
+
+    def unexpected_parse(*args: object, **kwargs: object) -> object:
+        raise AssertionError("oversized reference must block before JSON parsing")
+
+    with monkeypatch.context() as guarded:
+        guarded.setattr("skills_sdk.validation.skill_package.json.loads", unexpected_parse)
+        rejected = validate_skill_package(root, source_revision=REVISION, policy=policy)
+    assert rejected.status == "blocked"
+    assert "reference_content_limit" in {item.code for item in rejected.findings}
+    assert reference.read_bytes() == oversized
+    reference.write_bytes(b'"' + b"a" * (limit - 2) + b'"')
+    accepted = validate_skill_package(root, source_revision=REVISION, policy=policy)
+    assert accepted.status == "pass"
+    assert accepted.candidate != rejected.candidate
+
+
+@pytest.mark.parametrize("suffix", [".MD", ".markdown", ".mdown", ".mkd", ".mkdn", ".mdwn", ".mdtxt", ".mdtext"])
+def test_markdown_suffix_neighbours_block_and_recover(tmp_path: Path, suffix: str) -> None:
+    root = _package(tmp_path)
+    reference = root / "references" / ("example" + suffix)
+    reference.write_bytes(b" \n")
+    policy = SkillValidationPolicy(check_reference_content=True)
+    assert validate_skill_package(root, source_revision=REVISION, policy=policy).status == "blocked"
+    reference.write_bytes(b"\xef\xbb\xbf# Example\n")
+    assert validate_skill_package(root, source_revision=REVISION, policy=policy).status == "pass"
 
 
 def test_binary_references_and_nested_resources_are_not_text_requirements(tmp_path: Path) -> None:

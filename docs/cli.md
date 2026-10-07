@@ -40,7 +40,9 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 The `intake`, `validate`, and `build` routes accept repeatable
 `--require-file references/README.md` and opt-in `--check-reference-content`.
 Required paths must be unique portable package-relative paths. Textual references
-must be nonempty UTF-8; JSON and YAML must parse. Binary resources are not text
+must be nonempty UTF-8, ignoring a leading BOM; JSON and YAML must parse.
+Textual references larger than eight MiB return `reference_content_limit`
+before decoding or parsing. Binary resources are not text
 requirements. These flags do not establish semantic accuracy or review execution.
 Neither policy is required by default. The existing `check-local/v1` composition
 does not expose these flags; do not infer full package-quality coverage from it.

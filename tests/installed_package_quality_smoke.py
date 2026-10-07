@@ -50,13 +50,26 @@ def main() -> int:
         (root / "references").mkdir()
         reference = root / "references/README.md"
         policy = SkillValidationPolicy(required_files=("references/README.md",), check_reference_content=True)
-        for content, expected in [(None, "blocked"), (b" \n", "blocked"), (b"# Routing\n", "pass")]:
+        for content, expected in [
+            (None, "blocked"),
+            (b" \n", "blocked"),
+            (b"\xef\xbb\xbf \n", "blocked"),
+            (b"\xef\xbb\xbf# Routing\n", "pass"),
+        ]:
             if content is not None:
                 reference.write_bytes(content)
             result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
             assert result.status == expected, result.model_dump(mode="json")
             _check_routes(root, cwd, expected)
             assert (root / "SKILL.md").read_bytes() == skill
+        markdown = root / "references/example.markdown"
+        for content, expected in [(b"\xff", "blocked"), (b" \n", "blocked"), (b"# Example\n", "pass")]:
+            markdown.write_bytes(content)
+            result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
+            assert result.status == expected, result.model_dump(mode="json")
+            _check_routes(root, cwd, expected)
+            assert markdown.read_bytes() == content
+        markdown.unlink()
         structured = root / "references/example.json"
         for content, expected in [
             (b'{"score": NaN}', "blocked"),
@@ -64,6 +77,8 @@ def main() -> int:
             (b"[" + b"9" * 4301 + b",]", "blocked"),
             (b"[" + b"9" * 4301 + b"]", "pass"),
             (b"-" + b"9" * 4301, "pass"),
+            (b'"' + b"a" * (8_388_608 - 1) + b'"', "blocked"),
+            (b'"' + b"a" * (8_388_608 - 2) + b'"', "pass"),
         ]:
             structured.write_bytes(content)
             result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
