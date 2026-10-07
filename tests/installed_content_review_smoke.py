@@ -97,6 +97,49 @@ class SlowStartingBlockingReviewer(BlockingReviewer):
         return FixtureReviewer.reviewer
 
 
+class CompletedReviewer(FixtureReviewer):
+    def __init__(self, finished: Path, duration: float) -> None:
+        self.finished = finished
+        self.duration = duration
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        await asyncio.sleep(self.duration)
+        result = await super().review(inputs)
+        self.finished.write_text("finished")
+        return result
+
+
+def _assert_delayed_observation(root: Path) -> None:
+    original_read = review_module._read_worker
+    for duration, expected in ((0.05, "pass"), (0.5, "blocked")):
+        finished = root.parent / f"finished-{duration}"
+
+        async def delayed_read(
+            channel: review_module.socket.socket, finished: Path = finished
+        ) -> review_module._WorkerObservation:
+            async with asyncio.timeout(10):
+                while not finished.exists():
+                    await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
+            return await original_read(channel)
+
+        existing = {child.pid for child in review_module.multiprocessing.active_children()}
+        with (
+            patch.object(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2),
+            patch.object(review_module, "_read_worker", delayed_read),
+        ):
+            result = asyncio.run(
+                execute_content_review(root, source_revision="1" * 40, adapter=CompletedReviewer(finished, duration))
+            )
+        assert result.status == expected and result.adapter_invoked is True
+        if expected == "blocked":
+            assert result.findings[0].code == "content_review_timeout"
+        assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 def _assert_deadline_and_byte_text(root: Path, assessment: ContentReviewAssessment) -> None:
     malformed = assessment.model_dump(mode="python")
     malformed["items"][0]["rationale"] = b"Known fixture comparison completed."
@@ -343,6 +386,7 @@ def main() -> int:
             assessment.write_text(result.review.assessment.model_dump_json())
             if expected == "pass":
                 _assert_deadline_and_byte_text(root, result.review.assessment)
+                _assert_delayed_observation(root)
                 _assert_unsupported_read_recovery(root, assessment)
                 _assert_contract_boundaries(root, result.review.assessment)
                 _assert_mapping_and_finding_recovery(root, result.review.assessment)

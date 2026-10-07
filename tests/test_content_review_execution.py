@@ -116,6 +116,52 @@ class FixtureReviewer:
         }
 
 
+class CompletedReviewer(FixtureReviewer):
+    def __init__(self, finished: Path, duration: float) -> None:
+        super().__init__()
+        self.finished = finished
+        self.duration = duration
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        await asyncio.sleep(self.duration)
+        result = await super().review(inputs)
+        self.finished.write_text("finished")
+        return result
+
+
+@pytest.mark.parametrize("duration, expected", [(0.05, "pass"), (0.5, "blocked")])
+def test_delayed_parent_observation_preserves_callback_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, duration: float, expected: str
+) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    finished = tmp_path / "finished"
+    original_read = review_module._read_worker
+
+    async def delayed_read(channel: review_module.socket.socket) -> review_module._WorkerObservation:
+        async with asyncio.timeout(10):
+            while not finished.exists():
+                await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
+        return await original_read(channel)
+
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
+    with monkeypatch.context() as context:
+        context.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2)
+        context.setattr(review_module, "_read_worker", delayed_read)
+        result = asyncio.run(
+            execute_content_review(root, source_revision=REVISION, adapter=CompletedReviewer(finished, duration))
+        )
+    assert result.status == expected and result.adapter_invoked is True
+    if expected == "blocked":
+        assert result.findings[0].code == "content_review_timeout"
+    assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 def test_adapter_observes_current_bytes_and_corrected_input(tmp_path: Path) -> None:
     root = tmp_path / "review-example"
     root.mkdir()

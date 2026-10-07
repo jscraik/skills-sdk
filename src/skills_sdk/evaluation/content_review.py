@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import math
 import multiprocessing
 import pickle
 import socket
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from multiprocessing.process import BaseProcess
@@ -59,10 +61,12 @@ async def _invoke(
     inputs: ContentReviewInput,
     channel: socket.socket,
     reviewer: PackageSafetyReviewer,
-) -> object:
+) -> tuple[object, float]:
+    invoked_at = time.monotonic()
     invocation = callback(inputs)
-    _send_packet(channel, {"kind": "invoked", "reviewer": reviewer.model_dump(mode="json")})
-    return await invocation
+    _send_packet(channel, {"kind": "invoked", "reviewer": reviewer.model_dump(mode="json"), "invoked_at": invoked_at})
+    result = await invocation
+    return result, time.monotonic()
 
 
 async def _adapter_metadata(
@@ -95,6 +99,7 @@ async def _worker_review(
     if isinstance(observed, BaseException):
         _send_packet(channel, {"kind": "blocked", "code": "content_review_adapter_failed"})
         return
+    observed, completed_at = observed
     try:
         raw = (
             observed.model_dump(mode="python", warnings="error")
@@ -102,7 +107,14 @@ async def _worker_review(
             else observed
         )
         assessment = ContentReviewAssessment.model_validate(raw)
-        _send_packet(channel, {"kind": "returned", "assessment": assessment.model_dump(mode="json", warnings="error")})
+        _send_packet(
+            channel,
+            {
+                "kind": "returned",
+                "assessment": assessment.model_dump(mode="json", warnings="error"),
+                "completed_at": completed_at,
+            },
+        )
     except (ValidationError, ValueError, TypeError, RuntimeError, LookupError, PydanticSerializationError):
         _send_packet(channel, {"kind": "blocked", "code": "invalid_content_review"})
 
@@ -141,6 +153,7 @@ class _WorkerObservation:
 async def _read_worker(channel: socket.socket) -> _WorkerObservation:
     loop = asyncio.get_running_loop()
     reviewer: PackageSafetyReviewer | None = None
+    invoked_at = 0.0
     pending = bytearray()
     try:
         async with asyncio.timeout(_REVIEW_STARTUP_TIMEOUT_SECONDS) as deadline:
@@ -159,8 +172,17 @@ async def _read_worker(channel: socket.socket) -> _WorkerObservation:
                         raise ValueError("invalid worker packet")
                     if packet.get("kind") == "invoked" and reviewer is None:
                         reviewer = PackageSafetyReviewer.model_validate(packet["reviewer"])
-                        deadline.reschedule(loop.time() + _REVIEW_TIMEOUT_SECONDS)
+                        invoked_at = float(packet["invoked_at"])
+                        if not math.isfinite(invoked_at):
+                            raise ValueError("invalid worker invocation time")
+                        remaining = invoked_at + _REVIEW_TIMEOUT_SECONDS - time.monotonic()
+                        deadline.reschedule(loop.time() + remaining)
                     elif packet.get("kind") == "returned" and reviewer is not None:
+                        completed_at = float(packet["completed_at"])
+                        if not math.isfinite(completed_at) or completed_at < invoked_at:
+                            raise ValueError("invalid worker completion time")
+                        if completed_at - invoked_at > _REVIEW_TIMEOUT_SECONDS:
+                            return _WorkerObservation(reviewer, code="content_review_timeout")
                         return _WorkerObservation(
                             reviewer, ContentReviewAssessment.model_validate(packet["assessment"])
                         )
