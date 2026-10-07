@@ -81,9 +81,20 @@ class MetadataFailureReviewer(FixtureReviewer):
 
 
 class BlockingReviewer(FixtureReviewer):
+    def __init__(self, started: Path) -> None:
+        self.started = started
+
     async def review(self, inputs: ContentReviewInput) -> object:
+        self.started.write_text(str(time.monotonic()))
         while True:
             time.sleep(60)
+
+
+class SlowStartingBlockingReviewer(BlockingReviewer):
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        time.sleep(4)
+        return FixtureReviewer.reviewer
 
 
 def _assert_deadline_and_byte_text(root: Path, assessment: ContentReviewAssessment) -> None:
@@ -97,12 +108,19 @@ def _assert_deadline_and_byte_text(root: Path, assessment: ContentReviewAssessme
     malformed["evidence"] = (item for item in (forged, *assessment.evidence[1:]))
     rejected = assess_content_review(root, source_revision="1" * 40, assessment=malformed)
     assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
-    with patch.object(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2):
-        started = time.monotonic()
-        timed_out = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=BlockingReviewer()))
-        assert time.monotonic() - started < 3
-    assert timed_out.status == "blocked" and timed_out.adapter_invoked is True
-    assert timed_out.findings[0].code == "content_review_timeout"
+    for adapter_type in (BlockingReviewer, SlowStartingBlockingReviewer):
+        marker = root.parent / "callback-started"
+        existing = {child.pid for child in review_module.multiprocessing.active_children()}
+        with patch.object(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2):
+            timed_out = asyncio.run(
+                execute_content_review(root, source_revision="1" * 40, adapter=adapter_type(marker))
+            )
+            finished = time.monotonic()
+        # Startup has its own budget; measure only callback observation and cleanup.
+        assert finished - float(marker.read_text()) < 3
+        assert timed_out.status == "blocked" and timed_out.adapter_invoked is True
+        assert timed_out.findings[0].code == "content_review_timeout"
+        assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
     assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
     assert (
         asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
