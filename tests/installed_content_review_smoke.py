@@ -9,6 +9,8 @@ import json
 import subprocess
 import sys
 import time
+from collections import UserDict
+from multiprocessing.connection import Connection
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -233,6 +235,62 @@ def _assert_reference_binding(root: Path, cwd: Path, assessment: ContentReviewAs
         assert "invalid_content_review" in process.stdout and "Traceback" not in process.stderr
 
 
+def _assert_mapping_and_finding_recovery(root: Path, assessment: ContentReviewAssessment) -> None:
+    malformed = assessment.model_dump(mode="json")
+    malformed["candidate"] = UserDict(
+        {**malformed["candidate"], "package_id": assessment.candidate.package_id.encode()}
+    )
+    _assert_contract_rejects(ContentReviewAssessment, "content-review-assessment.v1", malformed)
+    rejected = assess_content_review(root, source_revision="1" * 40, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    finding = SkillPackageFinding(
+        code="fixture_blocked", severity=ValidationSeverity.BLOCKER, message="Blocked fixture"
+    )
+    for model, schema in (
+        (ContentReviewResult, "content-review.v1"),
+        (ContentReviewExecutionResult, "content-review-execution.v1"),
+    ):
+        payload = {
+            "candidate": None,
+            "status": "blocked",
+            "findings": (finding.model_copy(update={"code": "INVALID"}),),
+        }
+        _assert_contract_rejects(model, schema, payload)
+        corrected = {**payload, "findings": (finding,)}
+        model.model_validate(corrected)
+        SchemaRegistry().validate(schema, model.model_validate(corrected).model_dump(mode="json"))
+    assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
+
+
+def _daemon_review(root: Path, channel: Connection) -> None:
+    result = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer()))
+    channel.send((result.status, result.adapter_invoked, result.findings[0].code))
+    channel.close()
+
+
+def _assert_daemon_recovery(root: Path) -> None:
+    context = review_module.multiprocessing.get_context("spawn")
+    parent, child = context.Pipe(duplex=False)
+    worker = context.Process(target=_daemon_review, args=(root, child), daemon=True)
+    try:
+        worker.start()
+        child.close()
+        assert parent.poll(30), "daemon blocker did not return"
+        assert parent.recv() == ("blocked", False, "unsupported_content_review_isolation")
+        worker.join(5)
+        assert worker.exitcode == 0
+    finally:
+        parent.close()
+        child.close()
+        if worker.is_alive():
+            worker.terminate()
+            worker.join(5)
+        worker.close()
+    assert (
+        asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 def main() -> int:
     assert "site-packages" in str(Path(skills_sdk.__file__).resolve())
     with TemporaryDirectory(prefix="sdk-content-review-") as directory:
@@ -259,6 +317,8 @@ def main() -> int:
                 _assert_deadline_and_byte_text(root, result.review.assessment)
                 _assert_unsupported_read_recovery(root, assessment)
                 _assert_contract_boundaries(root, result.review.assessment)
+                _assert_mapping_and_finding_recovery(root, result.review.assessment)
+                _assert_daemon_recovery(root)
             command = [
                 sys.executable,
                 "-m",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -42,16 +43,29 @@ class _ReviewModel(_ContractModel):
                 raise ValueError("review input requires JSON text, not byte strings")
             if id(item) in visited:
                 continue
-            if isinstance(item, (BaseModel, dict, list, tuple)):
+            if isinstance(item, (BaseModel, Mapping, list, tuple)):
                 visited.add(id(item))
             if isinstance(item, BaseModel):
                 pending.append(item.model_dump(mode="python", warnings="error"))
-            elif isinstance(item, dict):
+            elif isinstance(item, Mapping):
                 pending.extend(item.keys())
                 pending.extend(item.values())
             elif isinstance(item, (list, tuple)):
                 pending.extend(item)
         return value
+
+    @field_validator("findings", mode="before", check_fields=False)
+    @classmethod
+    def nested_findings_are_revalidated(cls, value: object) -> object:
+        if not isinstance(value, (list, tuple)):
+            raise ValueError("review findings require list or tuple containers")
+        try:
+            return tuple(
+                item.model_dump(mode="python", warnings="error") if isinstance(item, SkillPackageFinding) else item
+                for item in value
+            )
+        except PydanticSerializationError:
+            raise ValueError("review findings failed revalidation") from None
 
     @field_validator(
         "semantic_review_executed",

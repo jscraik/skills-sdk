@@ -16,29 +16,61 @@ from skills_sdk.models.safety import PackageSafetyReviewer
 REVISION = "1" * 40
 
 
+def test_daemon_spawn_context_blocks_and_recovers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
+    with monkeypatch.context() as context:
+        context.setitem(review_module.multiprocessing.current_process()._config, "daemon", True)
+        result = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer()))
+    assert result.status == "blocked" and result.adapter_invoked is False
+    assert result.findings[0].code == "unsupported_content_review_isolation"
+    assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 class BlockingReviewer:
     reviewer = PackageSafetyReviewer(
         adapter_id="fixture-review", adapter_version_or_digest="1", method="static_analysis"
     )
 
+    def __init__(self, started: Path) -> None:
+        self.started = started
+
     async def review(self, inputs: ContentReviewInput) -> object:
+        self.started.write_text(str(time.monotonic()))
         time.sleep(2)
         return await FixtureReviewer().review(inputs)
 
 
+class SlowStartingBlockingReviewer(BlockingReviewer):
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        time.sleep(2)
+        return BlockingReviewer.reviewer
+
+
+@pytest.mark.parametrize("adapter_type", [BlockingReviewer, SlowStartingBlockingReviewer])
 def test_blocking_callback_exceeding_deadline_blocks_and_recovers(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, adapter_type: type[BlockingReviewer]
 ) -> None:
     root = tmp_path / "review-example"
     root.mkdir()
     (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    started = tmp_path / "callback-started"
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
     with monkeypatch.context() as context:
         context.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2, raising=False)
-        started = time.monotonic()
-        rejected = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=BlockingReviewer()))
-        assert time.monotonic() - started < 1.5
+        rejected = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=adapter_type(started)))
+        finished = time.monotonic()
+    # Exclude interpreter startup and metadata discovery from the callback deadline.
+    assert finished - float(started.read_text()) < 1.5
     assert rejected.status == "blocked" and rejected.adapter_invoked is True
     assert rejected.findings[0].code == "content_review_timeout"
+    assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
     assert (
         asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
     )
@@ -184,7 +216,12 @@ def test_caller_cancellation_cancels_owned_callback(tmp_path: Path) -> None:
 
 
 class NeverReturningReviewer(FixtureReviewer):
+    def __init__(self, started: Path) -> None:
+        super().__init__()
+        self.started = started
+
     async def review(self, inputs: ContentReviewInput) -> object:
+        self.started.write_text(str(time.monotonic()))
         while True:
             time.sleep(60)
 
@@ -196,19 +233,24 @@ class BlockingMetadataReviewer(FixtureReviewer):
         return FixtureReviewer.reviewer
 
 
-@pytest.mark.parametrize("adapter", [NeverReturningReviewer(), BlockingMetadataReviewer()])
+@pytest.mark.parametrize("adapter_type", [NeverReturningReviewer, BlockingMetadataReviewer])
 def test_nonreturning_worker_is_bounded_and_reaped(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, adapter: FixtureReviewer
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, adapter_type: type[FixtureReviewer]
 ) -> None:
     root = tmp_path / "review-example"
     root.mkdir()
     (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
     existing = {child.pid for child in review_module.multiprocessing.active_children()}
     monkeypatch.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2)
-    monkeypatch.setattr(review_module, "_REVIEW_STARTUP_TIMEOUT_SECONDS", 1.5)
-    started = time.monotonic()
+    monkeypatch.setattr(review_module, "_REVIEW_STARTUP_TIMEOUT_SECONDS", 5)
+    started = tmp_path / "callback-started"
+    adapter = NeverReturningReviewer(started) if adapter_type is NeverReturningReviewer else adapter_type()
     result = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=adapter))
-    assert time.monotonic() - started < 2.5
+    finished = time.monotonic()
+    if isinstance(adapter, NeverReturningReviewer):
+        assert finished - float(started.read_text()) < 1.5
+    else:
+        assert not started.exists()
     assert result.status == "blocked" and result.findings[0].code == "content_review_timeout"
     assert result.adapter_invoked is isinstance(adapter, NeverReturningReviewer)
     assert {child.pid for child in review_module.multiprocessing.active_children()} == existing

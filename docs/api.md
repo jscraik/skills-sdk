@@ -47,7 +47,8 @@ trust, sandboxing and side effects. Execution uses Python's `spawn` context,
 not `fork`: supply an importable, safely pickleable adapter and protect script
 entrypoints with `if __name__ == "__main__"`. Adapter transfer occurs before
 the startup timer and is trusted caller code, not a bounded untrusted ingress
-operation. Unsupported transfer returns `unsupported_content_review_isolation`
+operation. Daemon process contexts cannot spawn this worker. Unsupported
+transfer or daemon contexts return `unsupported_content_review_isolation`
 without invoking the callback. Adapter state changes remain in the child, not
 the caller's object. Worker termination does not undo filesystem or other
 external side effects and does not guarantee callback `finally` blocks run.

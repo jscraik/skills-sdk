@@ -175,6 +175,8 @@ async def _read_worker(channel: socket.socket) -> _WorkerObservation:
 
 
 async def _isolated_review(adapter: OfflineContentReviewAdapter, inputs: ContentReviewInput) -> _WorkerObservation:
+    if multiprocessing.current_process().daemon:
+        return _WorkerObservation(code="unsupported_content_review_isolation")
     try:
         parent, child = socket.socketpair()
     except OSError:

@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from collections import deque
+from collections import UserDict, deque
 from collections.abc import Callable, Iterable
 from copy import deepcopy
 from pathlib import Path
+from types import MappingProxyType
 from typing import ClassVar
 
 import pytest
@@ -25,6 +26,43 @@ from skills_sdk.validation.content_review import assess_content_review
 from skills_sdk.validation.skill_package import validate_skill_package
 
 REVISION = "1" * 40
+
+
+@pytest.mark.parametrize("container", [UserDict, MappingProxyType])
+@pytest.mark.parametrize(
+    "section,field", [("candidate", "package_id"), ("reviewer", "adapter_id"), ("evidence", "ref")]
+)
+def test_mapping_byte_text_rejects_and_recovers(tmp_path: Path, container: Callable, section: str, field: str) -> None:
+    root, data = _fixture(tmp_path)
+    malformed = deepcopy(data)
+    values = malformed[section][0] if section == "evidence" else malformed[section]
+    wrapped = container({**values, field: values[field].encode()})
+    if section == "evidence":
+        malformed[section][0] = wrapped
+    else:
+        malformed[section] = wrapped
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate(malformed)
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    corrected = deepcopy(data)
+    if section == "evidence":
+        corrected[section][0] = container(values)
+    else:
+        corrected[section] = container(data[section])
+    assert assess_content_review(root, source_revision=REVISION, assessment=corrected).status == "pass"
+
+
+@pytest.mark.parametrize("model", [ContentReviewResult, ContentReviewExecutionResult])
+@pytest.mark.parametrize("update", [{"code": "INVALID"}, {"evidence_refs": ("../escape",)}])
+def test_forged_finding_rejects_and_recovers(model: type[ContentReviewResult], update: dict[str, object]) -> None:
+    finding = SkillPackageFinding(
+        code="fixture_blocked", severity=ValidationSeverity.BLOCKER, message="Blocked fixture"
+    )
+    payload = {"candidate": None, "status": "blocked", "findings": (finding.model_copy(update=update),)}
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
+    assert model.model_validate({**payload, "findings": (finding,)}).status == "blocked"
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
