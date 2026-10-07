@@ -79,7 +79,7 @@ def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
         if not text.strip():
             return [_finding("empty_reference", "textual reference must contain content", path)]
         if suffix == ".json":
-            json.loads(text, parse_constant=_reject_json_constant)
+            json.loads(text, parse_int=str, parse_constant=_reject_json_constant)
         elif suffix in {".yaml", ".yml"}:
             for _ in yaml.parse(text, Loader=yaml.SafeLoader):
                 pass

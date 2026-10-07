@@ -1,5 +1,9 @@
 # SDK entrypoint
 
+Follow [the canonical workflow](workflow.md) to select the intent and ordered
+proof gates. Use [the migration map](migration-map.md) to distinguish current
+SDK behaviour from legacy capability labels and planned routes.
+
 The default `skills-sdk --help` route is intentionally short. It exposes the
 portable lifecycle commands without executing providers, inspecting runtime
 state, or performing distribution work. Python initialization still imports

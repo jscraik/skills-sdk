@@ -53,6 +53,8 @@ def test_required_file_rejection_and_corrected_input(tmp_path: Path) -> None:
         ("data.json", b"Infinity", "invalid_reference_format", b"1"),
         ("data.json", b"-Infinity", "invalid_reference_format", b"-1"),
         ("data.json", b'{"score": NaN}', "invalid_reference_format", b'{"score": 0}'),
+        ("data.json", b"[" + b"9" * 4301 + b",]", "invalid_reference_format", b"[" + b"9" * 4301 + b"]"),
+        ("data.json", b"--" + b"9" * 4301, "invalid_reference_format", b"-" + b"9" * 4301),
         ("data.yaml", b"example: [", "invalid_reference_format", b"example: true\n"),
     ],
 )

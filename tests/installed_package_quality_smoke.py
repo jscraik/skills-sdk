@@ -58,7 +58,13 @@ def main() -> int:
             _check_routes(root, cwd, expected)
             assert (root / "SKILL.md").read_bytes() == skill
         structured = root / "references/example.json"
-        for content, expected in [(b'{"score": NaN}', "blocked"), (b'{"score": 0}', "pass")]:
+        for content, expected in [
+            (b'{"score": NaN}', "blocked"),
+            (b'{"score": 0}', "pass"),
+            (b"[" + b"9" * 4301 + b",]", "blocked"),
+            (b"[" + b"9" * 4301 + b"]", "pass"),
+            (b"-" + b"9" * 4301, "pass"),
+        ]:
             structured.write_bytes(content)
             result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
             assert result.status == expected, result.model_dump(mode="json")
