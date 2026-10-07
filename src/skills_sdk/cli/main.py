@@ -127,6 +127,12 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--source-revision")
         command.add_argument("--max-entrypoint-lines", type=int)
         command.add_argument("--max-reference-depth", type=int)
+        command.add_argument(
+            "--require-file", action="append", default=[], help="require an applicable package-local file"
+        )
+        command.add_argument(
+            "--check-reference-content", action="store_true", help="check textual reference bytes and syntax"
+        )
         command.add_argument("--json", action="store_true", dest="json_output")
         command.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     intake = commands.add_parser("intake", help=COMMAND_HELP["intake"], description=COMMAND_HELP["intake"])
@@ -136,6 +142,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     intake.add_argument("--max-entrypoint-lines", type=int)
     intake.add_argument("--max-reference-depth", type=int)
+    intake.add_argument("--require-file", action="append", default=[], help="require an applicable package-local file")
+    intake.add_argument(
+        "--check-reference-content", action="store_true", help="check textual reference bytes and syntax"
+    )
     intake.add_argument("--json", action="store_true", dest="json_output")
     intake.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     local_check = commands.add_parser("check-local", help=COMMAND_HELP["check-local"])
@@ -522,6 +532,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     policy = SkillValidationPolicy(
         max_entrypoint_lines=arguments.max_entrypoint_lines,
         max_reference_depth=arguments.max_reference_depth,
+        required_files=tuple(arguments.require_file),
+        check_reference_content=arguments.check_reference_content,
     )
     if arguments.command == "intake":
         from pydantic import ValidationError
