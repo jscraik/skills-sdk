@@ -10,6 +10,18 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 ## Contract families
 
+**Declared scenario coverage:** `assess_scenario_coverage` from
+`skills_sdk.evaluation` audits a `ScenarioCoveragePlan` against the package's
+checked ten-case active set. Import the plan and `ScenarioCoverageResult` from
+`skills_sdk.models`. A plan binds the exact candidate and scenario-set id,
+declares `claims` with `id` and `statement`, maps each claim exactly once to
+`case_ids` or `gap_ids`, and declares each gap's `id`, `reason` and `owner`.
+Unknown cases, unmapped claims, duplicate ids, stale candidates, or unowned gaps
+block. An audit may pass with named gaps while `coverage_complete` remains false.
+Neither result authorises promotion or proves that a mapped case actually tests
+its claim. This checks the supplied inventory; it does not discover every claim,
+review semantic quality, execute cases, or calibrate a judge.
+
 `SkillValidationPolicy` from `skills_sdk.validation` selects optional package
 requirements. `required_files=("references/README.md",)` requires those exact
 portable relative paths to be readable regular files in the captured manifest.

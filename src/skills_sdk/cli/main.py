@@ -91,6 +91,16 @@ def _read_intake_context(path: Path) -> bytes:
         os.close(descriptor)
 
 
+def _add_coverage_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    coverage = commands.add_parser("scenario-coverage", help="audit declared claims against active cases and gaps")
+    coverage.add_argument("package_root", type=Path)
+    coverage.add_argument("--source-revision", required=True)
+    coverage.add_argument("--scenario-set", required=True)
+    coverage.add_argument("--coverage-plan", type=Path, required=True)
+    coverage.add_argument("--json", action="store_true", dest="json_output")
+    coverage.add_argument("--robot", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -163,6 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--contract-version", choices=("v1", "v2"), default="v1")
     quality.add_argument("--json", action="store_true", dest="json_output")
     quality.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    _add_coverage_parser(evaluation_commands)
     for name, help_text in (
         ("scorer-quality", "assess candidate scorer declarations without executing a judge"),
         ("scorer-calibration", "assess candidate-bound held-out scorer artifacts"),
@@ -287,6 +298,26 @@ def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int
     else:
         print(f"selected-case: blocked\n  {blocker.code}: {blocker.message}")
     return 2
+
+
+def _scenario_coverage(arguments: argparse.Namespace) -> int:
+    from skills_sdk.evaluation import assess_scenario_coverage
+
+    try:
+        plan = json.loads(
+            _read_intake_context(arguments.coverage_plan).decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_members,
+        )
+    except (OSError, ValueError, RecursionError):
+        plan = None
+    result = assess_scenario_coverage(
+        arguments.package_root,
+        source_revision=arguments.source_revision,
+        scenario_set_id=arguments.scenario_set,
+        coverage_plan=plan,
+    )
+    _print_result("scenario-coverage", result, json_output=arguments.json_output)
+    return 0 if result.status == "pass" else 2
 
 
 def _selected_case_host_input(path: Path) -> tuple[object, object, object | None, object | None]:
@@ -505,6 +536,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         for path in comparison.different_paths:
             print(f"  different: {path}")
         return 0 if comparison.status == "pass" else 2
+    if arguments.command == "eval" and arguments.eval_command == "scenario-coverage":
+        return _scenario_coverage(arguments)
     if arguments.command == "eval" and arguments.eval_command == "scenario-quality":
         from skills_sdk.evaluation import assess_scenario_quality
 

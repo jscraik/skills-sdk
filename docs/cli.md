@@ -22,7 +22,7 @@ compare-copy   maintain-entrypoint
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
 `intake`, `check-local`, `validate`, `build`, `eval scenario-quality`, `eval scorer-quality`,
-`eval scorer-calibration`, and `eval selected-case`
+`eval scorer-calibration`, `eval scenario-coverage`, and `eval selected-case`
 are implemented local commands:
 
 ```bash
@@ -84,6 +84,14 @@ candidate-bound lanes:
   Its default v1 contract retains the 5/8/10 release-set policy. Explicit
   `--contract-version v2 --scenario-set <id>` selects exactly ten active cases
   without loading historical Markdown fixtures or executing cases.
+- `eval scenario-coverage "<package>" --source-revision "<revision>"
+  --scenario-set "<id>" --coverage-plan ./plan.json --json` audits declared
+  claims against the checked ten-case active set. The bounded host-supplied
+  plan is read without following symlinks. Malformed or stale plans block with
+  exit `2`; a complete declared map exits `0`, including maps retaining owned
+  gaps. Inspect `coverage_complete` and `open_gap_ids`; exit `0` is not release
+  clearance, semantic accuracy, case execution, or proof of a complete claim
+  inventory. The versioned result is `scenario-coverage/v1`.
 - `eval scorer-quality` checks the candidate's `references/evals.yaml`
   `scorer_quality` declaration, including six probe types, judge parameters,
   rationale-audit samples, segmentation, and strict field types. It emits a

@@ -9,6 +9,7 @@ __all__ = [
     "SelectedCaseJudgeAdapter",
     "SelectedCaseJudgeInput",
     "SuppliedTextProviderAdapter",
+    "assess_scenario_coverage",
     "assess_scenario_quality",
     "assess_scorer_calibration",
     "assess_scorer_quality",
@@ -22,6 +23,10 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     """Load optional evaluation services only when requested."""
+    if name == "assess_scenario_coverage":
+        from skills_sdk.evaluation.coverage import assess_scenario_coverage
+
+        return assess_scenario_coverage
     if name in {"ScenarioQualityPolicy", "assess_scenario_quality"}:
         from skills_sdk.evaluation.quality import ScenarioQualityPolicy, assess_scenario_quality
 

@@ -1,5 +1,12 @@
 """Typed package and plugin inventory contracts."""
 
+from skills_sdk.models.coverage import (
+    ClaimCoverage,
+    CoverageClaim,
+    CoverageGap,
+    ScenarioCoveragePlan,
+    ScenarioCoverageResult,
+)
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
     ScenarioCase,
@@ -130,6 +137,9 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 
 __all__ = [
     "ActivationObservation",
+    "ClaimCoverage",
+    "CoverageClaim",
+    "CoverageGap",
     "DiscoveryObservation",
     "EntrypointMaintenanceBlocker",
     "EntrypointMaintenanceResult",
@@ -214,6 +224,8 @@ __all__ = [
     "ScenarioCaseResult",
     "ScenarioCaseResultV2",
     "ScenarioCaseV2",
+    "ScenarioCoveragePlan",
+    "ScenarioCoverageResult",
     "ScenarioObservation",
     "ScenarioObservationV2",
     "ScenarioQualityAppliedPolicy",

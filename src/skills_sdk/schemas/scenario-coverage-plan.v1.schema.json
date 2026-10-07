@@ -1,0 +1,169 @@
+{
+  "$defs": {
+    "ClaimCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "case_ids": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "claim_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "gap_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Gap Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claim_id"
+      ],
+      "title": "ClaimCoverage",
+      "type": "object"
+    },
+    "CoverageClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "statement"
+      ],
+      "title": "CoverageClaim",
+      "type": "object"
+    },
+    "CoverageGap": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reason",
+        "owner"
+      ],
+      "title": "CoverageGap",
+      "type": "object"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/scenario-coverage-plan.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/CoverageClaim"
+      },
+      "minItems": 1,
+      "title": "Claims",
+      "type": "array"
+    },
+    "gaps": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CoverageGap"
+      },
+      "title": "Gaps",
+      "type": "array"
+    },
+    "mappings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ClaimCoverage"
+      },
+      "title": "Mappings",
+      "type": "array"
+    },
+    "scenario_set_id": {
+      "minLength": 1,
+      "title": "Scenario Set Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "scenario-coverage-plan/v1",
+      "default": "scenario-coverage-plan/v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate",
+    "scenario_set_id",
+    "claims"
+  ],
+  "title": "ScenarioCoveragePlan",
+  "type": "object"
+}

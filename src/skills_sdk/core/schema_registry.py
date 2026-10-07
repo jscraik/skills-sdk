@@ -69,6 +69,8 @@ SCHEMA_NAMES = frozenset(
         "scorer-quality.v1",
         "scorer-calibration.v1",
         "local-check.v1",
+        "scenario-coverage-plan.v1",
+        "scenario-coverage.v1",
         "selected-case-judge-evidence.v1",
         "scorer-profile.v1",
         "skill-package-validation.v1",
@@ -390,6 +392,10 @@ class SchemaRegistry:
             from skills_sdk.models.scorer_quality import ScorerCalibrationReceipt
 
             model = ScorerCalibrationReceipt
+        elif name in {"scenario-coverage-plan.v1", "scenario-coverage.v1"}:
+            from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
+
+            model = ScenarioCoveragePlan if name == "scenario-coverage-plan.v1" else ScenarioCoverageResult
         elif name == "local-check.v1":
             from skills_sdk.models.local_check import LocalCheckResult
 

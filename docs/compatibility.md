@@ -278,6 +278,17 @@ rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
 
+The additive `scenario-coverage-plan/v1` and `scenario-coverage/v1` families
+audit caller-declared claim-to-case-or-gap mappings against the package's
+ten active scenarios. Existing scenario-quality v1/v2 receipts, local-check v1,
+and their policies do not change. Calibration probes and historical cases
+cannot satisfy an active-case mapping. Named gaps preserve incomplete coverage,
+even when the mapping audit passes. Model and `SchemaRegistry` validation
+enforce cross-field semantics beyond structural JSON Schema. Neither family
+enters generic `parse_receipt` dispatch; use its model or registry. The source
+skill's Evals Router audit shape guides this implementation; no executed
+Agent-Skills parity or semantic reviewer execution is claimed.
+
 The applicable package-quality policy is an additive increment, not full
 reference-review parity. Legacy `reference_quality_contract` checks nonempty
 reference content and structured syntax, but also applies filename/title
