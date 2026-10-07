@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import canonical_json_sha256
@@ -22,6 +22,29 @@ from skills_sdk.models.validation import SkillPackageFinding
 
 class _ReviewModel(_ContractModel):
     model_config = ConfigDict(extra="forbid", frozen=True, revalidate_instances="always")
+
+    @model_validator(mode="before")
+    @classmethod
+    def input_has_no_byte_strings(cls, value: object) -> object:
+        """Reject non-JSON text before nested contracts can coerce it."""
+        pending = [value]
+        visited: set[int] = set()
+        while pending:
+            item = pending.pop()
+            if isinstance(item, (bytes, bytearray, memoryview)):
+                raise ValueError("review input requires JSON text, not byte strings")
+            if id(item) in visited:
+                continue
+            if isinstance(item, (BaseModel, dict, list, tuple)):
+                visited.add(id(item))
+            if isinstance(item, BaseModel):
+                pending.append(item.model_dump(mode="python", warnings="error"))
+            elif isinstance(item, dict):
+                pending.extend(item.keys())
+                pending.extend(item.values())
+            elif isinstance(item, (list, tuple)):
+                pending.extend(item)
+        return value
 
     @field_validator(
         "semantic_review_executed",
@@ -109,17 +132,17 @@ class ContentReviewAssessment(_ReviewModel):
     @field_validator("evidence", mode="before")
     @classmethod
     def nested_evidence_is_revalidated(cls, value: object) -> object:
-        if isinstance(value, (tuple, list)):
-            try:
-                return tuple(
-                    item.model_dump(mode="python", warnings="error")
-                    if isinstance(item, PackageSafetyEvidenceReference)
-                    else item
-                    for item in value
-                )
-            except PydanticSerializationError:
-                raise ValueError("review evidence failed revalidation") from None
-        return value
+        if not isinstance(value, (tuple, list)):
+            raise ValueError("review evidence must use list or tuple containers")
+        try:
+            return tuple(
+                item.model_dump(mode="python", warnings="error")
+                if isinstance(item, PackageSafetyEvidenceReference)
+                else item
+                for item in value
+            )
+        except PydanticSerializationError:
+            raise ValueError("review evidence failed revalidation") from None
 
     @model_validator(mode="after")
     def review_has_closed_coverage(self) -> ContentReviewAssessment:

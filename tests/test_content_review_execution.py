@@ -3,15 +3,43 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 
 import pytest
 
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.evaluation import content_review as review_module
 from skills_sdk.evaluation.content_review import ContentReviewInput, execute_content_review
 from skills_sdk.models.safety import PackageSafetyReviewer
 
 REVISION = "1" * 40
+
+
+class BlockingReviewer:
+    reviewer = PackageSafetyReviewer(
+        adapter_id="fixture-review", adapter_version_or_digest="1", method="static_analysis"
+    )
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        time.sleep(0.02)
+        return await FixtureReviewer().review(inputs)
+
+
+def test_blocking_callback_exceeding_deadline_blocks_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    with monkeypatch.context() as context:
+        context.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.01, raising=False)
+        rejected = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=BlockingReviewer()))
+    assert rejected.status == "blocked" and rejected.adapter_invoked is True
+    assert rejected.findings[0].code == "content_review_timeout"
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
 
 
 class FixtureReviewer:

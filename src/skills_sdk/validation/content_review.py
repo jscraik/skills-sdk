@@ -23,7 +23,7 @@ def assess_content_review(package_root: Path, *, source_revision: str, assessmen
     review: ContentReviewAssessment | None = None
     try:
         raw = (
-            assessment.model_dump(mode="json", warnings="error")
+            assessment.model_dump(mode="python", warnings="error")
             if isinstance(assessment, ContentReviewAssessment)
             else assessment
         )

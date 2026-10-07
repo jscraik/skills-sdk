@@ -62,6 +62,61 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
     return root, data
 
 
+@pytest.mark.parametrize("field", ["rationale", "owner", "path"])
+def test_byte_string_review_input_rejects_and_recovers(tmp_path: Path, field: str) -> None:
+    root, data = _fixture(tmp_path)
+    malformed = deepcopy(data)
+    value = malformed["items"][0].get(field) or "fixture-owner"
+    malformed["items"][0][field] = value.encode()
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate(malformed)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("content-review-assessment.v1", malformed)
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"
+
+
+@pytest.mark.parametrize(
+    "section,field", [("candidate", "package_id"), ("reviewer", "adapter_id"), ("evidence", "ref")]
+)
+def test_nested_byte_text_rejects_before_coercion(tmp_path: Path, section: str, field: str) -> None:
+    root, data = _fixture(tmp_path)
+    malformed = deepcopy(data)
+    target = malformed[section][0] if section == "evidence" else malformed[section]
+    target[field] = target[field].encode()
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate(malformed)
+    assert assess_content_review(root, source_revision=REVISION, assessment=malformed).status == "blocked"
+    assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"
+
+
+def test_forged_typed_byte_text_is_not_laundered_by_service(tmp_path: Path) -> None:
+    root, data = _fixture(tmp_path)
+    assessment = ContentReviewAssessment.model_validate(data)
+    forged_item = assessment.items[0].model_copy(update={"rationale": b"Fixture review recorded."})
+    forged = assessment.model_copy(update={"items": (forged_item, *assessment.items[1:])})
+    assert assess_content_review(root, source_revision=REVISION, assessment=forged).status == "blocked"
+    assert assess_content_review(root, source_revision=REVISION, assessment=assessment).status == "pass"
+
+
+def test_generator_evidence_rejects_forged_instances_and_recovers(tmp_path: Path) -> None:
+    root, data = _fixture(tmp_path)
+    assessment = ContentReviewAssessment.model_validate(data)
+    forged = assessment.evidence[0].model_copy(update={"sha256": "invalid"})
+    malformed = {**data, "evidence": (item for item in (forged, *assessment.evidence[1:]))}
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate(malformed)
+    malformed["evidence"] = (item for item in (forged, *assessment.evidence[1:]))
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    for evidence in (list(assessment.evidence), assessment.evidence):
+        assert (
+            assess_content_review(root, source_revision=REVISION, assessment={**data, "evidence": evidence}).status
+            == "pass"
+        )
+
+
 @pytest.mark.parametrize("item_index", [0, 1, 2])
 def test_completed_disposition_requires_its_own_source_evidence(tmp_path: Path, item_index: int) -> None:
     root, data = _fixture(tmp_path)

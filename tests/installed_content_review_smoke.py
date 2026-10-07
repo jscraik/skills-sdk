@@ -8,6 +8,7 @@ import io
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -20,6 +21,7 @@ from skills_sdk.cli.main import main as cli_main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import ContentReviewInput, execute_content_review
+from skills_sdk.evaluation import content_review as review_module
 from skills_sdk.models import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
 from skills_sdk.models.safety import PackageSafetyReviewer
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
@@ -74,6 +76,33 @@ class MetadataFailureReviewer(FixtureReviewer):
     @property
     def reviewer(self) -> PackageSafetyReviewer:
         raise RuntimeError("private metadata diagnostic")
+
+
+class BlockingReviewer(FixtureReviewer):
+    async def review(self, inputs: ContentReviewInput) -> object:
+        time.sleep(0.02)
+        return await super().review(inputs)
+
+
+def _assert_deadline_and_byte_text(root: Path, assessment: ContentReviewAssessment) -> None:
+    malformed = assessment.model_dump(mode="python")
+    malformed["items"][0]["rationale"] = b"Known fixture comparison completed."
+    _assert_contract_rejects(ContentReviewAssessment, "content-review-assessment.v1", malformed)
+    rejected = assess_content_review(root, source_revision="1" * 40, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    malformed = assessment.model_dump(mode="python")
+    forged = assessment.evidence[0].model_copy(update={"sha256": "invalid"})
+    malformed["evidence"] = (item for item in (forged, *assessment.evidence[1:]))
+    rejected = assess_content_review(root, source_revision="1" * 40, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    with patch.object(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.01):
+        timed_out = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=BlockingReviewer()))
+    assert timed_out.status == "blocked" and timed_out.adapter_invoked is True
+    assert timed_out.findings[0].code == "content_review_timeout"
+    assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
+    assert (
+        asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
+    )
 
 
 class FailingAssessmentSerializer(ContentReviewAssessment):
@@ -189,6 +218,7 @@ def main() -> int:
             assessment = cwd / "assessment.json"
             assessment.write_text(result.review.assessment.model_dump_json())
             if expected == "pass":
+                _assert_deadline_and_byte_text(root, result.review.assessment)
                 _assert_unsupported_read_recovery(root, assessment)
                 _assert_contract_boundaries(root, result.review.assessment)
             command = [

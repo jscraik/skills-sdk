@@ -7,6 +7,7 @@ import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from time import monotonic
 from typing import Protocol
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
@@ -15,6 +16,8 @@ from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.safety import PackageSafetyReviewer
 from skills_sdk.validation.content_review import _finding, assess_content_review
 from skills_sdk.validation.skill_package import SkillValidationPolicy, _scan_files, validate_skill_package
+
+_REVIEW_TIMEOUT_SECONDS = 30.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,14 +104,15 @@ async def execute_content_review(
     reviewer, callback = metadata
     documents = tuple(ContentReviewDocument(item.path, item.sha256, captured[item.path]) for item in files)
     inputs = ContentReviewInput(PackageCandidateIdentity.model_validate(candidate.model_dump(mode="json")), documents)
+    started = monotonic()
     task = asyncio.create_task(_invoke(callback, inputs))
     try:
-        done, _pending = await asyncio.wait({task}, timeout=30)
+        done, _pending = await asyncio.wait({task}, timeout=_REVIEW_TIMEOUT_SECONDS)
     except asyncio.CancelledError:
         task.cancel()
         task.add_done_callback(_observe_task)
         raise
-    if task not in done:
+    if task not in done or monotonic() - started >= _REVIEW_TIMEOUT_SECONDS:
         task.cancel()
         task.add_done_callback(_observe_task)
         return _blocked_execution(
