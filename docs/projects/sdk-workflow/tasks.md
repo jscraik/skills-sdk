@@ -40,20 +40,30 @@ clearance. Required proof blocks completion of its dependent slice only.
 
 - Current accepted SDK base: `3fcd1565781a9a7da7b8594be61972d4b0d8f089`.
 - Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
-- Current work: S1 in an isolated task branch.
-- Next action: deliver S1, then start S2 with explicit applicable-file policy
-  and deterministic reference checks using the safely captured package bytes.
+- Current work: S1 review repair in its task branch; S2 applicable-file policy
+  and deterministic reference checks in a separate isolated branch.
+- Next action: validate and deliver the S1 review repair and S2 increment using
+  the safely captured package bytes.
   Keep semantic accuracy review separate from structural validation.
 - Local validation for S1 on 2026-10-07:
   `bash scripts/validate-repository.sh` -> `pass` (1977 passed, one skipped;
   schemas, style, build, installed PR-sweep smoke, and diff check passed).
   `bash scripts/validate-codestyle.sh` -> `pass` (all six changed docs included).
   `git diff --cached --check` -> `pass` after removing extra EOF blank lines.
-  The pinned `skills-sdk --help` route -> `pass`; no provider was executed.
+  `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help`
+  -> `pass`; no provider was executed.
 - Inventory proof: all 52 source ids mapped exactly once, with no extra ids.
 - Simplification outcome: `no_justified_edit`; the workflow, inventory, and
   temporary task record have separate consumers and maintenance purposes.
-- Hosted delivery/review: `not_run`.
+- Hosted delivery/review: [PR #44](https://github.com/jscraik/skills-sdk/pull/44)
+  is open. Initial CI failed PR-body command grammar; guarded metadata repair
+  passed with exact readback and unchanged head. Review repair and current-head
+  checks are pending; no merge-readiness claim.
+- S1 follow-up review: permit pre-identity blockers, return corrections to their
+  responsible gate, require registry preparation, and verify rollback after
+  failed runtime mutation. `bash scripts/validate-repository.sh` -> `pass`
+  for the repaired workflow (1977 passed, one skipped; build and installed
+  smoke passed). Hosted reconciliation still needs current-head checks.
 - Provider, registry, and runtime execution: `not_run`; no live operation selected.
 
 ## Lens application

@@ -31,7 +31,8 @@ flowchart TD
   L --> C[Matched oss-cloud confirmation]
   C --> D[Review and select candidate]
   D --> A[Prepare and verify archive]
-  A --> T[Private registry publication and readback]
+  A --> G[Candidate-bound registry preparation]
+  G --> T[Private registry publication and readback]
   T --> I[Selected install and runtime verification]
   P --> X[Classify blocker and correct responsible input]
   F --> X
@@ -39,13 +40,33 @@ flowchart TD
   S --> X
   L --> X
   C --> X
-  X --> P
-  I --> B[Classify observed failure and retain regression]
-  B --> P
+  A --> X
+  G --> X
+  T --> X
+  X --> Y{Responsible correction gate}
+  Y --> P
+  Y --> F
+  Y --> E
+  Y --> S
+  Y --> L
+  Y --> C
+  Y --> A
+  Y --> G
+  Y --> T
+  Y --> I
+  I --> W{Failed after runtime mutation?}
+  W -->|Yes| V[Rollback and verify prior lock and runtime]
+  V -->|Recovered| B[Classify failure and retain regression]
+  V -->|Blocked| Z[Stop dependent mutation; retain typed blocker]
+  W -->|No| B
+  B --> Y
 ```
 
-Each gate binds the package id, source revision, and content digest. A changed
-candidate invalidates downstream evidence for the earlier candidate. Stop
+Once identity is resolved, downstream evidence binds the package id, source
+revision, and content digest. Intake or validation may return a typed blocker
+with `candidate: null` before identity can be resolved; never fabricate identity
+to complete a blocked envelope. A changed candidate invalidates downstream
+evidence for the earlier candidate. Stop
 dependent gates at a blocker; retain independently valid upstream evidence.
 Rerun the affected gate and its dependent gates after correction.
 
@@ -58,7 +79,7 @@ Rerun the affected gate and its dependent gates after correction.
 | Security | Capability-specific checks and reviewer evidence; unresolved risks block execution. | Risk and safety contracts exist; supported security execution adapters are planned. |
 | Local comparison | Base and candidate run on the same oss-local model, frozen cases, settings, and rubric. | Selected-case and injected adapter services exist; matched A/B orchestration is planned. |
 | Cloud confirmation | Repeat both variants on the same oss-cloud model and same case ids; examine lift and regressions. | Supported cloud integration and matched confirmation are planned. |
-| Registry preparation | Exact archive verified against candidate manifest and required resources. | Build, hardening, archive verification, and preparation APIs exist; archive emission and CLI composition are planned. |
+| Registry preparation | Exact archive verified against candidate manifest and required resources; passing registry-preparation/v1 binds candidate, registry name, version, built receipt and hardening evidence before publication. | Build, hardening, archive verification, and preparation APIs exist; archive emission and CLI composition are planned. |
 | Publication and installation | Authorised private publication, exact version readback, selected install, discovery, activation, and runtime behaviour. | Portable planning/evidence contracts exist; executing adapters are planned. |
 | Feedback | Failure owner, retained internal regression, correction, and rerun before another live evaluation. | Local correction is supported; the external feedback loop is planned. |
 
@@ -99,6 +120,14 @@ Preparation, publication, installation, and runtime verification have separate
 authority and results. Public release requires Jamie's decision. Default managed
 publication targets Jamie's private registry; origin-verified provider-managed
 packages retain their supported routes.
+
+If installation or update fails after mutation, require the candidate-bound
+rollback journal and outcome, including verification of the previous lock and
+runtime. A successful rollback permits correction at the responsible gate;
+failed or missing recovery evidence blocks dependent mutation. Classify failures
+that happened before mutation without claiming that rollback executed.
+For uncertain publication outcomes, reconcile registry readback before retrying;
+an unavailable readback is not proof that publication failed without mutation.
 
 For each executable slice, prove accepted input, rejected input, and corrected
 input through public API and installed CLI boundaries as applicable. Include
