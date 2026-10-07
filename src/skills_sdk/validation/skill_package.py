@@ -29,6 +29,8 @@ _PACKAGE_ID_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]
 _SOURCE_REVISION_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{40}$")
 _MAX_PACKAGE_DIRECTORY_DEPTH: Final[int] = 64
 _MAX_REFERENCE_TEXT_BYTES: Final[int] = 8_388_608
+_MAX_YAML_COLLECTION_DEPTH: Final[int] = 128
+_MAX_YAML_EVENTS: Final[int] = 100_000
 _TEXT_REFERENCE_SUFFIXES: Final[frozenset[str]] = frozenset(
     {".md", ".markdown", ".mdown", ".mkd", ".mkdn", ".mdwn", ".mdtxt", ".mdtext", ".txt", ".json", ".yaml", ".yml"}
 )
@@ -73,6 +75,23 @@ def _reject_json_constant(value: str) -> None:
     raise ValueError("JSON reference contains a non-standard constant")
 
 
+def _yaml_within_work_budget(text: str) -> bool:
+    """Stop incremental syntax parsing before excessive depth or event work."""
+    depth = 0
+    events = yaml.parse(text, Loader=yaml.SafeLoader)
+    try:
+        for count, event in enumerate(events, start=1):
+            if isinstance(event, yaml.events.CollectionStartEvent):
+                depth += 1
+            elif isinstance(event, yaml.events.CollectionEndEvent):
+                depth -= 1
+            if depth > _MAX_YAML_COLLECTION_DEPTH or count > _MAX_YAML_EVENTS:
+                return False
+        return True
+    finally:
+        events.close()
+
+
 def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
     """Check textual reference bytes, not semantic accuracy or external links."""
     suffix = Path(path).suffix.lower()
@@ -86,9 +105,8 @@ def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
             return [_finding("empty_reference", "textual reference must contain content", path)]
         if suffix == ".json":
             json.loads(text, parse_int=str, parse_constant=_reject_json_constant)
-        elif suffix in {".yaml", ".yml"}:
-            for _ in yaml.parse(text, Loader=yaml.SafeLoader):
-                pass
+        elif suffix in {".yaml", ".yml"} and not _yaml_within_work_budget(text):
+            return [_finding("reference_content_limit", "YAML reference exceeds the syntax work budget", path)]
     except UnicodeDecodeError:
         return [_finding("invalid_reference_utf8", "textual reference must be UTF-8", path)]
     except (ValueError, yaml.YAMLError, RecursionError):

@@ -26,6 +26,9 @@ total host memory usage.
 JSON rejects non-standard constants such as `NaN` and `Infinity`. YAML syntax
 validation accepts application-defined tags and multiple documents without
 constructing tagged objects; it does not establish application validity or safety.
+Incremental YAML parsing stops above 128 nested collections or 100,000 parser
+events and returns `reference_content_limit`. These work budgets are not a
+wall-clock deadline or a total host memory guarantee.
 
 Apply the policy to `validate_skill_package`, `build_skill_package`, or
 `intake_skill_package`. Defaults are unchanged. Invalid applicable-file policy

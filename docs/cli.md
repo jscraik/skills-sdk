@@ -44,6 +44,9 @@ must be nonempty UTF-8, ignoring a leading BOM; JSON and YAML must parse.
 Textual references larger than eight MiB return `reference_content_limit`
 before decoding or parsing. Binary resources are not text
 requirements. These flags do not establish semantic accuracy or review execution.
+YAML references also return `reference_content_limit` above 128 nested
+collections or 100,000 incremental parser events. This is a work budget, not
+a wall-clock timeout.
 Neither policy is required by default. The existing `check-local/v1` composition
 does not expose these flags; do not infer full package-quality coverage from it.
 

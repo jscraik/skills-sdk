@@ -294,7 +294,10 @@ This does not bound the preceding package capture or waive source safety.
 YAML uses syntax events, not object construction, so custom tags and
 multiple documents remain valid reference formats. This deliberately differs
 from the source's single-document constructor; syntax acceptance is not safety
-clearance. Required files are explicit policy,
+clearance. Incremental YAML parsing stops above 128 nested collections or
+100,000 events with `reference_content_limit`; excessive but syntactically
+valid documents are deliberately blocked. This does not promise a wall-clock
+deadline. Required files are explicit policy,
 not a global OpenAI or repository layout requirement. Defaults and versioned
 validation/build/intake envelopes remain unchanged. Corrected source produces
 a new candidate digest; validation never changes the source.

@@ -93,6 +93,13 @@ def main() -> int:
             assert result.status == "pass", result.model_dump(mode="json")
             _check_routes(root, cwd, "pass")
             assert yaml_reference.read_bytes() == content
+        for depth, expected in ((10_000, "blocked"), (128, "pass")):
+            content = b"[" * depth + b"0" + b"]" * depth
+            yaml_reference.write_bytes(content)
+            result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
+            assert result.status == expected, result.model_dump(mode="json")
+            _check_routes(root, cwd, expected)
+            assert yaml_reference.read_bytes() == content
         assert (root / "SKILL.md").read_bytes() == skill
     print("installed package-quality API and CLI: pass")
     return 0
