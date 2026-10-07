@@ -133,7 +133,7 @@ class ContentReviewAssessment(_ReviewModel):
     @classmethod
     def nested_evidence_is_revalidated(cls, value: object) -> object:
         if not isinstance(value, (tuple, list)):
-            raise ValueError("review evidence must use list or tuple containers")
+            raise ValueError("review evidence must be a list or tuple")
         try:
             return tuple(
                 item.model_dump(mode="python", warnings="error")

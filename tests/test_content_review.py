@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections import deque
+from collections.abc import Callable, Iterable
 from copy import deepcopy
 from pathlib import Path
 from typing import ClassVar
@@ -329,6 +331,32 @@ def test_nested_forged_models_reject_and_recover(tmp_path: Path, field: str, upd
     rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
     assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
     assert assess_content_review(root, source_revision=REVISION, assessment=original).status == "pass"
+
+
+@pytest.mark.parametrize("container", [iter, deque, set, frozenset])
+def test_evidence_rejects_other_iterables_before_consuming_them(
+    tmp_path: Path, container: Callable[[Iterable[object]], Iterable[object]]
+) -> None:
+    _root, data = _fixture(tmp_path)
+    original = ContentReviewAssessment.model_validate(data)
+    evidence = container(original.evidence)
+    with pytest.raises(ValidationError, match="review evidence must be a list or tuple"):
+        ContentReviewAssessment.model_validate({**data, "evidence": evidence})
+    assert set(evidence) == set(original.evidence)
+
+
+@pytest.mark.parametrize("container", [list, tuple])
+def test_evidence_sequences_preserve_conversion_and_revalidation(
+    tmp_path: Path, container: Callable[[Iterable[object]], Iterable[object]]
+) -> None:
+    _root, data = _fixture(tmp_path)
+    original = ContentReviewAssessment.model_validate(data)
+    for evidence in (data["evidence"], original.evidence):
+        assert ContentReviewAssessment.model_validate({**data, "evidence": container(evidence)}) == original
+    for digest in ("invalid", 123):
+        forged = original.evidence[0].model_copy(update={"sha256": digest})
+        with pytest.raises(ValidationError):
+            ContentReviewAssessment.model_validate({**data, "evidence": container((forged, *original.evidence[1:]))})
 
 
 def _blocked_payload() -> dict[str, object]:
