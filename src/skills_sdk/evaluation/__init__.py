@@ -4,6 +4,9 @@ from skills_sdk.evaluation.deterministic import evaluate_scenario_set
 from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
 
 __all__ = [
+    "ContentReviewDocument",
+    "ContentReviewInput",
+    "OfflineContentReviewAdapter",
     "ScenarioQualityPolicy",
     "SelectedCaseDefinition",
     "SelectedCaseJudgeAdapter",
@@ -15,6 +18,7 @@ __all__ = [
     "assess_scorer_quality",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
+    "execute_content_review",
     "execute_selected_case",
     "execute_selected_case_with_judge",
     "load_selected_case",
@@ -23,6 +27,10 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     """Load optional evaluation services only when requested."""
+    if name in {"ContentReviewDocument", "ContentReviewInput", "OfflineContentReviewAdapter", "execute_content_review"}:
+        from skills_sdk.evaluation import content_review
+
+        return getattr(content_review, name)
     if name == "assess_scenario_coverage":
         from skills_sdk.evaluation.coverage import assess_scenario_coverage
 

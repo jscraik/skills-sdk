@@ -1,5 +1,16 @@
 # Command-line interface
 
+## Supplied content-review evidence
+
+`skills-sdk review-content '<package>' --source-revision '<revision>' --assessment '<assessment.json>' --json`
+binds supplied reviewer metadata to the current candidate and its captured
+source files. It reads a bounded regular assessment file without following
+symlinks. Exit `0` means the supplied assessment is valid, complete for the
+actual file inventory and contains only clear dispositions; exit `2` returns
+a typed blocker for invalid inputs, stale evidence, findings or gaps.
+This command does not perform semantic review, execute a judge, contact a
+provider or authorise promotion. A passing result is not accuracy proof.
+
 From the repository checkout root, install the pinned development environment
 and inspect the CLI through the managed `uv` entrypoint:
 

@@ -1,5 +1,17 @@
 # Compatibility
 
+## Supplied content-review contracts
+
+`content-review-assessment/v1`, `content-review/v1` and
+`content-review-execution/v1` are additive closed
+families. They do not reinterpret package validation or scenario-quality
+receipts. `SchemaRegistry` checks packaged structure and semantic model
+invariants; the public service additionally compares candidate, actual reference
+inventory and source-evidence digests with the captured package. A standalone
+schema cannot prove those filesystem relations or reviewer truth. These
+families remain outside the generic receipt parser and do not authorise
+execution, promotion, installation or publication.
+
 Skills SDK keeps portable contracts independent of Agent-Skills, Skills
 Foundry, Codex, Tessl, and any local runtime filesystem. Host adapters and
 providers consume the contracts through explicit boundaries; they are not

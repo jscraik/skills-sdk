@@ -1,5 +1,11 @@
 """Typed package and plugin inventory contracts."""
 
+from skills_sdk.models.content_review import (
+    ContentReviewAssessment,
+    ContentReviewExecutionResult,
+    ContentReviewItem,
+    ContentReviewResult,
+)
 from skills_sdk.models.coverage import (
     ClaimCoverage,
     CoverageClaim,
@@ -138,6 +144,10 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 __all__ = [
     "ActivationObservation",
     "ClaimCoverage",
+    "ContentReviewAssessment",
+    "ContentReviewExecutionResult",
+    "ContentReviewItem",
+    "ContentReviewResult",
     "CoverageClaim",
     "CoverageGap",
     "DiscoveryObservation",

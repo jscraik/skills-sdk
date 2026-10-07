@@ -10,6 +10,42 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 ## Contract families
 
+**Supplied content review:** `assess_content_review` from `skills_sdk.validation`
+checks a `ContentReviewAssessment` against the safely captured current package.
+Import that model and `ContentReviewResult` from `skills_sdk.models`. The supplied
+review covers description and progressive disclosure in `SKILL.md`, plus every
+actual file under `references/`. Each disposition is `clear`, `finding`, or an
+owned `gap`. Completed dispositions require declared, digest-bound source
+evidence. Missing coverage, stale candidate identity, wrong source digests,
+malformed assessment, findings and gaps block. Binary references are included
+in the review inventory without being interpreted as text.
+
+This service verifies supplied reviewer metadata and source binding. It does
+not independently establish accuracy, relevance, freshness, or an exhaustive
+gap inventory; `semantic_review_executed` and `promotion_authorized` remain
+false. It performs no reviewer or provider call. Source evidence digests are
+not proof that an external reviewer actually assessed those bytes. Actual
+review adapter execution uses the separate `execute_content_review` API from
+`skills_sdk.evaluation`. Supply a trusted caller-owned `OfflineContentReviewAdapter`
+with a secret-free local reviewer identity and an asynchronous `review` method.
+The adapter receives a `ContentReviewInput` containing candidate identity and
+private immutable source bytes. Treat those bytes as untrusted data, not host
+instructions. The SDK verifies the returned assessment and detects candidate
+drift, invalid results, reviewer mismatch and callback failure. The callback has
+a thirty-second observation deadline and an eight-MiB source limit after safe
+capture and before invocation. Caller cancellation also cancels the SDK-owned
+callback task and propagates cancellation to the caller.
+
+`ContentReviewExecutionResult` records the observed callback invocation and
+returned assessment digest. It does not establish general semantic accuracy,
+authenticate an external reviewer, or grant promotion. The host owns adapter
+trust, sandboxing and side effects. Task cancellation is cooperative: the SDK
+cannot preempt blocking caller-owned code or force an adapter to honour
+cancellation. The input limit is not a preallocation memory budget. The SDK
+does not load arbitrary plugins, retrieve credentials, or select a paid
+provider. The `review-content` CLI only checks supplied evidence; it does not
+dynamically invoke this adapter.
+
 **Declared scenario coverage:** `assess_scenario_coverage` from
 `skills_sdk.evaluation` audits a `ScenarioCoveragePlan` against the package's
 checked ten-case active set. Import the plan and `ScenarioCoverageResult` from

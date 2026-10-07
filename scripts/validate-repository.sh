@@ -23,4 +23,5 @@ mise exec -- uv pip install --python "$smoke_venv_dir/bin/python" "${sdk_built_w
 "$smoke_venv_dir/bin/python" tests/installed_pr_sweep_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_package_quality_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_scenario_coverage_smoke.py
+"$smoke_venv_dir/bin/python" tests/installed_content_review_smoke.py
 git diff --check
