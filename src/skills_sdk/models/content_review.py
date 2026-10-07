@@ -17,11 +17,18 @@ from skills_sdk.models.safety import (
     SafetyEvidenceId,
     _public_text_is_redaction_safe,
 )
-from skills_sdk.models.validation import SkillPackageFinding
+from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 
 
 class _ReviewModel(_ContractModel):
     model_config = ConfigDict(extra="forbid", frozen=True, revalidate_instances="always")
+
+    @field_validator("items", "findings", "evidence_ids", mode="before", check_fields=False)
+    @classmethod
+    def collections_are_materialized(cls, value: object) -> object:
+        if not isinstance(value, (list, tuple)):
+            raise ValueError("review collections require list or tuple containers")
+        return value
 
     @model_validator(mode="before")
     @classmethod
@@ -186,8 +193,8 @@ class ContentReviewResult(_ReviewModel):
                 raise ValueError("passing review requires matching assessment and no findings")
             if any(item.status != "clear" for item in self.assessment.items):
                 raise ValueError("passing review cannot retain findings or gaps")
-        elif not self.findings:
-            raise ValueError("blocked review requires findings")
+        elif not any(item.severity == ValidationSeverity.BLOCKER for item in self.findings):
+            raise ValueError("blocked review requires a blocker-severity finding")
         return self
 
 
@@ -206,6 +213,8 @@ class ContentReviewExecutionResult(_ReviewModel):
 
     @model_validator(mode="after")
     def execution_matches_observed_review(self) -> ContentReviewExecutionResult:
+        if not self.adapter_invoked and (self.review is not None or self.assessment_sha256 is not None):
+            raise ValueError("returned review evidence requires observed invocation")
         if self.adapter_invoked and (self.candidate is None or self.reviewer is None):
             raise ValueError("adapter invocation requires candidate and reviewer binding")
         if self.review is not None:
@@ -221,8 +230,8 @@ class ContentReviewExecutionResult(_ReviewModel):
                 raise ValueError("passing execution requires an invoked adapter and passing review")
             if self.candidate != self.review.candidate:
                 raise ValueError("passing execution must bind the reviewed candidate")
-        elif not self.findings:
-            raise ValueError("blocked execution requires findings")
+        elif not any(item.severity == ValidationSeverity.BLOCKER for item in self.findings):
+            raise ValueError("blocked execution requires a blocker-severity finding")
         return self
 
 

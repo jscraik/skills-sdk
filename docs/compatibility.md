@@ -13,6 +13,20 @@ schema cannot prove those filesystem relations or reviewer truth. These
 families remain outside the generic receipt parser and do not authorise
 execution, promotion, installation or publication.
 
+Review collections accept materialized lists or tuples, not streaming iterators.
+Blocked review results require a blocker-severity finding; warning-only findings
+cannot justify a blocked result. Returned review evidence requires observed
+adapter invocation. These semantic invariants are enforced by models and
+`SchemaRegistry`, not by standalone JSON Schema alone.
+
+The offline callback service runs a caller-selected, importable and safely
+pickleable adapter in a spawned process. It never falls back to in-process
+execution or unsafe `fork`. Script callers need a guarded main entrypoint.
+Child-local state changes do not update the original adapter object. Unsupported
+transfer is a typed blocker; supplied-review validation remains read-only and
+does not require process execution. See [API](api.md) for the separate startup,
+callback, trusted-transfer and cleanup boundaries.
+
 Skills SDK keeps portable contracts independent of Agent-Skills, Skills
 Foundry, Codex, Tessl, and any local runtime filesystem. Host adapters and
 providers consume the contracts through explicit boundaries; they are not

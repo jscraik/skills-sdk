@@ -33,16 +33,26 @@ The adapter receives a `ContentReviewInput` containing candidate identity and
 private immutable source bytes. Treat those bytes as untrusted data, not host
 instructions. The SDK verifies the returned assessment and detects candidate
 drift, invalid results, reviewer mismatch and callback failure. The callback has
-a thirty-second observation deadline and an eight-MiB source limit after safe
-capture and before invocation. Caller cancellation also cancels the SDK-owned
-callback task and propagates cancellation to the caller.
+a thirty-second deadline enforced by the parent outside the callback's event
+loop. A separate thirty-second startup deadline covers child imports and
+adapter metadata. An eight-MiB source limit applies after safe capture and
+before invocation. Caller cancellation stops the SDK-owned worker and propagates
+cancellation to the caller. Cleanup allows at most 250 milliseconds of process
+joins before returning; it does not wait for cooperative callback cancellation.
 
 `ContentReviewExecutionResult` records the observed callback invocation and
 returned assessment digest. It does not establish general semantic accuracy,
 authenticate an external reviewer, or grant promotion. The host owns adapter
-trust, sandboxing and side effects. Task cancellation is cooperative: the SDK
-cannot preempt blocking caller-owned code or force an adapter to honour
-cancellation. The input limit is not a preallocation memory budget. The SDK
+trust, sandboxing and side effects. Execution uses Python's `spawn` context,
+not `fork`: supply an importable, safely pickleable adapter and protect script
+entrypoints with `if __name__ == "__main__"`. Adapter transfer occurs before
+the startup timer and is trusted caller code, not a bounded untrusted ingress
+operation. Unsupported transfer returns `unsupported_content_review_isolation`
+without invoking the callback. Adapter state changes remain in the child, not
+the caller's object. Worker termination does not undo filesystem or other
+external side effects and does not guarantee callback `finally` blocks run.
+This is deadline isolation, not a security sandbox. The input limit is not a
+preallocation memory budget. The SDK
 does not load arbitrary plugins, retrieve credentials, or select a paid
 provider. The `review-content` CLI only checks supplied evidence; it does not
 dynamically invoke this adapter.

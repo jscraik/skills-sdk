@@ -4,20 +4,29 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
+import multiprocessing
+import pickle
+import socket
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from multiprocessing.process import BaseProcess
 from pathlib import Path
-from time import monotonic
 from typing import Protocol
 
+from pydantic import ValidationError
+from pydantic_core import PydanticSerializationError
+
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
-from skills_sdk.models.content_review import ContentReviewExecutionResult
+from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.safety import PackageSafetyReviewer
 from skills_sdk.validation.content_review import _finding, assess_content_review
 from skills_sdk.validation.skill_package import SkillValidationPolicy, _scan_files, validate_skill_package
 
 _REVIEW_TIMEOUT_SECONDS = 30.0
+_REVIEW_STARTUP_TIMEOUT_SECONDS = 30.0
+_REVIEW_OUTPUT_LIMIT = 8_388_608
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,13 +54,15 @@ class OfflineContentReviewAdapter(Protocol):
     async def review(self, inputs: ContentReviewInput) -> object: ...
 
 
-def _observe_task(task: asyncio.Task[object]) -> None:
-    if not task.cancelled():
-        task.exception()
-
-
-async def _invoke(callback: Callable[[ContentReviewInput], Awaitable[object]], inputs: ContentReviewInput) -> object:
-    return await callback(inputs)
+async def _invoke(
+    callback: Callable[[ContentReviewInput], Awaitable[object]],
+    inputs: ContentReviewInput,
+    channel: socket.socket,
+    reviewer: PackageSafetyReviewer,
+) -> object:
+    invocation = callback(inputs)
+    _send_packet(channel, {"kind": "invoked", "reviewer": reviewer.model_dump(mode="json")})
+    return await invocation
 
 
 async def _adapter_metadata(
@@ -63,6 +74,124 @@ async def _adapter_metadata(
     if reviewer.method not in {"manual_review", "static_analysis"} or not inspect.iscoroutinefunction(callback):
         raise ValueError("offline review requires a local asynchronous adapter")
     return reviewer, callback
+
+
+def _send_packet(channel: socket.socket, packet: dict[str, object]) -> None:
+    payload = json.dumps(packet, separators=(",", ":")).encode("utf-8") + b"\n"
+    if len(payload) > _REVIEW_OUTPUT_LIMIT:
+        payload = b'{"kind":"blocked","code":"content_review_output_limit"}\n'
+    channel.sendall(payload)
+
+
+async def _worker_review(
+    channel: socket.socket, adapter: OfflineContentReviewAdapter, inputs: ContentReviewInput
+) -> None:
+    metadata = (await asyncio.gather(_adapter_metadata(adapter), return_exceptions=True))[0]
+    if isinstance(metadata, BaseException):
+        _send_packet(channel, {"kind": "blocked", "code": "invalid_content_review_adapter"})
+        return
+    reviewer, callback = metadata
+    observed = (await asyncio.gather(_invoke(callback, inputs, channel, reviewer), return_exceptions=True))[0]
+    if isinstance(observed, BaseException):
+        _send_packet(channel, {"kind": "blocked", "code": "content_review_adapter_failed"})
+        return
+    try:
+        raw = (
+            observed.model_dump(mode="python", warnings="error")
+            if isinstance(observed, ContentReviewAssessment)
+            else observed
+        )
+        assessment = ContentReviewAssessment.model_validate(raw)
+        _send_packet(channel, {"kind": "returned", "assessment": assessment.model_dump(mode="json", warnings="error")})
+    except (ValidationError, ValueError, TypeError, RuntimeError, LookupError, PydanticSerializationError):
+        _send_packet(channel, {"kind": "blocked", "code": "invalid_content_review"})
+
+
+def _review_worker(channel: socket.socket, adapter: OfflineContentReviewAdapter, inputs: ContentReviewInput) -> None:
+    """Run trusted caller code in a fresh interpreter, never in the parent loop."""
+    try:
+        asyncio.run(_worker_review(channel, adapter, inputs))
+    finally:
+        channel.close()
+
+
+def _stop_worker(process: BaseProcess) -> None:
+    """Bound cleanup of the SDK-owned process; do not wait on caller cooperation."""
+    if process.pid is None:
+        process.close()
+        return
+    process.join(timeout=0.05)
+    if process.is_alive():
+        process.terminate()
+        process.join(timeout=0.1)
+    if process.is_alive():
+        process.kill()
+        process.join(timeout=0.1)
+    if not process.is_alive():
+        process.close()
+
+
+@dataclass(frozen=True, slots=True)
+class _WorkerObservation:
+    reviewer: PackageSafetyReviewer | None = None
+    assessment: ContentReviewAssessment | None = None
+    code: str | None = None
+
+
+async def _read_worker(channel: socket.socket) -> _WorkerObservation:
+    loop = asyncio.get_running_loop()
+    reviewer: PackageSafetyReviewer | None = None
+    pending = bytearray()
+    try:
+        async with asyncio.timeout(_REVIEW_STARTUP_TIMEOUT_SECONDS) as deadline:
+            while True:
+                chunk = await loop.sock_recv(channel, 65_536)
+                if not chunk:
+                    return _WorkerObservation(reviewer, code="content_review_adapter_failed")
+                pending.extend(chunk)
+                if len(pending) > _REVIEW_OUTPUT_LIMIT:
+                    return _WorkerObservation(reviewer, code="content_review_output_limit")
+                while b"\n" in pending:
+                    line, _, remaining = pending.partition(b"\n")
+                    pending = bytearray(remaining)
+                    packet = json.loads(line)
+                    if not isinstance(packet, dict):
+                        raise ValueError("invalid worker packet")
+                    if packet.get("kind") == "invoked" and reviewer is None:
+                        reviewer = PackageSafetyReviewer.model_validate(packet["reviewer"])
+                        deadline.reschedule(loop.time() + _REVIEW_TIMEOUT_SECONDS)
+                    elif packet.get("kind") == "returned" and reviewer is not None:
+                        return _WorkerObservation(
+                            reviewer, ContentReviewAssessment.model_validate(packet["assessment"])
+                        )
+                    elif packet.get("kind") == "blocked":
+                        return _WorkerObservation(reviewer, code=str(packet["code"]))
+                    else:
+                        raise ValueError("invalid worker transition")
+    except TimeoutError:
+        return _WorkerObservation(reviewer, code="content_review_timeout")
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError):
+        return _WorkerObservation(reviewer, code="content_review_adapter_failed")
+
+
+async def _isolated_review(adapter: OfflineContentReviewAdapter, inputs: ContentReviewInput) -> _WorkerObservation:
+    try:
+        parent, child = socket.socketpair()
+    except OSError:
+        return _WorkerObservation(code="unsupported_content_review_isolation")
+    parent.setblocking(False)
+    process = multiprocessing.get_context("spawn").Process(target=_review_worker, args=(child, adapter, inputs))
+    try:
+        try:
+            process.start()
+        except (OSError, RuntimeError, TypeError, AttributeError, ValueError, LookupError, pickle.PicklingError):
+            return _WorkerObservation(code="unsupported_content_review_isolation")
+        child.close()
+        return await _read_worker(parent)
+    finally:
+        parent.close()
+        child.close()
+        _stop_worker(process)
 
 
 def _blocked_execution(
@@ -96,34 +225,15 @@ async def execute_content_review(
         return _blocked_execution(
             candidate, "content_review_input_limit", "offline review source exceeds the eight MiB limit"
         )
-    metadata = (await asyncio.gather(_adapter_metadata(adapter), return_exceptions=True))[0]
-    if isinstance(metadata, BaseException):
-        return _blocked_execution(
-            candidate, "invalid_content_review_adapter", "select a trusted offline review adapter"
-        )
-    reviewer, callback = metadata
     documents = tuple(ContentReviewDocument(item.path, item.sha256, captured[item.path]) for item in files)
     inputs = ContentReviewInput(PackageCandidateIdentity.model_validate(candidate.model_dump(mode="json")), documents)
-    started = monotonic()
-    task = asyncio.create_task(_invoke(callback, inputs))
-    try:
-        done, _pending = await asyncio.wait({task}, timeout=_REVIEW_TIMEOUT_SECONDS)
-    except asyncio.CancelledError:
-        task.cancel()
-        task.add_done_callback(_observe_task)
-        raise
-    if task not in done or monotonic() - started >= _REVIEW_TIMEOUT_SECONDS:
-        task.cancel()
-        task.add_done_callback(_observe_task)
+    observed = await _isolated_review(adapter, inputs)
+    reviewer = observed.reviewer
+    if observed.code is not None:
         return _blocked_execution(
-            candidate, "content_review_timeout", "offline review adapter exceeded its deadline", reviewer=reviewer
+            candidate, observed.code, "offline review could not complete safely", reviewer=reviewer
         )
-    observed = (await asyncio.gather(task, return_exceptions=True))[0]
-    if isinstance(observed, BaseException):
-        return _blocked_execution(
-            candidate, "content_review_adapter_failed", "offline review adapter failed", reviewer=reviewer
-        )
-    review = assess_content_review(package_root, source_revision=source_revision, assessment=observed)
+    review = assess_content_review(package_root, source_revision=source_revision, assessment=observed.assessment)
     execution_findings = list(review.findings)
     if review.candidate != candidate:
         execution_findings.append(_finding("content_review_candidate_changed", "candidate changed during review"))

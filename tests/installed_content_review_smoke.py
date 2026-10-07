@@ -80,8 +80,8 @@ class MetadataFailureReviewer(FixtureReviewer):
 
 class BlockingReviewer(FixtureReviewer):
     async def review(self, inputs: ContentReviewInput) -> object:
-        time.sleep(0.02)
-        return await super().review(inputs)
+        while True:
+            time.sleep(60)
 
 
 def _assert_deadline_and_byte_text(root: Path, assessment: ContentReviewAssessment) -> None:
@@ -95,8 +95,10 @@ def _assert_deadline_and_byte_text(root: Path, assessment: ContentReviewAssessme
     malformed["evidence"] = (item for item in (forged, *assessment.evidence[1:]))
     rejected = assess_content_review(root, source_revision="1" * 40, assessment=malformed)
     assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
-    with patch.object(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.01):
+    with patch.object(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2):
+        started = time.monotonic()
         timed_out = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=BlockingReviewer()))
+        assert time.monotonic() - started < 3
     assert timed_out.status == "blocked" and timed_out.adapter_invoked is True
     assert timed_out.findings[0].code == "content_review_timeout"
     assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
@@ -154,6 +156,42 @@ def _assert_contract_boundaries(root: Path, assessment: ContentReviewAssessment)
     assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
     recovered = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer()))
     assert recovered.status == "pass" and recovered.adapter_invoked is True
+    _assert_new_receipt_invariants(root, assessment, recovered)
+
+
+def _assert_new_receipt_invariants(
+    root: Path, assessment: ContentReviewAssessment, execution: ContentReviewExecutionResult
+) -> None:
+    malformed = execution.model_dump(mode="json")
+    malformed["status"] = "blocked"
+    malformed["adapter_invoked"] = False
+    blocker = SkillPackageFinding(
+        code="fixture_blocked", severity=ValidationSeverity.BLOCKER, message="Blocked fixture"
+    )
+    malformed["findings"] = [blocker.model_dump(mode="json")]
+    _assert_contract_rejects(ContentReviewExecutionResult, "content-review-execution.v1", malformed)
+    for model, schema in (
+        (ContentReviewResult, "content-review.v1"),
+        (ContentReviewExecutionResult, "content-review-execution.v1"),
+    ):
+        warning_only = {
+            "candidate": None,
+            "status": "blocked",
+            "findings": [{**blocker.model_dump(mode="json"), "severity": "warning"}],
+        }
+        _assert_contract_rejects(model, schema, warning_only)
+        corrected = {**warning_only, "findings": [blocker.model_dump(mode="json")]}
+        model.model_validate(corrected)
+        SchemaRegistry().validate(schema, corrected)
+    streaming = assessment.model_dump(mode="json")
+    iterator = iter(streaming["items"])
+    streaming["items"] = iterator
+    _assert_contract_rejects(ContentReviewAssessment, "content-review-assessment.v1", streaming)
+    rejected = assess_content_review(root, source_revision="1" * 40, assessment=streaming)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    assert list(iterator) == assessment.model_dump(mode="json")["items"]
+    assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
+    SchemaRegistry().validate("content-review-execution.v1", execution.model_dump(mode="json"))
 
 
 def _assert_reference_binding(root: Path, cwd: Path, assessment: ContentReviewAssessment) -> None:

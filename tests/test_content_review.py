@@ -16,6 +16,7 @@ from pydantic import ValidationError
 
 from skills_sdk.cli import main as main_module
 from skills_sdk.cli.main import main
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
@@ -409,6 +410,71 @@ def test_invocation_claim_requires_candidate_and_reviewer(tmp_path: Path, missin
         SchemaRegistry().validate("content-review-execution.v1", payload)
     ContentReviewExecutionResult.model_validate(corrected)
     SchemaRegistry().validate("content-review-execution.v1", corrected)
+
+
+def test_returned_review_requires_observed_invocation(tmp_path: Path) -> None:
+    root, data = _fixture(tmp_path)
+    review = assess_content_review(root, source_revision=REVISION, assessment=data)
+    payload = {
+        **_blocked_payload(),
+        "candidate": data["candidate"],
+        "reviewer": data["reviewer"],
+        "review": review.model_dump(mode="json"),
+        "assessment_sha256": canonical_json_sha256(review.assessment.model_dump(mode="json")),
+        "adapter_invoked": False,
+    }
+    with pytest.raises(ValidationError):
+        ContentReviewExecutionResult.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("content-review-execution.v1", payload)
+    corrected = {**payload, "adapter_invoked": True}
+    ContentReviewExecutionResult.model_validate(corrected)
+    SchemaRegistry().validate("content-review-execution.v1", corrected)
+
+
+def test_streaming_items_are_rejected_without_consumption(tmp_path: Path) -> None:
+    root, data = _fixture(tmp_path)
+    items = iter(data["items"])
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate({**data, "items": items})
+    assert list(items) == data["items"]
+    items = iter(data["items"])
+    rejected = assess_content_review(root, source_revision=REVISION, assessment={**data, "items": items})
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    assert list(items) == data["items"]
+    assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"
+
+
+@pytest.mark.parametrize(
+    "model,schema",
+    [(ContentReviewResult, "content-review.v1"), (ContentReviewExecutionResult, "content-review-execution.v1")],
+)
+def test_warning_only_blocked_result_requires_actual_blocker(
+    model: type[ContentReviewResult] | type[ContentReviewExecutionResult], schema: str
+) -> None:
+    payload = _blocked_payload()
+    payload["findings"][0]["severity"] = "warning"
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate(schema, payload)
+    payload["findings"][0]["severity"] = "blocker"
+    model.model_validate(payload)
+    SchemaRegistry().validate(schema, payload)
+
+
+def test_streaming_findings_and_evidence_ids_are_not_consumed(tmp_path: Path) -> None:
+    _root, data = _fixture(tmp_path)
+    item = ContentReviewAssessment.model_validate(data).items[0]
+    evidence_ids = iter(item.evidence_ids)
+    with pytest.raises(ValidationError):
+        type(item).model_validate({**item.model_dump(mode="json"), "evidence_ids": evidence_ids})
+    assert tuple(evidence_ids) == item.evidence_ids
+    findings = _blocked_payload()["findings"]
+    iterator = iter(findings)
+    with pytest.raises(ValidationError):
+        ContentReviewResult.model_validate({**_blocked_payload(), "findings": iterator})
+    assert list(iterator) == findings
 
 
 class FailingAssessmentSerializer(ContentReviewAssessment):

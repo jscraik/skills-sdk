@@ -22,7 +22,7 @@ class BlockingReviewer:
     )
 
     async def review(self, inputs: ContentReviewInput) -> object:
-        time.sleep(0.02)
+        time.sleep(2)
         return await FixtureReviewer().review(inputs)
 
 
@@ -33,8 +33,10 @@ def test_blocking_callback_exceeding_deadline_blocks_and_recovers(
     root.mkdir()
     (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
     with monkeypatch.context() as context:
-        context.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.01, raising=False)
+        context.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2, raising=False)
+        started = time.monotonic()
         rejected = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=BlockingReviewer()))
+        assert time.monotonic() - started < 1.5
     assert rejected.status == "blocked" and rejected.adapter_invoked is True
     assert rejected.findings[0].code == "content_review_timeout"
     assert (
@@ -99,7 +101,8 @@ def test_adapter_observes_current_bytes_and_corrected_input(tmp_path: Path) -> N
     assert accepted.adapter_invoked is True
     assert accepted.candidate != rejected.candidate
     assert accepted.assessment_sha256 is not None
-    assert adapter.calls == 2
+    # A spawned adapter owns a private copy; receipts prove the two invocations.
+    assert adapter.calls == 0
     assert "Deletes production" not in accepted.model_dump_json()
     SchemaRegistry().validate("content-review-execution.v1", accepted.model_dump(mode="json"))
 
@@ -151,17 +154,13 @@ def test_adapter_failure_is_redacted_and_correctable(tmp_path: Path) -> None:
 
 
 class WaitingReviewer(FixtureReviewer):
-    def __init__(self) -> None:
+    def __init__(self, started: Path) -> None:
         super().__init__()
-        self.started = asyncio.Event()
-        self.cancelled = asyncio.Event()
+        self.started = started
 
     async def review(self, inputs: ContentReviewInput) -> object:
-        self.started.set()
-        try:
-            await asyncio.Event().wait()
-        finally:
-            self.cancelled.set()
+        self.started.write_text("started")
+        await asyncio.Event().wait()
 
 
 def test_caller_cancellation_cancels_owned_callback(tmp_path: Path) -> None:
@@ -170,15 +169,67 @@ def test_caller_cancellation_cancels_owned_callback(tmp_path: Path) -> None:
     (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
 
     async def run() -> None:
-        adapter = WaitingReviewer()
+        existing = {child.pid for child in review_module.multiprocessing.active_children()}
+        adapter = WaitingReviewer(tmp_path / "started")
         task = asyncio.create_task(execute_content_review(root, source_revision=REVISION, adapter=adapter))
-        await asyncio.wait_for(adapter.started.wait(), timeout=1)
+        async with asyncio.timeout(5):
+            while not adapter.started.exists():
+                await asyncio.sleep(0.01)
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-        await asyncio.wait_for(adapter.cancelled.wait(), timeout=1)
+        assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
 
     asyncio.run(run())
+
+
+class NeverReturningReviewer(FixtureReviewer):
+    async def review(self, inputs: ContentReviewInput) -> object:
+        while True:
+            time.sleep(60)
+
+
+class BlockingMetadataReviewer(FixtureReviewer):
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        time.sleep(60)
+        return FixtureReviewer.reviewer
+
+
+@pytest.mark.parametrize("adapter", [NeverReturningReviewer(), BlockingMetadataReviewer()])
+def test_nonreturning_worker_is_bounded_and_reaped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, adapter: FixtureReviewer
+) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
+    monkeypatch.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr(review_module, "_REVIEW_STARTUP_TIMEOUT_SECONDS", 1.5)
+    started = time.monotonic()
+    result = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=adapter))
+    assert time.monotonic() - started < 2.5
+    assert result.status == "blocked" and result.findings[0].code == "content_review_timeout"
+    assert result.adapter_invoked is isinstance(adapter, NeverReturningReviewer)
+    assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
+def test_unsupported_adapter_transfer_blocks_without_invocation_and_recovers(tmp_path: Path) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    adapter = FixtureReviewer()
+    adapter.untransferable = lambda: None
+    result = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=adapter))
+    assert result.status == "blocked" and result.adapter_invoked is False
+    assert result.findings[0].code == "unsupported_content_review_isolation"
+    assert adapter.calls == 0
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
 
 
 class MalformedReviewer(FixtureReviewer):
