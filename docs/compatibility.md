@@ -294,6 +294,13 @@ exactly, matching the scenario-quality inventory rather than normalising it.
 Whitespace-only and non-text identifiers remain invalid. Distinct identifiers
 such as `case-0` and ` case-0 ` remain distinct and can be mapped separately.
 
+Direct plan models and `SchemaRegistry` reject duplicate declaration or mapping
+identifiers, unknown claim or gap references, mapping entries without case or
+gap references, repeated references, and unused gaps. A declaration may omit a claim's mapping so
+the audit can report `unmapped_claim`; contract validation alone does not
+establish complete coverage. Active-case membership requires the package
+inventory and is checked by the audit, not standalone plan validation.
+
 The applicable package-quality policy is an additive increment, not full
 reference-review parity. Legacy `reference_quality_contract` checks nonempty
 reference content and structured syntax, but also applies filename/title

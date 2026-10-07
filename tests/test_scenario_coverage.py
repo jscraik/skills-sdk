@@ -74,6 +74,8 @@ def test_public_audit_rejection_and_recovery(tmp_path: Path) -> None:
     root, plan = package_and_plan(tmp_path)
     source = (root / "references/evals.yaml").read_bytes()
     bad = {**plan, "mappings": []}
+    ScenarioCoveragePlan.model_validate(bad)
+    SchemaRegistry().validate("scenario-coverage-plan.v1", bad)
     blocked = assess_scenario_coverage(root, source_revision=REVISION, scenario_set_id="active", coverage_plan=bad)
     assert blocked.status == "blocked"
     assert "unmapped_claim" in {item.code for item in blocked.findings}
@@ -97,6 +99,63 @@ def test_named_owned_gap_is_retained_not_promoted(tmp_path: Path) -> None:
     assert not result.coverage_complete
     with pytest.raises(ValidationError):
         ScenarioCoverageResult.model_validate({**result.model_dump(mode="json"), "coverage_complete": True})
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"claims": [{"id": "claim-one", "statement": "Preserve source."}] * 2},
+        {
+            "gaps": [{"id": "gap-one", "reason": "Missing case.", "owner": "maintainer"}] * 2,
+            "mappings": [{"claim_id": "claim-one", "gap_ids": ["gap-one"]}],
+        },
+        {"mappings": [{"claim_id": "claim-one", "case_ids": ["case-0"]}] * 2},
+        {"gaps": [{"id": "gap-one", "reason": "Missing case.", "owner": "maintainer"}]},
+        {"mappings": [{"claim_id": "unknown", "case_ids": ["case-0"]}]},
+        {"mappings": [{"claim_id": "claim-one", "case_ids": ["case-0", "case-0"]}]},
+        {"mappings": [{"claim_id": "claim-one", "gap_ids": ["unknown-gap"]}]},
+        {
+            "gaps": [{"id": "gap-one", "reason": "Missing case.", "owner": "maintainer"}],
+            "mappings": [{"claim_id": "claim-one", "gap_ids": ["gap-one", "gap-one"]}],
+        },
+        {"mappings": [{"claim_id": "claim-one"}]},
+    ],
+)
+def test_contradictory_declarations_fail_contract_validation(tmp_path: Path, change: dict[str, object]) -> None:
+    root, plan = package_and_plan(tmp_path)
+    malformed = {**plan, **change}
+    with pytest.raises(ValidationError):
+        ScenarioCoveragePlan.model_validate(malformed)
+    with pytest.raises(ValidationError):
+        ScenarioCoveragePlan.model_validate_json(json.dumps(malformed))
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("scenario-coverage-plan.v1", malformed)
+    blocked = assess_scenario_coverage(
+        root, source_revision=REVISION, scenario_set_id="active", coverage_plan=malformed
+    )
+    assert blocked.status == "blocked"
+    assert "invalid_coverage_plan" in {finding.code for finding in blocked.findings}
+    corrected = ScenarioCoveragePlan.model_validate(plan)
+    SchemaRegistry().validate("scenario-coverage-plan.v1", corrected.model_dump(mode="json"))
+    assert (
+        assess_scenario_coverage(
+            root, source_revision=REVISION, scenario_set_id="active", coverage_plan=corrected
+        ).status
+        == "pass"
+    )
+
+
+def test_forged_duplicate_declarations_are_revalidated(tmp_path: Path) -> None:
+    root, plan = package_and_plan(tmp_path)
+    forged = ScenarioCoveragePlan.model_validate(plan)
+    object.__setattr__(forged, "claims", forged.claims * 2)
+    with pytest.raises(ValidationError):
+        ScenarioCoveragePlan.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("scenario-coverage-plan.v1", forged.model_dump(mode="json"))
+    result = assess_scenario_coverage(root, source_revision=REVISION, scenario_set_id="active", coverage_plan=forged)
+    assert result.status == "blocked"
+    assert "invalid_coverage_plan" in {finding.code for finding in result.findings}
 
 
 @pytest.mark.parametrize("paired_ids", [False, True])
