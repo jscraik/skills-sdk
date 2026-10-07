@@ -223,7 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
     """Return findings suitable for the human-readable command output."""
-    if command in {"validate", "scenario-quality", "scorer-quality", "scorer-calibration"}:
+    if command in {"validate", "scenario-quality", "scenario-coverage", "scorer-quality", "scorer-calibration"}:
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 

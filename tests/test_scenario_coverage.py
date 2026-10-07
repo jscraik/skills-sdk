@@ -11,6 +11,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scenario_coverage
 from skills_sdk.evaluation import coverage as coverage_module
@@ -98,6 +99,38 @@ def test_named_owned_gap_is_retained_not_promoted(tmp_path: Path) -> None:
         ScenarioCoverageResult.model_validate({**result.model_dump(mode="json"), "coverage_complete": True})
 
 
+@pytest.mark.parametrize("paired_ids", [False, True])
+def test_exact_active_case_identifiers_preserve_whitespace(tmp_path: Path, paired_ids: bool) -> None:
+    root, plan = package_and_plan(tmp_path)
+    path = root / "references/evals.yaml"
+    payload = yaml.safe_load(path.read_text())
+    index = 1 if paired_ids else 0
+    payload["cases"][index]["id"] = " case-0 "
+    payload["release_scenario_sets"][0]["cases"][index] = " case-0 "
+    path.write_text(yaml.safe_dump(payload))
+    source = path.read_bytes()
+    plan["candidate"] = validate_skill_package(root, source_revision=REVISION).candidate.model_dump(mode="json")
+    plan["mappings"] = [{"claim_id": "claim-one", "case_ids": [" case-0 "]}]
+    result = assess_scenario_coverage(root, source_revision=REVISION, scenario_set_id="active", coverage_plan=plan)
+    assert result.status == "pass"
+    assert " case-0 " in result.active_case_ids
+    assert result.plan.mappings[0].case_ids == (" case-0 ",)
+    if paired_ids:
+        assert "case-0" in result.active_case_ids
+    SchemaRegistry().validate("scenario-coverage.v1", result.model_dump(mode="json"))
+    assert path.read_bytes() == source
+
+
+@pytest.mark.parametrize("case_id", ["", " \t\n", 1])
+def test_exact_case_identifier_rejects_empty_or_wrong_type(tmp_path: Path, case_id: object) -> None:
+    _, plan = package_and_plan(tmp_path)
+    plan["mappings"] = [{"claim_id": "claim-one", "case_ids": [case_id]}]
+    with pytest.raises(ValidationError):
+        ScenarioCoveragePlan.model_validate(plan)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("scenario-coverage-plan.v1", plan)
+
+
 @pytest.mark.parametrize(
     "mapping",
     [
@@ -169,7 +202,8 @@ def test_candidate_change_during_audit_blocks(tmp_path: Path, monkeypatch: pytes
     assert "candidate_changed" in {item.code for item in result.findings}
 
 
-def test_cli_safe_plan_read_and_corrected_input(tmp_path: Path) -> None:
+@pytest.mark.parametrize("json_output", [False, True])
+def test_cli_safe_plan_read_and_corrected_input(tmp_path: Path, json_output: bool) -> None:
     root, plan = package_and_plan(tmp_path)
     path = tmp_path / "plan.json"
     args = [
@@ -185,16 +219,26 @@ def test_cli_safe_plan_read_and_corrected_input(tmp_path: Path) -> None:
         "active",
         "--coverage-plan",
         str(path),
-        "--json",
     ]
+    if json_output:
+        args.append("--json")
     for data, expected in [("{", 2), (json.dumps(plan), 0)]:
         path.write_text(data)
         result = subprocess.run(args, capture_output=True, text=True, check=False)
         assert result.returncode == expected, result.stderr
-        assert json.loads(result.stdout)["status"] == ("pass" if expected == 0 else "blocked")
+        status = "pass" if expected == 0 else "blocked"
+        if json_output:
+            assert json.loads(result.stdout)["status"] == status
+        else:
+            assert result.stdout.startswith(f"scenario-coverage: {status} (")
+            assert "Traceback" not in result.stderr
     saved = tmp_path / "saved.json"
     path.rename(saved)
     path.symlink_to(saved)
     result = subprocess.run(args, capture_output=True, text=True, check=False)
     assert result.returncode == 2
-    assert json.loads(result.stdout)["status"] == "blocked"
+    if json_output:
+        assert json.loads(result.stdout)["status"] == "blocked"
+    else:
+        assert result.stdout.startswith("scenario-coverage: blocked (")
+        assert "Traceback" not in result.stderr

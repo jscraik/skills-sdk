@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, StringConstraints, model_validator
 
 from skills_sdk.models.inventory import NonEmptyText, PackageId, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding, ScenarioQualityReceiptV2
 
 CoverageId = PackageId
+ExactCaseId = Annotated[str, StringConstraints(strip_whitespace=False, min_length=1, pattern=r"\S")]
 
 
 class _CoverageModel(_ContractModel):
@@ -30,7 +31,7 @@ class CoverageGap(_CoverageModel):
 
 class ClaimCoverage(_CoverageModel):
     claim_id: CoverageId
-    case_ids: tuple[NonEmptyText, ...] = ()
+    case_ids: tuple[ExactCaseId, ...] = ()
     gap_ids: tuple[CoverageId, ...] = ()
 
 
@@ -82,7 +83,7 @@ class ScenarioCoverageResult(_CoverageModel):
     status: Literal["pass", "blocked"]
     quality: ScenarioQualityReceiptV2
     plan: ScenarioCoveragePlan | None = None
-    active_case_ids: tuple[NonEmptyText, ...] = ()
+    active_case_ids: tuple[ExactCaseId, ...] = ()
     open_gap_ids: tuple[CoverageId, ...] = ()
     coverage_complete: bool = False
     findings: tuple[ScenarioQualityFinding, ...] = ()
