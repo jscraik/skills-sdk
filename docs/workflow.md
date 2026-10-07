@@ -23,14 +23,18 @@ holding or source-admission state does not grant SDK clearance.
 
 ```mermaid
 flowchart TD
-  R[Create / update / inspect external candidate] --> P[Package and description]
+  R[Create / update / inspect external candidate] --> O{Origin-verified provider-managed exemption?}
+  O -->|Yes| EX[Record exemption and preserve provider-managed route]
+  O -->|No| P[Package and description]
   P --> F[References and coverage gaps]
   F --> E[Scenarios and calibrated scorer]
   E --> S[Applicable security review]
   S --> L[Matched oss-local comparison]
   L --> C[Matched oss-cloud confirmation]
   C --> D[Review and select candidate]
-  D --> A[Prepare and verify archive]
+  D -->|Selected| A[Prepare and verify archive]
+  D -->|Correction required| X
+  D -->|Not selected| N[Stop and record rejection or decision]
   A --> G[Candidate-bound registry preparation]
   G --> T[Private registry publication and readback]
   T --> I[Selected install and runtime verification]
@@ -50,11 +54,14 @@ flowchart TD
   Y --> S
   Y --> L
   Y --> C
+  Y --> D
   Y --> A
   Y --> G
   Y --> T
   Y --> I
-  I --> W{Failed after runtime mutation?}
+  I --> J{Installation and runtime verification passed?}
+  J -->|Yes| K[Complete checked managed installation]
+  J -->|No| W{Failed after runtime mutation?}
   W -->|Yes| V[Rollback and verify prior lock and runtime]
   V -->|Recovered| B[Classify failure and retain regression]
   V -->|Blocked| Z[Stop dependent mutation; retain typed blocker]

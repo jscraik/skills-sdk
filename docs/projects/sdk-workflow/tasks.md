@@ -24,8 +24,8 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 
 | Slice | Work | Completion proof | State |
 | --- | --- | --- | --- |
-| S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Locally verified; delivery pending |
-| S2 | Add applicable package policy and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; source remains unchanged. | Queued |
+| S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Review repairs in progress |
+| S2 | Add applicable package policy and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; source remains unchanged. | First increment in review; semantic work pending |
 | S3 | Bind applicable security evidence and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass. | Queued |
 | S4 | Implement matched baseline/candidate evaluation, local then cloud adapter handoff, and failure ownership. | Frozen identities, both variants, same-model lift, calibrated judging, rejected drift, and controlled recovery; live runs separately authorised. | Queued |
 | S5 | Compose archive preparation/verification and supported private registry/readback/install boundaries. | Complete resources/modes, exact candidate/version/digest, controlled adapter failures and recovery; real external state separately proved. | Queued |
@@ -40,10 +40,10 @@ clearance. Required proof blocks completion of its dependent slice only.
 
 - Current accepted SDK base: `3fcd1565781a9a7da7b8594be61972d4b0d8f089`.
 - Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
-- Current work: S1 review repair in its task branch; S2 applicable-file policy
-  and deterministic reference checks in a separate isolated branch.
-- Next action: validate and deliver the S1 review repair and S2 increment using
-  the safely captured package bytes.
+- Current work: S1 second review repair in its task branch; S2 applicable-file
+  policy and deterministic reference checks in [PR #45](https://github.com/jscraik/skills-sdk/pull/45).
+- Next action: validate and deliver the latest S1 review repairs, reconcile
+  exact hosted threads after checks pass, and review the S2 increment.
   Keep semantic accuracy review separate from structural validation.
 - Local validation for S1 on 2026-10-07:
   `bash scripts/validate-repository.sh` -> `pass` (1977 passed, one skipped;
@@ -64,6 +64,18 @@ clearance. Required proof blocks completion of its dependent slice only.
   failed runtime mutation. `bash scripts/validate-repository.sh` -> `pass`
   for the repaired workflow (1977 passed, one skipped; build and installed
   smoke passed). Hosted reconciliation still needs current-head checks.
+- S1 second review: add successful and rejected-selection terminals, preserve
+  verified provider-managed exemptions in the diagram, and reconcile command
+  status in architecture and product acceptance.
+  `bash scripts/validate-repository.sh` -> `pass` (1977 passed, one skipped;
+  schemas, style, build, installed smoke, and diff check passed). Signed
+  delivery and current-head hosted review remain pending.
+- S2 first increment: signed revision `5b050ba78b092a94b2c553e317c8b8e23ae41d85`.
+  `bash scripts/validate-repository.sh` -> `pass` (1993 passed, one skipped;
+  both installed smokes passed). The earlier wrapper run failed only its new
+  smoke's symlinked macOS temporary ancestor; the fixture was corrected without
+  relaxing package safety. Description accuracy, reference relevance and gaps
+  remain unimplemented; this is not complete S2 or executed source parity.
 - Provider, registry, and runtime execution: `not_run`; no live operation selected.
 
 ## Lens application
