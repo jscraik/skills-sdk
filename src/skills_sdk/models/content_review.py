@@ -109,17 +109,17 @@ class ContentReviewAssessment(_ReviewModel):
     @field_validator("evidence", mode="before")
     @classmethod
     def nested_evidence_is_revalidated(cls, value: object) -> object:
-        if isinstance(value, (tuple, list)):
-            try:
-                return tuple(
-                    item.model_dump(mode="python", warnings="error")
-                    if isinstance(item, PackageSafetyEvidenceReference)
-                    else item
-                    for item in value
-                )
-            except PydanticSerializationError:
-                raise ValueError("review evidence failed revalidation") from None
-        return value
+        if not isinstance(value, (tuple, list)):
+            raise ValueError("review evidence must be a list or tuple")
+        try:
+            return tuple(
+                item.model_dump(mode="python", warnings="error")
+                if isinstance(item, PackageSafetyEvidenceReference)
+                else item
+                for item in value
+            )
+        except PydanticSerializationError:
+            raise ValueError("review evidence failed revalidation") from None
 
     @model_validator(mode="after")
     def review_has_closed_coverage(self) -> ContentReviewAssessment:
