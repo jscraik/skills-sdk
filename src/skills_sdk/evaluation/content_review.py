@@ -9,8 +9,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from pydantic_core import PydanticSerializationError
-
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.models.content_review import ContentReviewExecutionResult
 from skills_sdk.models.package import PackageCandidateIdentity
@@ -53,6 +51,17 @@ async def _invoke(callback: Callable[[ContentReviewInput], Awaitable[object]], i
     return await callback(inputs)
 
 
+async def _adapter_metadata(
+    adapter: OfflineContentReviewAdapter,
+) -> tuple[PackageSafetyReviewer, Callable[[ContentReviewInput], Awaitable[object]]]:
+    """Observe caller-owned metadata through the same exception-isolating task boundary."""
+    reviewer = PackageSafetyReviewer.model_validate(adapter.reviewer.model_dump(mode="json", warnings="error"))
+    callback = adapter.review
+    if reviewer.method not in {"manual_review", "static_analysis"} or not inspect.iscoroutinefunction(callback):
+        raise ValueError("offline review requires a local asynchronous adapter")
+    return reviewer, callback
+
+
 def _blocked_execution(
     candidate: PackageCandidateIdentity | None,
     code: str,
@@ -84,15 +93,12 @@ async def execute_content_review(
         return _blocked_execution(
             candidate, "content_review_input_limit", "offline review source exceeds the eight MiB limit"
         )
-    try:
-        reviewer = PackageSafetyReviewer.model_validate(adapter.reviewer.model_dump(mode="json", warnings="error"))
-        callback = adapter.review
-        if reviewer.method not in {"manual_review", "static_analysis"} or not inspect.iscoroutinefunction(callback):
-            raise ValueError("offline review requires a local asynchronous adapter")
-    except (AttributeError, TypeError, ValueError, PydanticSerializationError):
+    metadata = (await asyncio.gather(_adapter_metadata(adapter), return_exceptions=True))[0]
+    if isinstance(metadata, BaseException):
         return _blocked_execution(
             candidate, "invalid_content_review_adapter", "select a trusted offline review adapter"
         )
+    reviewer, callback = metadata
     documents = tuple(ContentReviewDocument(item.path, item.sha256, captured[item.path]) for item in files)
     inputs = ContentReviewInput(PackageCandidateIdentity.model_validate(candidate.model_dump(mode="json")), documents)
     task = asyncio.create_task(_invoke(callback, inputs))

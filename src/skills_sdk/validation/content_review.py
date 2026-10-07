@@ -28,7 +28,7 @@ def assess_content_review(package_root: Path, *, source_revision: str, assessmen
             else assessment
         )
         review = ContentReviewAssessment.model_validate(raw)
-    except (ValidationError, ValueError, TypeError, RecursionError, PydanticSerializationError):
+    except (ValidationError, ValueError, TypeError, RuntimeError, LookupError, PydanticSerializationError):
         findings.append(_finding("invalid_content_review", "supplied review must match the closed assessment contract"))
     if validation.status == "pass" and review is not None:
         if review.candidate != validation.candidate:

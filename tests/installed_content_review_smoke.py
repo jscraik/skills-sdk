@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import io
 import json
 import subprocess
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
 import skills_sdk
+from skills_sdk.cli.main import _UnsupportedContextRead
+from skills_sdk.cli.main import main as cli_main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import ContentReviewInput, execute_content_review
-from skills_sdk.models import ContentReviewAssessment
+from skills_sdk.models import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
 from skills_sdk.models.safety import PackageSafetyReviewer
+from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation import assess_content_review
 
 
@@ -62,6 +68,63 @@ class FixtureReviewer:
                 for item in references
             ],
         }
+
+
+class MetadataFailureReviewer(FixtureReviewer):
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        raise RuntimeError("private metadata diagnostic")
+
+
+class FailingAssessmentSerializer(ContentReviewAssessment):
+    def model_dump(self, **kwargs: object) -> dict[str, object]:
+        raise RuntimeError("private serializer diagnostic")
+
+
+def _assert_contract_rejects(
+    model: type[ContentReviewResult] | type[ContentReviewExecutionResult] | type[ContentReviewAssessment],
+    schema: str,
+    data: object,
+) -> None:
+    try:
+        model.model_validate(data)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("malformed content-review proof accepted")
+    try:
+        SchemaRegistry().validate(schema, data)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("malformed content-review proof accepted by registry")
+
+
+def _assert_contract_boundaries(root: Path, assessment: ContentReviewAssessment) -> None:
+    malformed = assessment.model_dump(mode="json")
+    malformed["reviewer"] = assessment.reviewer.model_copy(update={"method": "invalid"})
+    _assert_contract_rejects(ContentReviewAssessment, "content-review-assessment.v1", malformed)
+    finding = SkillPackageFinding(
+        code="fixture_blocked", severity=ValidationSeverity.BLOCKER, message="Blocked fixture"
+    )
+    blocked = {"candidate": None, "status": "blocked", "findings": [finding.model_dump(mode="json")]}
+    _assert_contract_rejects(ContentReviewResult, "content-review.v1", {**blocked, "promotion_authorized": 0})
+    _assert_contract_rejects(
+        ContentReviewExecutionResult, "content-review-execution.v1", {**blocked, "adapter_invoked": "false"}
+    )
+    _assert_contract_rejects(
+        ContentReviewExecutionResult, "content-review-execution.v1", {**blocked, "adapter_invoked": True}
+    )
+    failing = FailingAssessmentSerializer.model_validate(assessment.model_dump(mode="json"))
+    rejected = assess_content_review(root, source_revision="1" * 40, assessment=failing)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    assert "private serializer" not in rejected.model_dump_json()
+    metadata = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=MetadataFailureReviewer()))
+    assert metadata.findings[0].code == "invalid_content_review_adapter" and metadata.adapter_invoked is False
+    assert "private metadata" not in metadata.model_dump_json()
+    assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
+    recovered = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer()))
+    assert recovered.status == "pass" and recovered.adapter_invoked is True
 
 
 def _assert_reference_binding(root: Path, cwd: Path, assessment: ContentReviewAssessment) -> None:
@@ -125,6 +188,9 @@ def main() -> int:
             _assert_reference_binding(root, cwd, result.review.assessment)
             assessment = cwd / "assessment.json"
             assessment.write_text(result.review.assessment.model_dump_json())
+            if expected == "pass":
+                _assert_unsupported_read_recovery(root, assessment)
+                _assert_contract_boundaries(root, result.review.assessment)
             command = [
                 sys.executable,
                 "-m",
@@ -153,6 +219,31 @@ def main() -> int:
                 assert skill.read_bytes() == original
     print("installed content-review API, offline adapter and supplied CLI: pass")
     return 0
+
+
+def _assert_unsupported_read_recovery(root: Path, assessment: Path) -> None:
+    command = ["review-content", str(root), "--source-revision", "1" * 40, "--assessment", str(assessment)]
+    for json_output in (False, True):
+        arguments = [*command, "--json"] if json_output else command
+        captured = io.StringIO()
+        with (
+            patch("skills_sdk.cli.main._read_intake_context", side_effect=_UnsupportedContextRead("unavailable")),
+            contextlib.redirect_stdout(captured),
+        ):
+            assert cli_main(arguments) == 2
+        if json_output:
+            blocker = json.loads(captured.getvalue())
+            assert blocker["code"] == "unsupported_context_read"
+            SchemaRegistry().validate("blocker.v1", blocker)
+        else:
+            assert "unsupported_context_read" in captured.getvalue()
+        recovered = io.StringIO()
+        with contextlib.redirect_stdout(recovered):
+            assert cli_main(arguments) == 0
+        if json_output:
+            assert json.loads(recovered.getvalue())["status"] == "pass"
+        else:
+            assert recovered.getvalue().startswith("review-content: pass (")
 
 
 if __name__ == "__main__":

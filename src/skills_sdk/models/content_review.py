@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
+from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.paths import require_portable_relative_path
@@ -21,6 +22,31 @@ from skills_sdk.models.validation import SkillPackageFinding
 
 class _ReviewModel(_ContractModel):
     model_config = ConfigDict(extra="forbid", frozen=True, revalidate_instances="always")
+
+    @field_validator(
+        "semantic_review_executed",
+        "promotion_authorized",
+        "network_used",
+        "mutation_performed",
+        "adapter_invoked",
+        mode="before",
+        check_fields=False,
+    )
+    @classmethod
+    def proof_flags_are_exact_booleans(cls, value: object) -> bool:
+        if type(value) is not bool:
+            raise ValueError("review proof flags require exact booleans")
+        return value
+
+    @field_validator("reviewer", mode="before", check_fields=False)
+    @classmethod
+    def nested_reviewer_is_revalidated(cls, value: object) -> object:
+        if isinstance(value, PackageSafetyReviewer):
+            try:
+                return value.model_dump(mode="python", warnings="error")
+            except PydanticSerializationError:
+                raise ValueError("reviewer failed revalidation") from None
+        return value
 
 
 class ContentReviewItem(_ReviewModel):
@@ -79,6 +105,21 @@ class ContentReviewAssessment(_ReviewModel):
     reviewer: PackageSafetyReviewer
     evidence: tuple[PackageSafetyEvidenceReference, ...] = Field(min_length=1)
     items: tuple[ContentReviewItem, ...] = Field(min_length=2)
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def nested_evidence_is_revalidated(cls, value: object) -> object:
+        if isinstance(value, (tuple, list)):
+            try:
+                return tuple(
+                    item.model_dump(mode="python", warnings="error")
+                    if isinstance(item, PackageSafetyEvidenceReference)
+                    else item
+                    for item in value
+                )
+            except PydanticSerializationError:
+                raise ValueError("review evidence failed revalidation") from None
+        return value
 
     @model_validator(mode="after")
     def review_has_closed_coverage(self) -> ContentReviewAssessment:
@@ -142,6 +183,8 @@ class ContentReviewExecutionResult(_ReviewModel):
 
     @model_validator(mode="after")
     def execution_matches_observed_review(self) -> ContentReviewExecutionResult:
+        if self.adapter_invoked and (self.candidate is None or self.reviewer is None):
+            raise ValueError("adapter invocation requires candidate and reviewer binding")
         if self.review is not None:
             ContentReviewResult.model_validate(self.review.model_dump(mode="json", warnings="error"))
         assessment = self.review.assessment if self.review is not None else None

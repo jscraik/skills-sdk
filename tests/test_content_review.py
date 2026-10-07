@@ -7,6 +7,7 @@ import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from pydantic import ValidationError
@@ -15,7 +16,8 @@ from skills_sdk.cli import main as main_module
 from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models.content_review import ContentReviewAssessment
+from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
+from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation.content_review import assess_content_review
 from skills_sdk.validation.skill_package import validate_skill_package
 
@@ -220,6 +222,17 @@ def test_cli_unsupported_assessment_read_is_a_typed_blocker(
         assert captured.out.startswith("review-content: blocked\n")
         assert "unsupported_context_read" in captured.out
 
+    monkeypatch.undo()
+    assert main(command) == 0
+    recovered = capsys.readouterr()
+    assert recovered.err == ""
+    if json_output:
+        result = json.loads(recovered.out)
+        assert result["status"] == "pass"
+        SchemaRegistry().validate("content-review.v1", result)
+    else:
+        assert recovered.out.startswith("review-content: pass (")
+
 
 @pytest.mark.parametrize("payload", [None, b"{", b"\xff", b'{"items": [], "items": []}', b"[" * 10_000 + b"]" * 10_000])
 def test_cli_other_assessment_read_errors_remain_invalid_reviews(
@@ -237,3 +250,97 @@ def test_cli_other_assessment_read_errors_remain_invalid_reviews(
     assert result["status"] == "blocked"
     assert result["findings"][0]["code"] == "invalid_content_review"
     SchemaRegistry().validate("content-review.v1", result)
+
+
+@pytest.mark.parametrize(
+    ("field", "update"),
+    [
+        ("reviewer", {"method": "invalid"}),
+        ("reviewer", {"adapter_id": "api_key=private"}),
+        ("evidence", {"sha256": "invalid"}),
+        ("evidence", {"ref": "../escape"}),
+    ],
+)
+def test_nested_forged_models_reject_and_recover(tmp_path: Path, field: str, update: dict[str, str]) -> None:
+    root, data = _fixture(tmp_path)
+    original = ContentReviewAssessment.model_validate(data)
+    malformed = dict(data)
+    if field == "reviewer":
+        malformed[field] = original.reviewer.model_copy(update=update)
+    else:
+        malformed[field] = (original.evidence[0].model_copy(update=update), *original.evidence[1:])
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate(malformed)
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    assert assess_content_review(root, source_revision=REVISION, assessment=original).status == "pass"
+
+
+def _blocked_payload() -> dict[str, object]:
+    finding = SkillPackageFinding(
+        code="fixture_blocked", severity=ValidationSeverity.BLOCKER, message="Blocked fixture"
+    )
+    return {"candidate": None, "status": "blocked", "findings": [finding.model_dump(mode="json")]}
+
+
+@pytest.mark.parametrize("value", [0, 1, "false", "true", b"false", None])
+@pytest.mark.parametrize(
+    ("model", "schema", "field"),
+    [
+        (ContentReviewResult, "content-review.v1", "semantic_review_executed"),
+        (ContentReviewResult, "content-review.v1", "promotion_authorized"),
+        (ContentReviewResult, "content-review.v1", "network_used"),
+        (ContentReviewResult, "content-review.v1", "mutation_performed"),
+        (ContentReviewExecutionResult, "content-review-execution.v1", "promotion_authorized"),
+        (ContentReviewExecutionResult, "content-review-execution.v1", "adapter_invoked"),
+    ],
+)
+def test_proof_flags_require_exact_booleans(
+    value: object, model: type[ContentReviewResult] | type[ContentReviewExecutionResult], schema: str, field: str
+) -> None:
+    payload = {**_blocked_payload(), field: value}
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate(schema, payload)
+    corrected = {**payload, field: False}
+    model.model_validate(corrected)
+    SchemaRegistry().validate(schema, corrected)
+
+
+@pytest.mark.parametrize("missing", ["candidate", "reviewer", "both"])
+def test_invocation_claim_requires_candidate_and_reviewer(tmp_path: Path, missing: str) -> None:
+    _root, data = _fixture(tmp_path)
+    payload = {
+        **_blocked_payload(),
+        "adapter_invoked": True,
+        "candidate": data["candidate"],
+        "reviewer": data["reviewer"],
+    }
+    corrected = dict(payload)
+    for field in ("candidate", "reviewer") if missing == "both" else (missing,):
+        payload[field] = None
+    with pytest.raises(ValidationError):
+        ContentReviewExecutionResult.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("content-review-execution.v1", payload)
+    ContentReviewExecutionResult.model_validate(corrected)
+    SchemaRegistry().validate("content-review-execution.v1", corrected)
+
+
+class FailingAssessmentSerializer(ContentReviewAssessment):
+    dump_error: ClassVar[type[Exception]] = RuntimeError
+
+    def model_dump(self, **kwargs: object) -> dict[str, object]:
+        raise self.dump_error("private serializer diagnostic")
+
+
+@pytest.mark.parametrize("error", [RuntimeError, KeyError])
+def test_typed_serializer_failure_is_redacted_and_recovers(tmp_path: Path, error: type[Exception]) -> None:
+    root, data = _fixture(tmp_path)
+    FailingAssessmentSerializer.dump_error = error
+    malformed = FailingAssessmentSerializer.model_validate(data)
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    assert "private serializer" not in rejected.model_dump_json()
+    assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"

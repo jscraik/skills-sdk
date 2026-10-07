@@ -168,6 +168,35 @@ class MismatchedReviewer(FixtureReviewer):
         return result
 
 
+class MetadataFailureReviewer(FixtureReviewer):
+    def __init__(self, field: str, error: type[Exception]) -> None:
+        super().__init__()
+        self.field = field
+        self.error = error
+
+    def __getattribute__(self, name: str) -> object:
+        if name in {"reviewer", "review"} and name == object.__getattribute__(self, "field"):
+            raise object.__getattribute__(self, "error")("private metadata diagnostic")
+        return object.__getattribute__(self, name)
+
+
+@pytest.mark.parametrize("field", ["reviewer", "review"])
+@pytest.mark.parametrize("error", [RuntimeError, KeyError])
+def test_metadata_failure_is_redacted_and_recovers(tmp_path: Path, field: str, error: type[Exception]) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    rejected = asyncio.run(
+        execute_content_review(root, source_revision=REVISION, adapter=MetadataFailureReviewer(field, error))
+    )
+    assert rejected.status == "blocked" and rejected.adapter_invoked is False
+    assert rejected.findings[0].code == "invalid_content_review_adapter"
+    assert "private metadata" not in rejected.model_dump_json()
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 @pytest.mark.parametrize(
     ("adapter", "code"),
     [(MalformedReviewer(), "invalid_content_review"), (MismatchedReviewer(), "content_review_reviewer_mismatch")],
