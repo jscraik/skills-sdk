@@ -15,6 +15,11 @@ work, not responsibilities left to Agent-Skills or Foundry.
 
 ## Product ownership and migration
 
+Use [the canonical workflow](docs/workflow.md) for the owner-approved gate
+sequence and correction loops. The [migration map](docs/migration-map.md)
+records source capability disposition; the [task record](docs/projects/sdk-workflow/tasks.md)
+tracks bounded implementation and acceptance proof.
+
 Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
 and executable tooling to create, update, check, and admit external skills and
 plugins, then orchestrate installation of selected checked versions through
@@ -173,7 +178,11 @@ Local candidate-bound contracts
 ```
 
 The CLI is an outer adapter over the implemented local services. `intake`,
-`validate`, and `build` execute the package-processing paths above. `eval
+`validate`, and `build` execute the package-processing paths above.
+`check-local` composes read-only intake, validation, scenario quality, scorer
+quality and supplied-artifact calibration. `eval scorer-quality` and
+`eval scorer-calibration` also expose their separate static assessment services;
+none of these commands proves a live judge ran. `eval
 scenario-quality` lazily invokes the separate read-only
 `evaluation/quality.py` service, prints its versioned assessment, and exits 0
 for a passing assessment or 2 for a blocked assessment. `eval selected-case`
@@ -187,10 +196,16 @@ host credentials, adapter discovery, or judge-result storage. `compare-copy`
 performs two read-only validations and compares captured files.
 `maintain-entrypoint` checks an existing host entrypoint and permits a
 digest-bound replacement only with explicit `--apply`. The other lifecycle
-names are parseable discovery boundaries and do not perform provider,
+names `inventory`, `package`, `project`, and `tessl` are parseable discovery
+boundaries and do not perform provider,
 installation, runtime, or publication work. See
 [Runtime copy integration](docs/runtime-copy-integration.md) for maintenance
 authority, backup, platform, and concurrency limitations.
+
+`verify recurring-findings` and `verify pr-sweep-dirty-closeout` execute local
+repository-evidence validators. Their proof remains separate from hosted PR
+readiness, provider execution and runtime installation. Use
+[CLI status](docs/cli.md) for the maintained command surface.
 
 ## Code map
 

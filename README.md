@@ -37,12 +37,14 @@ existing-copy comparison and maintenance routes are documented in
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `intake`, `validate`, `build`,
-`eval scenario-quality`, `eval selected-case`, `compare-copy`, and
-`maintain-entrypoint`. Comparison is read-only. Maintenance is read-only by
+series. The implemented local commands are `intake`, `check-local`, `validate`,
+`build`, `eval scenario-quality`, `eval scorer-quality`,
+`eval scorer-calibration`, `eval selected-case`, `verify recurring-findings`,
+`verify pr-sweep-dirty-closeout`, `compare-copy`, and `maintain-entrypoint`.
+Comparison is read-only. Maintenance is read-only by
 default and requires explicit `--apply` to change an existing host file. The
 other lifecycle names, including `inventory`, `package`,
-`project`, `verify`, and `tessl prepare`/`tessl verify`, are explicit discovery
+`project`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
 explicitly requested with `--help`, but do not execute provider work, install
 anything, mutate a runtime, or publish to a registry.
@@ -71,12 +73,17 @@ The migration is complete only when the SDK provides independently usable
 routes and proof for those lifecycle stages, Foundry can hold candidates
 without importing Agent-Skills, and every remaining Agent-Skills
 consumer has moved or been explicitly retired. Until then, the unimplemented
-CLI names above remain honest discovery boundaries except for the implemented
-`intake`, `validate`, `build`, `eval scenario-quality`, `eval selected-case`,
-`compare-copy`, and `maintain-entrypoint` routes.
+CLI names above remain discovery boundaries except for the implemented
+local commands listed above.
 [`ARCHITECTURE.md`](ARCHITECTURE.md) defines the
 required evidence and `pass`, `fail`, and `blocked` outcomes for that retirement
 decision.
+
+The [canonical workflow](docs/workflow.md) defines the ordered quality,
+security, evaluation, registry, installation, and correction gates. The
+[migration map](docs/migration-map.md) distinguishes legacy capabilities from
+current SDK behaviour; the [task record](docs/projects/sdk-workflow/tasks.md)
+tracks their implementation and proof.
 
 ## What the SDK guarantees
 
