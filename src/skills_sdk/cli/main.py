@@ -325,6 +325,19 @@ def _content_review(arguments: argparse.Namespace) -> int:
             _read_intake_context(arguments.assessment).decode("utf-8"),
             object_pairs_hook=_reject_duplicate_members,
         )
+    except _UnsupportedContextRead:
+        from skills_sdk.models.packaging import PackageReceiptBlocker
+
+        blocker = PackageReceiptBlocker(
+            code="unsupported_context_read",
+            message="safe descriptor-relative assessment reads are unavailable",
+            evidence_refs=("docs/compatibility.md",),
+        )
+        if arguments.json_output:
+            print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
+        else:
+            print(f"review-content: blocked\n  {blocker.code}: {blocker.message}")
+        return 2
     except (OSError, ValueError, RecursionError):
         assessment = None
     result = assess_content_review(

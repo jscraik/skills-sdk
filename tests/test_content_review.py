@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from skills_sdk.cli import main as main_module
+from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.content_review import ContentReviewAssessment
@@ -188,3 +190,50 @@ def test_cli_rejection_and_corrected_input(tmp_path: Path, json_output: bool) ->
         assert json.loads(accepted.stdout)["status"] == "pass"
     else:
         assert accepted.stdout.startswith("review-content: pass (")
+
+
+@pytest.mark.parametrize("json_output", [False, True])
+@pytest.mark.parametrize("capability", ["O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK", "supports_dir_fd"])
+def test_cli_unsupported_assessment_read_is_a_typed_blocker(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    json_output: bool,
+    capability: str,
+) -> None:
+    root, data = _fixture(tmp_path)
+    assessment = tmp_path / "assessment.json"
+    assessment.write_text(json.dumps(data))
+    monkeypatch.setattr(main_module.os, capability, set() if capability == "supports_dir_fd" else 0)
+    command = ["review-content", str(root), "--source-revision", REVISION, "--assessment", str(assessment)]
+    if json_output:
+        command.append("--json")
+    assert main(command) == 2
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    if json_output:
+        blocker = json.loads(captured.out)
+        assert blocker["code"] == "unsupported_context_read"
+        assert blocker["evidence_refs"] == ["docs/compatibility.md"]
+        SchemaRegistry().validate("blocker.v1", blocker)
+    else:
+        assert captured.out.startswith("review-content: blocked\n")
+        assert "unsupported_context_read" in captured.out
+
+
+@pytest.mark.parametrize("payload", [None, b"{", b"\xff", b'{"items": [], "items": []}', b"[" * 10_000 + b"]" * 10_000])
+def test_cli_other_assessment_read_errors_remain_invalid_reviews(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], payload: bytes | None
+) -> None:
+    root, _data = _fixture(tmp_path)
+    assessment = tmp_path / "assessment.json"
+    if payload is not None:
+        assessment.write_bytes(payload)
+    command = ["review-content", str(root), "--source-revision", REVISION, "--assessment", str(assessment), "--json"]
+    assert main(command) == 2
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    result = json.loads(captured.out)
+    assert result["status"] == "blocked"
+    assert result["findings"][0]["code"] == "invalid_content_review"
+    SchemaRegistry().validate("content-review.v1", result)
