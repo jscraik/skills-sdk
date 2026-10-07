@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
     ScenarioCaseResult,
@@ -62,6 +63,8 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ScorerQualityReceipt, "scorer-quality.v1.schema.json"),
         (ScorerCalibrationReceipt, "scorer-calibration.v1.schema.json"),
         (LocalCheckResult, "local-check.v1.schema.json"),
+        (ScenarioCoveragePlan, "scenario-coverage-plan.v1.schema.json"),
+        (ScenarioCoverageResult, "scenario-coverage.v1.schema.json"),
     )
 
 

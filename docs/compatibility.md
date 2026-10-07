@@ -278,6 +278,29 @@ rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
 
+The additive `scenario-coverage-plan/v1` and `scenario-coverage/v1` families
+audit caller-declared claim-to-case-or-gap mappings against the package's
+ten active scenarios. Existing scenario-quality v1/v2 receipts, local-check v1,
+and their policies do not change. Calibration probes and historical cases
+cannot satisfy an active-case mapping. Named gaps preserve incomplete coverage,
+even when the mapping audit passes. Model and `SchemaRegistry` validation
+enforce cross-field semantics beyond structural JSON Schema. Neither family
+enters generic `parse_receipt` dispatch; use its model or registry. The source
+skill's Evals Router audit shape guides this implementation; no executed
+Agent-Skills parity or semantic reviewer execution is claimed.
+
+Coverage mappings and active-case identifiers preserve surrounding whitespace
+exactly, matching the scenario-quality inventory rather than normalising it.
+Whitespace-only and non-text identifiers remain invalid. Distinct identifiers
+such as `case-0` and ` case-0 ` remain distinct and can be mapped separately.
+
+Direct plan models and `SchemaRegistry` reject duplicate declaration or mapping
+identifiers, unknown claim or gap references, mapping entries without case or
+gap references, repeated references, and unused gaps. A declaration may omit a claim's mapping so
+the audit can report `unmapped_claim`; contract validation alone does not
+establish complete coverage. Active-case membership requires the package
+inventory and is checked by the audit, not standalone plan validation.
+
 The applicable package-quality policy is an additive increment, not full
 reference-review parity. Legacy `reference_quality_contract` checks nonempty
 reference content and structured syntax, but also applies filename/title
