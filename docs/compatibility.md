@@ -285,7 +285,11 @@ heuristics and contract-specific fields. The SDK ports the deterministic byte
 and syntax checks behind explicit `check_reference_content`; semantic title,
 description, coverage and source-accuracy review remain separate work.
 Binary references are deliberately excluded from text checks, rather than
-requiring every resource to decode as UTF-8. Required files are explicit policy,
+requiring every resource to decode as UTF-8. JSON rejects non-standard numeric
+constants. YAML uses syntax events, not object construction, so custom tags and
+multiple documents remain valid reference formats. This deliberately differs
+from the source's single-document constructor; syntax acceptance is not safety
+clearance. Required files are explicit policy,
 not a global OpenAI or repository layout requirement. Defaults and versioned
 validation/build/intake envelopes remain unchanged. Corrected source produces
 a new candidate digest; validation never changes the source.

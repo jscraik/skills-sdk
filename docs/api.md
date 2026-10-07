@@ -17,6 +17,9 @@ portable relative paths to be readable regular files in the captured manifest.
 text, JSON and YAML references, plus JSON/YAML syntax. Binary references remain
 valid resources. These checks reuse the bytes that bind the candidate; they
 do not follow symlinks or reread files outside the package.
+JSON rejects non-standard constants such as `NaN` and `Infinity`. YAML syntax
+validation accepts application-defined tags and multiple documents without
+constructing tagged objects; it does not establish application validity or safety.
 
 Apply the policy to `validate_skill_package`, `build_skill_package`, or
 `intake_skill_package`. Defaults are unchanged. Invalid applicable-file policy

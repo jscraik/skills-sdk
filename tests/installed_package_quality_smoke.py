@@ -12,6 +12,33 @@ import skills_sdk
 from skills_sdk.validation import SkillValidationPolicy, validate_skill_package
 
 
+def _check_routes(root: Path, cwd: Path, expected: str) -> None:
+    for route in ("validate", "build"):
+        command = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "skills_sdk.cli.main",
+                route,
+                str(root),
+                "--source-revision",
+                "1" * 40,
+                "--require-file",
+                "references/README.md",
+                "--check-reference-content",
+                "--json",
+            ],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert command.returncode == (0 if expected == "pass" else 2), command.stderr
+        assert json.loads(command.stdout)["status"] == (
+            "built" if route == "build" and expected == "pass" else expected
+        )
+
+
 def main() -> int:
     assert "site-packages" in str(Path(skills_sdk.__file__).resolve())
     with TemporaryDirectory(prefix="sdk-package-quality-") as directory:
@@ -28,31 +55,24 @@ def main() -> int:
                 reference.write_bytes(content)
             result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
             assert result.status == expected, result.model_dump(mode="json")
-            for route in ("validate", "build"):
-                command = subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "skills_sdk.cli.main",
-                        route,
-                        str(root),
-                        "--source-revision",
-                        "1" * 40,
-                        "--require-file",
-                        "references/README.md",
-                        "--check-reference-content",
-                        "--json",
-                    ],
-                    cwd=cwd,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                assert command.returncode == (0 if expected == "pass" else 2), command.stderr
-                assert json.loads(command.stdout)["status"] == (
-                    "built" if route == "build" and expected == "pass" else expected
-                )
+            _check_routes(root, cwd, expected)
             assert (root / "SKILL.md").read_bytes() == skill
+        structured = root / "references/example.json"
+        for content, expected in [(b'{"score": NaN}', "blocked"), (b'{"score": 0}', "pass")]:
+            structured.write_bytes(content)
+            result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
+            assert result.status == expected, result.model_dump(mode="json")
+            _check_routes(root, cwd, expected)
+            assert structured.read_bytes() == content
+        structured.unlink()
+        yaml_reference = root / "references/example.yaml"
+        for content in (b"resource: !Ref Example\n", b"---\nfirst: true\n---\nsecond: false\n"):
+            yaml_reference.write_bytes(content)
+            result = validate_skill_package(root, source_revision="1" * 40, policy=policy)
+            assert result.status == "pass", result.model_dump(mode="json")
+            _check_routes(root, cwd, "pass")
+            assert yaml_reference.read_bytes() == content
+        assert (root / "SKILL.md").read_bytes() == skill
     print("installed package-quality API and CLI: pass")
     return 0
 

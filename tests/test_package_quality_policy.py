@@ -49,6 +49,10 @@ def test_required_file_rejection_and_corrected_input(tmp_path: Path) -> None:
         ("guide.md", b" \n", "empty_reference", b"# Guide\n"),
         ("guide.txt", b"\xff", "invalid_reference_utf8", b"Use the supplied fixture.\n"),
         ("data.json", b"{", "invalid_reference_format", b'{"example": true}'),
+        ("data.json", b"NaN", "invalid_reference_format", b"null"),
+        ("data.json", b"Infinity", "invalid_reference_format", b"1"),
+        ("data.json", b"-Infinity", "invalid_reference_format", b"-1"),
+        ("data.json", b'{"score": NaN}', "invalid_reference_format", b'{"score": 0}'),
         ("data.yaml", b"example: [", "invalid_reference_format", b"example: true\n"),
     ],
 )
@@ -66,6 +70,18 @@ def test_reference_rejection_default_compatibility_and_recovery(
     assert reference.read_bytes() == payload
     reference.write_bytes(corrected)
     assert validate_skill_package(root, source_revision=REVISION, policy=policy).status == "pass"
+
+
+@pytest.mark.parametrize("payload", ["resource: !Ref Example\n", "---\nfirst: true\n---\nsecond: false\n"])
+def test_yaml_syntax_accepts_tags_and_multiple_documents(tmp_path: Path, payload: str) -> None:
+    root = _package(tmp_path)
+    reference = root / "references/example.yaml"
+    reference.write_text(payload)
+    result = validate_skill_package(
+        root, source_revision=REVISION, policy=SkillValidationPolicy(check_reference_content=True)
+    )
+    assert result.status == "pass"
+    assert reference.read_text() == payload
 
 
 def test_binary_references_and_nested_resources_are_not_text_requirements(tmp_path: Path) -> None:

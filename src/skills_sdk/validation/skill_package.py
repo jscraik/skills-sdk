@@ -65,6 +65,10 @@ def _policy_findings(policy: SkillValidationPolicy) -> list[SkillPackageFinding]
     return []
 
 
+def _reject_json_constant(value: str) -> None:
+    raise ValueError("JSON reference contains a non-standard constant")
+
+
 def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
     """Check textual reference bytes, not semantic accuracy or external links."""
     suffix = Path(path).suffix.lower()
@@ -75,9 +79,10 @@ def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
         if not text.strip():
             return [_finding("empty_reference", "textual reference must contain content", path)]
         if suffix == ".json":
-            json.loads(text)
+            json.loads(text, parse_constant=_reject_json_constant)
         elif suffix in {".yaml", ".yml"}:
-            yaml.safe_load(text)
+            for _ in yaml.parse(text, Loader=yaml.SafeLoader):
+                pass
     except UnicodeDecodeError:
         return [_finding("invalid_reference_utf8", "textual reference must be UTF-8", path)]
     except (ValueError, yaml.YAMLError, RecursionError):
