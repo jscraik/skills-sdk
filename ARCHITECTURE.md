@@ -15,6 +15,11 @@ work, not responsibilities left to Agent-Skills or Foundry.
 
 ## Product ownership and migration
 
+Use [the canonical workflow](docs/workflow.md) for the owner-approved gate
+sequence and correction loops. The [migration map](docs/migration-map.md)
+records source capability disposition; the [task record](docs/projects/sdk-workflow/tasks.md)
+tracks bounded implementation and acceptance proof.
+
 Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
 and executable tooling to create, update, check, and admit external skills and
 plugins, then orchestrate installation of selected checked versions through
