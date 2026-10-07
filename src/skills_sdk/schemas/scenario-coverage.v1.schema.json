@@ -7,6 +7,7 @@
           "default": [],
           "items": {
             "minLength": 1,
+            "pattern": "\\S",
             "type": "string"
           },
           "title": "Case Ids",
@@ -362,6 +363,7 @@
       "default": [],
       "items": {
         "minLength": 1,
+        "pattern": "\\S",
         "type": "string"
       },
       "title": "Active Case Ids",

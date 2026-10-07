@@ -9,10 +9,36 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import yaml
+from pydantic import ValidationError
 
 import skills_sdk
+from skills_sdk.core.errors import ContractError
+from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import assess_scenario_coverage
+from skills_sdk.models.coverage import ScenarioCoveragePlan
 from skills_sdk.validation import validate_skill_package
+
+
+def check_plan_contract(plan: dict[str, object]) -> None:
+    """Prove installed direct/registry contradiction rejection and recovery."""
+    corrected = {**plan, "mappings": [{"claim_id": "preserve", "case_ids": ["case-0"]}]}
+    typed = ScenarioCoveragePlan.model_validate(corrected)
+    registry = SchemaRegistry()
+    registry.validate("scenario-coverage-plan.v1", typed.model_dump(mode="json"))
+    malformed = {**corrected, "claims": typed.model_dump(mode="json")["claims"] * 2}
+    try:
+        ScenarioCoveragePlan.model_validate(malformed)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("duplicate claims passed installed model validation")
+    try:
+        registry.validate("scenario-coverage-plan.v1", malformed)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("duplicate claims passed installed registry validation")
+    registry.validate("scenario-coverage-plan.v1", corrected)
 
 
 def main() -> int:
@@ -26,7 +52,7 @@ def main() -> int:
         (root / "references").mkdir()
         cases = [
             {
-                "id": f"case-{index}",
+                "id": " case-0 " if index == 1 else f"case-{index}",
                 "category": "regression" if index == 0 else "edge" if index == 1 else "happy",
                 "unit": "coverage",
                 "given": "A supplied candidate has claims.",
@@ -65,14 +91,22 @@ def main() -> int:
             "claims": [{"id": "preserve", "statement": "Preserve candidate bytes."}],
             "mappings": [],
         }
+        check_plan_contract(plan)
         plan_path = cwd / "plan.json"
-        for mappings, expected in [([], "blocked"), ([{"claim_id": "preserve", "case_ids": ["case-0"]}], "pass")]:
-            plan["mappings"] = mappings
-            plan_path.write_text(json.dumps(plan))
+        for change, expected in [
+            ({"mappings": []}, "blocked"),
+            ({"claims": plan["claims"] * 2}, "blocked"),
+            ({"mappings": [{"claim_id": "preserve", "case_ids": ["case-1"]}]}, "blocked"),
+            ({"mappings": [{"claim_id": "preserve", "case_ids": [" case-0 "]}]}, "pass"),
+            ({"mappings": [{"claim_id": "preserve", "case_ids": ["case-0"]}]}, "pass"),
+        ]:
+            supplied = {**plan, **change}
+            plan_path.write_text(json.dumps(supplied))
             result = assess_scenario_coverage(
-                root, source_revision="1" * 40, scenario_set_id="active", coverage_plan=plan
+                root, source_revision="1" * 40, scenario_set_id="active", coverage_plan=supplied
             )
             assert result.status == expected, result.model_dump(mode="json")
+            assert {"case-0", " case-0 "}.issubset(result.active_case_ids)
             command = subprocess.run(
                 [
                     sys.executable,
@@ -96,6 +130,10 @@ def main() -> int:
             )
             assert command.returncode == (0 if expected == "pass" else 2), command.stderr
             assert json.loads(command.stdout)["status"] == expected
+            human = subprocess.run(command.args[:-1], cwd=cwd, capture_output=True, text=True, check=False)
+            assert human.returncode == (0 if expected == "pass" else 2), human.stderr
+            assert human.stdout.startswith(f"scenario-coverage: {expected} (")
+            assert "Traceback" not in human.stderr
             assert (root / "SKILL.md").read_bytes() == skill
     print("installed scenario-coverage API and CLI: pass")
     return 0

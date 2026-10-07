@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.intake import intake_skill_package
@@ -47,12 +48,18 @@ def test_required_file_rejection_and_corrected_input(tmp_path: Path) -> None:
     ("name", "payload", "code", "corrected"),
     [
         ("guide.md", b" \n", "empty_reference", b"# Guide\n"),
+        ("guide.markdown", b" \n", "empty_reference", b"# Guide\n"),
+        ("guide.markdown", b"\xff", "invalid_reference_utf8", b"# Guide\n"),
+        ("guide.md", b"\xef\xbb\xbf \n", "empty_reference", b"\xef\xbb\xbf# Guide\n"),
+        ("guide.txt", b"\xef\xbb\xbf", "empty_reference", b"\xef\xbb\xbfUse the example.\n"),
         ("guide.txt", b"\xff", "invalid_reference_utf8", b"Use the supplied fixture.\n"),
         ("data.json", b"{", "invalid_reference_format", b'{"example": true}'),
         ("data.json", b"NaN", "invalid_reference_format", b"null"),
         ("data.json", b"Infinity", "invalid_reference_format", b"1"),
         ("data.json", b"-Infinity", "invalid_reference_format", b"-1"),
         ("data.json", b'{"score": NaN}', "invalid_reference_format", b'{"score": 0}'),
+        ("data.json", b"[" + b"9" * 4301 + b",]", "invalid_reference_format", b"[" + b"9" * 4301 + b"]"),
+        ("data.json", b"--" + b"9" * 4301, "invalid_reference_format", b"-" + b"9" * 4301),
         ("data.yaml", b"example: [", "invalid_reference_format", b"example: true\n"),
     ],
 )
@@ -82,6 +89,104 @@ def test_yaml_syntax_accepts_tags_and_multiple_documents(tmp_path: Path, payload
     )
     assert result.status == "pass"
     assert reference.read_text() == payload
+
+
+@pytest.mark.parametrize("depth", [129, 10_000])
+def test_yaml_nesting_budget_blocks_cli_and_recovers(tmp_path: Path, depth: int) -> None:
+    root = _package(tmp_path)
+    reference = root / "references/example.yaml"
+    payload = "[" * depth + "0" + "]" * depth
+    reference.write_text(payload)
+    arguments = [
+        sys.executable,
+        "-m",
+        "skills_sdk.cli.main",
+        "validate",
+        str(root),
+        "--source-revision",
+        REVISION,
+        "--check-reference-content",
+        "--json",
+    ]
+    rejected = subprocess.run(arguments, capture_output=True, text=True, check=False, timeout=5)
+    assert rejected.returncode == 2, rejected.stderr
+    result = json.loads(rejected.stdout)
+    assert "reference_content_limit" in {item["code"] for item in result["findings"]}
+    assert reference.read_text() == payload
+    reference.write_text("[" * 128 + "0" + "]" * 128)
+    accepted = subprocess.run(arguments, capture_output=True, text=True, check=False, timeout=5)
+    assert accepted.returncode == 0, accepted.stderr
+    assert json.loads(accepted.stdout)["candidate"] != result["candidate"]
+
+
+@pytest.mark.parametrize("count", [100_000, 100_001])
+def test_yaml_event_budget_stops_and_closes_parser(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, count: int) -> None:
+    from collections.abc import Iterator
+
+    root = _package(tmp_path)
+    (root / "references/example.yaml").write_text("example: true\n")
+    consumed = 0
+    closed = False
+
+    def bounded_events(*args: object, **kwargs: object) -> Iterator[yaml.events.Event]:
+        nonlocal consumed, closed
+        try:
+            for _ in range(count):
+                consumed += 1
+                yield yaml.events.ScalarEvent(None, None, (True, False), "value")
+            if count > 100_000:
+                raise AssertionError("parser must not resume after the work budget")
+        finally:
+            closed = True
+
+    with monkeypatch.context() as guarded:
+        guarded.setattr("skills_sdk.validation.skill_package.yaml.parse", bounded_events)
+        result = validate_skill_package(
+            root, source_revision=REVISION, policy=SkillValidationPolicy(check_reference_content=True)
+        )
+    assert result.status == ("pass" if count == 100_000 else "blocked")
+    assert consumed == count
+    assert closed
+    assert (
+        validate_skill_package(
+            root, source_revision=REVISION, policy=SkillValidationPolicy(check_reference_content=True)
+        ).status
+        == "pass"
+    )
+
+
+def test_reference_text_budget_blocks_then_recovers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _package(tmp_path)
+    reference = root / "references/example.json"
+    limit = 8_388_608
+    oversized = b'"' + b"a" * (limit - 1) + b'"'
+    reference.write_bytes(oversized)
+    policy = SkillValidationPolicy(check_reference_content=True)
+
+    def unexpected_parse(*args: object, **kwargs: object) -> object:
+        raise AssertionError("oversized reference must block before JSON parsing")
+
+    with monkeypatch.context() as guarded:
+        guarded.setattr("skills_sdk.validation.skill_package.json.loads", unexpected_parse)
+        rejected = validate_skill_package(root, source_revision=REVISION, policy=policy)
+    assert rejected.status == "blocked"
+    assert "reference_content_limit" in {item.code for item in rejected.findings}
+    assert reference.read_bytes() == oversized
+    reference.write_bytes(b'"' + b"a" * (limit - 2) + b'"')
+    accepted = validate_skill_package(root, source_revision=REVISION, policy=policy)
+    assert accepted.status == "pass"
+    assert accepted.candidate != rejected.candidate
+
+
+@pytest.mark.parametrize("suffix", [".MD", ".markdown", ".mdown", ".mkd", ".mkdn", ".mdwn", ".mdtxt", ".mdtext"])
+def test_markdown_suffix_neighbours_block_and_recover(tmp_path: Path, suffix: str) -> None:
+    root = _package(tmp_path)
+    reference = root / "references" / ("example" + suffix)
+    reference.write_bytes(b" \n")
+    policy = SkillValidationPolicy(check_reference_content=True)
+    assert validate_skill_package(root, source_revision=REVISION, policy=policy).status == "blocked"
+    reference.write_bytes(b"\xef\xbb\xbf# Example\n")
+    assert validate_skill_package(root, source_revision=REVISION, policy=policy).status == "pass"
 
 
 def test_binary_references_and_nested_resources_are_not_text_requirements(tmp_path: Path) -> None:

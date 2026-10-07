@@ -91,6 +91,12 @@ class ContentReviewAssessment(_ReviewModel):
         used = {evidence_id for item in self.items for evidence_id in item.evidence_ids}
         if used != set(ids):
             raise ValueError("every review evidence id must be declared and used")
+        evidence_paths = {item.evidence_id: item.ref for item in self.evidence}
+        if any(
+            item.status != "gap" and item.path not in {evidence_paths[key] for key in item.evidence_ids}
+            for item in self.items
+        ):
+            raise ValueError("completed dispositions require evidence for their own path")
         return self
 
 

@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, StringConstraints, model_validator
 
 from skills_sdk.models.inventory import NonEmptyText, PackageId, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding, ScenarioQualityReceiptV2
 
 CoverageId = PackageId
+ExactCaseId = Annotated[str, StringConstraints(strip_whitespace=False, min_length=1, pattern=r"\S")]
 
 
 class _CoverageModel(_ContractModel):
@@ -30,7 +31,7 @@ class CoverageGap(_CoverageModel):
 
 class ClaimCoverage(_CoverageModel):
     claim_id: CoverageId
-    case_ids: tuple[NonEmptyText, ...] = ()
+    case_ids: tuple[ExactCaseId, ...] = ()
     gap_ids: tuple[CoverageId, ...] = ()
 
 
@@ -42,26 +43,22 @@ class ScenarioCoveragePlan(_CoverageModel):
     mappings: tuple[ClaimCoverage, ...] = ()
     gaps: tuple[CoverageGap, ...] = ()
 
-    def audit(self, active_case_ids: tuple[str, ...]) -> tuple[ScenarioQualityFinding, ...]:
-        """Check declared coverage, not whether a case actually proves a claim."""
+    def _declaration_findings(self) -> tuple[ScenarioQualityFinding, ...]:
+        """Check contradictions that do not require an active-case inventory."""
         findings: list[ScenarioQualityFinding] = []
         claim_ids = [claim.id for claim in self.claims]
         gap_ids = [gap.id for gap in self.gaps]
         mapped_ids = [item.claim_id for item in self.mappings]
         if any(len(ids) != len(set(ids)) for ids in (claim_ids, gap_ids, mapped_ids)):
             findings.append(ScenarioQualityFinding(code="duplicate_coverage_id", message="coverage ids must be unique"))
-        if set(mapped_ids) != set(claim_ids):
-            findings.append(
-                ScenarioQualityFinding(code="unmapped_claim", message="map every declared claim exactly once")
-            )
         used_gaps: set[str] = set()
         for item in self.mappings:
             used_gaps.update(item.gap_ids)
             invalid = (
                 (not item.case_ids and not item.gap_ids)
+                or item.claim_id not in claim_ids
                 or len(item.case_ids) != len(set(item.case_ids))
                 or len(item.gap_ids) != len(set(item.gap_ids))
-                or not set(item.case_ids).issubset(active_case_ids)
                 or not set(item.gap_ids).issubset(gap_ids)
             )
             if invalid:
@@ -74,6 +71,29 @@ class ScenarioCoveragePlan(_CoverageModel):
             findings.append(ScenarioQualityFinding(code="unused_coverage_gap", message="every gap must map to a claim"))
         return tuple(findings)
 
+    @model_validator(mode="after")
+    def declarations_are_consistent(self) -> ScenarioCoveragePlan:
+        """Reject contradictory declarations at every model-validation boundary."""
+        if findings := self._declaration_findings():
+            raise ValueError("; ".join(finding.message for finding in findings))
+        return self
+
+    def audit(self, active_case_ids: tuple[str, ...]) -> tuple[ScenarioQualityFinding, ...]:
+        """Check coverage completeness and membership against an active inventory."""
+        findings = list(self._declaration_findings())
+        if {item.claim_id for item in self.mappings} != {claim.id for claim in self.claims}:
+            findings.append(
+                ScenarioQualityFinding(code="unmapped_claim", message="map every declared claim exactly once")
+            )
+        for item in self.mappings:
+            if not set(item.case_ids).issubset(active_case_ids):
+                findings.append(
+                    ScenarioQualityFinding(
+                        code="invalid_claim_mapping", message="map claims only to active cases or declared gaps"
+                    )
+                )
+        return tuple(findings)
+
 
 class ScenarioCoverageResult(_CoverageModel):
     schema_version: Literal["scenario-coverage/v1"] = "scenario-coverage/v1"
@@ -82,7 +102,7 @@ class ScenarioCoverageResult(_CoverageModel):
     status: Literal["pass", "blocked"]
     quality: ScenarioQualityReceiptV2
     plan: ScenarioCoveragePlan | None = None
-    active_case_ids: tuple[NonEmptyText, ...] = ()
+    active_case_ids: tuple[ExactCaseId, ...] = ()
     open_gap_ids: tuple[CoverageId, ...] = ()
     coverage_complete: bool = False
     findings: tuple[ScenarioQualityFinding, ...] = ()

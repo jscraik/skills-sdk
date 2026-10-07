@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.content_review import ContentReviewAssessment
 from skills_sdk.validation.content_review import assess_content_review
@@ -29,9 +32,13 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
         "candidate": validation.candidate.model_dump(mode="json"),
         "reviewer": {"adapter_id": "fixture-review", "adapter_version_or_digest": "1", "method": "manual_review"},
         "evidence": [
-            {"evidence_id": "entry", "kind": "manual_review", "ref": item.path, "sha256": item.sha256}
+            {
+                "evidence_id": "entry" if item.path == "SKILL.md" else "guide",
+                "kind": "manual_review",
+                "ref": item.path,
+                "sha256": item.sha256,
+            }
             for item in validation.files
-            if item.path == "SKILL.md"
         ],
         "items": [
             {
@@ -39,7 +46,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
                 "path": path,
                 "status": "clear",
                 "rationale": "Fixture review recorded.",
-                "evidence_ids": ["entry"],
+                "evidence_ids": ["entry" if path == "SKILL.md" else "guide"],
             }
             for dimension, path in (
                 ("description", "SKILL.md"),
@@ -51,10 +58,41 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
     return root, data
 
 
+@pytest.mark.parametrize("item_index", [0, 1, 2])
+def test_completed_disposition_requires_its_own_source_evidence(tmp_path: Path, item_index: int) -> None:
+    root, data = _fixture(tmp_path)
+    malformed = deepcopy(data)
+    malformed["items"][item_index]["evidence_ids"] = ["guide" if item_index < 2 else "entry"]
+    if item_index == 2:
+        malformed["evidence"] = malformed["evidence"][:1]
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate(malformed)
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate_json(json.dumps(malformed))
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("content-review-assessment.v1", malformed)
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.status == "blocked"
+    assert rejected.findings[0].code == "invalid_content_review"
+    SchemaRegistry().validate("content-review-assessment.v1", data)
+    assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"
+
+
+def test_forged_disposition_cannot_borrow_other_file_evidence(tmp_path: Path) -> None:
+    root, data = _fixture(tmp_path)
+    review = ContentReviewAssessment.model_validate(data)
+    forged_reference = review.items[2].model_copy(update={"evidence_ids": ("entry",)})
+    forged = review.model_copy(update={"items": (*review.items[:2], forged_reference), "evidence": review.evidence[:1]})
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=forged)
+    assert rejected.status == "blocked"
+    assert rejected.findings[0].code == "invalid_content_review"
+    assert assess_content_review(root, source_revision=REVISION, assessment=review).status == "pass"
+
+
 def test_review_missing_reference_then_corrected_input(tmp_path: Path) -> None:
     root, data = _fixture(tmp_path)
     review = ContentReviewAssessment.model_validate(data)
-    missing = review.model_copy(update={"items": review.items[:2]})
+    missing = review.model_copy(update={"items": review.items[:2], "evidence": review.evidence[:1]})
     before = (root / "SKILL.md").read_bytes()
     rejected = assess_content_review(root, source_revision=REVISION, assessment=missing)
     assert rejected.status == "blocked"
@@ -85,7 +123,7 @@ def test_stale_candidate_and_wrong_evidence_digest_block(tmp_path: Path) -> None
     review = ContentReviewAssessment.model_validate(data)
     wrong = review.evidence[0].model_copy(update={"sha256": "0" * 64})
     result = assess_content_review(
-        root, source_revision=REVISION, assessment=review.model_copy(update={"evidence": (wrong,)})
+        root, source_revision=REVISION, assessment=review.model_copy(update={"evidence": (wrong, *review.evidence[1:])})
     )
     assert result.findings[0].code == "content_review_evidence_mismatch"
     (root / "references/guide.md").write_text("# Changed guide\n")
@@ -116,7 +154,8 @@ def test_forged_nested_review_blocks_then_recovers(tmp_path: Path, field: str, v
     assert assess_content_review(root, source_revision=REVISION, assessment=review).status == "pass"
 
 
-def test_cli_rejection_and_corrected_input(tmp_path: Path) -> None:
+@pytest.mark.parametrize("json_output", [False, True])
+def test_cli_rejection_and_corrected_input(tmp_path: Path, json_output: bool) -> None:
     root, data = _fixture(tmp_path)
     assessment = tmp_path / "assessment.json"
     assessment.write_text("{}")
@@ -130,12 +169,22 @@ def test_cli_rejection_and_corrected_input(tmp_path: Path) -> None:
         REVISION,
         "--assessment",
         str(assessment),
-        "--json",
     ]
+    if json_output:
+        command.append("--json")
     rejected = subprocess.run(command, capture_output=True, text=True, check=False)
     assert rejected.returncode == 2
-    assert json.loads(rejected.stdout)["findings"][0]["code"] == "invalid_content_review"
+    assert "Traceback" not in rejected.stderr
+    if json_output:
+        assert json.loads(rejected.stdout)["findings"][0]["code"] == "invalid_content_review"
+    else:
+        assert rejected.stdout.startswith("review-content: blocked (")
+        assert "invalid_content_review" in rejected.stdout
     assessment.write_text(json.dumps(data))
     accepted = subprocess.run(command, capture_output=True, text=True, check=False)
     assert accepted.returncode == 0
-    assert json.loads(accepted.stdout)["status"] == "pass"
+    assert "Traceback" not in accepted.stderr
+    if json_output:
+        assert json.loads(accepted.stdout)["status"] == "pass"
+    else:
+        assert accepted.stdout.startswith("review-content: pass (")
