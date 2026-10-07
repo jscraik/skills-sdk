@@ -60,12 +60,16 @@ class _ReviewModel(_ContractModel):
         if not isinstance(value, (list, tuple)):
             raise ValueError("review findings require list or tuple containers")
         try:
-            return tuple(
+            normalized = tuple(
                 item.model_dump(mode="python", warnings="error") if isinstance(item, SkillPackageFinding) else item
                 for item in value
             )
         except PydanticSerializationError:
             raise ValueError("review findings failed revalidation") from None
+        for finding in normalized:
+            if isinstance(finding, Mapping) and not isinstance(finding.get("evidence_refs", ()), (list, tuple)):
+                raise ValueError("review finding evidence refs require list or tuple containers")
+        return normalized
 
     @field_validator(
         "semantic_review_executed",

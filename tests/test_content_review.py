@@ -501,6 +501,29 @@ def test_warning_only_blocked_result_requires_actual_blocker(
     SchemaRegistry().validate(schema, payload)
 
 
+@pytest.mark.parametrize("container", [dict, UserDict, MappingProxyType])
+@pytest.mark.parametrize("reference", ["docs/a.md", b"docs/a.md"])
+@pytest.mark.parametrize(
+    "model,schema",
+    [(ContentReviewResult, "content-review.v1"), (ContentReviewExecutionResult, "content-review-execution.v1")],
+)
+def test_nested_finding_refs_reject_without_consumption_and_recover(
+    container: Callable, reference: str | bytes, model: type[ContentReviewResult], schema: str
+) -> None:
+    finding = _blocked_payload()["findings"][0]
+    references = (value for value in (reference,))
+    payload = {**_blocked_payload(), "findings": [container({**finding, "evidence_refs": references})]}
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate(schema, payload)
+    assert list(references) == [reference]
+    for corrected_refs in (["docs/a.md"], ("docs/a.md",)):
+        corrected = {**_blocked_payload(), "findings": [{**finding, "evidence_refs": corrected_refs}]}
+        assert model.model_validate(corrected).findings[0].evidence_refs == ("docs/a.md",)
+        SchemaRegistry().validate(schema, corrected)
+
+
 def test_streaming_findings_and_evidence_ids_are_not_consumed(tmp_path: Path) -> None:
     _root, data = _fixture(tmp_path)
     item = ContentReviewAssessment.model_validate(data).items[0]

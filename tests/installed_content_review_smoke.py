@@ -203,6 +203,16 @@ def _assert_new_receipt_invariants(
         corrected = {**warning_only, "findings": [blocker.model_dump(mode="json")]}
         model.model_validate(corrected)
         SchemaRegistry().validate(schema, corrected)
+        references = (value for value in (b"docs/a.md",))
+        streaming_finding = {**blocker.model_dump(mode="python"), "evidence_refs": references}
+        malformed = {**corrected, "findings": [streaming_finding]}
+        _assert_contract_rejects(model, schema, malformed)
+        assert list(references) == [b"docs/a.md"]
+        for materialized in (["docs/a.md"], ("docs/a.md",)):
+            recovered_finding = {**blocker.model_dump(mode="python"), "evidence_refs": materialized}
+            recovered = {**corrected, "findings": [recovered_finding]}
+            assert model.model_validate(recovered).findings[0].evidence_refs == ("docs/a.md",)
+            SchemaRegistry().validate(schema, recovered)
     streaming = assessment.model_dump(mode="json")
     iterator = iter(streaming["items"])
     streaming["items"] = iterator
