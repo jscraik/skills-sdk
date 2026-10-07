@@ -10,6 +10,21 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 ## Contract families
 
+`SkillValidationPolicy` from `skills_sdk.validation` selects optional package
+requirements. `required_files=("references/README.md",)` requires those exact
+portable relative paths to be readable regular files in the captured manifest.
+`check_reference_content=True` checks UTF-8 and nonempty content for Markdown,
+text, JSON and YAML references, plus JSON/YAML syntax. Binary references remain
+valid resources. These checks reuse the bytes that bind the candidate; they
+do not follow symlinks or reread files outside the package.
+
+Apply the policy to `validate_skill_package`, `build_skill_package`, or
+`intake_skill_package`. Defaults are unchanged. Invalid applicable-file policy
+returns `invalid_validation_policy`; missing required files and invalid textual
+references return finding-specific blockers. These are deterministic checks,
+not proof of accuracy, relevance, link freshness, semantic description quality,
+or completed reviewer execution.
+
 - **Archive verification:** import `verify_package_archive` from
   `skills_sdk.packaging`, and `PackageArchiveVerificationPolicy` and
   `PackageArchiveVerificationReceipt` from `skills_sdk.models`.

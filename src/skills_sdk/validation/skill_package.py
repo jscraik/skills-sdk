@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import stat
@@ -40,6 +41,62 @@ class SkillValidationPolicy:
     max_entrypoint_lines: int | None = None
     max_reference_depth: int | None = None
     allowed_frontmatter: frozenset[str] = _ALLOWED_FRONTMATTER
+    required_files: tuple[str, ...] = ()
+    check_reference_content: bool = False
+
+
+def _policy_findings(policy: SkillValidationPolicy) -> list[SkillPackageFinding]:
+    """Revalidate applicable-file policy even for forged dataclass instances."""
+    if not isinstance(policy, SkillValidationPolicy):
+        return [_finding("invalid_validation_policy", "policy must be a SkillValidationPolicy")]
+    required = getattr(policy, "required_files", None)
+    enabled = getattr(policy, "check_reference_content", None)
+    if type(enabled) is not bool or not isinstance(required, tuple):
+        return [_finding("invalid_validation_policy", "reference policy requires a boolean and a tuple of paths")]
+    try:
+        for path in required:
+            if not isinstance(path, str):
+                raise ValueError("required file must be a string")
+            require_portable_relative_path(path)
+        if len(required) != len(set(required)):
+            raise ValueError("required paths must be unique")
+    except (ContractError, ValueError):
+        return [_finding("invalid_validation_policy", "required files must be unique portable relative paths")]
+    return []
+
+
+def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
+    """Check textual reference bytes, not semantic accuracy or external links."""
+    suffix = Path(path).suffix.lower()
+    if suffix not in {".md", ".txt", ".json", ".yaml", ".yml"}:
+        return []
+    try:
+        text = payload.decode("utf-8")
+        if not text.strip():
+            return [_finding("empty_reference", "textual reference must contain content", path)]
+        if suffix == ".json":
+            json.loads(text)
+        elif suffix in {".yaml", ".yml"}:
+            yaml.safe_load(text)
+    except UnicodeDecodeError:
+        return [_finding("invalid_reference_utf8", "textual reference must be UTF-8", path)]
+    except (ValueError, yaml.YAMLError, RecursionError):
+        return [_finding("invalid_reference_format", "structured reference must be parseable", path)]
+    return []
+
+
+def _package_policy_findings(captured: dict[str, bytes], policy: SkillValidationPolicy) -> list[SkillPackageFinding]:
+    """Apply policy to the same safely captured bytes that bind the candidate."""
+    findings = [
+        _finding("required_file_missing", "selected policy requires a readable regular file", path)
+        for path in policy.required_files
+        if path not in captured
+    ]
+    if policy.check_reference_content:
+        for path, payload in sorted(captured.items()):
+            if path.startswith("references/"):
+                findings.extend(_reference_findings(path, payload))
+    return findings
 
 
 def _read_regular_bytes(parent_fd: int, name: str) -> tuple[bytes, bool]:
@@ -321,7 +378,10 @@ def validate_skill_package(
 ) -> SkillPackageValidation:
     """Validate a package without executing it or mutating its source tree."""
 
-    active_policy = policy or SkillValidationPolicy()
+    active_policy = policy if policy is not None else SkillValidationPolicy()
+    policy_findings = _policy_findings(active_policy)
+    if policy_findings:
+        return SkillPackageValidation(status="blocked", findings=tuple(policy_findings))
     root = package_root.absolute()
     findings: list[SkillPackageFinding] = []
     files: list[PackageManifestFile] = []
@@ -348,6 +408,7 @@ def validate_skill_package(
         else:
             files, file_findings, captured = _scan_files(root, active_policy)
             findings.extend(file_findings)
+            findings.extend(_package_policy_findings(captured, active_policy))
             try:
                 skill_payload = captured.get("SKILL.md")
                 if skill_payload is None:

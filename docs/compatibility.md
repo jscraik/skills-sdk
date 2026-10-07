@@ -278,6 +278,25 @@ rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
 
+The applicable package-quality policy is an additive increment, not full
+reference-review parity. Legacy `reference_quality_contract` checks nonempty
+reference content and structured syntax, but also applies filename/title
+heuristics and contract-specific fields. The SDK ports the deterministic byte
+and syntax checks behind explicit `check_reference_content`; semantic title,
+description, coverage and source-accuracy review remain separate work.
+Binary references are deliberately excluded from text checks, rather than
+requiring every resource to decode as UTF-8. Required files are explicit policy,
+not a global OpenAI or repository layout requirement. Defaults and versioned
+validation/build/intake envelopes remain unchanged. Corrected source produces
+a new candidate digest; validation never changes the source.
+The existing result envelope does not record the effective validation policy.
+Retain the selected policy and exact command with evidence; an unspecified
+passing v1 validation result does not prove these opt-in checks ran.
+
+Retained proof includes `tests/test_package_quality_policy.py` and the installed
+API/CLI smoke in `tests/installed_package_quality_smoke.py`. Source semantics
+were inspected; live Agent-Skills execution is not claimed by these SDK tests.
+
 Before porting a workflow, identify the source revision, production consumer,
 supported input forms, policy declarations, and failure semantics. Use the
 source implementation and representative accepted and rejected cases to
