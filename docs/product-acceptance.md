@@ -51,6 +51,51 @@ None of these rows is complete. The matrix is not a completion percentage and
 does not change Foundry source custody, package rights, host policy, provider
 credentials, registry identity, or distribution authority.
 
+## Managed release gates
+
+The following strengthen existing SDK-2 through SDK-8 acceptance; they are not
+a second delivery tracker. Coverage below was inspected at accepted code
+`817966b378be0da45928fbaef89b2ede3708b012` on 2026-10-08. These requirements
+are product policy, not claims that the gates already execute. Use the
+[workflow policy](workflow.md#icons-and-presentation) for icon design and current
+OpenAI destination limits, and the [next slice](projects/sdk-workflow/tasks.md#queued-work-assessment-and-next-bounded-slice)
+for implementation order.
+
+| Gate | Existing accepted proof and limitation | Required acceptance |
+| --- | --- | --- |
+| Icons and presentation | [Skill capture](../tests/test_skill_package_validation.py) and [ZIP verification](../tests/test_package_archive_verification.py) bind generic asset bytes. [Intake](../tests/test_package_intake.py) checks supplied package rights; neither proves image rights, approval, decoding or host display. | Every Jamie-owned managed plugin has approved professional artwork. Bind approval and rights, decoded file validation, safe manifest closure, exact archive presence and candidate identity. Reject missing, malformed, oversized, non-square, escaping, stale or unapproved artwork; corrected inputs recover without source mutation. Preserve licensed third-party branding. Verify names, descriptions and starter prompts against actual capability, with screenshots/onboarding only when applicable. An authorised host observation must separately show the correct icon. |
+| Destination compatibility | Existing skill contracts and archive checks do not implement canonical portable-plugin conversion or destination presentation profiles. | Pin specification and adapter versions; prove representative portable and destination packages preserve required content and behaviour. Unsupported components return explicit blockers, never silent loss. Distinguish declared, structurally checked and observed compatibility. |
+| Discovery and activation | [Runtime evidence contracts](../tests/test_runtime_execution_evidence.py) validate supplied observations; the SDK does not observe or activate a plugin. | An authorised observing adapter proves direct, indirect, incomplete and unrelated requests, including overlapping skills. Expected activation, negative activation and clarification/routing all need evidence for the exact installed candidate. |
+| Update permissions | [Safety evidence](../tests/test_pre_execution_safety.py) and [static screening](../tests/test_security_screening.py) support candidate-bound checks, not baseline-to-candidate permission interpretation. | Compare hooks, MCP servers, destinations, dependencies and access. Unchanged or reduced permissions have valid neighbouring cases; expansion is visible and blocks dependent operations without renewed authority. Corrected input or applicable approval recovers without inheriting baseline authority. |
+| Bounded optimisation | [Provider limits](../tests/test_provider_call.py) and [observed calibration](../tests/test_observed_calibration.py) bound work; they do not establish an optimisation budget, matched lift or live quality. | Freeze budgets, stop rules, minimum meaningful improvement and regression limits before execution. Prove same-lane comparability, variability reporting, budget exhaustion and rejected promotion for unchanged/inconclusive results. Cloud baseline is the accepted local winner; changed candidates need fresh affected safety and evaluation evidence. |
+| Artifact completeness | [Archive verification](../tests/test_package_archive_verification.py) checks supplied ZIP content against the manifest; it is not archive emission or complete-plugin/mode preservation. | Inspect emitted and converted archives, not just directories. Required resources, artwork and executable modes survive; missing files, unsafe paths and incompatible representations block. Exclude secrets, private review/provider evidence and held-out answers. Public attribution remains available where required. |
+| Recovery and retries | [Provider calls](../tests/test_provider_call.py) classify retryable failures but perform zero automatic retries. [Runtime evidence](../tests/test_runtime_execution_evidence.py) models recovery without executing publication, install or rollback. | Prove interruption, repeated requests, idempotency and conflict handling. Read back uncertain publication before any retry; unavailable readback blocks dependent mutation. Failed installation preserves or restores the previous working version, with observed lock/runtime recovery and a typed blocker when recovery cannot be verified. |
+
+For the future [registry consumer boundary](../ARCHITECTURE.md#brainwav-product-family),
+prove isolated SDK operation without registry accounts, databases or server
+imports, and consumer tests against the installed pinned SDK package actually
+deployed. Reject production dependence on editable/neighbouring checkouts or
+private SDK modules. Registry workers use public APIs/versioned schemas without
+duplicating lifecycle logic or inheriting website publishing credentials.
+Registry display must retain the exact version's artwork and attributed
+evidence. These are future consumer acceptance criteria, not authority to start
+the registry before the existing gate or claims of deployed proof.
+
+Image and approval checks must distinguish file validity from visual quality;
+passing a decoder is not professional-design approval. An icon-only change
+requires a new candidate and affected proof, followed by normal versioned
+delivery. Inventory and schedule existing managed plugins; do not bulk-rewrite
+installed copies or alter verified provider-managed packages.
+
+Keep exactly ten active managed scenarios. Implementation, compatibility,
+security, calibration and held-out tests are not capped at ten. Validators and
+build remain read-only; generation, normalisation and repair are explicit
+preparation operations. Prove accepted, rejected and corrected inputs through
+supported public API and installed CLI routes without sibling projects. Use
+controlled adapters for offline proof and obtain separate authority for external
+state checks. No row above authorises provider spending, credentials, uploads,
+publication, installation or registry creation.
+
 ## Evidence invalidated by temporary-worktree loss
 
 The former provider-call, whole-report, evaluation, archive follow-up, runtime,

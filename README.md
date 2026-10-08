@@ -10,6 +10,11 @@ review assessment and static security screening have separate evidence limits;
 they do not establish live provider or reviewer truth. The core remains independent of a host
 repository, provider account, runtime installation, or registry.
 
+Within the [brAInwav product family](ARCHITECTURE.md#brainwav-product-family),
+`skills-sdk` owns reusable tooling. The future `skills-registry` is a separate
+repository for the service; its workers consume a pinned SDK package version.
+Its creation remains subject to the [registry start gate](docs/workflow.md#registry-transition).
+
 The Python API can deterministically prepare an intended runtime-lock
 transition with `plan_runtime_install`. The plan is portable and
 mutation-free: it does not resolve host paths, write a lock, install files,

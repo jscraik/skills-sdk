@@ -13,6 +13,45 @@ interaction, and publication remain outside the portable core. Supported
 integration adapters and their end-to-end orchestration are SDK-owned future
 work, not responsibilities left to Agent-Skills or Foundry.
 
+## brAInwav product family
+
+The owner-approved product structure has two separate repositories, not a
+combined runtime or a new SDK dependency:
+
+| Repository | Responsibilities |
+| --- | --- |
+| `skills-sdk` | Portable library, CLI and contracts; validation and evaluation; package preparation; registry and host adapters. |
+| `skills-registry` (future) | Website/API and search; publisher accounts; package/version catalogue; artifact storage and access; job scheduling and operations. Keep UI, API, administration and workers in this one registry repository initially. |
+
+Registry workers use an installed, pinned SDK package version for validation,
+evaluation and preparation through public APIs and versioned schemas. Production
+must not use neighbouring checkouts, editable installations, private SDK imports
+or duplicated validation rules. Record the package version with job evidence.
+The service owns worker scheduling and isolation; the SDK owns the reusable
+operation and its contracts. Shared repository custody does not grant untrusted
+evaluation workers the website's publishing credentials. Separate processes and
+permissions need not become separate repositories.
+
+SDK registry adapters may call supported APIs but must not import registry server
+code. Offline validation, preparation and applicable local evaluation require no
+registry account, database or running website. Neither project depends on
+Agent-Skills or Foundry at runtime. Prove both sides: isolated SDK operation and
+registry consumer tests against the installed SDK package actually deployed.
+Separate repositories alone do not prove independence or security.
+
+The SDK determines what candidate-bound evidence establishes; registry policy
+decides publication, storage, presentation and distribution. The target SDK icon
+gate validates approved artwork and binds packaged bytes; the registry displays
+that exact version's artwork and attributed evidence, never silently replaces
+released assets. Coordinate a boundary change through an SDK release or explicit
+candidate package and a tested registry dependency update, not shared source.
+Reconsider repository consolidation only if repeated cross-repository
+coordination becomes a demonstrated problem and Jamie approves that change.
+
+This is a responsibility boundary, not permission to create `skills-registry`
+now. The [registry start gate](docs/workflow.md#registry-transition) still
+requires completed SDK acceptance and verified private Tessl publication first.
+
 ## Product ownership and migration
 
 Use [the canonical workflow](docs/workflow.md) for the owner-approved gate
@@ -37,6 +76,14 @@ Whole-plugin identity precedes release-bound quality, security and evaluation
 evidence. Standalone skills remain intake and validation inputs, not a second
 managed release format. This target does not change the implemented skill-level
 services below or claim that the queued plugin implementation is accepted.
+
+The [mandatory icon policy](docs/workflow.md#icons-and-presentation) belongs to
+SDK release readiness. Bind approved artwork, its rights evidence and referenced
+presentation assets to the whole-plugin candidate. Portable capture belongs to
+the reusable core; destination image rules and observed display belong to the
+selected adapters. Asset generation, normalisation and repair are explicit
+preparation operations; validation and build remain read-only. Generic asset
+hashing is not image validation, approval or host-display proof.
 
 The target managed path is optional candidate holding/intake, whole-plugin
 SDK checking, a verified registry version and selected host installation.

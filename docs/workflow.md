@@ -31,6 +31,12 @@ presentation and distribution; they consume SDK validation/evaluation rather
 than duplicate it. Foundry remains optional holding, and Agent-Skills remains
 migration input only.
 
+Within the [brAInwav product family](../ARCHITECTURE.md#brainwav-product-family),
+keep `skills-sdk` and future `skills-registry` in separate repositories. Registry
+workers consume a pinned SDK package version and retain that version in job
+evidence; service scheduling and operations do not move into the SDK. This
+ownership decision does not open the registry start gate.
+
 ## Managed release format
 
 Owner-approved direction, 2026-10-08: every SDK-managed skill release is an
@@ -57,7 +63,7 @@ my-plugin/
 │       ├── scripts/             # When deterministic helpers are needed
 │       └── assets/              # When skill resources are needed
 ├── mcp.json                     # Only for bundled MCP servers
-├── assets/                      # Optional plugin-level resources
+├── assets/                      # Preferred location for approved release artwork
 ├── README.md                    # SDK release documentation policy
 └── LICENSE                      # SDK release rights/distribution policy
 ```
@@ -73,7 +79,8 @@ legacy `.mcp.json` is not a filename-only operation. See
 Distinguish standard conformance from SDK release policy. The base manifest
 requires `$schema` and `name`; version and description are optional there.
 SDK-managed releases additionally require a version, useful description, rights
-evidence, release documentation and applicable evaluation evidence. Supporting
+evidence, release documentation and applicable evaluation evidence. Jamie-owned
+managed plugins also require an approved professional icon as specified below. Supporting
 skill folders and integration metadata remain conditional; do not invent base
 standard requirements from SDK policy.
 
@@ -106,28 +113,73 @@ advancing packaging or registry integration; do not reinterpret existing skill
 receipts as whole-plugin proof. Preserve origin-verified provider-managed system
 skills and plugins on their supported routes, without automatic conversion.
 
+## Icons and presentation
+
+Every Jamie-owned, SDK-managed plugin must have an approved professional icon,
+including plugins containing only one skill. This is SDK release policy, not a
+universal Agent Plugins requirement. Prefer suitable existing owned artwork;
+otherwise use an approved image-generation or vector-design workflow. Do not
+regenerate acceptable artwork just to satisfy a step. Artwork creation requires
+its own applicable authority and is not a validation or build side effect.
+
+Review recognisability at representative small sizes, distinction from other
+managed plugins, light and dark backgrounds, and appropriate rights and
+attribution. Avoid tiny text, unnecessary detail and misleading branding. A
+1024 × 1024 transparent PNG is the preferred starting format, not a mandatory
+external format. Preserve valid upstream branding and licence for third-party
+packages. Missing artwork or unclear rights is an actionable release blocker,
+not permission to invent ownership or silently replace branding.
+
+For an OpenAI/Codex distribution target, use the canonical
+`extensions.com.openai.interface` presentation metadata, including `logo` and
+`composerIcon`; do not maintain conflicting copies. References must use safe
+`./`-prefixed plugin-root-relative paths to packaged regular files, preferably
+under `assets/`. Reject escaping paths and unsafe symlink references. The
+destination accepts PNG, JPEG, WebP and SVG, at most 5 MiB per image, square and
+at least 48 × 48; raster dimensions must not exceed 4096 × 4096. Decode raster
+content and verify its extension. Validate SVG structure and positive finite
+numeric dimensions or a square `viewBox`, rather than trusting a filename.
+These are destination checks, separate from portable-format conformance.
+Rechecked on 2026-10-08 against [icon requirements](https://developers.openai.com/plugins/deploy/submission#icons-and-screenshots),
+[image validation errors](https://developers.openai.com/plugins/deploy/submission-errors#image-errors)
+and [metadata packaging](https://developers.openai.com/plugins/build/plugins#add-an-openai-and-codex-overlay);
+recheck applicable specification and adapter versions before implementation.
+
+Keep approval and rights evidence bound to the candidate without bundling private
+review material. Prove valid artwork, safe manifest references, exact packed-file
+presence and candidate binding separately. Observe correct display in the
+intended host only when authorised; absent host proof remains unverified, not a
+local pass. Names, descriptions and starter prompts must match actual abilities;
+screenshots and onboarding apply only where appropriate to the destination or
+plugin. Changing artwork changes the candidate and affected downstream evidence.
+Use normal versioned releases, never silent changes to released versions or
+bulk rewrites of installed/provider-managed copies. Inventory existing managed
+plugins and schedule deficient artwork through the existing task record.
+
 ## Ordered gates and correction loops
 
 ```mermaid
 flowchart TD
   R[Create / update / inspect external candidate] --> O{Origin-verified provider-managed exemption?}
   O -->|Yes| EX[Record exemption and preserve provider-managed route]
-  O -->|No| PC[Create or normalise whole-plugin candidate]
+  O -->|No| IN[Provenance, rights, owner and update baseline]
+  IN --> PC[Explicit plugin preparation, approved artwork and metadata]
   PC --> P[Plugin and contained-skill quality]
   P --> F[References and coverage gaps]
   F --> E[Scenario definitions and scorer quality]
-  E --> S[Applicable security review]
+  E --> S[Applicable security and permission-delta review]
   S --> H[Held-out scorer calibration]
-  H --> L[Matched oss-local plugin comparison]
+  H --> L[Budgeted matched oss-local comparison]
   L --> LW[Select and freeze accepted local winner]
-  LW --> C[Cloud refinement against local-winner baseline]
+  LW --> C[Budgeted cloud refinement against local winner]
   C --> D[Review and select candidate]
-  D -->|Selected| A[Prepare and verify complete plugin archive]
+  D -->|Selected| A[Destination archive, presentation and recovery checks]
   D -->|Correction required| X
   D -->|Not selected| N[Stop and record rejection or decision]
   A --> G[Candidate-bound registry preparation]
   G --> T[Private registry publication and readback]
-  T --> I[Selected install and runtime verification]
+  T --> I[Authorised install, discovery, activation and rollback proof]
+  IN --> X
   PC --> X[Classify blocker and correct responsible input]
   P --> X
   F --> X
@@ -141,6 +193,7 @@ flowchart TD
   G --> X
   T --> X
   X --> Y{Responsible correction gate}
+  Y --> IN
   Y --> PC
   Y --> P
   Y --> F
@@ -181,8 +234,9 @@ retain separate provenance and score interpretation.
 | Intent and intake | Explicit create, update, or external-check intent; source and owner evidence; baseline for updates; whole-plugin candidate before release-bound evidence. | Directory skill intake and `check-quality` implement intent-aware checking and baseline capture, not plugin normalisation, source authoring or installation. Complete authoring/adoption composition remains. |
 | Package and description | Safe structure, truthful trigger description, applicable metadata, and useful progressive disclosure. | Structural policy, build, candidate-bound content-review assessment and bounded offline reviewer execution exist. General semantic accuracy and live reviewer quality remain unproved. |
 | References | Relevant, accurate, discoverable guidance with identified omissions and duplicate or stale content. | Applicable syntax checks and content-review coverage bind captured references, dispositions and source evidence. Independent accuracy, freshness and exhaustive gap discovery remain review obligations. |
+| Icons and presentation | Approved icon, rights evidence, accurate metadata, safe references and packed resources; selected destination and host proof remain distinct. | Generic asset capture and ZIP verification exist. Icon decoding, dimensions, approval, destination metadata validation and observed display are not implemented at this baseline. |
 | Scenarios and scorer | Realistic cases linked to claims, hidden criteria, gap inventory, scorer quality, and held-out calibration. | Scenario quality, declared claim coverage, supplied scorer checks and observed calibration callbacks exist. The calibration CLI uses supplied-offline fixtures; fresh model quality and matched experiments are separate. |
-| Security | Capability-specific checks and reviewer evidence; unresolved risks block execution. | `screen_package_security` runs bounded static screening. Guarded selected-case execution requires fresh candidate-bound review/checklist evidence and recapture. External scanners, independent review and comprehensive security remain separate gaps. |
+| Security | Capability-specific checks, reviewer evidence and update-permission differences; unresolved risks block execution and expanded authority needs renewed approval. | `screen_package_security` runs bounded static screening. Guarded selected-case execution requires fresh candidate-bound review/checklist evidence and recapture. Permission-delta interpretation, external scanners, independent review and comprehensive security remain separate gaps. |
 | Local comparison | Baseline and candidate plugin versions run on the same oss-local model, frozen cases, settings, and rubric; include relevant cross-skill behaviour. | Selected-case and injected adapter services exist; matched A/B orchestration and whole-plugin composition remain unmerged. |
 | Cloud refinement | Freeze the accepted local winner as baseline; compare it with a refined candidate on the same oss-cloud model and frozen cases/rubric/settings. | The unmerged handoff candidate enforces local-winner lineage; refinement authoring, plugin-bound integration and live cloud proof remain incomplete. |
 | Registry preparation | Complete plugin archive verified against candidate manifest and required resources; passing preparation evidence binds candidate, registry name, version, build and hardening before publication. | Skill build, hardening, archive verification and registry-preparation/v1 APIs exist; plugin-bound composition and archive emission are not accepted yet. |
@@ -202,8 +256,9 @@ without an applicable policy. Plugin resources and executable modes must survive
 packaging. Host metadata does not become a portable core requirement.
 
 Managed v2 release evaluation keeps exactly ten active scenarios. Calibration
-probes, implementation tests, generated drafts, and held-out examples do not
-automatically enlarge that set. Map each behavioural claim to a case or a named
+probes, implementation tests, compatibility checks, security cases, generated
+drafts and held-out coverage are not limited to ten and do not automatically
+enlarge the active set. Map each behavioural claim to a case or a named
 gap. Keep realistic tasks separate from hidden acceptance criteria, and retain
 rejected examples for leakage, weak comparators, unsupported assertions, hidden
 dependencies, and stale fixtures. Review scenario drift after a skill changes.
@@ -213,6 +268,14 @@ identity for each A/B experiment. Measure candidate versus baseline within one
 model lane. Cross-model scores do not establish skill lift. A changed comparison
 input starts a new experiment. Preserve held-out cases outside the tuning loop
 and require calibration before using judge verdicts as behavioural proof.
+
+Before either model lane executes, record its run/time/cost budgets, stopping
+rules, minimum meaningful improvement and allowed regressions. Existing provider
+call limits are not an optimisation budget or permission to spend. Report
+variability and insufficient evidence; unchanged or inconclusive results do not
+establish improvement. Discovery proof must cover direct, indirect, incomplete
+and unrelated requests, including overlapping skills together. Retain negative
+activation and appropriate clarification/routing cases, not just isolated success.
 
 Select and freeze the accepted local winner before cloud refinement. Within the
 cloud lane, run both that baseline and the refined candidate under the same
@@ -227,6 +290,17 @@ network, secret, subprocess, tool, and installation capabilities. Bind the
 checklist version, applicability decisions, reviewer/scanner identity, findings,
 and evidence to the candidate. File safety checks alone do not establish a
 completed content or dependency security review.
+For updates, compare the baseline and candidate for added hooks, MCP servers,
+destinations, dependencies and access requirements. Expose authority expansion
+and require renewed approval before dependent execution or installation;
+baseline approval does not cover newly requested access.
+
+Validate portable conformance separately from destination profiles. Record the
+applicable specification and adapter versions. Verify actual archive bytes,
+required resources and executable modes, excluding private evidence, secrets
+and held-out answers. Unsupported conversion must block rather than silently
+drop required content or behaviour. Declared compatibility, structural proof
+and observed host behaviour remain separate lanes.
 
 ## Registry transition
 
@@ -292,6 +366,11 @@ failed or missing recovery evidence blocks dependent mutation. Classify failures
 that happened before mutation without claiming that rollback executed.
 For uncertain publication outcomes, reconcile registry readback before retrying;
 an unavailable readback is not proof that publication failed without mutation.
+Prove interrupted and repeated requests, idempotency and conflicting-release
+rejection through the selected adapters. Preserve the prior working installation
+until the replacement is verified. A retryable classification does not prove a
+retry executed or permit automatic repetition; accepted provider calls currently
+perform zero automatic retries.
 
 For each executable slice, prove accepted input, rejected input, and corrected
 input through public API and installed CLI boundaries as applicable. Include

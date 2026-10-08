@@ -20,10 +20,22 @@ operate the Tessl registry, or claim an installed runtime from local receipts.
 - Keep the reusable core independent of Agent-Skills, Tessl, Codex, and local
   runtime filesystem layouts. SDK-owned integration layers orchestrate supported
   provider, registry, and host adapters without importing them into the core.
+- Keep `skills-sdk` and future `skills-registry` in separate repositories within
+  the [brAInwav product family](ARCHITECTURE.md#brainwav-product-family).
+  Registry workers consume an installed, pinned SDK package through public APIs
+  and versioned schemas; website, accounts, catalogue, storage, access control
+  and job operations are not SDK responsibilities. Do not import registry
+  server code into the SDK or duplicate SDK lifecycle rules in that service.
 - Follow the [managed release format](docs/workflow.md#managed-release-format):
   plugin-first processing and plugin-only managed releases, including one-skill
   releases, with root `plugin.json` canonical. This is target policy; current
   skill-level services and receipts do not establish whole-plugin clearance.
+- Require an approved professional icon for every Jamie-owned managed plugin,
+  including one-skill releases. Follow the [icon and presentation policy](docs/workflow.md#icons-and-presentation)
+  and [release acceptance gates](docs/product-acceptance.md#managed-release-gates).
+  This is SDK release policy, not a universal Agent Plugins rule. Preserve
+  third-party branding and rights; asset creation and repair require explicit
+  preparation operations, never validator or build side effects.
 - Foundry holds candidates awaiting SDK processing; holding is not approval or
   distribution and need not be permanent custody after processing. Managed,
   non-exempt runtime copies come from exact SDK-checked versions through a

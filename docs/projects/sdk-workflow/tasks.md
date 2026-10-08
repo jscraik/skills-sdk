@@ -35,6 +35,24 @@ A catalogue may then precede independent distribution; neither service building
 nor live publication is authorised by this record. Preserve one canonical content source and bind
 distinct portable/export artifact digests through an explicit adapter.
 
+The [brAInwav product-family boundary](../../../ARCHITECTURE.md#brainwav-product-family)
+keeps `skills-sdk` and future `skills-registry` in separate repositories.
+Registry UI, API and workers stay together initially. Workers consume an
+installed, pinned SDK package through public APIs and versioned schemas;
+website, accounts, catalogue, artifact storage/access and job operations belong
+to the registry. Production editable/checkout imports and duplicated SDK rules
+are excluded. Prove the packaged consumer boundary and credential isolation when
+that work is authorised. This is future ownership, not a new implementation
+slice or registry-start authority.
+
+The same owner direction requires an approved professional icon for every
+Jamie-owned managed plugin, including one-skill releases. Apply the
+[icon policy](../../workflow.md#icons-and-presentation) and
+[strengthened acceptance gates](../../product-acceptance.md#managed-release-gates)
+through existing slices. Preserve valid third-party branding and rights. Artwork
+creation is an explicit preparation operation, not a validator side effect or
+permission to spend; no installed-copy bulk rewrite is authorised.
+
 Preserve unrelated source edits and generated run state. No provider spending,
 credential use, registry mutation, public publication, or home runtime mutation
 is authorised by this task record. Implement portable boundaries and controlled
@@ -46,10 +64,10 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 | Slice | Work | Completion proof | State |
 | --- | --- | --- | --- |
 | S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Accepted in PR #44; maintain affected rows at every feature closeout. |
-| S2 | Add applicable plugin/skill policy and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review and local stage composition exist. Plugin normalisation/composition, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
-| S3 | Bind applicable security evidence and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
-| S4 | Implement matched baseline/candidate plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; live runs separately authorised. | Locally validated candidate, unmerged. Reconcile plugin binding and integrate against the accepted calibration base before normal PR delivery. Local fixtures do not establish live local/cloud model lift. |
-| S5 | Compose plugin archive verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, separate portable/export digests with verified relationship, exact checked version, adapter failures and recovery; real external state separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
+| S2 | Add applicable plugin/skill policy, approved icons and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review and local stage composition exist. Plugin normalisation/composition, icon validation/approval, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
+| S3 | Bind applicable security evidence, update-permission differences and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass; expanded permissions need renewed authority. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Permission-delta interpretation, independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
+| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Locally validated candidate, unmerged. Reconcile plugin binding and budget/decision acceptance against the accepted calibration base before normal PR delivery. Local fixtures do not establish live local/cloud model lift. |
+| S5 | Compose plugin archive/presentation verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, private-material exclusion, versioned destination profiles, separate portable/export digests, exact checked version, uncertain-outcome readback, idempotency and observed recovery; host display/activation separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
 | S6 | Join feedback-to-regression and reconcile consumer cutover or retirement coverage. | Every scoped failure has an owner and retained regression; clean-room entrypoints run without sibling projects; all legacy rows have disposition. | Queued |
 
 ## Accepted delivery ledger
@@ -80,9 +98,14 @@ candidate revision, evidence reference, what it proves, and the next check.
 Do not turn a successful local gate into hosted, provider, registry, or runtime
 clearance. Required proof blocks completion of its dependent slice only.
 
+Name delivery state separately: proposed, implemented locally, validated locally,
+under review, merged, published, or verified in a host. Record exact revision and
+proof for each applicable lane; these are not interchangeable completion labels.
+
 - Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
-- Current work: this bounded documentation reconciliation records the accepted
-  PRs above, the new plugin-first target and existing feature-closeout guidance.
+- Current work: this bounded documentation reconciliation, under review in
+  [PR #51](https://github.com/jscraik/skills-sdk/pull/51), records the accepted PRs
+  above, plugin-first target, mandatory icon policy and strengthened acceptance.
   It changes no executable service, schema, active scenario set, or live-operation
   authority. Plugin-first support remains implementation work, not a doc-only pass.
 - Next action: finish this documentation PR, then implement the bounded portable
@@ -131,6 +154,9 @@ provider execution, publication or installation is part of this slice.
   resources, modes and per-skill findings. Prove changed shared bytes or modes
   invalidate their affected evidence, and bare-skill receipts cannot clear a
   newly assembled plugin.
+- Capture referenced artwork bytes as resources in this slice, without claiming
+  decoding, visual approval or observed host display. Preserve the required
+  release-policy gate for the following presentation slice.
 - Implement OpenAI extension precedence without merging an ignored overlay.
   Separate standard conformance from stricter SDK policy, including unknown
   fields and metadata conflicts; never label an SDK-only rejection a standard
@@ -144,8 +170,19 @@ provider execution, publication or installation is part of this slice.
   with Agent-Skills, Foundry and registry services unavailable. Run focused
   proof and the required aggregate after relevant implementation changes.
 
+After intake binding, add a bounded icon/presentation validation slice using
+existing models and services, not a new framework. Prove approval/rights binding,
+destination image limits, safe manifest references, exact packed assets, changed
+icon invalidation, and accepted/rejected/corrected inputs. Keep visual approval
+distinct from decoding and authorised host-display proof distinct from offline
+validation. Inventory existing managed plugins for missing or unsuitable art
+through supplied candidates, then schedule normal versioned updates; preserve
+acceptable art and verified provider-managed exemptions.
+
 Then compose explicit standalone normalisation, plugin-bound evaluation and
-archive preparation. A separate bounded Tessl export adapter must retain
+archive preparation. Reconcile declared optimisation budgets and permission
+changes before dependent execution, and require adapter-version, presentation,
+interruption/retry and recovery proof before delivery. A separate bounded Tessl export adapter must retain
 unchanged skill contents, distinct artifact digests and a verified relationship,
 or block when required resources/modes cannot survive. Preserve the existing ten
 active scenarios. No current candidate authorises advancing to live operations.
