@@ -74,6 +74,36 @@ API accepts explicit trusted callbacks; the CLI only accepts supplied review
 evidence and blocks an observed request without that callback. Tests and
 calibration probes do not enlarge the exactly ten active managed scenarios.
 
+## Observed calibration contracts
+
+`observed-calibration-plan/v1` and `observed-calibration/v1` are additive
+contracts. They do not reinterpret read-only `scorer-calibration/v1`, change
+caller-supplied completion IDs into proof, or grant evaluation promotion.
+Raw, typed and copied inputs are revalidated at the model and service boundaries;
+`SchemaRegistry` adds semantic bindings beyond structural JSON Schema.
+Typed calibration inputs require canonical SDK model classes throughout the
+nested payload. Raw inputs require canonical dictionaries, lists and tuples with
+JSON scalars or canonical typed request timestamps; mapping views, custom
+containers, sets and iterators are rejected before coercion or iteration.
+Wrap validation audits raw members before the handler can
+discard subclass identity; copied unknown fields and byte strings are rejected
+before coercion. Normalisation reads raw members without calling model serializers,
+while preserving strict numeric values and canonical typed request timestamps.
+Receipts bind ordered held-out probes and trials to the candidate, output digest,
+assertion contract, scorer, judge and settings. Passing results require every
+declared invocation and the frozen confusion-matrix policy. Blocked partial
+results cannot claim multiple unrecorded invocations after the first stop.
+Policy-failure blockers require complete results that actually fail the policy;
+preflight blockers require zero execution, and execution blockers require an
+unfinished result prefix. Blocker codes cannot relabel complete passing evidence.
+
+The API observes injected numeric callbacks. The CLI invokes explicitly supplied
+offline verdicts; it does not discover executables, read credentials, spend
+provider credits, or authenticate scores and labels. Controlled installed API/CLI
+tests prove acceptance, preflight rejection and corrected-input recovery without
+Agent-Skills or Foundry imports. They do not prove a real model's calibration.
+Fresh model execution and matched local/cloud comparison remain separate work.
+
 ## Supplied content-review contracts
 
 Typed assessment inputs and callback results use the canonical

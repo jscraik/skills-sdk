@@ -4,6 +4,7 @@ from skills_sdk.evaluation.deterministic import evaluate_scenario_set
 from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
 
 __all__ = [
+    "CalibrationProbeExecution",
     "ContentReviewDocument",
     "ContentReviewInput",
     "OfflineContentReviewAdapter",
@@ -22,6 +23,7 @@ __all__ = [
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_content_review",
+    "execute_scorer_calibration",
     "execute_selected_case",
     "execute_selected_case_with_judge",
     "load_selected_case",
@@ -30,6 +32,10 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     """Load optional evaluation services only when requested."""
+    if name in {"CalibrationProbeExecution", "execute_scorer_calibration"}:
+        from skills_sdk.evaluation import observed_calibration
+
+        return getattr(observed_calibration, name)
     if name == "check_local_quality":
         from skills_sdk.evaluation.quality_workflow import check_local_quality
 

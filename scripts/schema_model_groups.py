@@ -23,6 +23,7 @@ from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageInta
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
 from skills_sdk.models.local_check import LocalCheckResult
 from skills_sdk.models.maintenance import EntrypointMaintenanceResult, RuntimeCopyComparison
+from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 from skills_sdk.models.packaging import (
     PackageArchiveVerificationReceipt,
     PackageHardeningReceipt,
@@ -65,6 +66,8 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ScenarioQualityReceiptV2, "scenario-quality.v2.schema.json"),
         (ScorerQualityReceipt, "scorer-quality.v1.schema.json"),
         (ScorerCalibrationReceipt, "scorer-calibration.v1.schema.json"),
+        (ObservedCalibrationPlan, "observed-calibration-plan.v1.schema.json"),
+        (ObservedCalibrationReceipt, "observed-calibration.v1.schema.json"),
         (LocalCheckResult, "local-check.v1.schema.json"),
         (LocalCheckRequestV2, "local-check-request.v2.schema.json"),
         (LocalCheckResultV2, "local-check.v2.schema.json"),

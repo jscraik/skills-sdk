@@ -54,6 +54,13 @@ from skills_sdk.models.maintenance import (
     EntrypointMaintenanceResult,
     RuntimeCopyComparison,
 )
+from skills_sdk.models.observed_calibration import (
+    CalibrationJudgeVerdict,
+    HeldOutCalibrationProbe,
+    ObservedCalibrationPlan,
+    ObservedCalibrationProbeResult,
+    ObservedCalibrationReceipt,
+)
 from skills_sdk.models.package import (
     IntakeChecks,
     IntakeDecision,
@@ -150,6 +157,7 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 
 __all__ = [
     "ActivationObservation",
+    "CalibrationJudgeVerdict",
     "CapabilitySafetyReview",
     "ClaimCoverage",
     "ContentReviewAssessment",
@@ -164,6 +172,7 @@ __all__ = [
     "EvaluationReceipt",
     "EvaluationReceiptV2",
     "FormatChecks",
+    "HeldOutCalibrationProbe",
     "InstallPlan",
     "InstallationResult",
     "IntakeChecks",
@@ -178,6 +187,9 @@ __all__ = [
     "MantraStatus",
     "MutationRaceEvidence",
     "NormalizedPackage",
+    "ObservedCalibrationPlan",
+    "ObservedCalibrationProbeResult",
+    "ObservedCalibrationReceipt",
     "OwnershipState",
     "PackageArchiveVerificationPolicy",
     "PackageArchiveVerificationReceipt",

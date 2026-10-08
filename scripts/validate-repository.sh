@@ -28,4 +28,6 @@ mise exec -- uv run --frozen python tests/installed_quality_workflow_smoke.py --
 "$smoke_venv_dir/bin/python" tests/installed_quality_workflow_smoke.py --check "$smoke_venv_dir/quality-inputs"
 mise exec -- uv run --frozen python tests/installed_pre_execution_smoke.py --prepare "$smoke_venv_dir/safety-inputs"
 "$smoke_venv_dir/bin/python" tests/installed_pre_execution_smoke.py --check "$smoke_venv_dir/safety-inputs"
+mise exec -- uv run --frozen python tests/installed_observed_calibration_smoke.py --prepare "$smoke_venv_dir/calibration-inputs"
+"$smoke_venv_dir/bin/python" tests/installed_observed_calibration_smoke.py --check "$smoke_venv_dir/calibration-inputs"
 git diff --check
