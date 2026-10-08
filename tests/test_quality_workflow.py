@@ -616,7 +616,14 @@ def test_quality_blocker_code_matches_failure_and_recovers(tmp_path: Path, stop:
             blocker={"code": "quality_candidate_changed", "message": "Fixture."},
         )
     elif stop == "final-capture":
-        valid["final_capture"]["candidate"]["source_revision"] = "2" * 40
+        from skills_sdk.core.digests import candidate_content_sha256
+        from skills_sdk.models.packaging import PackageManifestFile
+
+        capture = valid["final_capture"]
+        capture["files"][0]["sha256"] = "1" * 64
+        capture["candidate"]["content_sha256"] = candidate_content_sha256(
+            tuple(PackageManifestFile.model_validate(item) for item in capture["files"])
+        )
         valid.update(
             status="blocked",
             blocked_stage=stop,

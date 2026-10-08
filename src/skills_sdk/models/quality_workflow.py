@@ -301,6 +301,12 @@ class LocalCheckResultV2(_ContractModel):
                 or self.applied_policy is not None
             ):
                 raise ValueError("invalid request requires an empty blocked result")
+            if self.blocker.code not in {
+                "invalid_quality_request",
+                "unexpected_quality_baseline",
+                "invalid_quality_input",
+            }:
+                raise ValueError("request blocker code must identify a request failure")
             return self
         expected = tuple(_QUALITY_TYPES)
         if self.request.intent != "update":
@@ -351,9 +357,23 @@ class LocalCheckResultV2(_ContractModel):
             raise ValueError("final captures require every quality stage to pass")
         if self.request.intent != "update" and self.baseline_final_capture is not None:
             raise ValueError("only update intent permits a final baseline capture")
-        for capture in (self.final_capture, self.baseline_final_capture):
+        if self.request.intent == "update" and self.final_capture is not None and self.baseline_final_capture is None:
+            raise ValueError("update final baseline capture is required even when the current capture fails")
+        for capture, candidate, label in (
+            (self.final_capture, self.request.candidate, "final current capture"),
+            (self.baseline_final_capture, self.request.update_baseline, "final baseline capture"),
+        ):
             if capture is not None:
                 _validation_manifest_matches(capture)
+                if (
+                    capture.candidate is not None
+                    and candidate is not None
+                    and (
+                        capture.candidate.package_id != candidate.package_id
+                        or capture.candidate.source_revision != candidate.source_revision
+                    )
+                ):
+                    raise ValueError(f"{label} must bind the selected source identity")
         if self.final_capture is not None and self.final_capture.candidate == self.request.candidate:
             _policy_matches_capture(self.request.policy, self.final_capture)
         if self.status == "local_checks_passed":

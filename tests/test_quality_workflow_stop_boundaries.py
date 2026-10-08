@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,86 @@ def test_missing_input_cannot_stop_input_independent_stage(tmp_path: Path, stage
     assert missing.blocker is not None and missing.blocker.code == "quality_input_missing"
     SchemaRegistry().validate("local-check.v2", missing.model_dump(mode="json"))
     SchemaRegistry().validate("local-check.v2", passed.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize(
+    "code", ["quality_final_capture_changed", "quality_candidate_changed", "quality_input_missing", "unrelated_failure"]
+)
+def test_request_failure_requires_request_blocker_code(tmp_path: Path, code: str) -> None:
+    """Reject unrelated recovery codes in an otherwise valid pre-request blocker."""
+    request = _request(tmp_path)
+    package = _package_path(tmp_path)
+    invalid = asyncio.run(check_local_quality(package, {}))
+    forged = invalid.model_dump(mode="json")
+    forged["blocker"]["code"] = code
+    with pytest.raises(ValidationError, match="request blocker code"):
+        LocalCheckResultV2.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", forged)
+    for allowed in ("invalid_quality_request", "unexpected_quality_baseline", "invalid_quality_input"):
+        corrected = invalid.model_dump(mode="json")
+        corrected["blocker"]["code"] = allowed
+        SchemaRegistry().validate("local-check.v2", corrected)
+    recovered = asyncio.run(check_local_quality(package, request, assessment=_assessment(package)))
+    assert recovered.status == "local_checks_passed"
+
+
+@pytest.mark.parametrize(
+    ("capture", "defect"),
+    [
+        ("baseline", "missing"),
+        ("baseline", "package"),
+        ("baseline", "revision"),
+        ("current", "package"),
+        ("current", "revision"),
+    ],
+)
+def test_failed_update_final_capture_retains_bound_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capture: str, defect: str
+) -> None:
+    """Even a failed current capture must retain the selected baseline observation."""
+    from skills_sdk.evaluation import quality_workflow as workflow
+
+    request = _request(tmp_path, "update")
+    package = _package_path(tmp_path)
+    baseline = tmp_path / "baseline" / package.name
+    shutil.copytree(package, baseline)
+    request["update_baseline"] = dict(request["candidate"])
+    original = workflow.assess_content_review
+    entrypoint = package / "SKILL.md"
+    original_bytes = entrypoint.read_bytes()
+
+    def change_after_review(root: Path, *, source_revision: str, assessment: object) -> object:
+        receipt = original(root, source_revision=source_revision, assessment=assessment)
+        entrypoint.write_bytes(original_bytes + b"\nChanged after review.\n")
+        return receipt
+
+    with monkeypatch.context() as patch:
+        patch.setattr(workflow, "assess_content_review", change_after_review)
+        blocked = asyncio.run(
+            workflow.check_local_quality(package, request, baseline_root=baseline, assessment=_assessment(package))
+        )
+    assert blocked.blocked_stage == "final-capture"
+    assert blocked.baseline_final_capture is not None
+    forged = blocked.model_dump(mode="json")
+    key = "baseline_final_capture" if capture == "baseline" else "final_capture"
+    if defect == "missing":
+        forged[key] = None
+    else:
+        field = "package_id" if defect == "package" else "source_revision"
+        forged[key]["candidate"][field] = "other-package" if defect == "package" else "2" * 40
+        if defect == "package":
+            forged[key]["identity"].update(package_id="other-package", name="other-package")
+    with pytest.raises(ValidationError, match=f"final {capture} capture"):
+        LocalCheckResultV2.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", forged)
+    SchemaRegistry().validate("local-check.v2", blocked.model_dump(mode="json"))
+    entrypoint.write_bytes(original_bytes)
+    recovered = asyncio.run(
+        workflow.check_local_quality(package, request, baseline_root=baseline, assessment=_assessment(package))
+    )
+    assert recovered.status == "local_checks_passed"
 
 
 @pytest.mark.parametrize(
