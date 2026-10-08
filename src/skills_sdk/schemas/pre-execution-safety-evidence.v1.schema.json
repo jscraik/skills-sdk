@@ -1,0 +1,928 @@
+{
+  "$defs": {
+    "CapabilitySafetyReview": {
+      "additionalProperties": false,
+      "description": "One explicit review outcome or explained non-applicability decision.",
+      "properties": {
+        "check_id": {
+          "enum": [
+            "content_and_injection",
+            "secrets_and_privacy",
+            "filesystem_and_subprocess",
+            "network_and_external_writes",
+            "dependencies_and_binaries",
+            "tools_and_privileges"
+          ],
+          "title": "Check Id",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "reviewed_no_issue",
+            "not_applicable"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "status",
+        "rationale",
+        "evidence_ids"
+      ],
+      "title": "CapabilitySafetyReview",
+      "type": "object"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageFileRole": {
+      "description": "The portable role of a file included in a package manifest.",
+      "enum": [
+        "skill_md",
+        "readme",
+        "reference",
+        "script",
+        "asset",
+        "eval"
+      ],
+      "title": "PackageFileRole",
+      "type": "string"
+    },
+    "PackageManifest": {
+      "additionalProperties": false,
+      "description": "Candidate-bound package contents before distribution or installation.",
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/PackageManifestFile"
+          },
+          "minItems": 1,
+          "title": "Files",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/PackageManifestProvenance"
+        },
+        "schema_version": {
+          "const": "package-manifest/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "candidate",
+        "version",
+        "files",
+        "provenance"
+      ],
+      "title": "PackageManifest",
+      "type": "object"
+    },
+    "PackageManifestFile": {
+      "additionalProperties": false,
+      "description": "One immutable file entry in a package manifest.",
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/PackageFileRole"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "role"
+      ],
+      "title": "PackageManifestFile",
+      "type": "object"
+    },
+    "PackageManifestProvenance": {
+      "additionalProperties": false,
+      "description": "Portable provenance references used to build a package manifest.",
+      "properties": {
+        "builder": {
+          "minLength": 1,
+          "title": "Builder",
+          "type": "string"
+        },
+        "source": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source",
+        "builder"
+      ],
+      "title": "PackageManifestProvenance",
+      "type": "object"
+    },
+    "PackageReceiptBlocker": {
+      "additionalProperties": false,
+      "description": "Stable typed blocker details for a package proof receipt.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageReceiptBlocker",
+      "type": "object"
+    },
+    "PackageReceiptV2": {
+      "additionalProperties": false,
+      "description": "Digest-bound package result that preserves the v1 receipt shape.",
+      "properties": {
+        "blocker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageReceiptBlocker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "excluded_files": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Excluded Files",
+          "type": "array"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "included_files": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Included Files",
+          "type": "array"
+        },
+        "lane": {
+          "const": "validation",
+          "title": "Lane",
+          "type": "string"
+        },
+        "manifest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageManifest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package Digest"
+        },
+        "receipt_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Receipt Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-receipt/v2",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "built",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "receipt_id",
+        "lane",
+        "status",
+        "started_at",
+        "finished_at",
+        "evidence"
+      ],
+      "title": "PackageReceiptV2",
+      "type": "object"
+    },
+    "PackageSafetyBlocker": {
+      "additionalProperties": false,
+      "description": "Typed reason that a safety-review state cannot establish no issue.",
+      "properties": {
+        "code": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+                }
+              },
+              {
+                "not": {
+                  "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+                }
+              }
+            ],
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            },
+            {
+              "pattern": "\\S"
+            }
+          ],
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageSafetyBlocker",
+      "type": "object"
+    },
+    "PackageSafetyEvidenceReceipt": {
+      "additionalProperties": false,
+      "description": "One adapter-supplied package safety evidence state, never a safe boolean.",
+      "properties": {
+        "admission_performed": {
+          "const": false,
+          "default": false,
+          "title": "Admission Performed",
+          "type": "boolean"
+        },
+        "blocker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageSafetyBlocker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "blockers": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageSafetyBlocker"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageSafetyEvidenceReference"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageSafetyFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "input_receipt_id": {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Input Receipt Id",
+          "type": "string"
+        },
+        "lane": {
+          "const": "safety_review",
+          "title": "Lane",
+          "type": "string"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "package_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Package Digest",
+          "type": "string"
+        },
+        "receipt_id": {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Receipt Id",
+          "type": "string"
+        },
+        "reviewer": {
+          "$ref": "#/$defs/PackageSafetyReviewer"
+        },
+        "rights_decision_performed": {
+          "const": false,
+          "default": false,
+          "title": "Rights Decision Performed",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "package-safety-evidence/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "not_reviewed",
+            "reviewed_no_issue",
+            "issue_found",
+            "metadata_insufficient"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "receipt_id",
+        "candidate",
+        "lane",
+        "input_receipt_id",
+        "package_digest",
+        "reviewer",
+        "status",
+        "observed_at"
+      ],
+      "title": "PackageSafetyEvidenceReceipt",
+      "type": "object"
+    },
+    "PackageSafetyEvidenceReference": {
+      "additionalProperties": false,
+      "description": "One digest-bound portable evidence artifact supplied by an adapter.",
+      "properties": {
+        "evidence_id": {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "metadata",
+            "static_analysis",
+            "manual_review",
+            "external_review",
+            "policy"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Ref",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "kind",
+        "ref",
+        "sha256"
+      ],
+      "title": "PackageSafetyEvidenceReference",
+      "type": "object"
+    },
+    "PackageSafetyFinding": {
+      "additionalProperties": false,
+      "description": "Redacted safety finding metadata linked to supplied evidence.",
+      "properties": {
+        "category": {
+          "enum": [
+            "secret",
+            "private_data",
+            "unsafe_operation",
+            "unsafe_path",
+            "dependency",
+            "license",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+                }
+              },
+              {
+                "not": {
+                  "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "message": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            },
+            {
+              "pattern": "\\S"
+            }
+          ],
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "blocker"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "severity",
+        "message",
+        "evidence_ids"
+      ],
+      "title": "PackageSafetyFinding",
+      "type": "object"
+    },
+    "PackageSafetyReviewer": {
+      "additionalProperties": false,
+      "description": "Secret-free identity for the caller-supplied review adapter.",
+      "properties": {
+        "adapter_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "adapter_version_or_digest": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$",
+          "title": "Adapter Version Or Digest",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "metadata",
+            "static_analysis",
+            "manual_review",
+            "external_review"
+          ],
+          "title": "Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter_id",
+        "adapter_version_or_digest",
+        "method"
+      ],
+      "title": "PackageSafetyReviewer",
+      "type": "object"
+    },
+    "SecurityFinding": {
+      "additionalProperties": false,
+      "description": "Redacted finding metadata; raw secret values never enter the contract.",
+      "properties": {
+        "category": {
+          "enum": [
+            "secret",
+            "unsafe_path",
+            "external_service",
+            "license",
+            "mcp_auth",
+            "dependency"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "blocker"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "severity",
+        "message",
+        "evidence_refs"
+      ],
+      "title": "SecurityFinding",
+      "type": "object"
+    },
+    "SecurityScreeningResult": {
+      "additionalProperties": false,
+      "description": "Candidate-bound secret and unsafe-package screening result.",
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SecurityFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "scanned_paths": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Scanned Paths",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "security-screening/v1",
+          "default": "security-screening/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sensor_ids": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sensor Ids",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "needs_review",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "sensor_ids",
+        "status",
+        "scanned_paths"
+      ],
+      "title": "SecurityScreeningResult",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/pre-execution-safety-evidence.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Actual upstream and review artifacts, never an ID-only admission flag.",
+  "properties": {
+    "checklist": {
+      "items": {
+        "$ref": "#/$defs/CapabilitySafetyReview"
+      },
+      "title": "Checklist",
+      "type": "array"
+    },
+    "checklist_version": {
+      "const": "sdk-capability-checklist/v1",
+      "default": "sdk-capability-checklist/v1",
+      "title": "Checklist Version",
+      "type": "string"
+    },
+    "package_receipt": {
+      "$ref": "#/$defs/PackageReceiptV2"
+    },
+    "safety_receipt": {
+      "$ref": "#/$defs/PackageSafetyEvidenceReceipt"
+    },
+    "schema_version": {
+      "const": "pre-execution-safety-evidence/v1",
+      "default": "pre-execution-safety-evidence/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "screening": {
+      "$ref": "#/$defs/SecurityScreeningResult"
+    }
+  },
+  "required": [
+    "package_receipt",
+    "safety_receipt",
+    "screening",
+    "checklist"
+  ],
+  "title": "PreExecutionSafetyEvidence",
+  "type": "object"
+}

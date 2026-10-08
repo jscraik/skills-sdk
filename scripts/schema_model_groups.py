@@ -30,6 +30,7 @@ from skills_sdk.models.packaging import (
     PackageReceipt,
     PackageReceiptV2,
 )
+from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
 from skills_sdk.models.provider_call import ProviderCallPublicResult, TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
 from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckResultV2
@@ -81,6 +82,7 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
     return (
         (ProviderExecutionRequest, "provider-execution-request.v1.schema.json"),
         (ProviderExecutionResult, "provider-execution-result.v1.schema.json"),
+        (PreExecutionSafetyEvidence, "pre-execution-safety-evidence.v1.schema.json"),
     )
 
 

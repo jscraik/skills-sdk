@@ -83,6 +83,7 @@ from skills_sdk.models.packaging import (
     PackageReceiptV2,
 )
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
+from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
 from skills_sdk.models.provider_call import (
     ProviderCallPublicResult,
@@ -149,6 +150,7 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 
 __all__ = [
     "ActivationObservation",
+    "CapabilitySafetyReview",
     "ClaimCoverage",
     "ContentReviewAssessment",
     "ContentReviewExecutionResult",
@@ -209,6 +211,7 @@ __all__ = [
     "PrSweepDirtyState",
     "PrSweepFinding",
     "PrSweepValidationResult",
+    "PreExecutionSafetyEvidence",
     "ProviderCallPublicResult",
     "ProviderCostObservation",
     "ProviderExecutionBlocker",

@@ -212,6 +212,33 @@ or completed reviewer execution.
   to require matching receipt ID, candidate, and canonical manifest digest.
   A raw upstream mapping is first validated through the `package-receipt/v2`
   JSON boundary before that binding is applied.
+- **Pre-execution safety:** `PreExecutionSafetyEvidence` and
+  `CapabilitySafetyReview` retain actual upstream, review, screening and checklist
+  artifacts. `skills_sdk.validation.screen_package_security` uses the existing
+  safe package capture to inspect manifested bytes without running the package,
+  scanner subprocesses, network requests or credentials. Indicators select
+  relevant reviews; they are not proof of exploitability. The canonical
+  `sdk-capability-checklist/v1` covers content/injection, secrets/privacy,
+  filesystem/subprocess, network/external writes, dependencies/binaries and
+  tools/privileges. Content and privacy always require review. Script presence
+  cannot downgrade filesystem and dependency review to non-applicable; other
+  observed capabilities select their corresponding checks. Every non-applicable
+  entry still needs a rationale and retained review evidence.
+  `skills_sdk.evaluation.assess_pre_execution_safety` assesses bindings and
+  freshness; supplying `package_root` also requires actual recapture agreement.
+  Its `None` result means that these checks passed, not general security
+  approval. Host clocks and freshness budgets are not supplied artifact fields.
+  The default maximum review age is one hour, and an explicit host budget must
+  be an integer between one second and one day. Reviews cannot predate their
+  upstream build or be in the future.
+  Both selected-case execution APIs require `SelectedCaseExecutionInput`, which
+  wraps the provider input payload and safety evidence without sending safety
+  metadata to the provider. Bare payloads block before adapter access. Both APIs
+  enforce recapture before provider/judge properties, calls or cleanup. Omitting
+  it returns a candidate-bound evaluation blocker. The low-level provider-call
+  primitive is transport orchestration, not skill-workflow admission. Supplied
+  reviewer claims, external scanner execution, general semantic accuracy and
+  complete plugin-bundle security remain separate evidence lanes.
 - **Provider execution envelopes:** `ProviderExecutionRequest` records a
   candidate-, scenario-, provider-, safety-receipt-, and input-digest-bound
   request prepared for an external adapter. `ProviderExecutionResult` records

@@ -16,6 +16,7 @@ from pydantic_core import PydanticSerializationError
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
+from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput, assess_pre_execution_safety
 from skills_sdk.evaluation.quality import _capture_evals, _ClosedLoader
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2, ScenarioObservationV2, ScenarioSetV2
@@ -652,16 +653,8 @@ def _missing_judge_ref_receipt(
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 
 
-async def execute_selected_case(
-    definition: SelectedCaseDefinition,
-    request: ProviderExecutionRequest,
-    input_payload: JsonValue,
-    adapter: TextProviderAdapter | None,
-    assertion_evidence: object,
-) -> EvaluationReceiptV2:
-    """Execute one injected provider call and evaluate bound assertion evidence."""
-
-    definition = _revalidate_definition(definition)
+def _validated_selected_request(request: ProviderExecutionRequest) -> ProviderExecutionRequest:
+    """Revalidate public request identity before observing execution adapters."""
     try:
         request = ProviderExecutionRequest.model_validate(request)
     except ValidationError:
@@ -677,6 +670,24 @@ async def execute_selected_case(
         )
     ):
         raise _contract_error("invalid_provider_request", "provider identity contains private values")
+    return request
+
+
+async def execute_selected_case(
+    definition: SelectedCaseDefinition,
+    request: ProviderExecutionRequest,
+    input_payload: JsonValue | SelectedCaseExecutionInput,
+    adapter: TextProviderAdapter | None,
+    assertion_evidence: object,
+) -> EvaluationReceiptV2:
+    """Execute one injected provider call and evaluate bound assertion evidence."""
+
+    safety_evidence = None
+    if isinstance(input_payload, SelectedCaseExecutionInput):
+        safety_evidence = input_payload.safety_evidence
+        input_payload = input_payload.payload
+    definition = _revalidate_definition(definition)
+    request = _validated_selected_request(request)
     normalized_payload = _canonical_input_payload(input_payload)
     if not _request_matches_definition(definition, request, normalized_payload):
         observation = _blocked_observation(
@@ -695,6 +706,12 @@ async def execute_selected_case(
             blocker.code if blocker is not None else "provider_request_blocked",
             "provider request was blocked before execution",
             blocker.evidence_refs if blocker is not None else request.evidence_refs,
+        )
+        return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
+    safety_blocker = assess_pre_execution_safety(request, safety_evidence, package_root=definition._package_root)
+    if safety_blocker is not None:
+        observation = _blocked_observation(
+            definition, request, safety_blocker.code, safety_blocker.message, safety_blocker.evidence_refs
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     if adapter is None or assertion_evidence is None:
