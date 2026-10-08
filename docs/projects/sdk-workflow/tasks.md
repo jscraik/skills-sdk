@@ -24,6 +24,16 @@ releases; root `plugin.json` is canonical. Keep standalone-skill intake and
 validation, preserve source during normalisation, and bind release evidence to
 the completed plugin rather than wrapping a cleared skill afterwards. Existing
 accepted services are not retroactively complete-plugin implementations.
+The same decision makes distribution registry-independent: Tessl is the initial
+backend to prove; a separately operated registry becomes primary only after
+the [transition gates](../../workflow.md#registry-transition). Do not start or
+create that registry, including a catalogue or prototype, until the Skills SDK
+workflow meets its agreed acceptance criteria and publication to Jamie's private
+Tessl workspace is verified by exact-version and private-visibility readback.
+Record that proof here before separately authorised registry work begins.
+A catalogue may then precede independent distribution; neither service building
+nor live publication is authorised by this record. Preserve one canonical content source and bind
+distinct portable/export artifact digests through an explicit adapter.
 
 Preserve unrelated source edits and generated run state. No provider spending,
 credential use, registry mutation, public publication, or home runtime mutation
@@ -39,7 +49,7 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 | S2 | Add applicable plugin/skill policy and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review and local stage composition exist. Plugin normalisation/composition, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
 | S3 | Bind applicable security evidence and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
 | S4 | Implement matched baseline/candidate plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; live runs separately authorised. | Locally validated candidate, unmerged. Reconcile plugin binding and integrate against the accepted calibration base before normal PR delivery. Local fixtures do not establish live local/cloud model lift. |
-| S5 | Compose archive preparation/verification and supported private registry/readback/install boundaries. | Complete resources/modes, exact candidate/version/digest, controlled adapter failures and recovery; real external state separately proved. | Local archive and complete-plugin prototypes, unmerged. Resolve the remaining transport input-boundary finding, then integrate and prove against accepted main. Publication/readback/install execution remains separate. |
+| S5 | Compose plugin archive verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, separate portable/export digests with verified relationship, exact checked version, adapter failures and recovery; real external state separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
 | S6 | Join feedback-to-regression and reconcile consumer cutover or retirement coverage. | Every scoped failure has an owner and retained regression; clean-room entrypoints run without sibling projects; all legacy rows have disposition. | Queued |
 
 ## Accepted delivery ledger
@@ -75,16 +85,11 @@ clearance. Required proof blocks completion of its dependent slice only.
   PRs above, the new plugin-first target and existing feature-closeout guidance.
   It changes no executable service, schema, active scenario set, or live-operation
   authority. Plugin-first support remains implementation work, not a doc-only pass.
-- Next action: finish documentation validation and normal signed delivery, then
-  reconcile queued plugin capture/normalisation against root `plugin.json`,
-  direct skill discovery and OpenAI extension precedence before advancing S4/S5.
-  Reuse existing models/services where valid; do not create a competing framework.
-  Prove source preservation, accepted single/multi-skill packages, malformed or
-  conflicting metadata, unsafe resources, post-wrap evidence rejection and
-  corrected-input recovery through installed entrypoints with sibling projects
-  unavailable. Preserve the accepted calibration implementation; integrate and
-  refresh affected proof only after the complete-plugin identity seam is ready.
-  Earlier branch-local validation does not prove this new product contract.
+- Next action: finish this documentation PR, then implement the bounded portable
+  plugin intake/binding slice below. Preserve the accepted calibration service
+  and queued local-winner handoff; integrate downstream work only after the
+  complete-plugin identity seam is ready. Earlier branch-local validation does
+  not prove the new product contract.
 - Unmerged S4 evidence: the repaired candidate passed its local repository
   wrapper (2552 passed, one skipped), plus installed rejection/recovery proof.
   This is not accepted SDK functionality, hosted clearance, or live model proof.
@@ -98,6 +103,52 @@ clearance. Required proof blocks completion of its dependent slice only.
 - S2/S3 and programme acceptance remain open. Keep supplied mapping, semantic
   review, scenario execution, calibration, promotion and external-state proof
   separate; use the map's remaining actions before selecting further work.
+
+### Queued-work assessment and next bounded slice
+
+Read-only assessment on 2026-10-08 found that queued capture, build, hardening
+and transport use `.tessl-plugin/plugin.json` as authoritative metadata. Root
+`plugin.json` and the Codex overlay are retained as ordinary files, not
+interpreted as a canonical portable contract. Immediate-child skill discovery,
+full-file recapture, per-skill findings and a separate mode ledger are reusable.
+Byte-content identity must not be described as including modes when the current
+contract binds modes separately. Current ZIP/TGZ verification proves supplied
+representations of that bundle, not a portable-to-Tessl export relationship.
+
+The queued matched handoff already requires the qualifying local candidate as
+the cloud baseline, preserves frozen controls, and compares both cloud variants
+within one cloud model lane. Preserve it. Callers still supply the refined
+candidate; neither candidate authoring nor live cloud quality is established.
+These are source-inspection results, not new test runs or accepted-main claims.
+
+Next slice: **canonical portable plugin intake and binding**, within the existing
+validation, intake, packaging, model/schema and CLI seams. No registry server,
+provider execution, publication or installation is part of this slice.
+
+- Accept root-only single- and multi-skill Agent Plugins candidates using the
+  selected specification and direct skill discovery, with Tessl unavailable.
+- Establish whole-plugin identity before downstream evidence; retain complete
+  resources, modes and per-skill findings. Prove changed shared bytes or modes
+  invalidate their affected evidence, and bare-skill receipts cannot clear a
+  newly assembled plugin.
+- Implement OpenAI extension precedence without merging an ignored overlay.
+  Separate standard conformance from stricter SDK policy, including unknown
+  fields and metadata conflicts; never label an SDK-only rejection a standard
+  requirement. Keep supported compatibility imports explicit, not competing
+  canonical metadata sources.
+- Preserve standalone-skill public contracts and original source. Keep wrapping
+  into a new candidate as an explicit later normalisation step, not a silent
+  change to existing skill identity.
+- Prove valid, malformed/type-invalid, unsafe-path/resource, stale-evidence and
+  corrected-input cases through public models, schemas, API and installed CLI
+  with Agent-Skills, Foundry and registry services unavailable. Run focused
+  proof and the required aggregate after relevant implementation changes.
+
+Then compose explicit standalone normalisation, plugin-bound evaluation and
+archive preparation. A separate bounded Tessl export adapter must retain
+unchanged skill contents, distinct artifact digests and a verified relationship,
+or block when required resources/modes cannot survive. Preserve the existing ten
+active scenarios. No current candidate authorises advancing to live operations.
 
 ## Lens application
 

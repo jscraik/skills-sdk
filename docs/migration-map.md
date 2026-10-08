@@ -25,6 +25,12 @@ skill-level proof must be composed under a whole-plugin candidate before it can
 support managed release. Reconcile queued S2/S4/S5 work with that identity and
 root `plugin.json` before delivery; do not credit legacy compatibility layouts
 or local prototypes as the canonical plugin path.
+The [registry transition](workflow.md#registry-transition) also replaces a
+permanent Tessl-only destination with registry-independent adapters, initially
+Tessl. A future catalogue/distribution service is separately owned and remains
+outside current SDK implementation authority. Do not start or create it until
+the SDK workflow is complete and correct publication to Jamie's private Tessl
+workspace is verified; the task record must retain this start-gate evidence.
 
 ## Status meanings
 
@@ -69,7 +75,7 @@ does not describe the implemented SDK SchemaRegistry.
 | `observability_feedback` | Partial | `check_local_quality` retains blocked stages and recovery; [stop-boundary proof](../tests/test_quality_workflow_stop_boundaries.py). No automatic feedback-to-regression loop. | S6: compose failure ownership, retained regression and observed rerun. |
 | `refs_ingestion` | Partial | `assess_content_review` inventories captured references; [review proof](../tests/test_content_review.py). No external reference retrieval or comprehensive accuracy review. | S2: decide external ingestion needs and retain explicit content-review gaps. |
 | `evals` | Partial | Deterministic/selected-case services plus `execute_scorer_calibration`; [installed calibration proof](../tests/installed_observed_calibration_smoke.py). CLI calibration uses supplied-offline fixtures, not fresh model results. | S3/S4: prove live adapter quality and matched experiments separately. |
-| `eval_profiles` | Partial | Injected provider descriptors; [provider proof](../tests/test_provider_call.py). No automatic host profile integration. | S4: bind supported local/cloud model profiles without core host dependencies. |
+| `eval_profiles` | Partial | Injected provider descriptors; [provider proof](../tests/test_provider_call.py). No automatic host profile integration. | S4: bind supported profiles; use the accepted local winner as cloud baseline and compare within each model lane. |
 | `ab_rubric` | Partial | Scorer/judge contracts and numeric calibration; [calibration proof](../tests/test_observed_calibration.py). No accepted matched scorecard. | S4: validate matched rubric, weights and same-model decision rules. |
 | `ab_preview` | Pending | No matched A/B route in accepted [CLI](cli.md). | S4: integrate and prove the queued pair-preview route against accepted main. |
 | `ab_plan` | Pending | No matched plan service in accepted [API](api.md). | S4: freeze both candidates, cases, models, settings and rubric. |
@@ -85,15 +91,15 @@ does not describe the implemented SDK SchemaRegistry.
 | `capability_evidence` | Partial | `SchemaRegistry` and bound results; [core tests](../tests/test_core_contracts.py). No complete legacy capability verifier. | S6: map consumer evidence requirements and explicitly replace remaining checks. |
 | `skill_explorer` | Pending | No explorer route in the [CLI](cli.md). | S6: make an explicit explorer product or retirement decision. |
 | `schema_registry` | Implemented | `SchemaRegistry`; [core proof](../tests/test_core_contracts.py). Semantic validation is not live execution. | Retain unknown-family rejection and registered semantic checks. |
-| `registry` | External service | Registry identity/preparation [contracts](../tests/test_registry_contracts.py); SDK does not operate the registry. | S5: implement supported private registry adapters and readback. |
+| `registry` | External service | Registry identity/preparation [contracts](../tests/test_registry_contracts.py); SDK does not operate a catalogue or registry. | S5: prove initial private Tessl adapter/readback, retain independent SDK artifacts, and gate any future backend-default change on dual-destination proof. |
 | `local_plugin_readiness` | Partial | Discovery/activation [evidence contracts](../tests/test_runtime_execution_evidence.py); no observing adapter. | S5: observe complete-plugin discovery, activation and behaviour on the selected host. |
 | `sdk_plugin_lifecycle` | Partial | Skill intake/build [proof](../tests/test_package_intake.py); complete native plugin processing is not accepted. | S2/S5: integrate root `plugin.json` capture, direct skill discovery, extension precedence, full-resource checks and delivery. |
-| `remote_marketplace` | External service | [Ownership boundary](workflow.md#delivery-and-proof), not an SDK-operated marketplace. | S6: select an integration consumer or explicitly retire marketplace operation from scope. |
-| `publish` | Pending | Registry preparation [API proof](../tests/test_registry_preparation.py); no publication adapter. | S5: implement authorised private publication and uncertain-outcome readback. |
+| `remote_marketplace` | External service | [Registry ownership boundary](workflow.md#registry-transition), not an SDK-operated marketplace or independent distribution proof. | S6: retire marketplace operation from SDK ownership; any separately authorised service consumes SDK contracts and proves its own distribution. |
+| `publish` | Pending | Registry preparation [API proof](../tests/test_registry_preparation.py); no publication adapter. | S5: prove authorised private publication/readback initially through Tessl without assuming arbitrary endpoint compatibility. |
 | `rollback` | Partial | Rollback [evidence contracts](../tests/test_runtime_execution_evidence.py); no executing adapter. | S5: implement restoration and verify previous lock/runtime after failed mutation. |
 | `uninstall` | Pending | No uninstall executor in the [API](api.md). | S5: select a bounded host removal contract or explicit retirement. |
-| `compiled_package_pipeline` | Partial | Build and ZIP verification [proof](../tests/test_package_archive_verification.py); no accepted archive emission. | S5: prove complete plugin resource/mode archive round-trip before registry transport; retain exact checked identity. |
-| `emitters` | Pending | No general emitter service in the [API](api.md). | S5: choose necessary target emitters or explicitly retire unused legacy outputs. |
+| `compiled_package_pipeline` | Partial | Build and ZIP verification [proof](../tests/test_package_archive_verification.py); no accepted archive emission. | S5: prove complete plugin archive round-trip and explicit portable/Tessl export relationship with separate digests; block unsupported resource/mode loss. |
+| `emitters` | Pending | No general emitter service in the [API](api.md). | S5: implement necessary adapter exports from one canonical content source; explicitly retire unused legacy outputs. |
 | `ci_adoption_gates` | Partial | Repository [validation wrapper](../scripts/validate-repository.sh); not a package adoption gate. | S6: compose package admission evidence for the actual CI consumer. |
 | `package_hardening` | Implemented | `harden_skill_package`; [hardening proof](../tests/test_package_hardening.py). No full-plugin or live security clearance. | S5: compose the CLI and archive handoff while retaining separate security evidence. |
 

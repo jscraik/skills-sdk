@@ -23,7 +23,7 @@ tracks bounded implementation and acceptance proof.
 Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
 and executable tooling to create, update, check, and admit external skills and
 plugins, then orchestrate installation of selected checked versions through
-supported Tessl and Codex adapters. This is target ownership, not a claim that
+supported registry and host adapters, initially Tessl and Codex. This is target ownership, not a claim that
 all routes currently execute. Skills Foundry holds candidates awaiting SDK
 processing, including blocked candidates; its custody does not grant approval,
 distribution, or installation and need not be permanent after processing.
@@ -38,9 +38,19 @@ evidence. Standalone skills remain intake and validation inputs, not a second
 managed release format. This target does not change the implemented skill-level
 services below or claim that the queued plugin implementation is accepted.
 
-The target managed path is candidate holding/intake, SDK checking, private
-Tessl `jscraik` registry version, and selected Codex runtime copy. Only Jamie
-decides public release. Verify origin before exempting OpenAI-provided plugins
+The target managed path is optional candidate holding/intake, whole-plugin
+SDK checking, a verified registry version and selected host installation.
+Tessl `jscraik` is the initial private distribution backend, not a permanent
+SDK dependency. Do not start or create the separate registry, even a catalogue
+or prototype, before completing the SDK workflow and verifying correct private
+Tessl publication. A separately operated registry becomes primary only after
+publication, readback, download and installation proof; see the
+[registry transition](docs/workflow.md#registry-transition). The SDK remains
+usable and testable while either registry service is unavailable. Registry
+services own storage, search, access control, presentation and distribution;
+they consume SDK validation/evaluation rather than duplicate it. Tessl-specific
+manifests are import/export adapter outputs over one canonical content source.
+Only Jamie decides public release. Verify origin before exempting OpenAI-provided plugins
 or OpenAI system skills; keep their provider-managed loading paths intact.
 None of these registry, installation, or exemption outcomes is proved by the
 current local SDK contracts.

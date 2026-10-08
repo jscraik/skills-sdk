@@ -24,6 +24,13 @@ data. SDK code must not import either project, invoke its commands, or discover
 its checkout. Foundry holds candidates and may consume SDK contracts; its
 holding or source-admission state does not grant SDK clearance.
 
+The SDK must also work with Tessl's service and any future registry unavailable.
+It owns portable preparation and integration orchestration, not a registry
+server. Registry services own storage, search, access control, release
+presentation and distribution; they consume SDK validation/evaluation rather
+than duplicate it. Foundry remains optional holding, and Agent-Skills remains
+migration input only.
+
 ## Managed release format
 
 Owner-approved direction, 2026-10-08: every SDK-managed skill release is an
@@ -70,6 +77,11 @@ evidence, release documentation and applicable evaluation evidence. Supporting
 skill folders and integration metadata remain conditional; do not invent base
 standard requirements from SDK policy.
 
+Keep Tessl-specific manifests and configuration in an explicit import/export
+adapter, using one canonical source of skill contents. Do not maintain divergent
+portable and Tessl copies. Preserve current standalone-skill APIs through an
+explicit, tested migration; selecting the target format does not remove them.
+
 New authoring starts with a minimal one-skill plugin candidate. Intake may accept
 a standalone skill or an existing plugin, but standalone source is preserved
 while a separate plugin candidate is prepared. Establish the whole-plugin
@@ -107,7 +119,8 @@ flowchart TD
   E --> S[Applicable security review]
   S --> H[Held-out scorer calibration]
   H --> L[Matched oss-local plugin comparison]
-  L --> C[Matched oss-cloud confirmation]
+  L --> LW[Select and freeze accepted local winner]
+  LW --> C[Cloud refinement against local-winner baseline]
   C --> D[Review and select candidate]
   D -->|Selected| A[Prepare and verify complete plugin archive]
   D -->|Correction required| X
@@ -122,6 +135,7 @@ flowchart TD
   S --> X
   H --> X
   L --> X
+  LW --> X
   C --> X
   A --> X
   G --> X
@@ -134,6 +148,7 @@ flowchart TD
   Y --> S
   Y --> H
   Y --> L
+  Y --> LW
   Y --> C
   Y --> D
   Y --> A
@@ -157,6 +172,9 @@ to complete a blocked envelope. A changed candidate invalidates downstream
 evidence for the earlier candidate. Stop
 dependent gates at a blocker; retain independently valid upstream evidence.
 Rerun the affected gate and its dependent gates after correction.
+Preserve explicit not-evaluated, blocked and stale states; do not fill missing
+evidence with an implied pass. SDK-generated and Tessl-generated evaluations
+retain separate provenance and score interpretation.
 
 | Gate | Required outcome | Current SDK boundary |
 | --- | --- | --- |
@@ -166,7 +184,7 @@ Rerun the affected gate and its dependent gates after correction.
 | Scenarios and scorer | Realistic cases linked to claims, hidden criteria, gap inventory, scorer quality, and held-out calibration. | Scenario quality, declared claim coverage, supplied scorer checks and observed calibration callbacks exist. The calibration CLI uses supplied-offline fixtures; fresh model quality and matched experiments are separate. |
 | Security | Capability-specific checks and reviewer evidence; unresolved risks block execution. | `screen_package_security` runs bounded static screening. Guarded selected-case execution requires fresh candidate-bound review/checklist evidence and recapture. External scanners, independent review and comprehensive security remain separate gaps. |
 | Local comparison | Baseline and candidate plugin versions run on the same oss-local model, frozen cases, settings, and rubric; include relevant cross-skill behaviour. | Selected-case and injected adapter services exist; matched A/B orchestration and whole-plugin composition remain unmerged. |
-| Cloud confirmation | Repeat both variants on the same oss-cloud model and same case ids; examine lift and regressions. | Supported cloud integration and matched confirmation are planned. |
+| Cloud refinement | Freeze the accepted local winner as baseline; compare it with a refined candidate on the same oss-cloud model and frozen cases/rubric/settings. | The unmerged handoff candidate enforces local-winner lineage; refinement authoring, plugin-bound integration and live cloud proof remain incomplete. |
 | Registry preparation | Complete plugin archive verified against candidate manifest and required resources; passing preparation evidence binds candidate, registry name, version, build and hardening before publication. | Skill build, hardening, archive verification and registry-preparation/v1 APIs exist; plugin-bound composition and archive emission are not accepted yet. |
 | Publication and installation | Authorised private publication, exact version readback, selected install, discovery, activation, and runtime behaviour. | Portable planning/evidence contracts exist; executing adapters are planned. |
 | Feedback | Failure owner, retained internal regression, correction, and rerun before another live evaluation. | Local quality stages return typed blockers and support corrected-input recovery. Automated regression capture, external feedback and consumer cutover remain incomplete. |
@@ -196,18 +214,76 @@ model lane. Cross-model scores do not establish skill lift. A changed comparison
 input starts a new experiment. Preserve held-out cases outside the tuning loop
 and require calibration before using judge verdicts as behavioural proof.
 
+Select and freeze the accepted local winner before cloud refinement. Within the
+cloud lane, run both that baseline and the refined candidate under the same
+cloud model and controls; never compare a local-model score directly with a
+cloud-model score as evidence of lift. Recheck quality and safety for changed
+candidate inputs before affected execution. Static scenario/scorer inspection
+may precede security review; untrusted component execution and dependent
+observed evaluation may not.
+
 Security review selects relevant threat categories from the package's file,
 network, secret, subprocess, tool, and installation capabilities. Bind the
 checklist version, applicability decisions, reviewer/scanner identity, findings,
 and evidence to the candidate. File safety checks alone do not establish a
 completed content or dependency security review.
 
+## Registry transition
+
+Distribution is registry-independent. Tessl is the first supported backend to
+prove, not the permanent mandatory registry. A separately operated registry
+becomes primary only after its publication, readback, download and installation
+routes pass their own acceptance gates. This direction does not authorise
+building or deploying that separate registry now.
+
+**Start gate:** do not start or create the future registry, including a catalogue
+or prototype, until the Skills SDK workflow is complete against its agreed
+acceptance criteria and correct publication to Jamie's private Tessl workspace
+has been verified. A local package, preparation receipt or one successful upload
+alone does not close the SDK workflow. Record completion and exact-version,
+private-visibility readback in the existing task record before starting any
+separately authorised registry work.
+
+1. **Complete the SDK and prove SDK to Tessl:** carry one small checked plugin through separately
+   authorised private publication, exact readback and verified installation.
+   Inspect complete archive contents and modes rather than infer compatibility
+   from folder names. Retain canonical source, artifacts and SDK evidence
+   independently of Tessl's dashboard.
+2. **Catalogue after the start gate:** only then may a separately authorised
+   project display approved plugins,
+   contained skills, versions and evidence while directing installation to the
+   supported Tessl route. Label this a catalogue, not independent distribution.
+3. **Add independent distribution:** prove immutable artifact storage, publisher
+   authentication, private access, verified downloads, audit records and unsafe
+   release withdrawal using SDK contracts. Any server-side evaluation uses
+   isolated workers, not the catalogue server or publishing credentials.
+4. **Change the default after proof:** run representative releases through both
+   destinations and verify publication, readback, download and installation.
+   Preserve existing Tessl releases during migration. Audit installed hooks and
+   other executable components for Tessl CLI dependencies; changing storage does
+   not remove such runtime dependencies. Tessl can remain optional afterwards.
+
+Portable archives and Tessl exports may be different artifacts. Retain separate
+digests and prove their relationship to the same checked source. Conversion
+must preserve required content, relative paths and executable modes, or return
+an explicit blocker; silently dropping unsupported components is not success.
+Package-format compatibility is not registry-protocol compatibility. Do not
+assume the Tessl CLI accepts an arbitrary replacement registry endpoint. Recheck
+the relevant [configuration](https://docs.tessl.io/reference/configuration),
+[CLI commands](https://docs.tessl.io/reference/cli-commands) and
+[registry distribution](https://docs.tessl.io/distribute/distributing-via-registry)
+documentation when implementing the adapter; no endpoint override is established
+by this documentation decision.
+
 ## Delivery and proof
 
 Preparation, publication, installation, and runtime verification have separate
 authority and results. Public release requires Jamie's decision. Default managed
-publication targets Jamie's private registry; origin-verified provider-managed
-packages retain their supported routes.
+publication initially targets Jamie's private Tessl registry through an explicit
+adapter, with the proof-gated transition above. Origin-verified provider-managed
+packages retain their supported routes. This policy grants no provider spend,
+credential change, private-source upload, publication, installation, runtime
+mutation, release deletion or registry deployment authority.
 
 If installation or update fails after mutation, require the candidate-bound
 rollback journal and outcome, including verification of the previous lock and

@@ -8,6 +8,14 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 `PackageHardeningReceipt` from
 `skills_sdk.models` (or their submodules), as shown below.
 
+The [plugin-first, registry-independent target](workflow.md#managed-release-format)
+does not change the implemented APIs below. Standalone-skill validation remains
+supported; its evidence is not automatically whole-plugin clearance. Registry
+preparation remains local contract composition, not a Tessl transport or a
+generic registry client. New plugin and import/export boundaries require the
+[explicit compatibility proof](compatibility.md#plugin-first-and-registry-independent-migration-target)
+before they are documented as available here.
+
 ## Contract families
 
 **Supplied content review:** `assess_content_review` from `skills_sdk.validation`
