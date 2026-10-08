@@ -20,6 +20,8 @@ from skills_sdk.models.safety import (
 )
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 
+CONTENT_REVIEW_ASSESSMENT_MAX_BYTES = 8_388_608
+
 
 class _ReviewModel(_ContractModel):
     model_config = ConfigDict(extra="forbid", frozen=True, revalidate_instances="always")
@@ -46,6 +48,17 @@ class _ReviewModel(_ContractModel):
             if isinstance(item, (BaseModel, Mapping, list, tuple)):
                 visited.add(id(item))
             if isinstance(item, BaseModel):
+                if type(item) not in (
+                    PackageCandidateIdentity,
+                    PackageSafetyReviewer,
+                    PackageSafetyEvidenceReference,
+                    SkillPackageFinding,
+                    ContentReviewItem,
+                    ContentReviewAssessment,
+                    ContentReviewResult,
+                    ContentReviewExecutionResult,
+                ):
+                    raise ValueError("review input requires canonical nested contract models")
                 pending.append(item.model_dump(mode="python", warnings="error"))
             elif isinstance(item, Mapping):
                 pending.extend(item.keys())
@@ -148,11 +161,19 @@ class ContentReviewItem(_ReviewModel):
 class ContentReviewAssessment(_ReviewModel):
     """Closed supplied assessment; its claims still belong to its reviewer."""
 
+    model_config = ConfigDict(json_schema_extra={"x-max-normalized-json-bytes": CONTENT_REVIEW_ASSESSMENT_MAX_BYTES})
+
     schema_version: Literal["content-review-assessment/v1"] = "content-review-assessment/v1"
     candidate: PackageCandidateIdentity
     reviewer: PackageSafetyReviewer
     evidence: tuple[PackageSafetyEvidenceReference, ...] = Field(min_length=1)
     items: tuple[ContentReviewItem, ...] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def normalized_assessment_is_bounded(self) -> ContentReviewAssessment:
+        if len(self.model_dump_json().encode("utf-8")) > CONTENT_REVIEW_ASSESSMENT_MAX_BYTES:
+            raise ValueError("normalized review assessment exceeds eight MiB")
+        return self
 
     @field_validator("evidence", mode="before")
     @classmethod
@@ -253,4 +274,10 @@ class ContentReviewExecutionResult(_ReviewModel):
         return self
 
 
-__all__ = ["ContentReviewAssessment", "ContentReviewExecutionResult", "ContentReviewItem", "ContentReviewResult"]
+__all__ = [
+    "CONTENT_REVIEW_ASSESSMENT_MAX_BYTES",
+    "ContentReviewAssessment",
+    "ContentReviewExecutionResult",
+    "ContentReviewItem",
+    "ContentReviewResult",
+]

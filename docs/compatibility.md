@@ -7,6 +7,15 @@ Typed assessment inputs and callback results use the canonical
 `invalid_content_review` blocker before their serializers run. Raw closed
 assessment data and canonical typed models remain supported.
 
+The same canonical-only rule applies to nested review contract models before
+their serializers run. Assessments have an eight-MiB normalized UTF-8 JSON
+budget, enforced by the direct model, services and `SchemaRegistry`.
+Packaged schemas annotate this semantic budget as
+`x-max-normalized-json-bytes`; generic JSON Schema validators do not enforce
+serialized byte length. The review CLI separately bounds the supplied JSON
+file at eight MiB, including whitespace, and reports `content_review_input_limit`
+for oversized files. Other intake-context readers keep their one-MiB budget.
+
 `content-review-assessment/v1`, `content-review/v1` and
 `content-review-execution/v1` are additive closed
 families. They do not reinterpret package validation or scenario-quality

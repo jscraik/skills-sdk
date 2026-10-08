@@ -21,11 +21,74 @@ from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
+from skills_sdk.models.safety import PackageSafetyReviewer
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation.content_review import assess_content_review
 from skills_sdk.validation.skill_package import validate_skill_package
 
 REVISION = "1" * 40
+
+
+class NestedSerializerFailure(PackageSafetyReviewer):
+    def model_dump(self, **kwargs: object) -> dict[str, object]:
+        raise OSError("private nested serializer diagnostic")
+
+
+@pytest.mark.parametrize("field", ["reviewer", "candidate", "evidence", "items"])
+def test_nested_serializer_is_rejected_before_execution_and_recovers(tmp_path: Path, field: str) -> None:
+    root, data = _fixture(tmp_path)
+    canonical = ContentReviewAssessment.model_validate(data)
+    typed = getattr(canonical, field)
+    if field in {"evidence", "items"}:
+        typed = typed[0]
+    subclass = type("CustomNestedSerializer", (type(typed),), {"model_dump": NestedSerializerFailure.model_dump})
+    forged = subclass.model_validate(typed.model_dump(mode="python"))
+    malformed = deepcopy(data)
+    if field in {"evidence", "items"}:
+        malformed[field][0] = forged
+    else:
+        malformed[field] = forged
+    with pytest.raises(ValidationError):
+        ContentReviewAssessment.model_validate(malformed)
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.findings[0].code == "invalid_content_review"
+    assert "private nested serializer" not in rejected.model_dump_json()
+    assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"
+
+
+def test_large_valid_assessment_cli_matches_public_api(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root, data = _fixture(tmp_path)
+    data["items"][0]["rationale"] = "Known review. " * 90_000
+    review = ContentReviewAssessment.model_validate(data)
+    SchemaRegistry().validate("content-review-assessment.v1", review.model_dump(mode="json"))
+    assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"
+    assessment = tmp_path / "large-assessment.json"
+    assessment.write_text(json.dumps(data))
+    assert (
+        main(["review-content", str(root), "--source-revision", REVISION, "--assessment", str(assessment), "--json"])
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["status"] == "pass"
+
+
+def test_assessment_size_budget_rejects_and_recovers(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root, data = _fixture(tmp_path)
+    malformed = deepcopy(data)
+    malformed["items"][0]["rationale"] = "Known review. " * 650_000
+    with pytest.raises(ValidationError, match="exceeds eight MiB"):
+        ContentReviewAssessment.model_validate(malformed)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("content-review-assessment.v1", malformed)
+    rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
+    assert rejected.findings[0].code == "invalid_content_review"
+    assessment = tmp_path / "oversized-assessment.json"
+    assessment.write_text(json.dumps(malformed))
+    command = ["review-content", str(root), "--source-revision", REVISION, "--assessment", str(assessment), "--json"]
+    assert main(command) == 2
+    assert json.loads(capsys.readouterr().out)["code"] == "content_review_input_limit"
+    assessment.write_text(json.dumps(data))
+    assert main(command) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "pass"
 
 
 @pytest.mark.parametrize("container", [UserDict, MappingProxyType])

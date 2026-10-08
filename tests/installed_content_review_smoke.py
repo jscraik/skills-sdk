@@ -202,6 +202,83 @@ class TypedReviewer(FixtureReviewer):
         return model.model_validate(await super().review(inputs))
 
 
+class NestedSerializerFailure(PackageSafetyReviewer):
+    def model_dump(self, **kwargs: object) -> dict[str, object]:
+        raise OSError("private nested serializer diagnostic")
+
+
+class OrdinaryTransferFailure(Exception):
+    """Caller-defined ordinary transfer failure."""
+
+
+class CustomTransferFailureReviewer:
+    def __reduce_ex__(self, protocol: int) -> object:
+        raise OrdinaryTransferFailure("private transfer diagnostic")
+
+
+class OversizedMetadataReviewer(FixtureReviewer):
+    def __init__(self, marker: Path) -> None:
+        self.marker = marker
+
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        review_module._REVIEW_OUTPUT_LIMIT = 256
+        return PackageSafetyReviewer(adapter_id="a" * 300, adapter_version_or_digest="1", method="static_analysis")
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        self.marker.write_text("invoked")
+        return await super().review(inputs)
+
+
+def _assert_host_boundary_recovery(root: Path, assessment: ContentReviewAssessment) -> None:
+    malformed = assessment.model_dump(mode="json")
+    malformed["reviewer"] = NestedSerializerFailure.model_validate(malformed["reviewer"])
+    rejected = assess_content_review(root, source_revision="1" * 40, assessment=malformed)
+    assert rejected.findings[0].code == "invalid_content_review"
+    assert "private nested serializer" not in rejected.model_dump_json()
+    marker = root.parent / "metadata-callback"
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
+    for adapter, code in (
+        (CustomTransferFailureReviewer(), "unsupported_content_review_isolation"),
+        (OversizedMetadataReviewer(marker), "content_review_output_limit"),
+    ):
+        result = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=adapter))
+        assert result.findings[0].code == code and result.adapter_invoked is False
+        assert "private transfer" not in result.model_dump_json() and not marker.exists()
+        assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
+def _assert_assessment_size_recovery(root: Path, assessment: ContentReviewAssessment) -> None:
+    path = root.parent / "large-review.json"
+    data = assessment.model_dump(mode="json")
+    command = [
+        sys.executable,
+        "-m",
+        "skills_sdk.cli.main",
+        "review-content",
+        str(root),
+        "--source-revision",
+        "1" * 40,
+        "--assessment",
+        str(path),
+        "--json",
+    ]
+    for repetitions, expected, code in ((90_000, 0, None), (650_000, 2, "content_review_input_limit"), (1, 0, None)):
+        data["items"][0]["rationale"] = "Known review. " * repetitions
+        path.write_text(json.dumps(data))
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        assert result.returncode == expected and "Traceback" not in result.stderr
+        payload = json.loads(result.stdout)
+        if code:
+            assert payload["code"] == code
+        else:
+            assert payload["status"] == "pass"
+    assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
+
+
 def _assert_contract_rejects(
     model: type[ContentReviewResult] | type[ContentReviewExecutionResult] | type[ContentReviewAssessment],
     schema: str,
@@ -425,6 +502,8 @@ def main() -> int:
                 _assert_delayed_observation(root)
                 _assert_unsupported_read_recovery(root, assessment)
                 _assert_contract_boundaries(root, result.review.assessment)
+                _assert_host_boundary_recovery(root, result.review.assessment)
+                _assert_assessment_size_recovery(root, result.review.assessment)
                 _assert_mapping_and_finding_recovery(root, result.review.assessment)
                 _assert_daemon_recovery(root)
             command = [

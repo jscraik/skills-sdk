@@ -254,5 +254,6 @@
     "items"
   ],
   "title": "ContentReviewAssessment",
-  "type": "object"
+  "type": "object",
+  "x-max-normalized-json-bytes": 8388608
 }

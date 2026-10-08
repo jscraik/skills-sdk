@@ -7,7 +7,6 @@ import inspect
 import json
 import math
 import multiprocessing
-import pickle
 import socket
 import time
 from collections.abc import Awaitable, Callable
@@ -29,6 +28,10 @@ from skills_sdk.validation.skill_package import SkillValidationPolicy, _scan_fil
 _REVIEW_TIMEOUT_SECONDS = 30.0
 _REVIEW_STARTUP_TIMEOUT_SECONDS = 30.0
 _REVIEW_OUTPUT_LIMIT = 8_388_608
+
+
+class _OversizedReviewerMetadata(ValueError):
+    """Invocation metadata cannot fit the bounded worker protocol."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,8 +66,11 @@ async def _invoke(
     reviewer: PackageSafetyReviewer,
 ) -> tuple[object, float]:
     invoked_at = time.monotonic()
+    packet = {"kind": "invoked", "reviewer": reviewer.model_dump(mode="json"), "invoked_at": invoked_at}
+    if len(json.dumps(packet, separators=(",", ":")).encode("utf-8")) + 1 > _REVIEW_OUTPUT_LIMIT:
+        raise _OversizedReviewerMetadata("reviewer metadata exceeds the worker output limit")
     invocation = callback(inputs)
-    _send_packet(channel, {"kind": "invoked", "reviewer": reviewer.model_dump(mode="json"), "invoked_at": invoked_at})
+    _send_packet(channel, packet)
     result = await invocation
     return result, time.monotonic()
 
@@ -99,6 +105,9 @@ async def _worker_review(
         return
     reviewer, callback = metadata
     observed = (await asyncio.gather(_invoke(callback, inputs, channel, reviewer), return_exceptions=True))[0]
+    if isinstance(observed, _OversizedReviewerMetadata):
+        _send_packet(channel, {"kind": "blocked", "code": "content_review_output_limit"})
+        return
     if isinstance(observed, BaseException):
         _send_packet(
             channel, {"kind": "blocked", "code": "content_review_adapter_failed", "completed_at": time.monotonic()}
@@ -215,9 +224,13 @@ async def _isolated_review(adapter: OfflineContentReviewAdapter, inputs: Content
     parent.setblocking(False)
     process = multiprocessing.get_context("spawn").Process(target=_review_worker, args=(child, adapter, inputs))
     try:
-        try:
+
+        async def start_worker() -> None:
+            """Capture caller-owned transfer failures through the existing task boundary."""
             process.start()
-        except (OSError, RuntimeError, TypeError, AttributeError, ValueError, LookupError, pickle.PicklingError):
+
+        transfer = (await asyncio.gather(start_worker(), return_exceptions=True))[0]
+        if isinstance(transfer, BaseException):
             return _WorkerObservation(code="unsupported_content_review_isolation")
         child.close()
         return await _read_worker(parent)

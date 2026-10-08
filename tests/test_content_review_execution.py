@@ -17,6 +17,59 @@ from skills_sdk.models.safety import PackageSafetyReviewer
 REVISION = "1" * 40
 
 
+class OrdinaryTransferFailure(Exception):
+    """An arbitrary caller-defined pickling failure."""
+
+
+class CustomTransferFailureReviewer:
+    def __reduce_ex__(self, protocol: int) -> object:
+        raise OrdinaryTransferFailure("private transfer diagnostic")
+
+
+def test_custom_transfer_failure_is_typed_and_recovers(tmp_path: Path) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
+    result = asyncio.run(
+        execute_content_review(root, source_revision=REVISION, adapter=CustomTransferFailureReviewer())
+    )
+    assert result.findings[0].code == "unsupported_content_review_isolation" and result.adapter_invoked is False
+    assert "private transfer" not in result.model_dump_json()
+    assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
+class OversizedMetadataReviewer:
+    def __init__(self, marker: Path) -> None:
+        self.marker = marker
+
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        review_module._REVIEW_OUTPUT_LIMIT = 256
+        return PackageSafetyReviewer(adapter_id="a" * 300, adapter_version_or_digest="1", method="static_analysis")
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        self.marker.write_text("invoked")
+        return await FixtureReviewer().review(inputs)
+
+
+def test_oversized_reviewer_metadata_never_invokes_callback(tmp_path: Path) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    marker = tmp_path / "callback-started"
+    adapter = OversizedMetadataReviewer(marker)
+    result = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=adapter))
+    assert result.findings[0].code == "content_review_output_limit" and result.adapter_invoked is False
+    assert not marker.exists()
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 def test_daemon_spawn_context_blocks_and_recovers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "review-example"
     root.mkdir()

@@ -29,6 +29,10 @@ class _UnsupportedContextRead(OSError):
     """Safe context traversal is unavailable on this host."""
 
 
+class _ContextReadLimitExceeded(ValueError):
+    """The supplied regular file exceeds this command's read budget."""
+
+
 def _reject_duplicate_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
     """Build a JSON object while rejecting duplicate member names."""
     result: dict[str, object] = {}
@@ -63,24 +67,28 @@ def _open_intake_context(path: Path) -> int:
         os.close(parent)
 
 
-def _read_intake_context(path: Path) -> bytes:
+def _read_intake_context(path: Path, *, max_bytes: int = _MAX_INTAKE_CONTEXT_BYTES) -> bytes:
     """Read one bounded, regular, no-follow intake context file."""
     descriptor = _open_intake_context(path)
     try:
         before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_INTAKE_CONTEXT_BYTES:
+        if not stat.S_ISREG(before.st_mode):
             raise ValueError("invalid intake context file")
+        if before.st_size > max_bytes:
+            raise _ContextReadLimitExceeded("context file exceeds the command read budget")
         chunks: list[bytes] = []
         captured = 0
-        while captured <= _MAX_INTAKE_CONTEXT_BYTES:
-            chunk = os.read(descriptor, min(65_536, _MAX_INTAKE_CONTEXT_BYTES + 1 - captured))
+        while captured <= max_bytes:
+            chunk = os.read(descriptor, min(65_536, max_bytes + 1 - captured))
             if not chunk:
                 break
             chunks.append(chunk)
             captured += len(chunk)
         payload = b"".join(chunks)
         after = os.fstat(descriptor)
-        if len(payload) > _MAX_INTAKE_CONTEXT_BYTES or (
+        if len(payload) > max_bytes:
+            raise _ContextReadLimitExceeded("context file exceeds the command read budget")
+        if (
             before.st_size,
             before.st_mtime_ns,
             before.st_ino,
@@ -318,19 +326,24 @@ def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int
 
 
 def _content_review(arguments: argparse.Namespace) -> int:
+    from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES
     from skills_sdk.validation import assess_content_review
 
     try:
         assessment = json.loads(
-            _read_intake_context(arguments.assessment).decode("utf-8"),
+            _read_intake_context(arguments.assessment, max_bytes=CONTENT_REVIEW_ASSESSMENT_MAX_BYTES).decode("utf-8"),
             object_pairs_hook=_reject_duplicate_members,
         )
-    except _UnsupportedContextRead:
+    except (_UnsupportedContextRead, _ContextReadLimitExceeded) as error:
         from skills_sdk.models.packaging import PackageReceiptBlocker
 
         blocker = PackageReceiptBlocker(
-            code="unsupported_context_read",
-            message="safe descriptor-relative assessment reads are unavailable",
+            code="unsupported_context_read"
+            if isinstance(error, _UnsupportedContextRead)
+            else "content_review_input_limit",
+            message="safe descriptor-relative assessment reads are unavailable"
+            if isinstance(error, _UnsupportedContextRead)
+            else "assessment JSON exceeds the eight MiB read budget",
             evidence_refs=("docs/compatibility.md",),
         )
         if arguments.json_output:
