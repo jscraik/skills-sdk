@@ -355,6 +355,54 @@ def test_quality_cli_rejects_duplicate_members_and_symlinks(tmp_path: Path, caps
     assert json.loads(capsys.readouterr().out)["request"] is None
 
 
+@pytest.mark.parametrize("stop", ["owner", "policy", "review"])
+def test_quality_cli_text_explains_stage_receipt(tmp_path: Path, capsys: pytest.CaptureFixture[str], stop: str) -> None:
+    payload = _request(tmp_path)
+    if stop == "owner":
+        payload["intake"]["checks"]["owner_unchanged"] = False
+        expected = ("decision: needs_owner_decision", "decision_blocker: owner_decision_required")
+    elif stop == "policy":
+        payload["policy"] = {"required_files": ["agents/openai.yaml"]}
+        expected = (
+            "decision_blocker: required_file_missing",
+            "required_file_missing: selected policy requires a readable regular file",
+        )
+    else:
+        expected = ("invalid_content_review: supplied review must match the closed assessment contract",)
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps(payload))
+    assert main(["check-quality", str(_package_path(tmp_path)), "--request", str(request)]) == 2
+    output = capsys.readouterr().out
+    assert "quality_stage_incomplete:" in output
+    for detail in expected:
+        assert f"  {detail}\n" in output
+    if stop == "policy":
+        assert output.count(f"  {expected[1]}\n") == 2  # Validation finding and receipt blocker.
+
+
+@pytest.mark.parametrize("stop", ["request", "baseline", "candidate_changed", "content-review"])
+def test_quality_cli_text_excludes_unrelated_receipts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], stop: str
+) -> None:
+    payload = _request(tmp_path)
+    if stop == "request":
+        payload = {}
+    elif stop == "baseline":
+        payload.update(intent="update", update_baseline=payload["candidate"])
+    elif stop == "candidate_changed":
+        candidate = {**payload["candidate"], "content_sha256": "0" * 64}
+        payload["candidate"] = payload["coverage_plan"]["candidate"] = candidate
+    else:
+        payload["content_review_mode"] = "observed"
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps(payload))
+    assert main(["check-quality", str(_package_path(tmp_path)), "--request", str(request)]) == 2
+    output = capsys.readouterr().out.splitlines()
+    assert output[0] == "check-quality: blocked"
+    assert output[1].startswith(f"  {stop}: ")
+    assert len(output) == 2
+
+
 def test_update_final_capture_detects_baseline_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import shutil
 
