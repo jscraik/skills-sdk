@@ -344,7 +344,9 @@ class LocalCheckResultV2(_ContractModel):
                 ):
                     _review_matches_capture(stage.receipt, receipts["validate"])
         if (self.final_capture is not None or self.baseline_final_capture is not None) and (
-            len(self.stages) != len(expected) or not all(stage.passed() for stage in self.stages)
+            self.blocked_stage == "candidate_changed"
+            or len(self.stages) != len(expected)
+            or not all(stage.passed() for stage in self.stages)
         ):
             raise ValueError("final captures require every quality stage to pass")
         if self.request.intent != "update" and self.baseline_final_capture is not None:
@@ -374,6 +376,8 @@ class LocalCheckResultV2(_ContractModel):
             if self.final_capture is None or self._captures_passed():
                 raise ValueError("final capture blocker requires failed or changed capture evidence")
         elif self.blocker.code == "quality_input_missing":
+            if self.blocked_stage not in {"baseline", "content-review"}:
+                raise ValueError("missing input requires an input-dependent stage")
             if len(self.stages) >= len(expected) or self.blocked_stage != expected[len(self.stages)]:
                 raise ValueError("missing stage input must stop before the next stage")
             if not all(stage.passed() for stage in self.stages):
