@@ -19,6 +19,7 @@ from skills_sdk.models.plugin import (
     PluginCapturedFile,
     PluginPackageValidation,
     PluginValidationPolicy,
+    PortablePluginManifest,
 )
 from skills_sdk.validation import plugin_capture
 from skills_sdk.validation import plugin_package as service
@@ -441,3 +442,72 @@ def test_authority_flags_cannot_coerce_zero(tmp_path: Path, flag: str) -> None:
     value[flag] = False
     value["skills"][0]["validation"]["mutation_performed"] = 0
     _reject(value)
+
+
+@pytest.mark.parametrize("source", ["inline", "compatibility"])
+def test_selected_settings_digest_binding(tmp_path: Path, source: str) -> None:
+    root, metadata = _fixture(tmp_path)
+    settings = {"nested": [None, 1.5, {"execution_authorized": True}], "empty": {}}
+    if source == "inline":
+        metadata["extensions"] = {"com.openai": settings}
+        _manifest(root, metadata)
+    else:
+        overlay = root / ".codex-plugin" / "plugin.json"
+        overlay.parent.mkdir()
+        overlay.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    good = _valid(root)
+    assert good.manifest is not None
+    assert good.manifest.openai_settings == settings
+    assert good.manifest.openai_settings_sha256 == canonical_json_sha256(settings)
+    SchemaRegistry().validate("plugin-package-validation.v1", good.model_dump(mode="json"))
+    assert PluginPackageValidation.model_validate(good) == good
+    manifest = good.manifest.model_dump(mode="json")
+    del manifest["openai_settings_sha256"]
+    assert PortablePluginManifest.model_validate(manifest) == good.manifest
+    for change in (
+        {"openai_settings_sha256": "0" * 64},
+        {"openai_settings": None},
+        {"openai_settings": {}},
+        {"openai_settings_source": "none"},
+    ):
+        raw = good.model_dump(mode="json")
+        raw["manifest"].update(change)
+        forged = good.manifest.model_copy(update=change)
+        with pytest.raises(ValueError):
+            PortablePluginManifest.model_validate(forged)
+        _reject(raw)
+        _reject(good.model_copy(update={"manifest": forged}))
+        _reject(PluginPackageValidation.model_construct(**raw))
+        with pytest.raises(ContractError):
+            SchemaRegistry().validate("plugin-package-validation.v1", raw)
+
+
+def test_no_selected_settings_rejects_orphan_digest(tmp_path: Path) -> None:
+    root, _ = _fixture(tmp_path)
+    good = _valid(root)
+    raw = good.model_dump(mode="json")
+    raw["manifest"]["openai_settings_sha256"] = "0" * 64
+    _reject(raw)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-package-validation.v1", raw)
+
+
+@pytest.mark.parametrize("kind", ["file", "directory"])
+def test_skill_discovery_requires_literal_dot(tmp_path: Path, kind: str) -> None:
+    root, _ = _fixture(tmp_path)
+    lookalike = root / "skills" / "lookalike" / "SKILLXmd"
+    lookalike.parent.mkdir()
+    if kind == "file":
+        lookalike.write_text("Not a skill entrypoint", encoding="utf-8")
+    else:
+        lookalike.mkdir()
+        (lookalike / "resource.txt").write_text("Captured resource", encoding="utf-8")
+    result = _valid(root)
+    assert tuple(item.path for item in result.skills) == ("skills/fixture-skill",)
+    assert any(item.path.startswith("skills/lookalike/") for item in result.files)
+    SchemaRegistry().validate("plugin-package-validation.v1", result.model_dump(mode="json"))
+    if kind == "directory":
+        lookalike.rename(lookalike.with_name("SKILL.md"))
+        blocked = validate_plugin_package(root, source_revision=REVISION)
+        assert blocked.status == "blocked"
+        assert "plugin_component_kind_invalid" in {item.code for item in blocked.findings}

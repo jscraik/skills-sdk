@@ -63,7 +63,7 @@ def _component_findings(payloads: dict[str, bytes], directories: tuple[str, ...]
     findings: list[SkillPackageFinding] = []
     if "skills" in payloads or "mcp.json" in directories:
         findings.append(_finding("plugin_component_kind_invalid", "portable component location has the wrong kind"))
-    if any(re.fullmatch(r"skills/[^/]+/SKILL.md", path) for path in directories):
+    if any(re.fullmatch(r"skills/[^/]+/SKILL\.md", path) for path in directories):
         findings.append(_finding("plugin_component_kind_invalid", "skill entrypoint must be a regular file"))
     if "mcp.json" in payloads:
         findings.append(
@@ -98,7 +98,7 @@ def validate_plugin_package(
         diagnostic = "root plugin.json and selected settings require bounded valid JSON and supported field types"
         manifest, warnings = parse_plugin_manifest(payloads)
         diagnostic = "plugin child discovery and captured skill metadata must satisfy their input bounds"
-        paths = sorted(path.rsplit("/", 1)[0] for path in payloads if re.fullmatch(r"skills/[^/]+/SKILL.md", path))
+        paths = sorted(path.rsplit("/", 1)[0] for path in payloads if re.fullmatch(r"skills/[^/]+/SKILL\.md", path))
         if len(paths) > 128:
             raise ValueError("plugin skill count exceeds bound")
         children = tuple(_child(path, files, payloads, source_revision) for path in paths)

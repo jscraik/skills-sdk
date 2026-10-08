@@ -467,6 +467,10 @@ stays optional; unknown root fields and malformed `extensions` warn and are
 ignored. Immediate child discovery replaces selectors. OpenAI inline objects
 replace, never merge, fallback settings. An ignored fallback is captured but
 not parsed. Selected malformed fallback JSON blocks with typed invalid input.
+The manifest retains the selected settings object and derives its canonical
+JSON digest. Direct model and `SchemaRegistry` validation reject a conflicting
+supplied digest or selected settings without an object. Standalone JSON Schema
+checks structure; the service establishes selection from captured source bytes.
 
 The SDK rejects all symlinks and imposes documented capture/parsing budgets,
 stricter than the portable standard's containment rules. Child assessment keeps

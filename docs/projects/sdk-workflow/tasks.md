@@ -115,7 +115,7 @@ proof for each applicable lane; these are not interchangeable completion labels.
   settings precedence. Focused and installed proof live in
   [plugin tests](../../../tests/test_plugin_package.py) and
   [installed smoke](../../../tests/installed_plugin_intake_smoke.py).
-  Full repository validation passed on 2026-10-08: 2,566 tests passed, one skipped,
+  `bash scripts/validate-repository.sh` passed on 2026-10-08: 2,566 tests passed, one skipped,
   with wheel build and all installed-entrypoint checks passing. This is unmerged
   work; local validation and hosted delivery are separate states.
 - Next action: normal signed PR delivery for portable inspection. Preserve the accepted calibration service

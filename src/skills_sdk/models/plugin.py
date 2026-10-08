@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.paths import require_portable_relative_path
@@ -23,13 +24,13 @@ def plugin_candidate_id(name: str) -> str:
     return "plugin-" + hashlib.sha256(name.encode("utf-8")).hexdigest()
 
 
-def _normalise(value: object, budget: list[int], depth: int = 0) -> object:
+def _normalise(value: object, budget: list[int], depth: int = 0, *, settings: bool = False) -> object:
     """Inspect copied model members before serializers can hide forged input."""
     budget[0] -= 1
     if budget[0] < 0 or depth > 40:
         raise ValueError("plugin evidence exceeds its input budget")
     if isinstance(value, BaseModel):
-        if type(value) not in _PLUGIN_MODELS or value.__pydantic_extra__:
+        if settings or type(value) not in _PLUGIN_MODELS or value.__pydantic_extra__:
             raise ValueError("plugin evidence requires canonical SDK model classes")
         if set(value.__dict__) - set(type(value).model_fields):
             raise ValueError("plugin evidence contains unknown copied members")
@@ -38,14 +39,19 @@ def _normalise(value: object, budget: list[int], depth: int = 0) -> object:
         if any(type(key) is not str for key in value):
             raise ValueError("plugin evidence requires string keys")
         for flag in ("mutation_performed", "execution_authorized", "release_ready"):
-            if flag in value and value[flag] is not False:
+            if not settings and flag in value and value[flag] is not False:
                 raise ValueError("plugin evidence cannot coerce authority flags")
-        return {key: _normalise(item, budget, depth + 1) for key, item in value.items()}
+        return {
+            key: _normalise(item, budget, depth + 1, settings=settings or key == "openai_settings")
+            for key, item in value.items()
+        }
     if type(value) in (list, tuple):
-        return [_normalise(item, budget, depth + 1) for item in value]
-    if type(value) in (PackageFileRole, ValidationSeverity):
+        return [_normalise(item, budget, depth + 1, settings=settings) for item in value]
+    if not settings and type(value) in (PackageFileRole, ValidationSeverity):
         return value.value
     if value is None or type(value) in (str, int, bool):
+        return value
+    if settings and type(value) is float and math.isfinite(value):
         return value
     raise ValueError("plugin evidence requires canonical JSON values")
 
@@ -61,6 +67,7 @@ class PortablePluginManifest(_ContractModel):
     source_sha256: Sha256
     openai_settings_source: Literal["inline", "compatibility", "none"] = "none"
     openai_settings_sha256: Sha256 | None = None
+    openai_settings: dict[str, JsonValue] | None = None
 
     @field_validator("name")
     @classmethod
@@ -69,10 +76,19 @@ class PortablePluginManifest(_ContractModel):
             raise ValueError("portable plugin name cannot contain repeated separators")
         return value
 
+    @model_validator(mode="before")
+    @classmethod
+    def canonical_input(cls, value: object) -> object:
+        return _normalise(value, [131072])
+
     @model_validator(mode="after")
     def selected_settings(self) -> Self:
-        if (self.openai_settings_source == "none") != (self.openai_settings_sha256 is None):
-            raise ValueError("selected settings require exactly one object digest")
+        if (self.openai_settings_source == "none") != (self.openai_settings is None):
+            raise ValueError("selected settings require exactly one object")
+        digest = canonical_json_sha256(self.openai_settings) if self.openai_settings is not None else None
+        if self.openai_settings_sha256 is not None and self.openai_settings_sha256 != digest:
+            raise ValueError("selected settings digest must bind the selected object")
+        object.__setattr__(self, "openai_settings_sha256", digest)
         return self
 
 
@@ -197,7 +213,7 @@ class PluginPackageValidation(_ContractModel):
         if self.manifest.openai_settings_source == "compatibility" and ".codex-plugin/plugin.json" not in paths:
             raise ValueError("compatibility settings require the captured overlay")
         expected = tuple(
-            sorted(path.rsplit("/", 1)[0] for path in paths if re.fullmatch(r"skills/[^/]+/SKILL.md", path))
+            sorted(path.rsplit("/", 1)[0] for path in paths if re.fullmatch(r"skills/[^/]+/SKILL\.md", path))
         )
         if tuple(item.path for item in self.skills) != expected:
             raise ValueError("retained children must equal all discovered immediate skills")
