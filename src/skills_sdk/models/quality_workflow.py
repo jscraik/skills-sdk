@@ -55,6 +55,12 @@ def _review_types_are_canonical(value: object) -> None:
 
 def _validation_manifest_matches(validation: SkillPackageValidation) -> None:
     """Check internal manifest consistency, without authenticating source execution."""
+    if (
+        validation.candidate is not None
+        and validation.identity is not None
+        and validation.identity.package_id != validation.candidate.package_id
+    ):
+        raise ValueError("quality capture identity must bind its candidate package")
     paths = tuple(item.path for item in validation.files)
     if paths != tuple(sorted(paths)):
         raise ValueError("quality capture file paths must be sorted")
@@ -376,6 +382,7 @@ class LocalCheckResultV2(_ContractModel):
                     raise ValueError(f"{label} must bind the selected source identity")
         if self.final_capture is not None and self.final_capture.candidate == self.request.candidate:
             _policy_matches_capture(self.request.policy, self.final_capture)
+        self._repeated_validations_agree(receipts)
         if self.status == "local_checks_passed":
             if self.blocker is not None or self.blocked_stage is not None or len(self.stages) != len(expected):
                 raise ValueError("passing quality workflow requires every stage")
@@ -407,6 +414,30 @@ class LocalCheckResultV2(_ContractModel):
         elif self.blocker.code != "quality_stage_incomplete":
             raise ValueError("incomplete stage blocker code must match its failure")
         return self
+
+    def _repeated_validations_agree(self, receipts: Mapping[str, QualityStageReceipt]) -> None:
+        """Compare retained metadata for observations of the same unchanged candidate."""
+        intake = receipts.get("intake")
+        current = intake.validation if isinstance(intake, SkillPackageIntakeReceipt) else None
+        for first, second in (
+            (current, receipts.get("validate")),
+            (receipts.get("validate"), self.final_capture),
+            (receipts.get("baseline"), self.baseline_final_capture),
+        ):
+            if (
+                isinstance(first, SkillPackageValidation)
+                and isinstance(second, SkillPackageValidation)
+                and first.candidate is not None
+                and first.candidate == second.candidate
+                and (
+                    first.files != second.files
+                    or (
+                        first.identity is not None and second.identity is not None and first.identity != second.identity
+                    )
+                    or (first.status == second.status == "pass" and first != second)
+                )
+            ):
+                raise ValueError("repeated validation captures must agree for an unchanged candidate")
 
     def _captures_passed(self) -> bool:
         """Check the observed final identities, including update baseline freshness."""
