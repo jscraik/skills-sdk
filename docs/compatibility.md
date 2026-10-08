@@ -12,6 +12,13 @@ This is deliberate execution hardening, not a claim of authenticated review or
 external scanner execution. Supplied manual-review fixtures prove guard behavior,
 not comprehensive security accuracy or completed plugin processing.
 
+Typed safety inputs use canonical SDK model classes, including nested models.
+Custom subclasses are rejected before their serializers run. Copied members
+are audited for unknown fields, byte strings, cycles and mutation constants,
+then revalidated; ordinary typed timestamps and closed raw JSON remain supported.
+Pipe-to-shell indicators require both filesystem/subprocess and network review,
+including commands written in non-script instructions or references.
+
 Content-review worker packets use a separate bounded wire budget: the public
 eight-MiB normalized assessment limit plus 64 KiB for the envelope. Compact
 UTF-8 serialization avoids ASCII escaping that expands Unicode assessments.
