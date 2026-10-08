@@ -626,6 +626,15 @@ def _quality_check(arguments: argparse.Namespace) -> int:
         print(f"check-quality: {result.status}")
         if result.blocker is not None:
             print(f"  {result.blocked_stage}: {result.blocker.code}: {result.blocker.message}")
+        if result.stages and result.blocked_stage not in {None, "candidate_changed", "final-capture"}:
+            receipt = result.stages[-1].receipt
+            decision = getattr(receipt, "decision", None)
+            if decision is not None:
+                print(f"  decision: {decision.decision.value}")
+            validation = getattr(receipt, "validation", None)
+            findings = getattr(receipt, "findings", None) or getattr(validation, "findings", ())
+            for finding in findings:
+                print(f"  {finding.code}: {finding.message}")
     return 0 if result.status == "local_checks_passed" else 2
 
 
