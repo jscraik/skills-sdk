@@ -45,6 +45,7 @@ def _request(root: Path, intent: str = "create") -> dict[str, object]:
 
 @pytest.mark.parametrize("intent", ["create", "external-check"])
 def test_request_preserves_explicit_intent_and_policy(tmp_path: Path, intent: str) -> None:
+    """Verify create and external-check requests retain their selected intent and policy."""
     request = LocalCheckRequestV2.model_validate(_request(tmp_path, intent))
     assert request.intent == intent
     assert request.policy.required_files == ("references/evals.yaml",)
@@ -53,6 +54,7 @@ def test_request_preserves_explicit_intent_and_policy(tmp_path: Path, intent: st
 
 
 def test_update_requires_same_package_baseline_and_accepts_noop(tmp_path: Path) -> None:
+    """Require a same-package baseline only for updates, allowing an unchanged candidate."""
     payload = _request(tmp_path, "update")
     with pytest.raises(ValidationError, match="update baseline"):
         LocalCheckRequestV2.model_validate(payload)
@@ -70,6 +72,7 @@ def test_update_requires_same_package_baseline_and_accepts_noop(tmp_path: Path) 
 
 @pytest.mark.parametrize("field", ["candidate", "coverage_plan", "intake"])
 def test_request_rejects_cross_candidate_context(tmp_path: Path, field: str) -> None:
+    """Reject candidate, intake, or coverage bindings with contradictory revisions."""
     payload = _request(tmp_path)
     changed = dict(payload[field])
     if field == "coverage_plan":
@@ -92,11 +95,13 @@ def test_request_rejects_cross_candidate_context(tmp_path: Path, field: str) -> 
     ],
 )
 def test_request_rejects_malformed_policy(tmp_path: Path, policy: dict[str, object]) -> None:
+    """Reject coercible flags, unsafe or duplicate paths, invalid limits, and unknown fields."""
     with pytest.raises(ValidationError):
         LocalCheckRequestV2.model_validate({**_request(tmp_path), "policy": policy})
 
 
 def test_forged_typed_request_is_revalidated(tmp_path: Path) -> None:
+    """Reject a copied update request whose required baseline bypassed initial validation."""
     request = LocalCheckRequestV2.model_validate(_request(tmp_path))
     forged = request.model_copy(update={"intent": "update"})
     with pytest.raises(ValidationError, match="update baseline"):
@@ -104,6 +109,7 @@ def test_forged_typed_request_is_revalidated(tmp_path: Path) -> None:
 
 
 def test_registry_and_schema_reject_missing_update_baseline(tmp_path: Path) -> None:
+    """Check model-backed registry and JSON Schema rejection, followed by valid recovery."""
     payload = _request(tmp_path)
     registry = SchemaRegistry()
     schema = Draft202012Validator(registry.load("local-check-request.v2"))
@@ -117,12 +123,14 @@ def test_registry_and_schema_reject_missing_update_baseline(tmp_path: Path) -> N
 
 
 def test_byte_text_and_streaming_policy_fail_before_consumption(tmp_path: Path) -> None:
+    """Reject byte text and streaming file selectors without advancing the caller's generator."""
     payload = _request(tmp_path)
     with pytest.raises(ValidationError, match="JSON text"):
         LocalCheckRequestV2.model_validate({**payload, "intent": b"create"})
     consumed: list[str] = []
 
     def paths() -> object:
+        """Record generator consumption before yielding a required-file selector."""
         consumed.append("called")
         yield "references/evals.yaml"
 
@@ -159,11 +167,13 @@ def _assessment(package: Path) -> dict[str, object]:
 
 
 def _package_path(tmp_path: Path) -> Path:
+    """Locate the synthetic package directory by its SKILL.md entrypoint."""
     return next(path.parent for path in tmp_path.glob("*/SKILL.md"))
 
 
 @pytest.mark.parametrize("intent", ["create", "external-check", "update"])
 def test_quality_workflow_runs_ordered_checks_and_final_captures(tmp_path: Path, intent: str) -> None:
+    """Verify stage order, final candidate capture, and evidence limits for every intent."""
     payload = _request(tmp_path, intent)
     package = _package_path(tmp_path)
     baseline = None
@@ -189,6 +199,7 @@ def test_quality_workflow_runs_ordered_checks_and_final_captures(tmp_path: Path,
 
 
 def test_quality_workflow_content_rejection_and_recovery(tmp_path: Path) -> None:
+    """Recover from invalid content evidence while preserving the passing upstream receipts."""
     payload = _request(tmp_path)
     package = _package_path(tmp_path)
     rejected = asyncio.run(check_local_quality(package, payload, assessment={}))
@@ -200,6 +211,7 @@ def test_quality_workflow_content_rejection_and_recovery(tmp_path: Path) -> None
 
 
 def test_quality_workflow_observes_required_baseline(tmp_path: Path) -> None:
+    """Block missing or stale update baselines and accept a matching observed baseline."""
     payload = _request(tmp_path, "update")
     package = _package_path(tmp_path)
     payload["update_baseline"] = payload["candidate"]
@@ -218,6 +230,7 @@ def test_quality_workflow_observes_required_baseline(tmp_path: Path) -> None:
 
 
 def test_quality_result_rejects_forged_stop_and_proof_flags(tmp_path: Path) -> None:
+    """Reject a fabricated stopping stage and a numeric substitute for a false proof flag."""
     payload = _request(tmp_path)
     package = _package_path(tmp_path)
     result = asyncio.run(check_local_quality(package, payload, assessment={}))
@@ -228,6 +241,7 @@ def test_quality_result_rejects_forged_stop_and_proof_flags(tmp_path: Path) -> N
 
 
 def test_quality_policy_and_owned_coverage_gaps_stop_before_content(tmp_path: Path) -> None:
+    """Stop on required-file or coverage gaps and recover with complete valid inputs."""
     payload = _request(tmp_path)
     package = _package_path(tmp_path)
     selected = {**payload, "policy": {"required_files": ["agents/openai.yaml"]}}
@@ -252,6 +266,7 @@ def test_quality_policy_and_owned_coverage_gaps_stop_before_content(tmp_path: Pa
 def test_quality_final_capture_detects_post_review_source_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Block source changes after content review and recover once the original bytes return."""
     from skills_sdk.evaluation import quality_workflow as workflow
 
     payload = _request(tmp_path)
@@ -262,6 +277,7 @@ def test_quality_final_capture_detects_post_review_source_drift(
     initial = entrypoint.read_bytes()
 
     def mutate_after_review(root: Path, *, source_revision: str, assessment: object) -> object:
+        """Change the entrypoint after obtaining a content receipt to simulate source drift."""
         receipt = original(root, source_revision=source_revision, assessment=assessment)
         entrypoint.write_bytes(initial + b"\nChanged after review.\n")
         return receipt
@@ -285,15 +301,17 @@ class QualityFixtureReviewer:
     reviewer = PackageSafetyReviewer(adapter_id="fixture-review", adapter_version_or_digest="1", method="manual_review")
 
     def __init__(self, assessment: dict[str, object]) -> None:
+        """Store the synthetic assessment returned by the review callback."""
         self.assessment = assessment
 
     async def review(self, inputs: ContentReviewInput) -> object:
+        """Return fixture evidence after checking that the callback received its candidate."""
         assert self.assessment["candidate"] == inputs.candidate.model_dump(mode="json")
         return self.assessment
 
 
 def test_quality_observed_lane_requires_and_records_callback(tmp_path: Path) -> None:
-
+    """Require a trusted callback for observed review and reject simultaneous supplied evidence."""
     payload = {**_request(tmp_path), "content_review_mode": "observed"}
     package = _package_path(tmp_path)
     missing = asyncio.run(check_local_quality(package, payload))
@@ -310,6 +328,7 @@ def test_quality_observed_lane_requires_and_records_callback(tmp_path: Path) -> 
 def test_quality_cli_accepts_rejects_recovers_and_emits_text(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """Check CLI exit codes, JSON recovery, registry acceptance, and successful text output."""
     payload = _request(tmp_path)
     package = _package_path(tmp_path)
     request = tmp_path / "request.json"
@@ -341,6 +360,7 @@ def test_quality_cli_accepts_rejects_recovers_and_emits_text(
 
 
 def test_quality_cli_rejects_duplicate_members_and_symlinks(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Reject request files with duplicate JSON members or a symbolic-link input path."""
     payload = _request(tmp_path)
     package = _package_path(tmp_path)
     request = tmp_path / "request.json"
@@ -357,6 +377,7 @@ def test_quality_cli_rejects_duplicate_members_and_symlinks(tmp_path: Path, caps
 
 @pytest.mark.parametrize("stop", ["owner", "policy", "review"])
 def test_quality_cli_text_explains_stage_receipt(tmp_path: Path, capsys: pytest.CaptureFixture[str], stop: str) -> None:
+    """Include the stopping receipt's owner decision, policy finding, or review blocker in text."""
     payload = _request(tmp_path)
     accepted_payload = json.loads(json.dumps(payload))
     if stop == "owner":
@@ -398,6 +419,7 @@ def test_quality_cli_text_explains_stage_receipt(tmp_path: Path, capsys: pytest.
 def test_quality_cli_text_excludes_unrelated_receipts(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], stop: str
 ) -> None:
+    """Keep text output limited to the workflow blocker when no matching receipt explains it."""
     payload = _request(tmp_path)
     if stop == "request":
         payload = {}
@@ -418,6 +440,7 @@ def test_quality_cli_text_excludes_unrelated_receipts(
 
 
 def test_update_final_capture_detects_baseline_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Detect baseline changes during review and recover after restoring the baseline bytes."""
     import shutil
 
     from skills_sdk.evaluation import quality_workflow as workflow
@@ -430,6 +453,7 @@ def test_update_final_capture_detects_baseline_drift(tmp_path: Path, monkeypatch
     original = workflow.assess_content_review
 
     def mutate_baseline(root: Path, *, source_revision: str, assessment: object) -> object:
+        """Change the baseline after content review to exercise the final baseline capture."""
         receipt = original(root, source_revision=source_revision, assessment=assessment)
         (baseline / "SKILL.md").write_text("---\nname: synthetic-skill\ndescription: Changed baseline.\n---\n")
         return receipt
@@ -452,6 +476,7 @@ def test_update_final_capture_detects_baseline_drift(tmp_path: Path, monkeypatch
 
 
 def test_standalone_stage_and_result_revalidate_forged_receipts(tmp_path: Path) -> None:
+    """Reject copied receipt contradictions and passing results without final capture evidence."""
     from skills_sdk.models.quality_workflow import LocalQualityStage
 
     payload = _request(tmp_path)
@@ -470,6 +495,7 @@ def test_standalone_stage_and_result_revalidate_forged_receipts(tmp_path: Path) 
 
 @pytest.mark.parametrize("target", ["final_capture", "baseline_final_capture", "baseline", "validate"])
 def test_quality_capture_rejects_manifest_digest_contradictions_and_recovers(tmp_path: Path, target: str) -> None:
+    """Reject inconsistent capture manifests through model and registry validation, then recover."""
     payload = _request(tmp_path, "update")
     package = _package_path(tmp_path)
     payload["update_baseline"] = payload["candidate"]
@@ -496,6 +522,7 @@ def test_quality_capture_rejects_manifest_digest_contradictions_and_recovers(tmp
 
 
 def test_quality_review_subclass_rejected_before_serializer_and_recovers(tmp_path: Path) -> None:
+    """Reject a review subclass before invoking its serializer and accept canonical evidence."""
     from collections import UserDict
 
     from skills_sdk.models.content_review import ContentReviewResult
@@ -504,6 +531,7 @@ def test_quality_review_subclass_rejected_before_serializer_and_recovers(tmp_pat
 
     class CustomReview(ContentReviewResult):
         def model_dump(self, **kwargs: object) -> dict[str, object]:
+            """Record and fail any attempt to serialize the noncanonical review fixture."""
             calls.append("called")
             raise RuntimeError("private diagnostic")
 
@@ -521,6 +549,7 @@ def test_quality_review_subclass_rejected_before_serializer_and_recovers(tmp_pat
 
 @pytest.mark.parametrize("field", ["scorer_id", "scorer_version_or_digest", "threshold", "parameters"])
 def test_quality_calibration_matches_declared_scorer_and_recovers(tmp_path: Path, field: str) -> None:
+    """Reject calibration that contradicts the declared scorer, then accept the original result."""
     payload = _request(tmp_path)
     package = _package_path(tmp_path)
     result = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))
@@ -545,6 +574,7 @@ def test_quality_calibration_matches_declared_scorer_and_recovers(tmp_path: Path
 @pytest.mark.parametrize("mode", ["supplied", "observed"])
 @pytest.mark.parametrize("defect", ["digest", "reference_coverage"])
 def test_quality_review_matches_captured_files_and_recovers(tmp_path: Path, mode: str, defect: str) -> None:
+    """Reject review digest or reference-coverage contradictions in both review modes, then recover."""
     from skills_sdk.core.digests import canonical_json_sha256
 
     payload = _request(tmp_path)
@@ -575,6 +605,7 @@ def test_quality_review_matches_captured_files_and_recovers(tmp_path: Path, mode
 
 @pytest.mark.parametrize("target", ["baseline", "validate", "final_capture", "baseline_final_capture"])
 def test_blocked_quality_capture_binds_manifest_and_recovers(tmp_path: Path, target: str) -> None:
+    """Require consistent manifest digests even for blocked captures and accept valid blocked evidence."""
     payload = _request(tmp_path, "update")
     package = _package_path(tmp_path)
     payload["update_baseline"] = payload["candidate"]
@@ -603,6 +634,7 @@ def test_blocked_quality_capture_binds_manifest_and_recovers(tmp_path: Path, tar
 
 @pytest.mark.parametrize("stage_name", ["scorer-calibration", "content-review"])
 def test_changed_candidate_does_not_join_evidence_from_old_candidate(tmp_path: Path, stage_name: str) -> None:
+    """Retain changed-candidate blockers without joining receipts to evidence from the old candidate."""
     payload = _request(tmp_path)
     package = _package_path(tmp_path)
     result = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))

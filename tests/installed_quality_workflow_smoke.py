@@ -20,9 +20,11 @@ class FixtureReviewer:
     reviewer = PackageSafetyReviewer(adapter_id="fixture-review", adapter_version_or_digest="1", method="manual_review")
 
     def __init__(self, assessment: dict[str, object]) -> None:
+        """Store the synthetic assessment returned by the review callback."""
         self.assessment = assessment
 
     async def review(self, inputs: ContentReviewInput) -> object:
+        """Return fixture evidence after checking that the callback received its candidate."""
         assert self.assessment["candidate"] == inputs.candidate.model_dump(mode="json")
         return self.assessment
 
@@ -39,6 +41,7 @@ def prepare(root: Path) -> None:
 
 
 def _cli(root: Path) -> tuple[int, dict[str, object]]:
+    """Run the installed quality CLI and return its exit code and parsed JSON result."""
     command = [
         str(Path(sys.executable).with_name("skills-sdk.exe" if sys.platform == "win32" else "skills-sdk")),
         "check-quality",
@@ -56,6 +59,7 @@ def _cli(root: Path) -> tuple[int, dict[str, object]]:
 
 
 def _api(root: Path, request: dict[str, object], assessment: dict[str, object]) -> None:
+    """Check installed API acceptance for each intent, content recovery, and observed review."""
     package = root / "synthetic-skill"
     for intent in ("create", "external-check", "update"):
         selected = {**request, "intent": intent}
@@ -103,6 +107,7 @@ def check(root: Path) -> None:
 
 
 def main() -> int:
+    """Dispatch fixture preparation or installed validation for the supplied directory."""
     mode, directory = sys.argv[1:]
     root = Path(directory).resolve()
     if mode == "--prepare":

@@ -223,6 +223,7 @@ class LocalQualityStage(_ContractModel):
 
     @model_validator(mode="after")
     def receipt_matches_name(self) -> LocalQualityStage:
+        """Require the stage's canonical receipt type and consistent validation manifests."""
         if type(self.receipt) not in _QUALITY_TYPES[self.name]:
             raise ValueError("quality stage must use its canonical receipt type")
         if isinstance(self.receipt, SkillPackageValidation):
@@ -262,6 +263,7 @@ class LocalCheckResultV2(_ContractModel):
     @model_validator(mode="before")
     @classmethod
     def evidence_is_revalidated(cls, value: object) -> object:
+        """Revalidate nested evidence and require literal false values for proof flags."""
         normalized = LocalCheckRequestV2.inputs_are_revalidated(value)
         if isinstance(normalized, dict):
             for name in ("promotion_authorized", "evaluation_executed"):
@@ -271,6 +273,7 @@ class LocalCheckResultV2(_ContractModel):
 
     @model_validator(mode="after")
     def result_matches_ordered_evidence(self) -> LocalCheckResultV2:
+        """Require ordered, candidate-bound receipts and captures that justify the result."""
         if self.request is None:
             if (
                 self.status != "blocked"

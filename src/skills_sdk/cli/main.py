@@ -119,6 +119,7 @@ def _add_content_review_parser(commands: argparse._SubParsersAction[argparse.Arg
 
 
 def _add_quality_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    """Register the v2 quality command and its request, baseline, and assessment inputs."""
     quality = commands.add_parser("check-quality", help="run explicit v2 intent, policy and content quality checks")
     quality.add_argument("package_root", type=Path)
     quality.add_argument("--request", type=Path, required=True)
