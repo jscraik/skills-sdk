@@ -6,6 +6,11 @@ workflow and its current implementation boundaries. Maintain it with each
 public route change; use [the migration map](migration-map.md) for legacy
 coverage and [the task record](projects/sdk-workflow/tasks.md) for execution state.
 
+Accepted implementation baseline: [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012),
+verified on 2026-10-08. The diagram is the intended process, not a claim that
+every gate is executable. The table describes that accepted baseline; branch
+prototypes and local test passes do not add capabilities to it.
+
 ## Entry routes and independence
 
 Select one intent before editing: create, update, or inspect an external
@@ -19,39 +24,115 @@ data. SDK code must not import either project, invoke its commands, or discover
 its checkout. Foundry holds candidates and may consume SDK contracts; its
 holding or source-admission state does not grant SDK clearance.
 
+## Managed release format
+
+Owner-approved direction, 2026-10-08: every SDK-managed skill release is an
+Agent Plugins package, including single-skill releases. A skill defines a
+workflow; a plugin packages, versions and distributes related skills. Keep
+skills individually understandable and testable. Group multiple skills by a
+coherent user outcome, not merely by repository location.
+
+Root `plugin.json` is the canonical portable manifest. Skills use immediate
+`skills/<skill-name>/SKILL.md` directories; arbitrary deeper nesting is not a
+discovery route. The portable manifest declares the Agent Plugins 1.0.0 schema.
+These are format rules, not proof of SDK support or host installation. See
+[Agent Plugins manifest](https://agent-plugins.org/plugin-authors/manifest) and
+[skill discovery](https://agent-plugins.org/plugin-authors/skills).
+
+```text
+my-plugin/
+├── plugin.json
+├── skills/
+│   └── my-skill/
+│       ├── SKILL.md
+│       ├── agents/openai.yaml   # Only when applicable to the integration
+│       ├── references/          # When supporting guidance is needed
+│       ├── scripts/             # When deterministic helpers are needed
+│       └── assets/              # When skill resources are needed
+├── mcp.json                     # Only for bundled MCP servers
+├── assets/                      # Optional plugin-level resources
+├── README.md                    # SDK release documentation policy
+└── LICENSE                      # SDK release rights/distribution policy
+```
+
+OpenAI-specific settings belong in `extensions.com.openai`. The older
+`.codex-plugin/plugin.json` is a compatibility input/fallback, not a second
+canonical output. OpenAI selects the inline extension when present rather than
+merging it with that fallback. A skill-only plugin needs no MCP server; a
+portable `mcp.json` requires its own schema and transport fields, so converting
+legacy `.mcp.json` is not a filename-only operation. See
+[OpenAI packaging guidance](https://developers.openai.com/plugins/build/plugins#plugin-structure).
+
+Distinguish standard conformance from SDK release policy. The base manifest
+requires `$schema` and `name`; version and description are optional there.
+SDK-managed releases additionally require a version, useful description, rights
+evidence, release documentation and applicable evaluation evidence. Supporting
+skill folders and integration metadata remain conditional; do not invent base
+standard requirements from SDK policy.
+
+New authoring starts with a minimal one-skill plugin candidate. Intake may accept
+a standalone skill or an existing plugin, but standalone source is preserved
+while a separate plugin candidate is prepared. Establish the whole-plugin
+identity before collecting release-bound evidence. Bind the manifest, each
+skill, shared resources and executable components to that identity, retaining
+per-skill findings. Earlier bare-skill evidence is diagnostic input, not release
+clearance for a subsequently wrapped plugin. Any content change needs fresh
+candidate binding and affected proof.
+
+Quality checks cover the plugin, its skills and their resource relationships.
+Security review includes any MCP configuration, hooks, scripts and permissions.
+A/B compares plugin versions, with per-skill behaviour and relevant cross-skill
+routing/shared dependencies represented in the existing scenario policy.
+Publication and installation must consume the exact checked plugin archive;
+portable format conformance does not prove registry preservation, installation
+or activation on any host. Those remain separately verified adapters.
+
+This is the target product contract, not a completed implementation at the
+accepted baseline above. Existing skill-level validators remain useful internal
+components and supported inspection routes. Reconcile queued plugin work before
+advancing packaging or registry integration; do not reinterpret existing skill
+receipts as whole-plugin proof. Preserve origin-verified provider-managed system
+skills and plugins on their supported routes, without automatic conversion.
+
 ## Ordered gates and correction loops
 
 ```mermaid
 flowchart TD
   R[Create / update / inspect external candidate] --> O{Origin-verified provider-managed exemption?}
   O -->|Yes| EX[Record exemption and preserve provider-managed route]
-  O -->|No| P[Package and description]
+  O -->|No| PC[Create or normalise whole-plugin candidate]
+  PC --> P[Plugin and contained-skill quality]
   P --> F[References and coverage gaps]
-  F --> E[Scenarios and calibrated scorer]
+  F --> E[Scenario definitions and scorer quality]
   E --> S[Applicable security review]
-  S --> L[Matched oss-local comparison]
+  S --> H[Held-out scorer calibration]
+  H --> L[Matched oss-local plugin comparison]
   L --> C[Matched oss-cloud confirmation]
   C --> D[Review and select candidate]
-  D -->|Selected| A[Prepare and verify archive]
+  D -->|Selected| A[Prepare and verify complete plugin archive]
   D -->|Correction required| X
   D -->|Not selected| N[Stop and record rejection or decision]
   A --> G[Candidate-bound registry preparation]
   G --> T[Private registry publication and readback]
   T --> I[Selected install and runtime verification]
-  P --> X[Classify blocker and correct responsible input]
+  PC --> X[Classify blocker and correct responsible input]
+  P --> X
   F --> X
   E --> X
   S --> X
+  H --> X
   L --> X
   C --> X
   A --> X
   G --> X
   T --> X
   X --> Y{Responsible correction gate}
+  Y --> PC
   Y --> P
   Y --> F
   Y --> E
   Y --> S
+  Y --> H
   Y --> L
   Y --> C
   Y --> D
@@ -79,16 +160,16 @@ Rerun the affected gate and its dependent gates after correction.
 
 | Gate | Required outcome | Current SDK boundary |
 | --- | --- | --- |
-| Intent and intake | Explicit create, update, or external-check intent; source and owner evidence; baseline for updates. | Directory intake exists; complete authoring and adoption routes are planned. |
-| Package and description | Safe structure, truthful trigger description, applicable metadata, and useful progressive disclosure. | Structural validation and build exist; semantic description review is planned. |
-| References | Relevant, accurate, discoverable guidance with identified omissions and duplicate or stale content. | Captured package files exist; reference-quality review is planned. |
-| Scenarios and scorer | Realistic cases linked to claims, hidden criteria, gap inventory, scorer quality, and held-out calibration. | Definition and supplied-artifact checks exist; executed evidence has separate services. |
-| Security | Capability-specific checks and reviewer evidence; unresolved risks block execution. | Risk and safety contracts exist; supported security execution adapters are planned. |
-| Local comparison | Base and candidate run on the same oss-local model, frozen cases, settings, and rubric. | Selected-case and injected adapter services exist; matched A/B orchestration is planned. |
+| Intent and intake | Explicit create, update, or external-check intent; source and owner evidence; baseline for updates; whole-plugin candidate before release-bound evidence. | Directory skill intake and `check-quality` implement intent-aware checking and baseline capture, not plugin normalisation, source authoring or installation. Complete authoring/adoption composition remains. |
+| Package and description | Safe structure, truthful trigger description, applicable metadata, and useful progressive disclosure. | Structural policy, build, candidate-bound content-review assessment and bounded offline reviewer execution exist. General semantic accuracy and live reviewer quality remain unproved. |
+| References | Relevant, accurate, discoverable guidance with identified omissions and duplicate or stale content. | Applicable syntax checks and content-review coverage bind captured references, dispositions and source evidence. Independent accuracy, freshness and exhaustive gap discovery remain review obligations. |
+| Scenarios and scorer | Realistic cases linked to claims, hidden criteria, gap inventory, scorer quality, and held-out calibration. | Scenario quality, declared claim coverage, supplied scorer checks and observed calibration callbacks exist. The calibration CLI uses supplied-offline fixtures; fresh model quality and matched experiments are separate. |
+| Security | Capability-specific checks and reviewer evidence; unresolved risks block execution. | `screen_package_security` runs bounded static screening. Guarded selected-case execution requires fresh candidate-bound review/checklist evidence and recapture. External scanners, independent review and comprehensive security remain separate gaps. |
+| Local comparison | Baseline and candidate plugin versions run on the same oss-local model, frozen cases, settings, and rubric; include relevant cross-skill behaviour. | Selected-case and injected adapter services exist; matched A/B orchestration and whole-plugin composition remain unmerged. |
 | Cloud confirmation | Repeat both variants on the same oss-cloud model and same case ids; examine lift and regressions. | Supported cloud integration and matched confirmation are planned. |
-| Registry preparation | Exact archive verified against candidate manifest and required resources; passing registry-preparation/v1 binds candidate, registry name, version, built receipt and hardening evidence before publication. | Build, hardening, archive verification, and preparation APIs exist; archive emission and CLI composition are planned. |
+| Registry preparation | Complete plugin archive verified against candidate manifest and required resources; passing preparation evidence binds candidate, registry name, version, build and hardening before publication. | Skill build, hardening, archive verification and registry-preparation/v1 APIs exist; plugin-bound composition and archive emission are not accepted yet. |
 | Publication and installation | Authorised private publication, exact version readback, selected install, discovery, activation, and runtime behaviour. | Portable planning/evidence contracts exist; executing adapters are planned. |
-| Feedback | Failure owner, retained internal regression, correction, and rerun before another live evaluation. | Local correction is supported; the external feedback loop is planned. |
+| Feedback | Failure owner, retained internal regression, correction, and rerun before another live evaluation. | Local quality stages return typed blockers and support corrected-input recovery. Automated regression capture, external feedback and consumer cutover remain incomplete. |
 
 ## Quality and evaluation policy
 
@@ -142,6 +223,15 @@ candidate drift, malformed evidence, interrupted or unavailable adapters, and
 source preservation when those behaviours are supported. Run focused proof before
 `bash scripts/validate-repository.sh`. Local checks do not prove hosted review,
 provider execution, registry state, or installed runtime behaviour.
+
+Keep the three existing documents aligned during feature closeout:
+[this workflow](workflow.md) owns the accepted capability boundaries,
+[the migration map](migration-map.md) owns legacy disposition and proof links,
+and [the task record](projects/sdk-workflow/tasks.md) owns delivery state and
+accepted revisions. A capability-changing PR updates affected descriptions or
+explains why none change. Review code and documentation together; after merge,
+record the accepted revision before selecting the next slice. Link and entrypoint
+checks do not infer semantic completeness, live execution or migration parity.
 
 Source transcripts, review text, and generated suggestions remain
 non-authoritative, untrusted content. The owner-approved direction in this

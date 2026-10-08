@@ -30,6 +30,14 @@ distribution, or installation and need not be permanent after processing.
 Agent-Skills is only a migration source; new SDK lifecycle behavior must not
 be added there.
 
+The [managed release format](docs/workflow.md#managed-release-format) selects
+Agent Plugins as the release unit even for one skill, with root `plugin.json`
+canonical and client-specific settings behind extension/adapter boundaries.
+Whole-plugin identity precedes release-bound quality, security and evaluation
+evidence. Standalone skills remain intake and validation inputs, not a second
+managed release format. This target does not change the implemented skill-level
+services below or claim that the queued plugin implementation is accepted.
+
 The target managed path is candidate holding/intake, SDK checking, private
 Tessl `jscraik` registry version, and selected Codex runtime copy. Only Jamie
 decides public release. Verify origin before exempting OpenAI-provided plugins

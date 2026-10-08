@@ -18,6 +18,14 @@ files are validated as portable package content. It is source input, not proof
 that a skill is installed or active.
 _Avoid_: runtime installation, plugin cache, published package
 
+**SDK-managed release**:
+A checked, versioned Agent Plugins package, including when it contains only one
+skill. Root `plugin.json` is canonical; skills remain independently testable
+workflow components under `skills/`. This is the
+[target release policy](docs/workflow.md#managed-release-format), not a claim
+that existing standalone-skill services already produce complete plugins.
+_Avoid_: bare-skill receipt, source custody, installed runtime
+
 **Candidate identity**:
 The exact tuple of `package_id`, `source_revision`, and `content_sha256` that
 identifies the source state carried into downstream manifests and receipts.
@@ -152,7 +160,9 @@ _Avoid_: skill instance, runtime handle
 **Plugin identity**:
 The package identity for a plugin, with its own package ID, name, version, and
 `package_type: "plugin"`. It is distinct from a standalone skill and from any
-client adapter that may consume it.
+client adapter that may consume it. Under the managed release policy it binds
+the complete plugin before release evidence is collected; wrapping a skill does
+not transfer that skill's existing clearance to the new plugin.
 _Avoid_: skill identity, installed plugin
 
 **Provider lane**:

@@ -20,6 +20,10 @@ operate the Tessl registry, or claim an installed runtime from local receipts.
 - Keep the reusable core independent of Agent-Skills, Tessl, Codex, and local
   runtime filesystem layouts. SDK-owned integration layers orchestrate supported
   provider, Tessl, and Codex adapters without importing them into the core.
+- Follow the [managed release format](docs/workflow.md#managed-release-format):
+  plugin-first processing and plugin-only managed releases, including one-skill
+  releases, with root `plugin.json` canonical. This is target policy; current
+  skill-level services and receipts do not establish whole-plugin clearance.
 - Foundry holds candidates awaiting SDK processing; holding is not approval or
   distribution and need not be permanent custody after processing. Managed,
   non-exempt runtime copies come from SDK-checked private Tessl versions, not
