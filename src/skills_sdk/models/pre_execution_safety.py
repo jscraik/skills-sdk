@@ -62,6 +62,8 @@ class CapabilitySafetyReview(_ContractModel):
     @field_validator("rationale")
     @classmethod
     def rationale_must_be_public(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("checklist rationale must not be blank")
         if not _public_text_is_redaction_safe(value):
             raise ValueError("checklist rationale must not contain private values")
         return value

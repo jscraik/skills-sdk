@@ -19,6 +19,13 @@ then revalidated; ordinary typed timestamps and closed raw JSON remain supported
 Pipe-to-shell indicators require both filesystem/subprocess and network review,
 including commands written in non-script instructions or references.
 
+The packaged Draft 2020-12 schema enforces exactly six ordered checklist IDs,
+unique checklist evidence IDs and nonblank, public-safe rationale text. The
+model and `SchemaRegistry` additionally enforce digest and cross-object joins,
+supported screening, evidence references and applicable capability outcomes.
+The resource labels these remaining semantic checks; standalone structural
+acceptance does not establish safety admission or source freshness.
+
 Content-review worker packets use a separate bounded wire budget: the public
 eight-MiB normalized assessment limit plus 64 KiB for the envelope. Compact
 UTF-8 serialization avoids ASCII escaping that expands Unicode assessments.

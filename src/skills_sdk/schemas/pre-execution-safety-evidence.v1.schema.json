@@ -1,4 +1,5 @@
 {
+  "$comment": "Validate digest and cross-object bindings, applicable capability outcomes, and supported completed screening with skills_sdk.core.schema_registry.SchemaRegistry.validate.",
   "$defs": {
     "CapabilitySafetyReview": {
       "additionalProperties": false,
@@ -23,9 +24,25 @@
           },
           "minItems": 1,
           "title": "Evidence Ids",
-          "type": "array"
+          "type": "array",
+          "uniqueItems": true
         },
         "rationale": {
+          "allOf": [
+            {
+              "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+            },
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\u0009-\\u000d \\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
           "minLength": 1,
           "title": "Rationale",
           "type": "string"
@@ -889,9 +906,59 @@
   "description": "Actual upstream and review artifacts, never an ID-only admission flag.",
   "properties": {
     "checklist": {
-      "items": {
-        "$ref": "#/$defs/CapabilitySafetyReview"
-      },
+      "items": false,
+      "maxItems": 6,
+      "minItems": 6,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/CapabilitySafetyReview",
+          "properties": {
+            "check_id": {
+              "const": "content_and_injection"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/CapabilitySafetyReview",
+          "properties": {
+            "check_id": {
+              "const": "secrets_and_privacy"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/CapabilitySafetyReview",
+          "properties": {
+            "check_id": {
+              "const": "filesystem_and_subprocess"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/CapabilitySafetyReview",
+          "properties": {
+            "check_id": {
+              "const": "network_and_external_writes"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/CapabilitySafetyReview",
+          "properties": {
+            "check_id": {
+              "const": "dependencies_and_binaries"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/CapabilitySafetyReview",
+          "properties": {
+            "check_id": {
+              "const": "tools_and_privileges"
+            }
+          }
+        }
+      ],
       "title": "Checklist",
       "type": "array"
     },
@@ -924,5 +991,14 @@
     "checklist"
   ],
   "title": "PreExecutionSafetyEvidence",
-  "type": "object"
+  "type": "object",
+  "x-skills-sdk-semantic-validator": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "package, review and screening must bind the same candidate and captured manifest",
+      "screening and checklist digests must match retained review evidence",
+      "checklist evidence ids must resolve to supplied review evidence",
+      "screening must be completed by the supported sensor and applicable checks reviewed"
+    ]
+  }
 }
