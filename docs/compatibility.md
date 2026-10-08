@@ -447,6 +447,46 @@ rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
 
+### Portable plugin capture increment
+
+The additive `plugin-package-validation/v1` family does not reinterpret
+`PluginIdentity`, `SkillIdentity`, standalone validation, intake, build or their
+existing schemas. Only `validate-plugin` selects this new route. The canonical
+source is root `plugin.json` under Agent Plugins 1.0.0, assessed against the
+[normative specification](https://agent-plugins.org/specification) and
+[OpenAI packaging semantics](https://developers.openai.com/plugins/build/plugins)
+on 2026-10-08. This is a new portable contract, not executed Agent-Skills parity.
+
+Source inspection of the queued Tessl-format implementation at revision
+`02a43847f926a0ba7f9b4c29d763237d2805c939` supplied the bounded no-follow capture,
+child/subtree binding and second-capture mechanisms. The consumer is subsequent
+SDK whole-plugin preparation and evaluation, not the future registry service.
+Deliberate differences: root manifest replaces Tessl metadata authority; no
+required workspace/private field or directory-name match; base optional metadata
+stays optional; unknown root fields and malformed `extensions` warn and are
+ignored. Immediate child discovery replaces selectors. OpenAI inline objects
+replace, never merge, fallback settings. An ignored fallback is captured but
+not parsed. Selected malformed fallback JSON blocks with typed invalid input.
+
+The SDK rejects all symlinks and imposes documented capture/parsing budgets,
+stricter than the portable standard's containment rules. Child assessment keeps
+the existing SDK standalone semantics; an invalid child blocks this SDK result
+while retaining sibling findings. No skills is structurally valid, not proof
+of a useful managed release. MCP bytes and selected settings are bound without
+claiming transport, destination, permissions or artwork validation. Ordinary
+file modes have their own digest; the frozen candidate content formula is
+unchanged. Empty directories are observed for capture stability but are not
+part of candidate file identity.
+
+Synthetic accepted/rejected/recovery cases are in
+[`test_plugin_package.py`](../tests/test_plugin_package.py) and
+[`installed_plugin_intake_smoke.py`](../tests/installed_plugin_intake_smoke.py).
+The latter uses the installed wheel's public API, packaged schema and CLI with
+no sibling project, provider, registry or editable SDK import. See the task
+record for validation/delivery state; test presence alone is not passing proof.
+
+### Existing migration increments
+
 The additive `scenario-coverage-plan/v1` and `scenario-coverage/v1` families
 audit caller-declared claim-to-case-or-gap mappings against the package's
 ten active scenarios. Existing scenario-quality v1/v2 receipts, local-check v1,

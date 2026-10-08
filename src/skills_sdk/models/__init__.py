@@ -89,6 +89,13 @@ from skills_sdk.models.packaging import (
     PackageReceiptBlocker,
     PackageReceiptV2,
 )
+from skills_sdk.models.plugin import (
+    PluginCapturedFile,
+    PluginPackageValidation,
+    PluginSkillBinding,
+    PluginValidationPolicy,
+    PortablePluginManifest,
+)
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
@@ -219,7 +226,12 @@ __all__ = [
     "PackageSource",
     "PackageSourceKind",
     "PackageType",
+    "PluginCapturedFile",
     "PluginIdentity",
+    "PluginPackageValidation",
+    "PluginSkillBinding",
+    "PluginValidationPolicy",
+    "PortablePluginManifest",
     "PrSweepDirtyState",
     "PrSweepFinding",
     "PrSweepValidationResult",

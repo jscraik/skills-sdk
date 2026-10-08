@@ -399,6 +399,28 @@ def _validate_ir(
     return identity, findings
 
 
+def _captured_skill_identity(
+    root: Path,
+    payload: bytes | None,
+    policy: SkillValidationPolicy,
+) -> tuple[SkillIdentity | None, list[SkillPackageFinding]]:
+    """Apply existing entrypoint semantics to already captured bytes only."""
+    try:
+        if payload is None:
+            raise OSError("SKILL.md was not captured as a regular file")
+        text = payload.decode("utf-8")
+        _frontmatter, _body, closed = read_frontmatter(text)
+        if not closed:
+            return None, [_finding("invalid_frontmatter", "SKILL.md requires closed frontmatter", "SKILL.md")]
+        return _validate_ir(root, text, build_skill_ir(root / "SKILL.md", text=text), policy)
+    except UnicodeDecodeError:
+        return None, [_finding("invalid_utf8", "SKILL.md must be UTF-8", "SKILL.md")]
+    except OSError:
+        return None, [_finding("unreadable_skill_md", "SKILL.md must remain a readable regular file", "SKILL.md")]
+    except (ValueError, yaml.YAMLError):
+        return None, [_finding("invalid_frontmatter", "SKILL.md frontmatter must be valid YAML", "SKILL.md")]
+
+
 def validate_skill_package(
     package_root: Path,
     *,
@@ -438,26 +460,8 @@ def validate_skill_package(
             files, file_findings, captured = _scan_files(root, active_policy)
             findings.extend(file_findings)
             findings.extend(_package_policy_findings(captured, active_policy))
-            try:
-                skill_payload = captured.get("SKILL.md")
-                if skill_payload is None:
-                    raise OSError("SKILL.md was not captured as a regular file")
-                text = skill_payload.decode("utf-8")
-                _frontmatter, _body, closed = read_frontmatter(text)
-                if not closed:
-                    findings.append(_finding("invalid_frontmatter", "SKILL.md requires closed frontmatter", "SKILL.md"))
-                else:
-                    ir = build_skill_ir(skill_md, text=text)
-                    identity, ir_findings = _validate_ir(root, text, ir, active_policy)
-                    findings.extend(ir_findings)
-            except UnicodeDecodeError:
-                findings.append(_finding("invalid_utf8", "SKILL.md must be UTF-8", "SKILL.md"))
-            except OSError:
-                findings.append(
-                    _finding("unreadable_skill_md", "SKILL.md must remain a readable regular file", "SKILL.md")
-                )
-            except (ValueError, yaml.YAMLError):
-                findings.append(_finding("invalid_frontmatter", "SKILL.md frontmatter must be valid YAML", "SKILL.md"))
+            identity, ir_findings = _captured_skill_identity(root, captured.get("SKILL.md"), active_policy)
+            findings.extend(ir_findings)
     candidate = _candidate(root, source_revision, files) if revision_is_valid else None
     status: Literal["pass", "blocked"] = (
         "blocked" if any(item.severity is ValidationSeverity.BLOCKER for item in findings) else "pass"

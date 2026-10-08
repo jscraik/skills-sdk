@@ -31,6 +31,7 @@ from skills_sdk.models.packaging import (
     PackageReceipt,
     PackageReceiptV2,
 )
+from skills_sdk.models.plugin import PluginPackageValidation
 from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
 from skills_sdk.models.provider_call import ProviderCallPublicResult, TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
@@ -102,6 +103,7 @@ def intake_schema_models() -> tuple[tuple[type[Any], str], ...]:
     """Return executable intake receipt schemas."""
 
     return (
+        (PluginPackageValidation, "plugin-package-validation.v1.schema.json"),
         (SkillPackageIntakeContext, "skill-package-intake-context.v1.schema.json"),
         (SkillPackageIntakeReceipt, "skill-package-intake.v1.schema.json"),
     )

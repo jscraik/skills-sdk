@@ -82,6 +82,7 @@ SCHEMA_NAMES = frozenset(
         "selected-case-judge-evidence.v1",
         "scorer-profile.v1",
         "skill-package-validation.v1",
+        "plugin-package-validation.v1",
         "skill-package-intake.v1",
         "skill-package-intake-context.v1",
     }
@@ -472,6 +473,10 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
 
             model = EvaluationReceiptV2
+        elif name == "plugin-package-validation.v1":
+            from skills_sdk.models.plugin import PluginPackageValidation
+
+            model = PluginPackageValidation
         elif name == "skill-package-validation.v1":
             from skills_sdk.models.validation import SkillPackageValidation
 

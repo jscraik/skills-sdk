@@ -17,8 +17,25 @@ external-intake, registry delivery, or host installation workflow:
 ```text
 inventory   intake   check-local   check-quality   validate   build   review-content   eval   package   project   verify
 tessl prepare   tessl verify
-compare-copy   maintain-entrypoint
+compare-copy   maintain-entrypoint   validate-plugin
 ```
+
+### Portable plugin inspection
+
+Use `skills-sdk validate-plugin ./my-plugin --source-revision "<40-lowercase-hex>" --json --robot`
+to inspect root `plugin.json` and bind the complete captured package. Add
+`--require-version` and `--require-description` for those explicit SDK metadata
+policies. Base-format optionality is preserved without those flags. Exit `0`
+means structural pass, `2` means a typed blocked result. Both emit
+`plugin-package-validation/v1`; human output labels the release limitation and
+retains per-skill findings. No execution, admission, wrapping, publication or
+installation occurs. MCP transport validity and artwork approval are not proved.
+See [the API boundary](api.md#portable-plugin-validation) for capture limits and
+[delivery state](projects/sdk-workflow/tasks.md) before treating this candidate
+route as accepted-main functionality. Existing `validate` and `build` remain
+standalone-skill commands; they do not auto-detect plugins.
+
+### Existing local routes
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
 `intake`, `check-local`, `validate`, `build`, `review-content`, `eval scenario-quality`, `eval scorer-quality`,

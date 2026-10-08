@@ -14,10 +14,20 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012),
+Accepted SDK baseline: [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a),
 verified on 2026-10-08 and shared with the workflow and task record. Entries below
 describe that revision, not queued branches. Each row names its entrypoint or
 absence, a proof or boundary reference, its limitation, and the remaining action.
+
+Unmerged portable-plugin candidate affecting `package_identity`, `skill_intake`
+and `sdk_plugin_lifecycle`: `validate_plugin_package` / `validate-plugin` add
+root-manifest inspection, whole-file/mode binding, immediate skill findings and
+OpenAI settings selection. Proof lives in
+[plugin regressions](../tests/test_plugin_package.py) and the
+[installed smoke](../tests/installed_plugin_intake_smoke.py). This is not
+standalone wrapping, admission, artwork approval, MCP transport validation or
+release delivery. Complete those separate gates after accepting this bounded
+slice; the table below still records accepted main, not this candidate.
 
 The [plugin-first release decision](workflow.md#managed-release-format) changes
 the destination contract, not these accepted implementation statuses. Existing

@@ -72,7 +72,7 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 
 ## Accepted delivery ledger
 
-Accepted SDK baseline: [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012),
+Accepted SDK baseline: [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a),
 verified on 2026-10-08. The workflow and migration map describe this same
 revision. These merges accept the bounded capabilities below, not all acceptance
 criteria of their parent slices.
@@ -86,6 +86,7 @@ criteria of their parent slices.
 | [PR #48](https://github.com/jscraik/skills-sdk/pull/48) | [`b208b1d`](https://github.com/jscraik/skills-sdk/commit/b208b1d20f1ff948013b4594336c4d7f260164d1) | Ordered local quality workflow with typed stop and recovery boundaries. |
 | [PR #49](https://github.com/jscraik/skills-sdk/pull/49) | [`40139ca`](https://github.com/jscraik/skills-sdk/commit/40139ca2e813cd6e3555cff0366cd2262fdd5972) | Bounded static screening and candidate-bound safety gates before selected-case execution. |
 | [PR #50](https://github.com/jscraik/skills-sdk/pull/50) | [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012) | Observed numeric scorer-calibration callbacks; the CLI consumes supplied-offline fixtures. |
+| [PR #51](https://github.com/jscraik/skills-sdk/pull/51) | [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a) | Reconciled accepted coverage and plugin-first release policy, mandatory icons and the separate registry start gate; no executable capability added. |
 
 Repository tests and installed-entrypoint proof are linked in the migration map.
 The ledger records hosted acceptance; it does not replace exact candidate
@@ -103,13 +104,21 @@ under review, merged, published, or verified in a host. Record exact revision an
 proof for each applicable lane; these are not interchangeable completion labels.
 
 - Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
-- Current work: this bounded documentation reconciliation, under review in
-  [PR #51](https://github.com/jscraik/skills-sdk/pull/51), records the accepted PRs
-  above, plugin-first target, mandatory icon policy and strengthened acceptance.
-  It changes no executable service, schema, active scenario set, or live-operation
-  authority. Plugin-first support remains implementation work, not a doc-only pass.
-- Next action: finish this documentation PR, then implement the bounded portable
-  plugin intake/binding slice below. Preserve the accepted calibration service
+- Documentation reconciliation merged in
+  [PR #51](https://github.com/jscraik/skills-sdk/pull/51) at `c38a769`. It records the plugin-first
+  target, mandatory icon policy and strengthened acceptance without changing
+  executable services or live-operation authority.
+- Current work: portable plugin inspection and binding, validated locally on
+  `codex/sdk-portable-plugin-intake` with documentation from PR #51. The additive
+  `validate_plugin_package` / `validate-plugin` route captures root-manifest
+  candidates, complete file bytes and modes, per-skill findings and OpenAI
+  settings precedence. Focused and installed proof live in
+  [plugin tests](../../../tests/test_plugin_package.py) and
+  [installed smoke](../../../tests/installed_plugin_intake_smoke.py).
+  Full repository validation passed on 2026-10-08: 2,566 tests passed, one skipped,
+  with wheel build and all installed-entrypoint checks passing. This is unmerged
+  work; local validation and hosted delivery are separate states.
+- Next action: normal signed PR delivery for portable inspection. Preserve the accepted calibration service
   and queued local-winner handoff; integrate downstream work only after the
   complete-plugin identity seam is ready. Earlier branch-local validation does
   not prove the new product contract.
@@ -144,7 +153,7 @@ within one cloud model lane. Preserve it. Callers still supply the refined
 candidate; neither candidate authoring nor live cloud quality is established.
 These are source-inspection results, not new test runs or accepted-main claims.
 
-Next slice: **canonical portable plugin intake and binding**, within the existing
+Active slice: **canonical portable plugin intake and binding**, within the existing
 validation, intake, packaging, model/schema and CLI seams. No registry server,
 provider execution, publication or installation is part of this slice.
 

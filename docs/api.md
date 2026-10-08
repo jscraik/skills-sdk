@@ -1,5 +1,59 @@
 # Python API
 
+## Portable plugin validation
+
+The additive `validate_plugin_package` service in `skills_sdk.validation` captures
+a root-manifest plugin without executing it or changing its source. Supply a
+`Path`, a forty-character source revision and optional `PluginValidationPolicy`
+from `skills_sdk.models`. The policy can require nonempty version and description
+metadata; neither is a mandatory base-format field. This candidate implementation
+is tracked separately from accepted main in the [task record](projects/sdk-workflow/tasks.md).
+
+The `plugin-package-validation/v1` result retains a `PortablePluginManifest`
+projection, all captured file hashes/sizes/ordinary permissions, a separate mode
+digest, and each immediate `skills/<name>/SKILL.md` subtree's existing
+`SkillPackageValidation`. Invalid child findings remain visible and block the
+plugin; deeper nested skills are resources, not automatically discovered skills.
+Existing standalone APIs do not auto-detect or wrap plugins.
+
+Root `plugin.json` supplies the canonical name and declares
+`https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`. Names need not match
+the source directory. To preserve the frozen SDK identifier grammar, every
+plugin candidate uses `plugin-` followed by the SHA-256 of its exact UTF-8
+manifest name as `package_id`. The original name is retained separately.
+Byte-content identity covers sorted paths and hashes, including unused overlays,
+shared assets and integration files. Permission changes affect
+`mode_manifest_sha256`, not the historical content digest; compare both evidence
+lanes when consuming a capture.
+
+Unknown root fields and non-object `extensions` produce warning findings and
+are ignored. Other known fields with wrong types block. The result records which
+OpenAI settings object is selected and its canonical JSON digest: an inline
+`extensions.com.openai` object replaces the complete compatibility overlay;
+otherwise `.codex-plugin/plugin.json`, if present, supplies the object. It never
+overrides root identity or component discovery. Settings values are not echoed
+or interpreted as permission, artwork or host-compatibility approval.
+
+Capture rejects symbolic links, unsafe resources and special files. It permits
+at most 1,024 files, 2,048 total entries, 64 nested directories, 16 MiB per file
+and 64 MiB total file bytes; metadata JSON is limited to one MiB, 32 nested
+containers and 65,536 inspected values. At most 128 direct skills are assessed.
+Parsing uses captured bytes; a second whole capture rejects observed content,
+permission or directory changes. These are bounded observations, not a promise
+of a filesystem-wide atomic snapshot or protection after validation returns.
+
+`pass` establishes this structural capture only. MCP configuration bytes are
+bound but transport validity is explicitly unassessed. Icon decoding/approval,
+rights/admission, security, evaluation, wrapping, archive emission, export,
+publication and installation remain separate gates. `mutation_performed`,
+`execution_authorized` and `release_ready` remain false. Validate the envelope
+through `SchemaRegistry().validate("plugin-package-validation.v1", payload)`;
+semantic binding checks supplement JSON Schema. This is not a generic receipt
+accepted by `parse_receipt`.
+Envelope validation checks supplied evidence consistency; it cannot authenticate
+source provenance or reconstruct unavailable source bytes. Use a fresh service
+capture before relying on a supplied envelope for the current filesystem.
+
 The public API is the typed contract layer under `skills_sdk`. The top-level
 package exports the inventory, risk, evaluation, and provider execution
 contracts listed in its `__all__`. Import family-specific contracts such as
