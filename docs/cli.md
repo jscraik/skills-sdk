@@ -159,7 +159,7 @@ candidate-bound lanes:
   caller-supplied bounded text adapter, validates separately supplied semantic
   assertion evidence against the candidate, case, provider, and output digest,
   and emits an `evaluation-receipt/v2`. The host-input JSON contains
-  `request`, `input_payload`, optional `adapter`, and optional
+  `request`, `input_payload`, `safety_evidence`, optional `adapter`, and optional
   `assertion_evidence` members. `assertion_evidence` is a
   `selected-case-judge-evidence/v1` artifact that binds the complete semantic
   assertion contract, candidate, scenario set, case, provider output, judge
@@ -175,6 +175,15 @@ candidate-bound lanes:
   provider-then-judge execution uses the Python
   `execute_selected_case_with_judge` API; JSON input does not import arbitrary
   provider or judge executables.
+  `safety_evidence` is `pre-execution-safety-evidence/v1`: actual built package,
+  supplied safety-review receipt, completed SDK static screening, and the six
+  explicit capability-review outcomes. The safety receipt must retain the
+  canonical screening and checklist digests. Before adapter access, the SDK
+  recaptures the source and requires the supplied screening to match it. Missing,
+  contradictory, future, stale, or incomplete evidence blocks execution; receipt
+  IDs alone do not clear this gate. Review freshness defaults to one hour.
+  Static indicators and supplied review metadata do not establish scanner
+  execution, reviewer authenticity, or comprehensive security clearance.
 - `package` names a reserved local contract lane and does not execute.
 - `project` names runtime projection intent; parsing it does not prove
   installed behavior.

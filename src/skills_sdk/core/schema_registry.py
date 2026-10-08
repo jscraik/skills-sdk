@@ -34,6 +34,7 @@ SCHEMA_NAMES = frozenset(
         "package-receipt.v1",
         "package-receipt.v2",
         "package-safety-evidence.v1",
+        "pre-execution-safety-evidence.v1",
         "receipt-base.v1",
         "risk-classification.v1",
         "security-screening.v1",
@@ -369,6 +370,10 @@ class SchemaRegistry:
             from skills_sdk.models.runtime_evidence import RuntimeOutcomeReceipt
 
             model = RuntimeOutcomeReceipt
+        elif name == "pre-execution-safety-evidence.v1":
+            from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
+
+            model = PreExecutionSafetyEvidence
         elif name == "package-safety-evidence.v1":
             from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 

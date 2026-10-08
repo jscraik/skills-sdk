@@ -10,6 +10,7 @@ import package_safety_schema
 from intake_schema import append_intake_constraints
 from local_check_schema import append_local_check_constraints
 from package_archive_schema import append_package_archive_constraints
+from pre_execution_safety_schema import append_pre_execution_safety_constraints
 from provider_execution_schema import append_provider_execution_constraints
 from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
 from scenario_quality_schema import append_scenario_quality_constraints
@@ -78,7 +79,6 @@ _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
 
 def _append_portable_path_constraints(schema: Any) -> None:
     """Project the shared PortablePath contract into every generated schema node."""
-
     if isinstance(schema, dict):
         if schema.pop("x-skills-sdk-portable-path", False):
             schema["pattern"] = _PORTABLE_PATH_PATTERN
@@ -91,7 +91,6 @@ def _append_portable_path_constraints(schema: Any) -> None:
 
 def _append_provider_identity_constraints(schema: Any) -> None:
     """Project the secret-free contract into standalone and nested provider schemas."""
-
     if isinstance(schema, dict):
         title = schema.get("title")
         if title == "ProviderIdentity":
@@ -112,7 +111,6 @@ def _append_provider_identity_constraints(schema: Any) -> None:
 
 def _append_registry_identity_constraints(schema: Any) -> None:
     """Project the secret-free contract into registry identity schemas."""
-
     if isinstance(schema, dict):
         title = schema.get("title")
         if title == "RegistryIdentity":
@@ -706,6 +704,8 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         _append_risk_constraints(schema)
     elif filename == "security-screening.v1.schema.json":
         _append_security_constraints(schema)
+    elif filename == "pre-execution-safety-evidence.v1.schema.json":
+        append_pre_execution_safety_constraints(schema)
     elif filename in {"scenario-set.v1.schema.json", "scenario-set.v2.schema.json", "scorer-profile.v1.schema.json"}:
         _append_evaluation_constraints(schema, filename)
     elif filename in {

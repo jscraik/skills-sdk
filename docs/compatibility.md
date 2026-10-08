@@ -1,5 +1,31 @@
 # Compatibility
 
+## Selected-case safety admission
+
+The additive `pre-execution-safety-evidence/v1` input retains actual artifacts
+and explicit capability-review outcomes. Frozen package-safety, provider-request
+and security-screening v1 payloads remain parseable without reinterpretation.
+Parsing those contracts does not grant execution admission. Selected-case API
+and CLI dispatch now requires the actual safety input and fresh source recapture;
+ID-only requests return a typed blocked evaluation instead of invoking adapters.
+This is deliberate execution hardening, not a claim of authenticated review or
+external scanner execution. Supplied manual-review fixtures prove guard behavior,
+not comprehensive security accuracy or completed plugin processing.
+
+Typed safety inputs use canonical SDK model classes, including nested models.
+Custom subclasses are rejected before their serializers run. Copied members
+are audited for unknown fields, byte strings, cycles and mutation constants,
+then revalidated; ordinary typed timestamps and closed raw JSON remain supported.
+Pipe-to-shell indicators require both filesystem/subprocess and network review,
+including commands written in non-script instructions or references.
+
+The packaged Draft 2020-12 schema enforces exactly six ordered checklist IDs,
+unique checklist evidence IDs and nonblank, public-safe rationale text. The
+model and `SchemaRegistry` additionally enforce digest and cross-object joins,
+supported screening, evidence references and applicable capability outcomes.
+The resource labels these remaining semantic checks; standalone structural
+acceptance does not establish safety admission or source freshness.
+
 Content-review worker packets use a separate bounded wire budget: the public
 eight-MiB normalized assessment limit plus 64 KiB for the envelope. Compact
 UTF-8 serialization avoids ASCII escaping that expands Unicode assessments.

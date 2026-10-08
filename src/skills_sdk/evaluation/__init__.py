@@ -9,9 +9,11 @@ __all__ = [
     "OfflineContentReviewAdapter",
     "ScenarioQualityPolicy",
     "SelectedCaseDefinition",
+    "SelectedCaseExecutionInput",
     "SelectedCaseJudgeAdapter",
     "SelectedCaseJudgeInput",
     "SuppliedTextProviderAdapter",
+    "assess_pre_execution_safety",
     "assess_scenario_coverage",
     "assess_scenario_quality",
     "assess_scorer_calibration",
@@ -32,6 +34,10 @@ def __getattr__(name: str) -> object:
         from skills_sdk.evaluation.quality_workflow import check_local_quality
 
         return check_local_quality
+    if name in {"assess_pre_execution_safety", "SelectedCaseExecutionInput"}:
+        from skills_sdk.evaluation import pre_execution_safety
+
+        return getattr(pre_execution_safety, name)
     if name in {"ContentReviewDocument", "ContentReviewInput", "OfflineContentReviewAdapter", "execute_content_review"}:
         from skills_sdk.evaluation import content_review
 

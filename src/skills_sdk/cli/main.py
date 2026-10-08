@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from skills_sdk import __version__
+from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 
 COMMAND_HELP = {
     "inventory": "inspect a read-only source inventory",
@@ -392,7 +393,7 @@ def _scenario_coverage(arguments: argparse.Namespace) -> int:
     return 0 if result.status == "pass" else 2
 
 
-def _selected_case_host_input(path: Path) -> tuple[object, object, object | None, object | None]:
+def _selected_case_host_input(path: Path) -> tuple[object, object, object | None, object | None, object | None]:
     """Load the bounded host-supplied inputs for one selected-case run."""
     payload = json.loads(
         _read_intake_context(path).decode("utf-8"),
@@ -403,6 +404,7 @@ def _selected_case_host_input(path: Path) -> tuple[object, object, object | None
         "assertion_evidence",
         "input_payload",
         "request",
+        "safety_evidence",
     }:
         raise ValueError("invalid selected-case host input")
     return (
@@ -410,6 +412,7 @@ def _selected_case_host_input(path: Path) -> tuple[object, object, object | None
         payload.get("input_payload"),
         payload.get("adapter"),
         payload.get("assertion_evidence"),
+        payload.get("safety_evidence"),
     )
 
 
@@ -450,14 +453,20 @@ def _selected_case_eval(arguments: argparse.Namespace) -> int:
             case_id=arguments.case_id,
             mode=arguments.mode,
         )
-        request_payload, input_payload, adapter_payload, evidence_payload = _selected_case_host_input(
+        request_payload, input_payload, adapter_payload, evidence_payload, safety_payload = _selected_case_host_input(
             arguments.host_input
         )
         request = ProviderExecutionRequest.model_validate(request_payload)
         adapter = cast(TextProviderAdapter | None, _supplied_adapter(adapter_payload))
         evidence = None if evidence_payload is None else SelectedCaseJudgeEvidence.model_validate(evidence_payload)
         receipt = asyncio.run(
-            execute_selected_case(definition, request, cast(JsonValue, input_payload), adapter, evidence)
+            execute_selected_case(
+                definition,
+                request,
+                SelectedCaseExecutionInput(cast(JsonValue, input_payload), safety_payload),
+                adapter,
+                evidence,
+            )
         )
     except ContractError as exc:
         return _selected_case_blocker(exc.code, exc.message, json_output=arguments.json_output)
