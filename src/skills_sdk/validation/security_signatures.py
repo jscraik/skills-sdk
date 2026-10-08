@@ -13,7 +13,7 @@ from pathlib import PurePosixPath
 from skills_sdk.models.risk import SecurityFinding
 
 _PATTERNS = (
-    (r"\b(curl|wget)\b[^\n|]*\|\s*(sh|bash|zsh|python|node)\b", "pipe_to_shell_download", "external_service"),
+    (r"\b(curl|wget)\b[^\n|]{0,512}\|\s*(sh|bash|zsh|python|node)\b", "pipe_to_shell_download", "external_service"),
     (
         r"https?://[^\s)'\"]*(?:raw\.githubusercontent\.com|gist\.githubusercontent\.com|bit\.ly|tinyurl\.com|"
         r"\.sh\b|\.py\b|\.js\b|\.zip\b|\.tgz\b|\.tar\.gz\b|\.dmg\b|\.pkg\b|\.exe\b)[^\s)'\"]*",
