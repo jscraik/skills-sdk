@@ -11,7 +11,7 @@ import pytest
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import content_review as review_module
 from skills_sdk.evaluation.content_review import ContentReviewInput, execute_content_review
-from skills_sdk.models.content_review import ContentReviewAssessment
+from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES, ContentReviewAssessment
 from skills_sdk.models.safety import PackageSafetyReviewer
 
 REVISION = "1" * 40
@@ -48,7 +48,7 @@ class OversizedMetadataReviewer:
 
     @property
     def reviewer(self) -> PackageSafetyReviewer:
-        review_module._REVIEW_OUTPUT_LIMIT = 256
+        review_module._REVIEW_WIRE_LIMIT = 256
         return PackageSafetyReviewer(adapter_id="a" * 300, adapter_version_or_digest="1", method="static_analysis")
 
     async def review(self, inputs: ContentReviewInput) -> object:
@@ -170,6 +170,89 @@ class FixtureReviewer:
         }
 
 
+class LargeAssessmentReviewer(FixtureReviewer):
+    def __init__(self, unit: str) -> None:
+        super().__init__()
+        self.unit = unit
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        data = await super().review(inputs)
+        assessment = ContentReviewAssessment.model_validate(data)
+        baseline = len(assessment.model_dump_json().encode("utf-8"))
+        original = assessment.items[0].rationale
+        available = CONTENT_REVIEW_ASSESSMENT_MAX_BYTES - baseline + len(original.encode("utf-8"))
+        count, remainder = divmod(available, len(self.unit.encode("utf-8")))
+        item = assessment.items[0].model_copy(update={"rationale": self.unit * count + "x" * remainder})
+        assessment = ContentReviewAssessment.model_validate(
+            assessment.model_copy(update={"items": (item, *assessment.items[1:])})
+        )
+        assert len(assessment.model_dump_json().encode("utf-8")) == CONTENT_REVIEW_ASSESSMENT_MAX_BYTES
+        return assessment
+
+
+@pytest.mark.parametrize("unit", ["x ", "é "])
+def test_public_assessment_limit_fits_worker_wire_and_recovers(tmp_path: Path, unit: str) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
+    result = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=LargeAssessmentReviewer(unit)))
+    assert result.status == "pass", result.findings
+    assert result.adapter_invoked is True
+    assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
+class StartupDelayReviewer(FixtureReviewer):
+    def __init__(self, finished: Path, fail: bool = False) -> None:
+        super().__init__()
+        self.finished = finished
+        self.fail = fail
+
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        time.sleep(0.5)
+        self.finished.write_text("metadata completed")
+        if self.fail:
+            raise OSError("private startup diagnostic")
+        return FixtureReviewer.reviewer
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_delayed_parent_observation_preserves_startup_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail: bool
+) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    finished = tmp_path / "startup-finished"
+    original_read = review_module._read_worker
+
+    async def delayed_read(
+        channel: review_module.socket.socket, launched_at: float
+    ) -> review_module._WorkerObservation:
+        async with asyncio.timeout(10):
+            while not finished.exists():
+                await asyncio.sleep(0.01)
+        await asyncio.sleep(0.3)
+        return await original_read(channel, launched_at)
+
+    with monkeypatch.context() as context:
+        context.setattr(review_module, "_REVIEW_STARTUP_TIMEOUT_SECONDS", 0.2)
+        context.setattr(review_module, "_read_worker", delayed_read)
+        result = asyncio.run(
+            execute_content_review(root, source_revision=REVISION, adapter=StartupDelayReviewer(finished, fail))
+        )
+    assert result.status == "blocked" and result.findings[0].code == "content_review_timeout"
+    assert result.adapter_invoked is (not fail)
+    assert "private startup" not in result.model_dump_json()
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 class CompletedReviewer(FixtureReviewer):
     def __init__(self, finished: Path, duration: float, fail: bool = False) -> None:
         super().__init__()
@@ -233,12 +316,14 @@ def test_delayed_parent_observation_preserves_callback_deadline(
     finished = tmp_path / "finished"
     original_read = review_module._read_worker
 
-    async def delayed_read(channel: review_module.socket.socket) -> review_module._WorkerObservation:
+    async def delayed_read(
+        channel: review_module.socket.socket, launched_at: float
+    ) -> review_module._WorkerObservation:
         async with asyncio.timeout(10):
             while not finished.exists():
                 await asyncio.sleep(0.01)
         await asyncio.sleep(0.1)
-        return await original_read(channel)
+        return await original_read(channel, launched_at)
 
     existing = {child.pid for child in review_module.multiprocessing.active_children()}
     with monkeypatch.context() as context:

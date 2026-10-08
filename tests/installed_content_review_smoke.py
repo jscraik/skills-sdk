@@ -26,6 +26,7 @@ from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import ContentReviewInput, execute_content_review
 from skills_sdk.evaluation import content_review as review_module
 from skills_sdk.models import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
+from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES
 from skills_sdk.models.safety import PackageSafetyReviewer
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation import assess_content_review
@@ -75,6 +76,33 @@ class FixtureReviewer:
         }
 
 
+class WireBoundaryReviewer(FixtureReviewer):
+    def __init__(self, extra_bytes: int = 0) -> None:
+        self.extra_bytes = extra_bytes
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        assessment = ContentReviewAssessment.model_validate(await super().review(inputs))
+        baseline = len(assessment.model_dump_json().encode("utf-8"))
+        original = assessment.items[0].rationale
+        available = CONTENT_REVIEW_ASSESSMENT_MAX_BYTES - baseline + len(original.encode("utf-8")) + self.extra_bytes
+        count, remainder = divmod(available, len("é ".encode()))
+        item = assessment.items[0].model_copy(update={"rationale": "é " * count + "x" * remainder})
+        return assessment.model_copy(update={"items": (item, *assessment.items[1:])})
+
+
+def _assert_wire_boundary_recovery(root: Path) -> None:
+    existing = {child.pid for child in review_module.multiprocessing.active_children()}
+    accepted = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=WireBoundaryReviewer()))
+    assert accepted.status == "pass" and accepted.adapter_invoked is True
+    rejected = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=WireBoundaryReviewer(1)))
+    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+    assert rejected.adapter_invoked is True
+    assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
+    )
+
+
 class MetadataFailureReviewer(FixtureReviewer):
     @property
     def reviewer(self) -> PackageSafetyReviewer:
@@ -96,6 +124,51 @@ class SlowStartingBlockingReviewer(BlockingReviewer):
     def reviewer(self) -> PackageSafetyReviewer:
         time.sleep(4)
         return FixtureReviewer.reviewer
+
+
+class StartupDelayReviewer(FixtureReviewer):
+    def __init__(self, finished: Path, fail: bool) -> None:
+        self.finished = finished
+        self.fail = fail
+
+    @property
+    def reviewer(self) -> PackageSafetyReviewer:
+        time.sleep(0.5)
+        self.finished.write_text("metadata completed")
+        if self.fail:
+            raise OSError("private startup diagnostic")
+        return FixtureReviewer.reviewer
+
+
+def _assert_startup_deadline_recovery(root: Path) -> None:
+    original_read = review_module._read_worker
+    for fail in (False, True):
+        finished = root.parent / f"startup-finished-{fail}"
+
+        async def delayed_read(
+            channel: review_module.socket.socket, launched_at: float, finished: Path = finished
+        ) -> review_module._WorkerObservation:
+            async with asyncio.timeout(10):
+                while not finished.exists():
+                    await asyncio.sleep(0.01)
+            await asyncio.sleep(0.3)
+            return await original_read(channel, launched_at)
+
+        existing = {child.pid for child in review_module.multiprocessing.active_children()}
+        with (
+            patch.object(review_module, "_REVIEW_STARTUP_TIMEOUT_SECONDS", 0.2),
+            patch.object(review_module, "_read_worker", delayed_read),
+        ):
+            result = asyncio.run(
+                execute_content_review(root, source_revision="1" * 40, adapter=StartupDelayReviewer(finished, fail))
+            )
+        assert result.status == "blocked" and result.findings[0].code == "content_review_timeout"
+        assert result.adapter_invoked is (not fail)
+        assert "private startup" not in result.model_dump_json()
+        assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
+    assert (
+        asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
+    )
 
 
 class CompletedReviewer(FixtureReviewer):
@@ -124,13 +197,13 @@ def _assert_delayed_observation(root: Path) -> None:
         finished = root.parent / f"finished-{duration}-{fail}"
 
         async def delayed_read(
-            channel: review_module.socket.socket, finished: Path = finished
+            channel: review_module.socket.socket, launched_at: float, finished: Path = finished
         ) -> review_module._WorkerObservation:
             async with asyncio.timeout(10):
                 while not finished.exists():
                     await asyncio.sleep(0.01)
             await asyncio.sleep(0.1)
-            return await original_read(channel)
+            return await original_read(channel, launched_at)
 
         existing = {child.pid for child in review_module.multiprocessing.active_children()}
         with (
@@ -222,7 +295,7 @@ class OversizedMetadataReviewer(FixtureReviewer):
 
     @property
     def reviewer(self) -> PackageSafetyReviewer:
-        review_module._REVIEW_OUTPUT_LIMIT = 256
+        review_module._REVIEW_WIRE_LIMIT = 256
         return PackageSafetyReviewer(adapter_id="a" * 300, adapter_version_or_digest="1", method="static_analysis")
 
     async def review(self, inputs: ContentReviewInput) -> object:
@@ -504,6 +577,8 @@ def main() -> int:
                 _assert_contract_boundaries(root, result.review.assessment)
                 _assert_host_boundary_recovery(root, result.review.assessment)
                 _assert_assessment_size_recovery(root, result.review.assessment)
+                _assert_wire_boundary_recovery(root)
+                _assert_startup_deadline_recovery(root)
                 _assert_mapping_and_finding_recovery(root, result.review.assessment)
                 _assert_daemon_recovery(root)
             command = [

@@ -1,5 +1,18 @@
 # Compatibility
 
+Content-review worker packets use a separate bounded wire budget: the public
+eight-MiB normalized assessment limit plus 64 KiB for the envelope. Compact
+UTF-8 serialization avoids ASCII escaping that expands Unicode assessments.
+The sender and receiver enforce the same per-packet bound; the public model
+limit and CLI wire-file limit remain unchanged. A valid exact-limit assessment
+can complete offline review; one byte beyond the model limit remains invalid.
+
+The content-review startup deadline is anchored immediately after the spawned
+process launch returns, outside the trusted adapter-transfer operation. Delayed
+parent observation does not restart it. Child invocation and failed-metadata
+completion timestamps preserve timeout classification even when packets are
+already queued. Timely startup and short callbacks remain valid.
+
 ## Supplied content-review contracts
 
 Typed assessment inputs and callback results use the canonical

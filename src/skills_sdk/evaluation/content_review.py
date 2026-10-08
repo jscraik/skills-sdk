@@ -19,7 +19,11 @@ from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
-from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult
+from skills_sdk.models.content_review import (
+    CONTENT_REVIEW_ASSESSMENT_MAX_BYTES,
+    ContentReviewAssessment,
+    ContentReviewExecutionResult,
+)
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.safety import PackageSafetyReviewer
 from skills_sdk.validation.content_review import _finding, assess_content_review
@@ -27,7 +31,7 @@ from skills_sdk.validation.skill_package import SkillValidationPolicy, _scan_fil
 
 _REVIEW_TIMEOUT_SECONDS = 30.0
 _REVIEW_STARTUP_TIMEOUT_SECONDS = 30.0
-_REVIEW_OUTPUT_LIMIT = 8_388_608
+_REVIEW_WIRE_LIMIT = CONTENT_REVIEW_ASSESSMENT_MAX_BYTES + 65_536
 
 
 class _OversizedReviewerMetadata(ValueError):
@@ -67,7 +71,7 @@ async def _invoke(
 ) -> tuple[object, float]:
     invoked_at = time.monotonic()
     packet = {"kind": "invoked", "reviewer": reviewer.model_dump(mode="json"), "invoked_at": invoked_at}
-    if len(json.dumps(packet, separators=(",", ":")).encode("utf-8")) + 1 > _REVIEW_OUTPUT_LIMIT:
+    if len(json.dumps(packet, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) + 1 > _REVIEW_WIRE_LIMIT:
         raise _OversizedReviewerMetadata("reviewer metadata exceeds the worker output limit")
     invocation = callback(inputs)
     _send_packet(channel, packet)
@@ -87,8 +91,8 @@ async def _adapter_metadata(
 
 
 def _send_packet(channel: socket.socket, packet: dict[str, object]) -> None:
-    payload = json.dumps(packet, separators=(",", ":")).encode("utf-8") + b"\n"
-    if len(payload) > _REVIEW_OUTPUT_LIMIT:
+    payload = json.dumps(packet, ensure_ascii=False, separators=(",", ":")).encode("utf-8") + b"\n"
+    if len(payload) > _REVIEW_WIRE_LIMIT:
         replacement: dict[str, object] = {"kind": "blocked", "code": "content_review_output_limit"}
         if "completed_at" in packet:
             replacement["completed_at"] = packet["completed_at"]
@@ -101,12 +105,18 @@ async def _worker_review(
 ) -> None:
     metadata = (await asyncio.gather(_adapter_metadata(adapter), return_exceptions=True))[0]
     if isinstance(metadata, BaseException):
-        _send_packet(channel, {"kind": "blocked", "code": "invalid_content_review_adapter"})
+        _send_packet(
+            channel,
+            {"kind": "blocked", "code": "invalid_content_review_adapter", "startup_completed_at": time.monotonic()},
+        )
         return
     reviewer, callback = metadata
     observed = (await asyncio.gather(_invoke(callback, inputs, channel, reviewer), return_exceptions=True))[0]
     if isinstance(observed, _OversizedReviewerMetadata):
-        _send_packet(channel, {"kind": "blocked", "code": "content_review_output_limit"})
+        _send_packet(
+            channel,
+            {"kind": "blocked", "code": "content_review_output_limit", "startup_completed_at": time.monotonic()},
+        )
         return
     if isinstance(observed, BaseException):
         _send_packet(
@@ -166,23 +176,26 @@ class _WorkerObservation:
     code: str | None = None
 
 
-async def _read_worker(channel: socket.socket) -> _WorkerObservation:
+async def _read_worker(channel: socket.socket, launched_at: float) -> _WorkerObservation:
     loop = asyncio.get_running_loop()
     reviewer: PackageSafetyReviewer | None = None
     invoked_at = 0.0
     pending = bytearray()
     try:
-        async with asyncio.timeout(_REVIEW_STARTUP_TIMEOUT_SECONDS) as deadline:
+        startup_remaining = launched_at + _REVIEW_STARTUP_TIMEOUT_SECONDS - time.monotonic()
+        async with asyncio.timeout(max(0.0, startup_remaining)) as deadline:
             while True:
                 chunk = await loop.sock_recv(channel, 65_536)
                 if not chunk:
                     return _WorkerObservation(reviewer, code="content_review_adapter_failed")
                 pending.extend(chunk)
-                if len(pending) > _REVIEW_OUTPUT_LIMIT:
+                if len(pending) > _REVIEW_WIRE_LIMIT and b"\n" not in pending:
                     return _WorkerObservation(reviewer, code="content_review_output_limit")
                 while b"\n" in pending:
                     line, _, remaining = pending.partition(b"\n")
                     pending = bytearray(remaining)
+                    if len(line) + 1 > _REVIEW_WIRE_LIMIT:
+                        return _WorkerObservation(reviewer, code="content_review_output_limit")
                     packet = json.loads(line)
                     if not isinstance(packet, dict):
                         raise ValueError("invalid worker packet")
@@ -191,6 +204,8 @@ async def _read_worker(channel: socket.socket) -> _WorkerObservation:
                         invoked_at = float(packet["invoked_at"])
                         if not math.isfinite(invoked_at):
                             raise ValueError("invalid worker invocation time")
+                        if invoked_at - launched_at > _REVIEW_STARTUP_TIMEOUT_SECONDS:
+                            return _WorkerObservation(reviewer, code="content_review_timeout")
                         remaining = invoked_at + _REVIEW_TIMEOUT_SECONDS - time.monotonic()
                         deadline.reschedule(loop.time() + remaining)
                     elif packet.get("kind") in {"returned", "blocked"} and reviewer is not None:
@@ -205,6 +220,11 @@ async def _read_worker(channel: socket.socket) -> _WorkerObservation:
                             reviewer, ContentReviewAssessment.model_validate(packet["assessment"])
                         )
                     elif packet.get("kind") == "blocked":
+                        completed_at = float(packet["startup_completed_at"])
+                        if not math.isfinite(completed_at):
+                            raise ValueError("invalid worker startup completion time")
+                        if completed_at - launched_at > _REVIEW_STARTUP_TIMEOUT_SECONDS:
+                            return _WorkerObservation(code="content_review_timeout")
                         return _WorkerObservation(reviewer, code=str(packet["code"]))
                     else:
                         raise ValueError("invalid worker transition")
@@ -225,15 +245,16 @@ async def _isolated_review(adapter: OfflineContentReviewAdapter, inputs: Content
     process = multiprocessing.get_context("spawn").Process(target=_review_worker, args=(child, adapter, inputs))
     try:
 
-        async def start_worker() -> None:
+        async def start_worker() -> float:
             """Capture caller-owned transfer failures through the existing task boundary."""
             process.start()
+            return time.monotonic()
 
         transfer = (await asyncio.gather(start_worker(), return_exceptions=True))[0]
         if isinstance(transfer, BaseException):
             return _WorkerObservation(code="unsupported_content_review_isolation")
         child.close()
-        return await _read_worker(parent)
+        return await _read_worker(parent, transfer)
     finally:
         parent.close()
         child.close()
