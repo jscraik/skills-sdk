@@ -11,6 +11,7 @@ import pytest
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import content_review as review_module
 from skills_sdk.evaluation.content_review import ContentReviewInput, execute_content_review
+from skills_sdk.models.content_review import ContentReviewAssessment
 from skills_sdk.models.safety import PackageSafetyReviewer
 
 REVISION = "1" * 40
@@ -117,21 +118,61 @@ class FixtureReviewer:
 
 
 class CompletedReviewer(FixtureReviewer):
-    def __init__(self, finished: Path, duration: float) -> None:
+    def __init__(self, finished: Path, duration: float, fail: bool = False) -> None:
         super().__init__()
         self.finished = finished
         self.duration = duration
+        self.fail = fail
 
     async def review(self, inputs: ContentReviewInput) -> object:
         await asyncio.sleep(self.duration)
         result = await super().review(inputs)
         self.finished.write_text("finished")
+        if self.fail:
+            raise OSError("private callback diagnostic")
         return result
 
 
-@pytest.mark.parametrize("duration, expected", [(0.05, "pass"), (0.5, "blocked")])
+class NonCanonicalAssessment(ContentReviewAssessment):
+    def model_dump(self, **kwargs: object) -> dict[str, object]:
+        raise OSError("private serializer diagnostic")
+
+
+class TypedReviewer(FixtureReviewer):
+    def __init__(self, canonical: bool) -> None:
+        super().__init__()
+        self.canonical = canonical
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        model = ContentReviewAssessment if self.canonical else NonCanonicalAssessment
+        return model.model_validate(await super().review(inputs))
+
+
+def test_worker_rejects_custom_serializers_and_accepts_canonical_model(tmp_path: Path) -> None:
+    root = tmp_path / "review-example"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: review-example\ndescription: Reads examples.\n---\n# Read examples\n")
+    rejected = asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=TypedReviewer(False)))
+    assert rejected.status == "blocked" and rejected.adapter_invoked is True
+    assert rejected.findings[0].code == "invalid_content_review"
+    assert "private serializer" not in rejected.model_dump_json()
+    assert (
+        asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=TypedReviewer(True))).status
+        == "pass"
+    )
+
+
+@pytest.mark.parametrize(
+    "duration, fail, expected_code",
+    [
+        (0.05, False, None),
+        (0.5, False, "content_review_timeout"),
+        (0.05, True, "content_review_adapter_failed"),
+        (0.5, True, "content_review_timeout"),
+    ],
+)
 def test_delayed_parent_observation_preserves_callback_deadline(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, duration: float, expected: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, duration: float, fail: bool, expected_code: str | None
 ) -> None:
     root = tmp_path / "review-example"
     root.mkdir()
@@ -151,11 +192,12 @@ def test_delayed_parent_observation_preserves_callback_deadline(
         context.setattr(review_module, "_REVIEW_TIMEOUT_SECONDS", 0.2)
         context.setattr(review_module, "_read_worker", delayed_read)
         result = asyncio.run(
-            execute_content_review(root, source_revision=REVISION, adapter=CompletedReviewer(finished, duration))
+            execute_content_review(root, source_revision=REVISION, adapter=CompletedReviewer(finished, duration, fail))
         )
-    assert result.status == expected and result.adapter_invoked is True
-    if expected == "blocked":
-        assert result.findings[0].code == "content_review_timeout"
+    assert result.status == ("blocked" if expected_code else "pass") and result.adapter_invoked is True
+    if expected_code:
+        assert result.findings[0].code == expected_code
+    assert "private callback" not in result.model_dump_json()
     assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
     assert (
         asyncio.run(execute_content_review(root, source_revision=REVISION, adapter=FixtureReviewer())).status == "pass"

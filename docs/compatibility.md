@@ -2,6 +2,11 @@
 
 ## Supplied content-review contracts
 
+Typed assessment inputs and callback results use the canonical
+`ContentReviewAssessment` model. Custom subclasses return an
+`invalid_content_review` blocker before their serializers run. Raw closed
+assessment data and canonical typed models remain supported.
+
 `content-review-assessment/v1`, `content-review/v1` and
 `content-review-execution/v1` are additive closed
 families. They do not reinterpret package validation or scenario-quality

@@ -540,12 +540,18 @@ def test_streaming_findings_and_evidence_ids_are_not_consumed(tmp_path: Path) ->
 
 class FailingAssessmentSerializer(ContentReviewAssessment):
     dump_error: ClassVar[type[Exception]] = RuntimeError
+    dump_calls: ClassVar[int] = 0
 
     def model_dump(self, **kwargs: object) -> dict[str, object]:
+        type(self).dump_calls += 1
         raise self.dump_error("private serializer diagnostic")
 
 
-@pytest.mark.parametrize("error", [RuntimeError, KeyError])
+class OrdinarySerializerError(Exception):
+    """Caller-defined failure outside built-in exception families."""
+
+
+@pytest.mark.parametrize("error", [RuntimeError, KeyError, OSError, OrdinarySerializerError])
 def test_typed_serializer_failure_is_redacted_and_recovers(tmp_path: Path, error: type[Exception]) -> None:
     root, data = _fixture(tmp_path)
     FailingAssessmentSerializer.dump_error = error
@@ -553,4 +559,11 @@ def test_typed_serializer_failure_is_redacted_and_recovers(tmp_path: Path, error
     rejected = assess_content_review(root, source_revision=REVISION, assessment=malformed)
     assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
     assert "private serializer" not in rejected.model_dump_json()
+    assert FailingAssessmentSerializer.dump_calls == 0
+    assert (
+        assess_content_review(
+            root, source_revision=REVISION, assessment=ContentReviewAssessment.model_validate(data)
+        ).status
+        == "pass"
+    )
     assert assess_content_review(root, source_revision=REVISION, assessment=data).status == "pass"

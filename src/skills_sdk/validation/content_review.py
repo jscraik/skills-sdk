@@ -22,6 +22,8 @@ def assess_content_review(package_root: Path, *, source_revision: str, assessmen
     findings = list(validation.findings)
     review: ContentReviewAssessment | None = None
     try:
+        if isinstance(assessment, ContentReviewAssessment) and type(assessment) is not ContentReviewAssessment:
+            raise ValueError("supplied typed review must use the canonical assessment model")
         raw = (
             assessment.model_dump(mode="python", warnings="error")
             if isinstance(assessment, ContentReviewAssessment)

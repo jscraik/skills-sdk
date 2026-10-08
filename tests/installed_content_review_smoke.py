@@ -13,6 +13,7 @@ from collections import UserDict
 from multiprocessing.connection import Connection
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import ClassVar
 from unittest.mock import patch
 
 from pydantic import ValidationError
@@ -98,21 +99,29 @@ class SlowStartingBlockingReviewer(BlockingReviewer):
 
 
 class CompletedReviewer(FixtureReviewer):
-    def __init__(self, finished: Path, duration: float) -> None:
+    def __init__(self, finished: Path, duration: float, fail: bool = False) -> None:
         self.finished = finished
         self.duration = duration
+        self.fail = fail
 
     async def review(self, inputs: ContentReviewInput) -> object:
         await asyncio.sleep(self.duration)
         result = await super().review(inputs)
         self.finished.write_text("finished")
+        if self.fail:
+            raise OSError("private callback diagnostic")
         return result
 
 
 def _assert_delayed_observation(root: Path) -> None:
     original_read = review_module._read_worker
-    for duration, expected in ((0.05, "pass"), (0.5, "blocked")):
-        finished = root.parent / f"finished-{duration}"
+    for duration, fail, code in (
+        (0.05, False, None),
+        (0.5, False, "content_review_timeout"),
+        (0.05, True, "content_review_adapter_failed"),
+        (0.5, True, "content_review_timeout"),
+    ):
+        finished = root.parent / f"finished-{duration}-{fail}"
 
         async def delayed_read(
             channel: review_module.socket.socket, finished: Path = finished
@@ -129,11 +138,14 @@ def _assert_delayed_observation(root: Path) -> None:
             patch.object(review_module, "_read_worker", delayed_read),
         ):
             result = asyncio.run(
-                execute_content_review(root, source_revision="1" * 40, adapter=CompletedReviewer(finished, duration))
+                execute_content_review(
+                    root, source_revision="1" * 40, adapter=CompletedReviewer(finished, duration, fail)
+                )
             )
-        assert result.status == expected and result.adapter_invoked is True
-        if expected == "blocked":
-            assert result.findings[0].code == "content_review_timeout"
+        assert result.status == ("blocked" if code else "pass") and result.adapter_invoked is True
+        if code:
+            assert result.findings[0].code == code
+        assert "private callback" not in result.model_dump_json()
         assert {child.pid for child in review_module.multiprocessing.active_children()} == existing
     assert (
         asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer())).status == "pass"
@@ -171,8 +183,23 @@ def _assert_deadline_and_byte_text(root: Path, assessment: ContentReviewAssessme
 
 
 class FailingAssessmentSerializer(ContentReviewAssessment):
+    dump_error: ClassVar[type[Exception]] = RuntimeError
+
     def model_dump(self, **kwargs: object) -> dict[str, object]:
-        raise RuntimeError("private serializer diagnostic")
+        raise self.dump_error("private serializer diagnostic")
+
+
+class OrdinarySerializerError(Exception):
+    """Caller-defined failure outside built-in exception families."""
+
+
+class TypedReviewer(FixtureReviewer):
+    def __init__(self, canonical: bool) -> None:
+        self.canonical = canonical
+
+    async def review(self, inputs: ContentReviewInput) -> object:
+        model = ContentReviewAssessment if self.canonical else FailingAssessmentSerializer
+        return model.model_validate(await super().review(inputs))
 
 
 def _assert_contract_rejects(
@@ -209,14 +236,23 @@ def _assert_contract_boundaries(root: Path, assessment: ContentReviewAssessment)
     _assert_contract_rejects(
         ContentReviewExecutionResult, "content-review-execution.v1", {**blocked, "adapter_invoked": True}
     )
-    failing = FailingAssessmentSerializer.model_validate(assessment.model_dump(mode="json"))
-    rejected = assess_content_review(root, source_revision="1" * 40, assessment=failing)
-    assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
-    assert "private serializer" not in rejected.model_dump_json()
+    for error in (RuntimeError, OSError, OrdinarySerializerError):
+        FailingAssessmentSerializer.dump_error = error
+        failing = FailingAssessmentSerializer.model_validate(assessment.model_dump(mode="json"))
+        rejected = assess_content_review(root, source_revision="1" * 40, assessment=failing)
+        assert rejected.status == "blocked" and rejected.findings[0].code == "invalid_content_review"
+        assert "private serializer" not in rejected.model_dump_json()
     metadata = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=MetadataFailureReviewer()))
     assert metadata.findings[0].code == "invalid_content_review_adapter" and metadata.adapter_invoked is False
     assert "private metadata" not in metadata.model_dump_json()
     assert assess_content_review(root, source_revision="1" * 40, assessment=assessment).status == "pass"
+    rejected_worker = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=TypedReviewer(False)))
+    assert rejected_worker.findings[0].code == "invalid_content_review" and rejected_worker.adapter_invoked is True
+    assert "private serializer" not in rejected_worker.model_dump_json()
+    assert (
+        asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=TypedReviewer(True))).status
+        == "pass"
+    )
     recovered = asyncio.run(execute_content_review(root, source_revision="1" * 40, adapter=FixtureReviewer()))
     assert recovered.status == "pass" and recovered.adapter_invoked is True
     _assert_new_receipt_invariants(root, assessment, recovered)

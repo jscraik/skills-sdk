@@ -83,7 +83,10 @@ async def _adapter_metadata(
 def _send_packet(channel: socket.socket, packet: dict[str, object]) -> None:
     payload = json.dumps(packet, separators=(",", ":")).encode("utf-8") + b"\n"
     if len(payload) > _REVIEW_OUTPUT_LIMIT:
-        payload = b'{"kind":"blocked","code":"content_review_output_limit"}\n'
+        replacement: dict[str, object] = {"kind": "blocked", "code": "content_review_output_limit"}
+        if "completed_at" in packet:
+            replacement["completed_at"] = packet["completed_at"]
+        payload = json.dumps(replacement, separators=(",", ":")).encode("utf-8") + b"\n"
     channel.sendall(payload)
 
 
@@ -97,10 +100,14 @@ async def _worker_review(
     reviewer, callback = metadata
     observed = (await asyncio.gather(_invoke(callback, inputs, channel, reviewer), return_exceptions=True))[0]
     if isinstance(observed, BaseException):
-        _send_packet(channel, {"kind": "blocked", "code": "content_review_adapter_failed"})
+        _send_packet(
+            channel, {"kind": "blocked", "code": "content_review_adapter_failed", "completed_at": time.monotonic()}
+        )
         return
     observed, completed_at = observed
     try:
+        if isinstance(observed, ContentReviewAssessment) and type(observed) is not ContentReviewAssessment:
+            raise ValueError("returned typed review must use the canonical assessment model")
         raw = (
             observed.model_dump(mode="python", warnings="error")
             if isinstance(observed, ContentReviewAssessment)
@@ -116,7 +123,7 @@ async def _worker_review(
             },
         )
     except (ValidationError, ValueError, TypeError, RuntimeError, LookupError, PydanticSerializationError):
-        _send_packet(channel, {"kind": "blocked", "code": "invalid_content_review"})
+        _send_packet(channel, {"kind": "blocked", "code": "invalid_content_review", "completed_at": completed_at})
 
 
 def _review_worker(channel: socket.socket, adapter: OfflineContentReviewAdapter, inputs: ContentReviewInput) -> None:
@@ -177,12 +184,14 @@ async def _read_worker(channel: socket.socket) -> _WorkerObservation:
                             raise ValueError("invalid worker invocation time")
                         remaining = invoked_at + _REVIEW_TIMEOUT_SECONDS - time.monotonic()
                         deadline.reschedule(loop.time() + remaining)
-                    elif packet.get("kind") == "returned" and reviewer is not None:
+                    elif packet.get("kind") in {"returned", "blocked"} and reviewer is not None:
                         completed_at = float(packet["completed_at"])
                         if not math.isfinite(completed_at) or completed_at < invoked_at:
                             raise ValueError("invalid worker completion time")
                         if completed_at - invoked_at > _REVIEW_TIMEOUT_SECONDS:
                             return _WorkerObservation(reviewer, code="content_review_timeout")
+                        if packet["kind"] == "blocked":
+                            return _WorkerObservation(reviewer, code=str(packet["code"]))
                         return _WorkerObservation(
                             reviewer, ContentReviewAssessment.model_validate(packet["assessment"])
                         )
