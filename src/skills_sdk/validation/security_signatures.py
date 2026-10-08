@@ -13,13 +13,6 @@ from pathlib import PurePosixPath
 from skills_sdk.models.risk import SecurityFinding
 
 _PATTERNS = (
-    (r"\b(curl|wget)\b[^\n|]*\|\s*(sh|bash|zsh|python|node)\b", "pipe_to_shell_download", "external_service"),
-    (
-        r"https?://[^\s)'\"]*(?:raw\.githubusercontent\.com|gist\.githubusercontent\.com|bit\.ly|tinyurl\.com|"
-        r"\.sh\b|\.py\b|\.js\b|\.zip\b|\.tgz\b|\.tar\.gz\b|\.dmg\b|\.pkg\b|\.exe\b)[^\s)'\"]*",
-        "suspicious_download_url",
-        "external_service",
-    ),
     (
         r"\b(fetch|download|curl|wget|retrieve)\b[^\n]{0,80}(?:\b(instruction|prompt|rule|skill|agent)\b|https?://[^\s)'\"]+)",
         "runtime_instruction_fetch",
@@ -57,6 +50,35 @@ _PATTERNS = (
     ),
 )
 
+_PIPE_TOKENS = re.compile(r"\b(?:curl|wget)\b|[|\n]", re.IGNORECASE)
+_SHELL_AFTER_PIPE = re.compile(r"\s*(?:sh|bash|zsh|python|node)\b", re.IGNORECASE)
+_URL_TOKENS = re.compile(r"https?://[^\s)'\"]*", re.IGNORECASE)
+_DOWNLOAD_MARKERS = re.compile(
+    r"raw\.githubusercontent\.com|gist\.githubusercontent\.com|bit\.ly|tinyurl\.com|"
+    r"\.sh\b|\.py\b|\.js\b|\.zip\b|\.tgz\b|\.tar\.gz\b|\.dmg\b|\.pkg\b|\.exe\b",
+    re.IGNORECASE,
+)
+
+
+def _pipe_to_shell(text: str) -> bool:
+    """Scan non-overlapping download/pipe segments without repeated tail scans."""
+    download = False
+    for token in _PIPE_TOKENS.finditer(text):
+        if token.group() == "\n":
+            download = False
+        elif token.group() == "|":
+            if download and _SHELL_AFTER_PIPE.match(text, token.end()) is not None:
+                return True
+            download = False
+        else:
+            download = True
+    return False
+
+
+def _suspicious_download_url(text: str) -> bool:
+    """Inspect each consumed URL once, including nested scheme-shaped text."""
+    return any(_DOWNLOAD_MARKERS.search(token.group()) is not None for token in _URL_TOKENS.finditer(text))
+
 
 def _finding(code: str, category: str, path: str) -> SecurityFinding:
     return SecurityFinding.model_validate(
@@ -78,11 +100,16 @@ def source_security_indicators(path: str, content: bytes) -> tuple[SecurityFindi
         return (_finding("opaque_binary_content", "dependency", path),)
     if path == "references/evals.yaml":
         text = _eval_security_text(text)
-    findings = [
+    findings = []
+    if _pipe_to_shell(text):
+        findings.append(_finding("pipe_to_shell_download", "external_service", path))
+    if _suspicious_download_url(text):
+        findings.append(_finding("suspicious_download_url", "external_service", path))
+    findings.extend(
         _finding(code, category, path)
         for pattern, code, category in _PATTERNS
         if re.search(pattern, text, re.IGNORECASE)
-    ]
+    )
     codes = {finding.code for finding in findings}
     if "untrusted_external_content_acquisition" in codes and codes & {
         "hardcoded_secret_literal",

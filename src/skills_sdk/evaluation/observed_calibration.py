@@ -128,8 +128,7 @@ def _preflight(plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbe
         if type(item) is not CalibrationProbeExecution or type(item.inputs) is not SelectedCaseExecutionInput:
             return "invalid_calibration_execution"
         definition = _revalidate_definition(item.definition)
-        ObservedCalibrationPlan.normalize_nested_models(item.request)
-        request = ProviderExecutionRequest.model_validate(item.request)
+        request = ProviderExecutionRequest.model_validate(ObservedCalibrationPlan.normalize_nested_models(item.request))
         if (
             definition.scenario_set.candidate != plan.candidate
             or request.candidate != plan.candidate

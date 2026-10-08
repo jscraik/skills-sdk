@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Mapping
+from datetime import datetime
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ModelWrapValidatorHandler, field_validator, model_validator
 
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.inventory import NonEmptyText, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.provider import ProviderIdentityV2
-from skills_sdk.models.provider_execution import _identity_is_public
+from skills_sdk.models.provider_execution import ProviderExecutionBlocker, ProviderExecutionRequest, _identity_is_public
 from skills_sdk.models.safety import PackageSafetyBlocker
 from skills_sdk.models.scorer_quality import ScorerCalibrationAppliedPolicy, ScorerJudgeParameters
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
@@ -32,17 +34,27 @@ def _audit_copied_members(value: object) -> None:
         remaining -= 1
         if remaining < 0 or depth > 32:
             raise ValueError("calibration input exceeds its nesting or work boundary")
-        if not isinstance(item, (BaseModel, dict, tuple, list)):
-            continue
+        if isinstance(item, (bytes, bytearray, memoryview)):
+            raise ValueError("calibration input must not coerce byte strings")
+        if isinstance(item, Mapping) and type(item) is not dict:
+            raise ValueError("calibration raw mappings require canonical dictionaries")
+        if not isinstance(item, BaseModel) and type(item) not in (dict, tuple, list):
+            if item is None or type(item) in (str, bool, int, float, datetime):
+                continue
+            raise ValueError("calibration input requires canonical containers and scalars")
         if identity in active:
             raise ValueError("calibration input contains a cycle")
         if identity in completed:
             continue
         if isinstance(item, BaseModel):
+            if type(item) not in _CANONICAL_CALIBRATION_MODELS:
+                raise ValueError("calibration requires canonical SDK model classes")
             if set(item.__dict__) - set(type(item).model_fields) or item.__pydantic_extra__:
                 raise ValueError("copied calibration models contain unknown fields")
             members = tuple(item.__dict__.values())
         elif isinstance(item, dict):
+            if any(type(key) is not str for key in item):
+                raise ValueError("calibration input requires string dictionary keys")
             members = tuple(item.values())
         else:
             members = item
@@ -53,17 +65,39 @@ def _audit_copied_members(value: object) -> None:
         stack.extend((member, depth + 1, False) for member in members)
 
 
+def _canonical_calibration_input(value: object) -> object:
+    """Rebuild bounded raw members without invoking any model serializers."""
+    _audit_copied_members(value)
+    remaining = 4096
+
+    def visit(item: object, depth: int) -> object:
+        nonlocal remaining
+        remaining -= 1
+        if remaining < 0 or depth > 32:
+            raise ValueError("calibration input exceeds its nesting or work boundary")
+        if isinstance(item, BaseModel):
+            return visit(item.__dict__, depth + 1)
+        if isinstance(item, dict):
+            return {key: visit(member, depth + 1) for key, member in item.items()}
+        if isinstance(item, (tuple, list)):
+            return [visit(member, depth + 1) for member in item]
+        if isinstance(item, datetime):
+            return datetime.isoformat(item)
+        return item
+
+    return visit(value, 0)
+
+
 class _ObservedContractModel(_ContractModel):
     """Revalidate copied instances without changing frozen contract families."""
 
     model_config = ConfigDict(revalidate_instances="always")
 
-    @model_validator(mode="before")
+    @model_validator(mode="wrap")
     @classmethod
-    def copied_members_are_explicit(cls, value: object) -> object:
+    def copied_members_are_explicit(cls, value: object, handler: ModelWrapValidatorHandler[Self]) -> Self:
         """Preserve unknown-field rejection for typed and mixed nested inputs."""
-        _audit_copied_members(value)
-        return value
+        return handler(_canonical_calibration_input(value))
 
 
 class HeldOutCalibrationProbe(_ObservedContractModel):
@@ -90,12 +124,7 @@ class ObservedCalibrationPlan(_ObservedContractModel):
     @classmethod
     def normalize_nested_models(cls, value: object) -> object:
         """Revalidate copied members without laundering bools into numeric fields."""
-        _audit_copied_members(value)
-        if isinstance(value, BaseModel):
-            return value.model_dump(mode="python")
-        if isinstance(value, (tuple, list)):
-            return [item.model_dump(mode="python") if isinstance(item, BaseModel) else item for item in value]
-        return value
+        return _canonical_calibration_input(value)
 
     @model_validator(mode="after")
     def bindings_and_coverage(self) -> ObservedCalibrationPlan:
@@ -252,3 +281,23 @@ class ObservedCalibrationReceipt(_ObservedContractModel):
                 raise ValueError("execution failure requires an unfinished result prefix")
         elif self.results or self.judge_invocation_count:
             raise ValueError("pre-execution blockers cannot retain judge invocations")
+
+
+_CANONICAL_CALIBRATION_MODELS = frozenset(
+    {
+        CalibrationJudgeVerdict,
+        HeldOutCalibrationProbe,
+        ObservedCalibrationPlan,
+        ObservedCalibrationProbeResult,
+        ObservedCalibrationReceipt,
+        PackageCandidateIdentity,
+        ScorerProfile,
+        ProviderIdentityV2,
+        ScorerJudgeParameters,
+        ScorerCalibrationAppliedPolicy,
+        SelectedCaseJudgeEvidence,
+        PackageSafetyBlocker,
+        ProviderExecutionRequest,
+        ProviderExecutionBlocker,
+    }
+)

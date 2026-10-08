@@ -6,7 +6,10 @@ import asyncio
 import json
 import subprocess
 import sys
+from collections import UserDict, UserList
 from pathlib import Path
+
+from pydantic import ValidationError, model_serializer
 
 import skills_sdk
 from skills_sdk.evaluation import (
@@ -83,6 +86,62 @@ def _api(root: Path, original: dict[str, object]) -> None:
     rejected = asyncio.run(execute_scorer_calibration(plan, _executions(root, invalid, events)))
     assert rejected.status == "blocked" and rejected.judge_invocation_count == 0 and events == []
     assert asyncio.run(execute_scorer_calibration(plan, valid)).status == "pass"
+    events.clear()
+    _ingress(plan, valid, events)
+
+
+def _ingress(plan: ObservedCalibrationPlan, valid: tuple[CalibrationProbeExecution, ...], events: list[str]) -> None:
+    """Reject caller serializers, direct subclasses and bytes in the installed API."""
+    calls: list[str] = []
+
+    class CallerProvider(ProviderIdentityV2):
+        @model_serializer(mode="plain")
+        def mask_members(self) -> dict[str, object]:
+            calls.append("serializer")
+            return plan.judge.model_dump(mode="python")
+
+    forged = CallerProvider.model_construct(**plan.judge.__dict__).model_copy(update={"provider_kind": "bogus"})
+    malformed = {**plan.model_dump(mode="json"), "judge": forged}
+    blocked = asyncio.run(execute_scorer_calibration(malformed, valid))
+    assert blocked.blocker.code == "invalid_calibration_input" and blocked.judge_invocation_count == 0
+    assert calls == [] and events == []
+    view_input = {**plan.model_dump(mode="json"), "judge": UserDict({"provider": forged})}
+    blocked = asyncio.run(execute_scorer_calibration(view_input, valid))
+    assert blocked.blocker.code == "invalid_calibration_input" and blocked.judge_invocation_count == 0
+    assert calls == [] and events == []
+    verdict = valid[0].judge.verdict
+    for field in ("provider", "judge"):
+        identity = getattr(verdict.evidence, field)
+        evidence = {
+            **verdict.evidence.model_dump(mode="json"),
+            field: identity.model_copy(update={"provider_id": b"synthetic-provider"}),
+        }
+        try:
+            CalibrationJudgeVerdict.model_validate({"evidence": evidence, "score": verdict.score})
+        except ValidationError:
+            pass
+        else:
+            raise AssertionError("installed mixed typed bytes must reject before coercion")
+    for field in ("evidence_refs", "satisfied_assertion_ids"):
+        member = getattr(verdict.evidence, field)[0].encode()
+        for container in ({member}, UserList([member]), iter([member])):
+            evidence = {**verdict.evidence.model_dump(mode="json"), field: container}
+            try:
+                CalibrationJudgeVerdict.model_validate({"evidence": evidence, "score": verdict.score})
+            except ValidationError:
+                pass
+            else:
+                raise AssertionError("installed unsupported containers must reject before coercion")
+
+    class CallerVerdict(CalibrationJudgeVerdict):
+        """No subclass may lose its identity before the wrap validator."""
+
+    valid[0].judge.verdict = CallerVerdict.model_construct(**verdict.__dict__)
+    blocked = asyncio.run(execute_scorer_calibration(plan, valid))
+    assert blocked.status == "blocked" and blocked.judge_invocation_count == 1 and blocked.results == ()
+    valid[0].judge.verdict = verdict
+    assert asyncio.run(execute_scorer_calibration(plan, valid)).status == "pass"
+    print("installed calibration raw/typed serializer, byte, container and subclass rejection/recovery: pass")
 
 
 def _cli(root: Path) -> tuple[int, dict[str, object]]:

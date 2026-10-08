@@ -12,6 +12,20 @@ This is deliberate execution hardening, not a claim of authenticated review or
 external scanner execution. Supplied manual-review fixtures prove guard behavior,
 not comprehensive security accuracy or completed plugin processing.
 
+Typed safety inputs use canonical SDK model classes, including nested models.
+Custom subclasses are rejected before their serializers run. Copied members
+are audited for unknown fields, byte strings, cycles and mutation constants,
+then revalidated; ordinary typed timestamps and closed raw JSON remain supported.
+Pipe-to-shell indicators require both filesystem/subprocess and network review,
+including commands written in non-script instructions or references.
+
+The packaged Draft 2020-12 schema enforces exactly six ordered checklist IDs,
+unique checklist evidence IDs and nonblank, public-safe rationale text. The
+model and `SchemaRegistry` additionally enforce digest and cross-object joins,
+supported screening, evidence references and applicable capability outcomes.
+The resource labels these remaining semantic checks; standalone structural
+acceptance does not establish safety admission or source freshness.
+
 Content-review worker packets use a separate bounded wire budget: the public
 eight-MiB normalized assessment limit plus 64 KiB for the envelope. Compact
 UTF-8 serialization avoids ASCII escaping that expands Unicode assessments.
@@ -67,6 +81,14 @@ contracts. They do not reinterpret read-only `scorer-calibration/v1`, change
 caller-supplied completion IDs into proof, or grant evaluation promotion.
 Raw, typed and copied inputs are revalidated at the model and service boundaries;
 `SchemaRegistry` adds semantic bindings beyond structural JSON Schema.
+Typed calibration inputs require canonical SDK model classes throughout the
+nested payload. Raw inputs require canonical dictionaries, lists and tuples with
+JSON scalars or canonical typed request timestamps; mapping views, custom
+containers, sets and iterators are rejected before coercion or iteration.
+Wrap validation audits raw members before the handler can
+discard subclass identity; copied unknown fields and byte strings are rejected
+before coercion. Normalisation reads raw members without calling model serializers,
+while preserving strict numeric values and canonical typed request timestamps.
 Receipts bind ordered held-out probes and trials to the candidate, output digest,
 assertion contract, scorer, judge and settings. Passing results require every
 declared invocation and the frozen confusion-matrix policy. Blocked partial

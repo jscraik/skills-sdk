@@ -6,9 +6,14 @@ import asyncio
 import json
 import subprocess
 import sys
+from copy import deepcopy
 from pathlib import Path
 
+from jsonschema import Draft202012Validator, FormatChecker
+
 import skills_sdk
+from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import SuppliedTextProviderAdapter, execute_selected_case, load_selected_case
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
@@ -120,12 +125,58 @@ def _cli(root: Path) -> tuple[int, dict[str, object]]:
     return result.returncode, json.loads(result.stdout)
 
 
+def _schema(context: dict[str, object]) -> None:
+    """Prove the installed resource rejects invalid checklist shapes and text."""
+    schema = SchemaRegistry().load("pre-execution-safety-evidence.v1")
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    accepted = context["safety_evidence"]
+    validator.validate(accepted)
+    for change in (
+        "empty",
+        "duplicate",
+        "reordered",
+        "evidence_duplicate",
+        "private",
+        "blank",
+        *(chr(code) for code in range(28, 32)),
+        "\u0085",
+    ):
+        payload = deepcopy(accepted)
+        checks = payload["checklist"]
+        if change == "empty":
+            checks.clear()
+        elif change == "duplicate":
+            checks[1] = deepcopy(checks[0])
+        elif change == "reordered":
+            checks[0], checks[1] = checks[1], checks[0]
+        elif change == "evidence_duplicate":
+            checks[0]["evidence_ids"] *= 2
+        elif change == "private":
+            checks[0]["rationale"] = "token=private-fixture"
+        else:
+            checks[0]["rationale"] = "   " if change == "blank" else change
+        for reference in payload["safety_receipt"]["evidence"]:
+            if reference["evidence_id"] == "capability-checklist":
+                reference["sha256"] = canonical_json_sha256({"version": payload["checklist_version"], "checks": checks})
+        assert list(validator.iter_errors(payload)), change
+        try:
+            PreExecutionSafetyEvidence.model_validate(payload)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"installed model accepted invalid checklist: {change!r}")
+    validator.validate(accepted)
+    assert schema["x-skills-sdk-semantic-validator"]["required_for"]
+    print("installed standalone safety schema rejection and recovery: pass")
+
+
 def check(root: Path) -> None:
     """Check wheel provenance and both entrypoints without repository fixture imports."""
     assert "site-packages" in str(Path(skills_sdk.__file__).resolve())
     assert "pytest" not in sys.modules
     path = root / "host-input.json"
     context = json.loads(path.read_text(encoding="utf-8"))
+    _schema(context)
     _api(root, context)
     code, accepted = _cli(root)
     assert code == 0 and accepted["status"] == "pass"

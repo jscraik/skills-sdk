@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
-from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.evaluation.pre_execution_safety import assess_pre_execution_safety
+from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
 from skills_sdk.models.risk import SecurityScreeningResult
 from skills_sdk.models.safety import PackageSafetyBlocker
 from skills_sdk.packaging import build_skill_package
@@ -16,6 +19,36 @@ from skills_sdk.validation.security_screening import screen_package_security
 from skills_sdk.validation.security_signatures import source_security_indicators
 from tests.test_pre_execution_safety import _bound
 from tests.test_selected_case_evaluation import REVISION, _skill
+
+
+def test_download_scanning_has_bounded_work_for_repeated_prefixes() -> None:
+    program = "\n".join(
+        [
+            "from skills_sdk.validation.security_signatures import source_security_indicators",
+            "for text in ('curl ' * 100000, 'https://example.invalid/' * 30000):",
+            "    found = source_security_indicators('references/fixture.md', text.encode())",
+            "    assert 'pipe_to_shell_download' not in {item.code for item in found}",
+            "    assert 'suspicious_download_url' not in {item.code for item in found}",
+        ]
+    )
+    completed = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=5, check=False)
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize(
+    "command,expected",
+    [
+        ("curl " + "argument " * 1000 + "| bash", True),
+        ("CURL https://example.invalid/a |\n bash", True),
+        ("curl one | cat | bash", False),
+        ("curl one\n| bash", False),
+        ("notcurl one | bash", False),
+        ("wget one | python", True),
+    ],
+)
+def test_linear_pipe_scanning_preserves_long_and_neighboring_semantics(command: str, expected: bool) -> None:
+    found = source_security_indicators("references/fixture.md", command.encode())
+    assert ("pipe_to_shell_download" in {item.code for item in found}) is expected
 
 
 @pytest.mark.parametrize(
@@ -161,6 +194,7 @@ def test_copied_checklist_members_are_revalidated() -> None:
     checks = list(evidence.checklist)
     checks[0] = checks[0].model_copy(update={"rationale": "token=private-value-long"})
     forged = evidence.model_copy(update={"checklist": tuple(checks)})
-    # Binding a forged checklist digest cannot make a private rationale valid.
-    assert canonical_json_sha256([item.model_dump(mode="json") for item in checks])
+    with pytest.raises(ValidationError, match="checklist rationale must not contain private values"):
+        PreExecutionSafetyEvidence.model_validate(forged)
     assert assess_pre_execution_safety(request, forged, checked_at=datetime(2026, 10, 8, 9, tzinfo=UTC)) is not None
+    assert assess_pre_execution_safety(request, evidence, checked_at=datetime(2026, 10, 8, 9, tzinfo=UTC)) is None

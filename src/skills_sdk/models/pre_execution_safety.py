@@ -1,18 +1,28 @@
 """Portable actual-artifact input for the pre-execution safety binding check."""
 
 from collections.abc import Mapping
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ModelWrapValidatorHandler, field_validator, model_validator
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.inventory import NonEmptyText, _ContractModel
-from skills_sdk.models.packaging import PackageReceiptV2
-from skills_sdk.models.risk import SecurityScreeningResult
+from skills_sdk.models.package import PackageCandidateIdentity
+from skills_sdk.models.packaging import (
+    PackageManifest,
+    PackageManifestFile,
+    PackageManifestProvenance,
+    PackageReceiptBlocker,
+    PackageReceiptV2,
+)
+from skills_sdk.models.risk import SecurityFinding, SecurityScreeningResult
 from skills_sdk.models.safety import (
+    PackageSafetyBlocker,
     PackageSafetyEvidenceReceipt,
+    PackageSafetyEvidenceReference,
+    PackageSafetyFinding,
+    PackageSafetyReviewer,
     SafetyEvidenceId,
-    _contains_byte_string,
     _public_text_is_redaction_safe,
 )
 
@@ -37,19 +47,23 @@ SAFETY_CHECK_IDS = (
 class CapabilitySafetyReview(_ContractModel):
     """One explicit review outcome or explained non-applicability decision."""
 
+    model_config = ConfigDict(revalidate_instances="always")
+
     check_id: SafetyCheckId
     status: Literal["reviewed_no_issue", "not_applicable"]
     rationale: NonEmptyText
     evidence_ids: tuple[SafetyEvidenceId, ...] = Field(min_length=1)
 
-    @model_validator(mode="before")
+    @model_validator(mode="wrap")
     @classmethod
-    def copied_models_must_be_revalidated(cls, value: object) -> object:
-        return value.model_dump(mode="json") if isinstance(value, BaseModel) else value
+    def copied_models_must_be_revalidated(cls, value: object, handler: ModelWrapValidatorHandler[Self]) -> Self:
+        return handler(_canonical_nested_input(value))
 
     @field_validator("rationale")
     @classmethod
     def rationale_must_be_public(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("checklist rationale must not be blank")
         if not _public_text_is_redaction_safe(value):
             raise ValueError("checklist rationale must not contain private values")
         return value
@@ -65,6 +79,8 @@ class CapabilitySafetyReview(_ContractModel):
 class PreExecutionSafetyEvidence(_ContractModel):
     """Actual upstream and review artifacts, never an ID-only admission flag."""
 
+    model_config = ConfigDict(revalidate_instances="always")
+
     schema_version: Literal["pre-execution-safety-evidence/v1"] = "pre-execution-safety-evidence/v1"
     package_receipt: PackageReceiptV2
     safety_receipt: PackageSafetyEvidenceReceipt
@@ -72,16 +88,10 @@ class PreExecutionSafetyEvidence(_ContractModel):
     checklist_version: Literal["sdk-capability-checklist/v1"] = "sdk-capability-checklist/v1"
     checklist: tuple[CapabilitySafetyReview, ...]
 
-    @model_validator(mode="before")
+    @model_validator(mode="wrap")
     @classmethod
-    def actual_artifacts_must_be_revalidated(cls, value: object) -> object:
-        if _contains_byte_string(value):
-            raise ValueError("pre-execution evidence must not coerce byte strings")
-        if isinstance(value, BaseModel):
-            value = value.model_dump(mode="json")
-        if isinstance(value, Mapping):
-            return {key: _canonical_nested_input(item) for key, item in value.items()}
-        return value
+    def actual_artifacts_must_be_revalidated(cls, value: object, handler: ModelWrapValidatorHandler[Self]) -> Self:
+        return handler(_canonical_nested_input(value))
 
     @model_validator(mode="after")
     def upstream_and_review_must_bind(self) -> "PreExecutionSafetyEvidence":
@@ -125,7 +135,9 @@ def _required_checks(value: PreExecutionSafetyEvidence) -> set[str]:
         required.add("network_and_external_writes")
     if "dependency" in categories:
         required.add("dependencies_and_binaries")
-    if "unsafe_path" in categories or any(f.code == "executable_source_capability" for f in value.screening.findings):
+    if "unsafe_path" in categories or any(
+        f.code in {"executable_source_capability", "pipe_to_shell_download"} for f in value.screening.findings
+    ):
         required.add("filesystem_and_subprocess")
     if "mcp_auth" in categories or any(f.code == "system_service_modification" for f in value.screening.findings):
         required.add("tools_and_privileges")
@@ -135,9 +147,63 @@ def _required_checks(value: PreExecutionSafetyEvidence) -> set[str]:
     return required
 
 
+_CANONICAL_EVIDENCE_MODELS = frozenset(
+    {
+        CapabilitySafetyReview,
+        PreExecutionSafetyEvidence,
+        PackageCandidateIdentity,
+        PackageManifest,
+        PackageManifestFile,
+        PackageManifestProvenance,
+        PackageReceiptBlocker,
+        PackageReceiptV2,
+        PackageSafetyBlocker,
+        PackageSafetyEvidenceReceipt,
+        PackageSafetyEvidenceReference,
+        PackageSafetyFinding,
+        PackageSafetyReviewer,
+        SecurityFinding,
+        SecurityScreeningResult,
+    }
+)
+
+
 def _canonical_nested_input(value: object) -> object:
-    if isinstance(value, BaseModel):
-        return value.model_dump(mode="json")
-    if isinstance(value, (list, tuple)):
-        return [_canonical_nested_input(item) for item in value]
-    return value
+    """Bound mixed nested inputs without dropping copied fields or validators."""
+    remaining = 131072
+    active: set[int] = set()
+
+    def visit(item: object, depth: int) -> object:
+        nonlocal remaining
+        remaining -= 1
+        if remaining < 0 or depth > 32:
+            raise ValueError("pre-execution evidence exceeds its work or nesting bound")
+        if isinstance(item, (bytes, bytearray, memoryview)):
+            raise ValueError("pre-execution evidence must not coerce byte strings")
+        if not isinstance(item, (BaseModel, Mapping, list, tuple)):
+            return item
+        identity = id(item)
+        if identity in active:
+            raise ValueError("pre-execution evidence must not contain cycles")
+        active.add(identity)
+        try:
+            if isinstance(item, BaseModel):
+                if type(item) not in _CANONICAL_EVIDENCE_MODELS:
+                    raise ValueError("pre-execution evidence requires canonical SDK model classes")
+                if set(item.__dict__) - set(type(item).model_fields) or item.__pydantic_extra__:
+                    raise ValueError("copied pre-execution evidence contains unknown members")
+                # Audit raw members before serialization can hide copied fields
+                # or coerce bytes, then retain the contract's JSON scalar forms.
+                visit(item.__dict__, depth + 1)
+                return visit(item.model_dump(mode="json"), depth + 1)
+            if isinstance(item, Mapping):
+                if any(type(key) is not str for key in item):
+                    raise ValueError("pre-execution evidence requires string dictionary keys")
+                if "mutation_performed" in item and item["mutation_performed"] is not False:
+                    raise ValueError("pre-execution evidence cannot coerce mutation constants")
+                return {key: visit(member, depth + 1) for key, member in item.items()}
+            return [visit(member, depth + 1) for member in item]
+        finally:
+            active.remove(identity)
+
+    return visit(value, 0)

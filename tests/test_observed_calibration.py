@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from collections import UserDict, UserList
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError, model_serializer
 from test_live_selected_case import _Provider, _setup
 from test_selected_case_evaluation import _evidence, _safety_for
 
@@ -432,6 +433,141 @@ def test_input_audit_bounds_cycles_and_work_preserving_valid_aliases(tmp_path: P
             _audit_copied_members(malformed)
         rejected = asyncio.run(execute_scorer_calibration(malformed, executions))
         assert rejected.status == "blocked" and events == []
+    assert asyncio.run(execute_scorer_calibration(plan, executions)).status == "pass"
+
+
+def _masked_model(value: BaseModel, calls: list[str]) -> BaseModel:
+    """A caller serializer must not replace raw members at a contract boundary."""
+
+    class CallerModel(type(value)):
+        @model_serializer(mode="plain")
+        def mask_members(self) -> dict[str, object]:
+            calls.append("serializer")
+            return value.model_dump(mode="python")
+
+    return CallerModel.model_construct(**value.__dict__)
+
+
+@pytest.mark.parametrize("boundary", ["raw", "typed"])
+def test_noncanonical_plan_judge_rejects_before_serialization_and_recovers(tmp_path: Path, boundary: str) -> None:
+    plan, executions, events = _batch(tmp_path)
+    calls: list[str] = []
+    forged = _masked_model(plan.judge, calls).model_copy(update={"provider_kind": "bogus"})
+    supplied = (
+        {**plan.model_dump(mode="json"), "judge": forged}
+        if boundary == "raw"
+        else plan.model_copy(update={"judge": forged})
+    )
+    with pytest.raises(ValidationError):
+        ObservedCalibrationPlan.model_validate(supplied)
+    rejected = asyncio.run(execute_scorer_calibration(supplied, executions))
+    assert rejected.blocker.code == "invalid_calibration_input" and rejected.plan is None
+    assert calls == [] and events == []
+    assert asyncio.run(execute_scorer_calibration(plan, executions)).status == "pass"
+
+
+@pytest.mark.parametrize("field", ["provider", "judge"])
+@pytest.mark.parametrize("mutation", ["subclass", "bytes"])
+def test_mixed_verdict_evidence_rejects_before_coercion_and_recovers(tmp_path: Path, field: str, mutation: str) -> None:
+    _, executions, _ = _batch(tmp_path)
+    item = executions[0]
+    evidence = _evidence(item.definition, item.request, "behavior preserved")
+    calls: list[str] = []
+    identity = getattr(evidence, field)
+    forged = (
+        _masked_model(identity, calls).model_copy(update={"provider_kind": "bogus"})
+        if mutation == "subclass"
+        else identity.model_copy(update={"provider_id": b"synthetic-provider"})
+    )
+    supplied = {"evidence": {**evidence.model_dump(mode="json"), field: forged}, "score": 0.9}
+    with pytest.raises(ValidationError):
+        CalibrationJudgeVerdict.model_validate(supplied)
+    assert calls == []
+    assert CalibrationJudgeVerdict(evidence=evidence, score=0.9).evidence == evidence
+
+
+@pytest.mark.parametrize("boundary", ["raw", "typed"])
+def test_mapping_views_cannot_hide_nested_serializers_and_recover(tmp_path: Path, boundary: str) -> None:
+    _, executions, _ = _batch(tmp_path)
+    item = executions[0]
+    evidence = _evidence(item.definition, item.request, "behavior preserved")
+    canonical = CalibrationJudgeVerdict(evidence=evidence, score=0.9)
+    calls: list[str] = []
+    hidden = _masked_model(evidence.provider, calls).model_copy(update={"provider_kind": "bogus"})
+    view = UserDict({**evidence.model_dump(mode="json"), "provider": hidden})
+    supplied = (
+        {"evidence": view, "score": 0.9} if boundary == "raw" else canonical.model_copy(update={"evidence": view})
+    )
+    with pytest.raises(ValidationError):
+        CalibrationJudgeVerdict.model_validate(supplied)
+    assert calls == []
+    assert CalibrationJudgeVerdict.model_validate(canonical) == canonical
+
+
+@pytest.mark.parametrize("field", ["evidence_refs", "satisfied_assertion_ids"])
+@pytest.mark.parametrize("container", ["set", "view", "generator"])
+def test_non_json_containers_cannot_hide_bytes_and_recover(tmp_path: Path, field: str, container: str) -> None:
+    _, executions, _ = _batch(tmp_path)
+    item = executions[0]
+    evidence = _evidence(item.definition, item.request, "behavior preserved")
+    text = b"evidence/review.json" if field == "evidence_refs" else b"preserve-behavior"
+    hidden = {"set": {text}, "view": UserList([text]), "generator": iter([text])}[container]
+    raw = {"evidence": {**evidence.model_dump(mode="json"), field: hidden}, "score": 0.9}
+    with pytest.raises(ValidationError):
+        CalibrationJudgeVerdict.model_validate(raw)
+    assert CalibrationJudgeVerdict(evidence=evidence, score=0.9).evidence == evidence
+
+
+@pytest.mark.parametrize("member", ["plan", "probe", "verdict", "receipt", "result"])
+def test_direct_additive_subclasses_reject_before_handler_and_recover(tmp_path: Path, member: str) -> None:
+    plan, executions, _ = _batch(tmp_path)
+    receipt = asyncio.run(execute_scorer_calibration(plan, executions))
+    item = executions[0]
+    verdict = CalibrationJudgeVerdict(
+        evidence=_evidence(item.definition, item.request, "behavior preserved"), score=0.9
+    )
+    canonical = {
+        "plan": plan,
+        "probe": plan.probes[0],
+        "verdict": verdict,
+        "receipt": receipt,
+        "result": receipt.results[0],
+    }[member]
+    calls: list[str] = []
+    with pytest.raises(ValidationError):
+        type(canonical).model_validate(_masked_model(canonical, calls))
+    assert calls == []
+    assert type(canonical).model_validate(canonical) == canonical
+
+
+class NoncanonicalVerdictJudge(NumericJudge):
+    """Actual invocation cannot turn a caller subclass into canonical evidence."""
+
+    async def judge(self, inputs: object) -> object:
+        verdict = await super().judge(inputs)
+        return _masked_model(verdict, self.events)
+
+
+class MappingVerdictJudge(NumericJudge):
+    """A mapping view must not defer hidden model validation to a frozen family."""
+
+    async def judge(self, inputs: object) -> object:
+        verdict = await super().judge(inputs)
+        hidden = _masked_model(verdict.evidence.provider, self.events)
+        view = UserDict({**verdict.evidence.model_dump(mode="json"), "provider": hidden})
+        return {"evidence": view, "score": verdict.score}
+
+
+@pytest.mark.parametrize("adapter", [NoncanonicalVerdictJudge, MappingVerdictJudge])
+def test_noncanonical_callback_rejects_without_serialization_and_recovers(
+    tmp_path: Path, adapter: type[NumericJudge]
+) -> None:
+    plan, executions, events = _batch(tmp_path)
+    judge = adapter(executions[0].definition, executions[0].request, 0.9, events)
+    changed = (replace(executions[0], judge=judge), executions[1])
+    blocked = asyncio.run(execute_scorer_calibration(plan, changed))
+    assert blocked.status == "blocked" and blocked.judge_invocation_count == 1 and blocked.results == ()
+    assert "serializer" not in events
     assert asyncio.run(execute_scorer_calibration(plan, executions)).status == "pass"
 
 
