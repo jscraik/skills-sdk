@@ -358,6 +358,7 @@ def test_quality_cli_rejects_duplicate_members_and_symlinks(tmp_path: Path, caps
 @pytest.mark.parametrize("stop", ["owner", "policy", "review"])
 def test_quality_cli_text_explains_stage_receipt(tmp_path: Path, capsys: pytest.CaptureFixture[str], stop: str) -> None:
     payload = _request(tmp_path)
+    accepted_payload = json.loads(json.dumps(payload))
     if stop == "owner":
         payload["intake"]["checks"]["owner_unchanged"] = False
         expected = ("decision: needs_owner_decision", "decision_blocker: owner_decision_required")
@@ -378,6 +379,19 @@ def test_quality_cli_text_explains_stage_receipt(tmp_path: Path, capsys: pytest.
         assert f"  {detail}\n" in output
     if stop == "policy":
         assert output.count(f"  {expected[1]}\n") == 2  # Validation finding and receipt blocker.
+    request.write_text(json.dumps(accepted_payload))
+    assessment = tmp_path / "assessment.json"
+    assessment.write_text(json.dumps(_assessment(_package_path(tmp_path))))
+    command = [
+        "check-quality",
+        str(_package_path(tmp_path)),
+        "--request",
+        str(request),
+        "--assessment",
+        str(assessment),
+    ]
+    assert main(command) == 0
+    assert capsys.readouterr().out == "check-quality: local_checks_passed\n"
 
 
 @pytest.mark.parametrize("stop", ["request", "baseline", "candidate_changed", "content-review"])
@@ -502,4 +516,114 @@ def test_quality_review_subclass_rejected_before_serializer_and_recovers(tmp_pat
     with pytest.raises(ValidationError, match="canonical review"):
         LocalCheckResultV2.model_validate(UserDict(dict(forged)))
     assert calls == []
+    assert LocalCheckResultV2.model_validate(result).status == "local_checks_passed"
+
+
+@pytest.mark.parametrize("field", ["scorer_id", "scorer_version_or_digest", "threshold", "parameters"])
+def test_quality_calibration_matches_declared_scorer_and_recovers(tmp_path: Path, field: str) -> None:
+    payload = _request(tmp_path)
+    package = _package_path(tmp_path)
+    result = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))
+    forged = result.model_dump(mode="json")
+    calibration = next(stage["receipt"] for stage in forged["stages"] if stage["name"] == "scorer-calibration")
+    if field == "threshold":
+        calibration["effective_policy"][field] = 0.6
+    elif field == "parameters":
+        declaration = next(stage["receipt"] for stage in forged["stages"] if stage["name"] == "scorer-quality")
+        declaration["parameters"] = dict(calibration[field])
+        LocalCheckResultV2.model_validate(forged)
+        calibration[field]["model"] = "unrelated-judge"
+    else:
+        calibration[field] = "unrelated-scorer"
+    with pytest.raises(ValidationError, match="declared scorer"):
+        LocalCheckResultV2.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", forged)
+    assert LocalCheckResultV2.model_validate(result).status == "local_checks_passed"
+
+
+@pytest.mark.parametrize("mode", ["supplied", "observed"])
+@pytest.mark.parametrize("defect", ["digest", "reference_coverage"])
+def test_quality_review_matches_captured_files_and_recovers(tmp_path: Path, mode: str, defect: str) -> None:
+    from skills_sdk.core.digests import canonical_json_sha256
+
+    payload = _request(tmp_path)
+    package = _package_path(tmp_path)
+    payload["content_review_mode"] = mode
+    assessment = _assessment(package)
+    options = {"assessment": assessment} if mode == "supplied" else {"adapter": QualityFixtureReviewer(assessment)}
+    result = asyncio.run(check_local_quality(package, payload, **options))
+    forged = result.model_dump(mode="json")
+    receipt = forged["stages"][-1]["receipt"]
+    review = receipt if mode == "supplied" else receipt["review"]
+    edited = review["assessment"]
+    if defect == "digest":
+        edited["evidence"][0]["sha256"] = "0" * 64
+    else:
+        removed = next(item for item in edited["items"] if item["dimension"] == "reference")
+        edited["items"].remove(removed)
+        used = {key for item in edited["items"] for key in item["evidence_ids"]}
+        edited["evidence"] = [item for item in edited["evidence"] if item["evidence_id"] in used]
+    if mode == "observed":
+        receipt["assessment_sha256"] = canonical_json_sha256(edited)
+    with pytest.raises(ValidationError, match="captured manifest"):
+        LocalCheckResultV2.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", forged)
+    assert LocalCheckResultV2.model_validate(result).status == "local_checks_passed"
+
+
+@pytest.mark.parametrize("target", ["baseline", "validate", "final_capture", "baseline_final_capture"])
+def test_blocked_quality_capture_binds_manifest_and_recovers(tmp_path: Path, target: str) -> None:
+    payload = _request(tmp_path, "update")
+    package = _package_path(tmp_path)
+    payload["update_baseline"] = payload["candidate"]
+    result = asyncio.run(check_local_quality(package, payload, baseline_root=package, assessment=_assessment(package)))
+    blocked = result.model_dump(mode="json")
+    blocked.update(status="blocked", blocker={"code": "quality_stage_incomplete", "message": "Fixture blocker."})
+    if target.endswith("capture"):
+        blocked["blocked_stage"] = "final-capture"
+        capture = blocked[target]
+    else:
+        blocked.update(blocked_stage=target, final_capture=None, baseline_final_capture=None)
+        index = next(index for index, stage in enumerate(blocked["stages"]) if stage["name"] == target)
+        blocked["stages"] = blocked["stages"][: index + 1]
+        capture = blocked["stages"][-1]["receipt"]
+    capture.update(
+        status="blocked", findings=[{"code": "fixture_blocked", "severity": "blocker", "message": "Fixture."}]
+    )
+    valid = LocalCheckResultV2.model_validate(blocked)
+    capture["files"][0]["sha256"] = "0" * 64
+    with pytest.raises(ValidationError, match="digest must match"):
+        LocalCheckResultV2.model_validate(blocked)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", blocked)
+    SchemaRegistry().validate("local-check.v2", valid.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize("stage_name", ["scorer-calibration", "content-review"])
+def test_changed_candidate_does_not_join_evidence_from_old_candidate(tmp_path: Path, stage_name: str) -> None:
+    payload = _request(tmp_path)
+    package = _package_path(tmp_path)
+    result = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))
+    changed = result.model_dump(mode="json")
+    index = next(index for index, stage in enumerate(changed["stages"]) if stage["name"] == stage_name)
+    changed["stages"] = changed["stages"][: index + 1]
+    receipt = changed["stages"][-1]["receipt"]
+    receipt["candidate"]["content_sha256"] = "1" * 64
+    if stage_name == "scorer-calibration":
+        receipt["scorer_id"] = "changed-scorer"
+    else:
+        receipt["assessment"]["candidate"] = dict(receipt["candidate"])
+        receipt["assessment"]["evidence"][0]["sha256"] = "1" * 64
+    changed.update(
+        status="blocked",
+        blocked_stage="candidate_changed",
+        blocker={"code": "quality_candidate_changed", "message": "Candidate changed between stages."},
+        final_capture=None,
+        baseline_final_capture=None,
+    )
+    blocked = LocalCheckResultV2.model_validate(changed)
+    assert blocked.status == "blocked" and blocked.blocked_stage == "candidate_changed"
+    SchemaRegistry().validate("local-check.v2", changed)
     assert LocalCheckResultV2.model_validate(result).status == "local_checks_passed"

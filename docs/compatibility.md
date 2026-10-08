@@ -26,7 +26,12 @@ but is not an authenticated attestation of execution or semantic truth.
 Packaged JSON Schema enforces structural types and update-baseline presence.
 Models and `SchemaRegistry` additionally enforce candidate/lineage equality,
 ordered first-stop evidence, selected intake/coverage context, content lane and
-final capture relationships. Only the service observes source bytes and applies
+final capture relationships. Captures with a candidate bind their manifest
+digest even when blocked. Passing calibration matches the selected scorer's
+identity, threshold and declared parameters; passing content review matches
+captured file digests and actual reference coverage. A last-stage receipt from
+a changed candidate remains a typed blocker, not a cross-candidate evidence join.
+Only the service observes source bytes and applies
 the selected policy. Generic schema validation cannot prove these observations.
 Both families remain outside the generic receipt parser. No earlier receipt
 family is reinterpreted as permission to execute, promote or publish.

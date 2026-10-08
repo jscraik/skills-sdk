@@ -56,11 +56,41 @@ def _review_types_are_canonical(value: object) -> None:
 def _validation_manifest_matches(validation: SkillPackageValidation) -> None:
     """Check internal manifest consistency, without authenticating source execution."""
     if (
-        validation.status == "pass"
-        and validation.candidate is not None
+        validation.candidate is not None
         and candidate_content_sha256(validation.files) != validation.candidate.content_sha256
     ):
         raise ValueError("quality capture digest must match its manifest files")
+
+
+def _calibration_matches_declaration(calibration: ScorerCalibrationReceipt, declaration: QualityStageReceipt) -> None:
+    """Join passing calibration to its scorer, retaining failed evidence as failure."""
+    if calibration.status != "pass":
+        return
+    if not isinstance(declaration, ScorerQualityReceipt) or (
+        calibration.scorer_id != declaration.scorer_id
+        or calibration.scorer_version_or_digest != declaration.scorer_version_or_digest
+        or calibration.effective_policy is None
+        or calibration.effective_policy.threshold != declaration.pass_threshold
+        or (declaration.parameters is not None and calibration.parameters != declaration.parameters)
+    ):
+        raise ValueError("passing calibration must match the declared scorer")
+
+
+def _review_matches_capture(
+    receipt: ContentReviewResult | ContentReviewExecutionResult, capture: QualityStageReceipt
+) -> None:
+    """Bind passing review digests and actual reference coverage to captured files."""
+    if receipt.status != "pass":
+        return
+    review = receipt.review if isinstance(receipt, ContentReviewExecutionResult) else receipt
+    if review is None or review.assessment is None or not isinstance(capture, SkillPackageValidation):
+        raise ValueError("passing review requires a captured manifest")
+    assessment = review.assessment
+    files = {item.path: item.sha256 for item in capture.files}
+    expected = {path for path in files if path.startswith("references/")}
+    reviewed = {item.path for item in assessment.items if item.dimension == "reference"}
+    if reviewed != expected or any(files.get(item.ref) != item.sha256 for item in assessment.evidence):
+        raise ValueError("passing review evidence and coverage must match the captured manifest")
 
 
 class LocalQualityPolicy(_ContractModel):
@@ -258,6 +288,7 @@ class LocalCheckResultV2(_ContractModel):
         if tuple(stage.name for stage in self.stages) != expected[: len(self.stages)]:
             raise ValueError("quality stages must be an ordered prefix")
         mismatches = []
+        receipts = {stage.name: stage.receipt for stage in self.stages}
         for index, stage in enumerate(self.stages):
             candidate = self.request.update_baseline if stage.name == "baseline" else self.request.candidate
             if stage.receipt.candidate != candidate:
@@ -270,10 +301,17 @@ class LocalCheckResultV2(_ContractModel):
                 raise ValueError("intake receipt must retain the selected request context")
             if isinstance(stage.receipt, ScenarioCoverageResult) and stage.receipt.plan != self.request.coverage_plan:
                 raise ValueError("coverage receipt must retain the selected request plan")
+            if isinstance(stage.receipt, ScorerCalibrationReceipt) and stage.receipt.candidate == candidate:
+                _calibration_matches_declaration(stage.receipt, receipts["scorer-quality"])
             if stage.name == "content-review":
                 observed = isinstance(stage.receipt, ContentReviewExecutionResult)
                 if observed != (self.request.content_review_mode == "observed"):
                     raise ValueError("content evidence must match the selected review lane")
+                if (
+                    isinstance(stage.receipt, (ContentReviewResult, ContentReviewExecutionResult))
+                    and stage.receipt.candidate == candidate
+                ):
+                    _review_matches_capture(stage.receipt, receipts["validate"])
         if (self.final_capture is not None or self.baseline_final_capture is not None) and (
             len(self.stages) != len(expected) or not all(stage.passed() for stage in self.stages)
         ):
