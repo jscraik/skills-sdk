@@ -155,6 +155,24 @@ candidate-bound lanes:
   identity agreement with the valid declaration. It emits a
   `scorer-calibration/v1` receipt. The SDK reads supplied artifacts but neither
   runs a judge nor proves their external provenance.
+- `eval observed-calibration` invokes numeric judge callbacks for every held-out
+  probe and declared trial. The CLI requires `--adapter-mode supplied-offline`:
+  its text outputs and numeric verdicts are supplied fixtures, not fresh model
+  results. Use `skills-sdk eval observed-calibration ./skills/example
+  --source-revision "<40-lowercase-hex>" --host-input ./calibration.json
+  --adapter-mode supplied-offline --json --robot`. The bounded no-follow input
+  has exactly `plan` and `executions` members. Each execution has `case_id`,
+  `mode`, `request`, `input_payload`, `safety_evidence`, `provider`, and `judge`.
+  The provider has `descriptor`, `output_text`, and `evidence_refs`; the judge
+  has `identity`, `parameters`, and a `verdict` containing `evidence` and `score`.
+  The plan freezes candidate, scorer, judge, parameters, policy, assertion digest,
+  and ordered probe IDs, output digests and expected labels. Labels remain in
+  the harness, outside the delegate input. The `observed-calibration/v1` result
+  records invocation count and ordered outcomes; incomplete, drifted or unsafe
+  batches block. Exit codes are `0` for pass and `2` for blocked. Neither outcome
+  proves external authenticity or authorises promotion. See the maintained
+  [installed calibration proof](../tests/installed_observed_calibration_smoke.py)
+  for a complete synthetic input and accepted/rejected/recovery example.
 - `eval selected-case` loads one declared case for the requested mode, runs a
   caller-supplied bounded text adapter, validates separately supplied semantic
   assertion evidence against the candidate, case, provider, and output digest,

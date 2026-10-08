@@ -167,6 +167,22 @@ or completed reviewer execution.
   declared judge parameters when supplied.
   Neither service runs a judge, turns declared probe IDs into execution evidence, or
   expands the active scenario set.
+- **Observed calibration:** `execute_scorer_calibration(plan, executions)` accepts
+  an `ObservedCalibrationPlan` and ordered `CalibrationProbeExecution` host
+  capabilities. It composes the existing guarded selected-case executor rather
+  than importing a provider transport or accepting completed probe claims.
+  Every probe runs for the declared trial count, bounded to 128 invocations.
+  Judges return `CalibrationJudgeVerdict` with bound assertion evidence and an
+  actual callback-returned numeric score. The harness retains held-out labels;
+  delegates receive only ordinary `SelectedCaseJudgeInput`. Identity/settings
+  are checked around the callback; full-batch request and safety preflight
+  precedes dispatch. `ObservedCalibrationReceipt` retains a first-stop ordered
+  result prefix, invocation count, confusion-policy outcome and typed blockers.
+  Callbacks may be controlled offline fixtures: `evidence_scope` is
+  `observed_adapter_callbacks`, while `external_authenticity_verified`,
+  `mutation_performed` and `promotion_authorized` remain literal `false`.
+  Adapter invocation is not proof of externally generated scores or trusted
+  ground-truth labels. Calibration probes do not enlarge the ten active cases.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
 - **Registry preparation:** `RegistryIdentity`, `RegistryPreparationRequest`,
