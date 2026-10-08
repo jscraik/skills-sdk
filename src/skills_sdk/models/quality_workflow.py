@@ -55,6 +55,9 @@ def _review_types_are_canonical(value: object) -> None:
 
 def _validation_manifest_matches(validation: SkillPackageValidation) -> None:
     """Check internal manifest consistency, without authenticating source execution."""
+    paths = tuple(item.path for item in validation.files)
+    if paths != tuple(sorted(paths)):
+        raise ValueError("quality capture file paths must be sorted")
     if (
         validation.candidate is not None
         and candidate_content_sha256(validation.files) != validation.candidate.content_sha256
@@ -74,6 +77,18 @@ def _calibration_matches_declaration(calibration: ScorerCalibrationReceipt, decl
         or (declaration.parameters is not None and calibration.parameters != declaration.parameters)
     ):
         raise ValueError("passing calibration must match the declared scorer")
+
+
+def _policy_matches_capture(policy: LocalQualityPolicy, capture: SkillPackageValidation) -> None:
+    """Reject policy contradictions observable from a passing captured manifest."""
+    if capture.status != "pass":
+        return
+    paths = {item.path for item in capture.files}
+    if not set(policy.required_files) <= paths or (
+        policy.max_reference_depth is not None
+        and any(path.startswith("references/") and path.count("/") > policy.max_reference_depth for path in paths)
+    ):
+        raise ValueError("applied policy contradicts passing captured files")
 
 
 def _review_matches_capture(
@@ -252,6 +267,7 @@ class LocalCheckResultV2(_ContractModel):
     schema_version: Literal["local-check/v2"] = "local-check/v2"
     status: Literal["local_checks_passed", "blocked"]
     request: LocalCheckRequestV2 | None
+    applied_policy: LocalQualityPolicy | None = None
     stages: tuple[LocalQualityStage, ...] = ()
     final_capture: SkillPackageValidation | None = None
     baseline_final_capture: SkillPackageValidation | None = None
@@ -282,6 +298,7 @@ class LocalCheckResultV2(_ContractModel):
                 or self.blocker is None
                 or self.final_capture is not None
                 or self.baseline_final_capture is not None
+                or self.applied_policy is not None
             ):
                 raise ValueError("invalid request requires an empty blocked result")
             return self
@@ -292,6 +309,11 @@ class LocalCheckResultV2(_ContractModel):
             raise ValueError("quality stages must be an ordered prefix")
         mismatches = []
         receipts = {stage.name: stage.receipt for stage in self.stages}
+        if "intake" in receipts:
+            if self.applied_policy != self.request.policy:
+                raise ValueError("quality evidence must retain the selected applied policy")
+        elif self.applied_policy is not None:
+            raise ValueError("applied policy requires an observed intake stage")
         for index, stage in enumerate(self.stages):
             candidate = self.request.update_baseline if stage.name == "baseline" else self.request.candidate
             if stage.receipt.candidate != candidate:
@@ -302,6 +324,12 @@ class LocalCheckResultV2(_ContractModel):
                 raise ValueError("quality workflow must stop at the first incomplete stage")
             if isinstance(stage.receipt, SkillPackageIntakeReceipt) and stage.receipt.context != self.request.intake:
                 raise ValueError("intake receipt must retain the selected request context")
+            if stage.receipt.candidate == candidate and stage.name in {"intake", "validate"}:
+                capture = (
+                    stage.receipt.validation if isinstance(stage.receipt, SkillPackageIntakeReceipt) else stage.receipt
+                )
+                if isinstance(capture, SkillPackageValidation):
+                    _policy_matches_capture(self.request.policy, capture)
             if isinstance(stage.receipt, ScenarioCoverageResult) and stage.receipt.plan != self.request.coverage_plan:
                 raise ValueError("coverage receipt must retain the selected request plan")
             if isinstance(stage.receipt, ScorerCalibrationReceipt) and stage.receipt.candidate == candidate:
@@ -324,6 +352,8 @@ class LocalCheckResultV2(_ContractModel):
         for capture in (self.final_capture, self.baseline_final_capture):
             if capture is not None:
                 _validation_manifest_matches(capture)
+        if self.final_capture is not None and self.final_capture.candidate == self.request.candidate:
+            _policy_matches_capture(self.request.policy, self.final_capture)
         if self.status == "local_checks_passed":
             if self.blocker is not None or self.blocked_stage is not None or len(self.stages) != len(expected):
                 raise ValueError("passing quality workflow requires every stage")
@@ -334,9 +364,13 @@ class LocalCheckResultV2(_ContractModel):
         elif self.blocker is None or self.blocked_stage is None:
             raise ValueError("blocked quality workflow requires a typed blocker and stage")
         elif self.blocked_stage == "candidate_changed":
+            if self.blocker.code != "quality_candidate_changed":
+                raise ValueError("candidate change blocker code must match its failure")
             if mismatches != [len(self.stages) - 1]:
                 raise ValueError("candidate change requires an actual last-stage mismatch")
         elif self.blocked_stage == "final-capture":
+            if self.blocker.code != "quality_final_capture_changed":
+                raise ValueError("final capture blocker code must match its failure")
             if self.final_capture is None or self._captures_passed():
                 raise ValueError("final capture blocker requires failed or changed capture evidence")
         elif self.blocker.code == "quality_input_missing":
@@ -346,6 +380,8 @@ class LocalCheckResultV2(_ContractModel):
                 raise ValueError("missing stage input requires passing upstream evidence")
         elif not self.stages or self.blocked_stage != self.stages[-1].name or self.stages[-1].passed():
             raise ValueError("blocked workflow must identify the first incomplete stage")
+        elif self.blocker.code != "quality_stage_incomplete":
+            raise ValueError("incomplete stage blocker code must match its failure")
         return self
 
     def _captures_passed(self) -> bool:

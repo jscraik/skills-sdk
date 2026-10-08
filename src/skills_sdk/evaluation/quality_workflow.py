@@ -31,6 +31,9 @@ def _blocked(
     return LocalCheckResultV2(
         status="blocked",
         request=request,
+        applied_policy=request.policy
+        if request is not None and any(item.name == "intake" for item in stages)
+        else None,
         stages=tuple(stages),
         blocked_stage=stage,
         blocker=PackageReceiptBlocker(code=code, message="Local quality workflow stopped at the reported stage."),
@@ -91,6 +94,7 @@ def _final_result(
     return LocalCheckResultV2(
         status="local_checks_passed" if unchanged else "blocked",
         request=request,
+        applied_policy=request.policy,
         stages=tuple(stages),
         final_capture=current,
         baseline_final_capture=baseline,

@@ -2245,6 +2245,17 @@
   "additionalProperties": false,
   "description": "Ordered local quality evidence; never admission or promotion permission.",
   "properties": {
+    "applied_policy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LocalQualityPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "baseline_final_capture": {
       "anyOf": [
         {

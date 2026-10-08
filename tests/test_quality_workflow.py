@@ -547,6 +547,91 @@ def test_quality_review_subclass_rejected_before_serializer_and_recovers(tmp_pat
     assert LocalCheckResultV2.model_validate(result).status == "local_checks_passed"
 
 
+def test_update_rejects_reordered_baseline_identity_and_recovers(tmp_path: Path) -> None:
+    """Reject alternate identities obtained by hashing unsorted baseline captures."""
+    from skills_sdk.core.digests import candidate_content_sha256
+    from skills_sdk.models.packaging import PackageManifestFile
+
+    payload = _request(tmp_path, "update")
+    package = _package_path(tmp_path)
+    payload["update_baseline"] = payload["candidate"]
+    result = asyncio.run(check_local_quality(package, payload, baseline_root=package, assessment=_assessment(package)))
+    changed = result.model_dump(mode="json")
+    baseline = changed["stages"][0]["receipt"]
+    baseline["files"].reverse()
+    identity = dict(baseline["candidate"])
+    identity["content_sha256"] = candidate_content_sha256(
+        tuple(PackageManifestFile.model_validate(item) for item in baseline["files"])
+    )
+    changed["request"]["update_baseline"] = identity
+    baseline["candidate"] = identity
+    changed["baseline_final_capture"]["candidate"] = identity
+    changed["baseline_final_capture"]["files"] = baseline["files"]
+    with pytest.raises(ValidationError, match="sorted"):
+        LocalCheckResultV2.model_validate(changed)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", changed)
+    SchemaRegistry().validate("local-check.v2", result.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        {"required_files": ["missing.md"]},
+        {"max_entrypoint_lines": 0},
+        {"max_reference_depth": 0},
+        {"check_reference_content": False},
+    ],
+)
+def test_quality_result_binds_applied_policy_and_recovers(tmp_path: Path, policy: dict[str, object]) -> None:
+    """Reject selected-policy edits after execution, retaining the actual applied declaration."""
+    payload = _request(tmp_path)
+    package = _package_path(tmp_path)
+    result = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))
+    changed = result.model_dump(mode="json")
+    changed["request"]["policy"].update(policy)
+    with pytest.raises(ValidationError, match="applied policy"):
+        LocalCheckResultV2.model_validate(changed)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", changed)
+    SchemaRegistry().validate("local-check.v2", result.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize("stop", ["candidate_changed", "final-capture", "content-review"])
+def test_quality_blocker_code_matches_failure_and_recovers(tmp_path: Path, stop: str) -> None:
+    """Reject contradictory typed recovery codes for every orchestration failure branch."""
+    payload = _request(tmp_path)
+    package = _package_path(tmp_path)
+    result = asyncio.run(
+        check_local_quality(package, payload, assessment={} if stop == "content-review" else _assessment(package))
+    )
+    valid = result.model_dump(mode="json")
+    if stop == "candidate_changed":
+        valid["stages"] = valid["stages"][:-1]
+        valid["stages"][-1]["receipt"]["candidate"]["source_revision"] = "2" * 40
+        valid.update(
+            status="blocked",
+            blocked_stage=stop,
+            final_capture=None,
+            blocker={"code": "quality_candidate_changed", "message": "Fixture."},
+        )
+    elif stop == "final-capture":
+        valid["final_capture"]["candidate"]["source_revision"] = "2" * 40
+        valid.update(
+            status="blocked",
+            blocked_stage=stop,
+            blocker={"code": "quality_final_capture_changed", "message": "Fixture."},
+        )
+    LocalCheckResultV2.model_validate(valid)
+    changed = json.loads(json.dumps(valid))
+    changed["blocker"]["code"] = "contradictory_failure"
+    with pytest.raises(ValidationError, match="blocker code"):
+        LocalCheckResultV2.model_validate(changed)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", changed)
+    SchemaRegistry().validate("local-check.v2", valid)
+
+
 @pytest.mark.parametrize("field", ["scorer_id", "scorer_version_or_digest", "threshold", "parameters"])
 def test_quality_calibration_matches_declared_scorer_and_recovers(tmp_path: Path, field: str) -> None:
     """Reject calibration that contradicts the declared scorer, then accept the original result."""
@@ -614,11 +699,14 @@ def test_blocked_quality_capture_binds_manifest_and_recovers(tmp_path: Path, tar
     blocked.update(status="blocked", blocker={"code": "quality_stage_incomplete", "message": "Fixture blocker."})
     if target.endswith("capture"):
         blocked["blocked_stage"] = "final-capture"
+        blocked["blocker"]["code"] = "quality_final_capture_changed"
         capture = blocked[target]
     else:
         blocked.update(blocked_stage=target, final_capture=None, baseline_final_capture=None)
         index = next(index for index, stage in enumerate(blocked["stages"]) if stage["name"] == target)
         blocked["stages"] = blocked["stages"][: index + 1]
+        if target == "baseline":
+            blocked["applied_policy"] = None
         capture = blocked["stages"][-1]["receipt"]
     capture.update(
         status="blocked", findings=[{"code": "fixture_blocked", "severity": "blocker", "message": "Fixture."}]
@@ -659,3 +747,42 @@ def test_changed_candidate_does_not_join_evidence_from_old_candidate(tmp_path: P
     assert blocked.status == "blocked" and blocked.blocked_stage == "candidate_changed"
     SchemaRegistry().validate("local-check.v2", changed)
     assert LocalCheckResultV2.model_validate(result).status == "local_checks_passed"
+
+
+def test_quality_applied_policy_boundaries_and_recovery(tmp_path: Path) -> None:
+    """Reject absent and forged applied policy, while distinguishing structural schema proof."""
+    payload = _request(tmp_path)
+    package = _package_path(tmp_path)
+    result = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))
+    assert result.applied_policy == result.request.policy
+    forged = result.model_copy(update={"applied_policy": None})
+    with pytest.raises(ValidationError, match="applied policy"):
+        LocalCheckResultV2.model_validate(forged)
+    raw = forged.model_dump(mode="json")
+    registry = SchemaRegistry()
+    schema = Draft202012Validator(registry.load("local-check.v2"))
+    assert schema.is_valid(raw)
+    with pytest.raises(ContractError):
+        registry.validate("local-check.v2", raw)
+    raw["applied_policy"] = "not-a-policy"
+    assert not schema.is_valid(raw)
+    rejected = asyncio.run(check_local_quality(package, {**payload, "policy": {"required_files": ["missing.md"]}}))
+    assert rejected.blocked_stage == "intake" and rejected.applied_policy == rejected.request.policy
+    registry.validate("local-check.v2", rejected.model_dump(mode="json"))
+    registry.validate("local-check.v2", result.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize("policy", [{"required_files": ["missing.md"]}, {"max_reference_depth": 0}])
+def test_matching_policy_declarations_cannot_contradict_manifest(tmp_path: Path, policy: dict[str, object]) -> None:
+    """Even matching policy declarations cannot justify contradictions visible in captured paths."""
+    payload = _request(tmp_path)
+    package = _package_path(tmp_path)
+    result = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))
+    changed = result.model_dump(mode="json")
+    changed["request"]["policy"].update(policy)
+    changed["applied_policy"].update(policy)
+    with pytest.raises(ValidationError, match="applied policy"):
+        LocalCheckResultV2.model_validate(changed)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("local-check.v2", changed)
+    SchemaRegistry().validate("local-check.v2", result.model_dump(mode="json"))

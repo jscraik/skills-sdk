@@ -22,12 +22,17 @@ coverage before content assessment. Updates observe the supplied baseline path
 and recheck it after the journey. Source paths are host inputs, not persisted
 contract fields. The result retains the selected request and upstream receipts,
 but is not an authenticated attestation of execution or semantic truth.
+Once intake runs, `applied_policy` retains the policy supplied to validation and
+must equal the selected request policy. Earlier blockers keep it null; missing
+or contradictory applied-policy evidence cannot support a passing result.
 
 Packaged JSON Schema enforces structural types and update-baseline presence.
 Models and `SchemaRegistry` additionally enforce candidate/lineage equality,
 ordered first-stop evidence, selected intake/coverage context, content lane and
 final capture relationships. Captures with a candidate bind their manifest
-digest even when blocked. Passing calibration matches the selected scorer's
+digest even when blocked, and their file paths must retain canonical sorted
+order before hashing. Recovery blocker codes must match the reported failure.
+Passing calibration matches the selected scorer's
 identity, threshold and declared parameters; passing content review matches
 captured file digests and actual reference coverage. A last-stage receipt from
 a changed candidate remains a typed blocker, not a cross-candidate evidence join.
