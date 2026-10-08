@@ -15,7 +15,7 @@ do not by themselves implement the SDK's target create, update, full check,
 external-intake, private Tessl delivery, or Codex installation workflow:
 
 ```text
-inventory   intake   check-local   validate   build   review-content   eval   package   project   verify
+inventory   intake   check-local   check-quality   validate   build   review-content   eval   package   project   verify
 tessl prepare   tessl verify
 compare-copy   maintain-entrypoint
 ```
@@ -37,6 +37,41 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scorer-calibration ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
+
+## Explicit local quality workflow
+
+`skills-sdk check-quality '<package>' --request '<request.json>' --assessment '<assessment.json>' --json --robot`
+composes the additive `local-check/v2` workflow. Its `local-check-request/v2`
+input declares `create`, `update` or `external-check` intent, the exact candidate,
+intake context, applicable file/reference policy, claim coverage plan and content
+review lane. Update intent also requires a same-package baseline identity and
+`--baseline-root '<baseline>'`; the service observes that source rather than
+trusting the declaration. A no-op update is valid. These intents select checks,
+not source authoring, copying or installation.
+
+The ordered stages are baseline capture for updates, intake, selected-policy
+validation, scenario coverage, scorer quality, held-out scorer artifact
+assessment and content review. The first failed stage, non-admit intake,
+incomplete coverage or changed candidate stops downstream work. An audit with
+owned coverage gaps still blocks this composition. Final captures recheck both
+the candidate and any update baseline. Correct the input and rerun for fresh
+evidence; earlier stage receipts remain visible in a blocked result.
+
+Exit `0` means `local_checks_passed`; exit `2` returns a versioned blocked
+envelope, including unreadable, duplicate-member or symlinked JSON inputs.
+Request reads have a one-MiB budget and assessment reads have an eight-MiB
+budget. The CLI supports supplied content assessments only; an observed lane
+requires the public API's explicitly supplied trusted callback, otherwise it
+blocks. It never imports an arbitrary adapter from a file or module name.
+`--robot` remains a non-interactive no-op.
+
+`promotion_authorized` and `evaluation_executed` remain `false`. Scorer checks
+assess supplied artifacts, not live judge execution or fresh calibration.
+Supplied content review is not semantic review execution or accuracy proof.
+The observed API lane retains its separate callback receipt; caller-owned
+callback side effects cannot be claimed absent from its invocation receipt.
+Security, executed evaluations, matched local/cloud improvement, registry
+publication and runtime installation remain separate incomplete lanes.
 
 ## Supplied content-review evidence
 

@@ -1,0 +1,2372 @@
+{
+  "$defs": {
+    "ClaimCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "case_ids": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "claim_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "gap_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Gap Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claim_id"
+      ],
+      "title": "ClaimCoverage",
+      "type": "object"
+    },
+    "ContentReviewAssessment": {
+      "additionalProperties": false,
+      "description": "Closed supplied assessment; its claims still belong to its reviewer.",
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/PackageSafetyEvidenceReference"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ContentReviewItem"
+          },
+          "minItems": 2,
+          "title": "Items",
+          "type": "array"
+        },
+        "reviewer": {
+          "$ref": "#/$defs/PackageSafetyReviewer"
+        },
+        "schema_version": {
+          "const": "content-review-assessment/v1",
+          "default": "content-review-assessment/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "reviewer",
+        "evidence",
+        "items"
+      ],
+      "title": "ContentReviewAssessment",
+      "type": "object",
+      "x-max-normalized-json-bytes": 8388608
+    },
+    "ContentReviewExecutionResult": {
+      "additionalProperties": false,
+      "description": "Observed local callback invocation, separate from semantic truth.",
+      "properties": {
+        "adapter_invoked": {
+          "default": false,
+          "title": "Adapter Invoked",
+          "type": "boolean"
+        },
+        "assessment_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assessment Sha256"
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SkillPackageFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "promotion_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Promotion Authorized",
+          "type": "boolean"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentReviewResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reviewer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageSafetyReviewer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema_version": {
+          "const": "content-review-execution/v1",
+          "default": "content-review-execution/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "status"
+      ],
+      "title": "ContentReviewExecutionResult",
+      "type": "object"
+    },
+    "ContentReviewItem": {
+      "additionalProperties": false,
+      "description": "One review disposition, not an SDK-generated semantic judgement.",
+      "properties": {
+        "dimension": {
+          "enum": [
+            "description",
+            "progressive_disclosure",
+            "reference"
+          ],
+          "title": "Dimension",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner"
+        },
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "clear",
+            "finding",
+            "gap"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dimension",
+        "path",
+        "status",
+        "rationale"
+      ],
+      "title": "ContentReviewItem",
+      "type": "object"
+    },
+    "ContentReviewResult": {
+      "additionalProperties": false,
+      "description": "Result of binding supplied review evidence to the current package.",
+      "properties": {
+        "assessment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentReviewAssessment"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SkillPackageFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "network_used": {
+          "const": false,
+          "default": false,
+          "title": "Network Used",
+          "type": "boolean"
+        },
+        "promotion_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Promotion Authorized",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "content-review/v1",
+          "default": "content-review/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "semantic_review_executed": {
+          "const": false,
+          "default": false,
+          "title": "Semantic Review Executed",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "status"
+      ],
+      "title": "ContentReviewResult",
+      "type": "object"
+    },
+    "CoverageClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "statement"
+      ],
+      "title": "CoverageClaim",
+      "type": "object"
+    },
+    "CoverageGap": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reason",
+        "owner"
+      ],
+      "title": "CoverageGap",
+      "type": "object"
+    },
+    "IntakeChecks": {
+      "additionalProperties": false,
+      "description": "Boolean proof lanes required before canonical admission.",
+      "properties": {
+        "identity": {
+          "title": "Identity",
+          "type": "boolean"
+        },
+        "owner_unchanged": {
+          "title": "Owner Unchanged",
+          "type": "boolean"
+        },
+        "provenance": {
+          "title": "Provenance",
+          "type": "boolean"
+        },
+        "rights": {
+          "title": "Rights",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "identity",
+        "provenance",
+        "rights",
+        "owner_unchanged"
+      ],
+      "title": "IntakeChecks",
+      "type": "object"
+    },
+    "IntakeDecision": {
+      "additionalProperties": false,
+      "description": "Candidate-bound admission result with typed, explicit blockers.",
+      "properties": {
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "checks": {
+          "$ref": "#/$defs/IntakeChecks"
+        },
+        "decision": {
+          "$ref": "#/$defs/IntakeDecisionStatus"
+        },
+        "schema_version": {
+          "const": "intake-decision/v1",
+          "default": "intake-decision/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "decision",
+        "checks"
+      ],
+      "title": "IntakeDecision",
+      "type": "object"
+    },
+    "IntakeDecisionStatus": {
+      "description": "Explicit intake result with no implicit waiver path.",
+      "enum": [
+        "admit",
+        "block",
+        "reject",
+        "needs_owner_decision"
+      ],
+      "title": "IntakeDecisionStatus",
+      "type": "string"
+    },
+    "LocalCheckRequestV2": {
+      "$comment": "Candidate equality and update lineage require the model or SchemaRegistry semantic validator.",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "update_baseline": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "intent": {
+                "const": "update"
+              }
+            },
+            "required": [
+              "intent"
+            ]
+          },
+          "then": {
+            "properties": {
+              "update_baseline": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "update_baseline"
+            ]
+          }
+        }
+      ],
+      "description": "Bind supplied workflow inputs; baseline and source still need observation.",
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "content_review_mode": {
+          "enum": [
+            "supplied",
+            "observed"
+          ],
+          "title": "Content Review Mode",
+          "type": "string"
+        },
+        "coverage_plan": {
+          "$ref": "#/$defs/ScenarioCoveragePlan"
+        },
+        "intake": {
+          "$ref": "#/$defs/SkillPackageIntakeContext"
+        },
+        "intent": {
+          "enum": [
+            "create",
+            "update",
+            "external-check"
+          ],
+          "title": "Intent",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/LocalQualityPolicy"
+        },
+        "schema_version": {
+          "const": "local-check-request/v2",
+          "default": "local-check-request/v2",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "update_baseline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "intent",
+        "candidate",
+        "intake",
+        "policy",
+        "coverage_plan",
+        "content_review_mode"
+      ],
+      "title": "LocalCheckRequestV2",
+      "type": "object"
+    },
+    "LocalQualityPolicy": {
+      "additionalProperties": false,
+      "description": "Persist selected deterministic checks without asserting that they ran.",
+      "properties": {
+        "check_reference_content": {
+          "default": false,
+          "title": "Check Reference Content",
+          "type": "boolean"
+        },
+        "max_entrypoint_lines": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Entrypoint Lines"
+        },
+        "max_reference_depth": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Reference Depth"
+        },
+        "required_files": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Required Files",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "title": "LocalQualityPolicy",
+      "type": "object"
+    },
+    "LocalQualityStage": {
+      "additionalProperties": false,
+      "description": "Retain each actual upstream service receipt without altering its meaning.",
+      "properties": {
+        "name": {
+          "enum": [
+            "baseline",
+            "intake",
+            "validate",
+            "scenario-coverage",
+            "scorer-quality",
+            "scorer-calibration",
+            "content-review"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillPackageValidation"
+            },
+            {
+              "$ref": "#/$defs/SkillPackageIntakeReceipt"
+            },
+            {
+              "$ref": "#/$defs/ScenarioCoverageResult"
+            },
+            {
+              "$ref": "#/$defs/ScorerQualityReceipt"
+            },
+            {
+              "$ref": "#/$defs/ScorerCalibrationReceipt"
+            },
+            {
+              "$ref": "#/$defs/ContentReviewResult"
+            },
+            {
+              "$ref": "#/$defs/ContentReviewExecutionResult"
+            }
+          ],
+          "title": "Receipt"
+        }
+      },
+      "required": [
+        "name",
+        "receipt"
+      ],
+      "title": "LocalQualityStage",
+      "type": "object"
+    },
+    "NormalizedPackage": {
+      "additionalProperties": false,
+      "description": "Portable normalized package before provider or runtime projection.",
+      "properties": {
+        "dependencies": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "identity": {
+          "discriminator": {
+            "mapping": {
+              "plugin": "#/$defs/PluginIdentity",
+              "skill": "#/$defs/SkillIdentity"
+            },
+            "propertyName": "package_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SkillIdentity"
+            },
+            {
+              "$ref": "#/$defs/PluginIdentity"
+            }
+          ],
+          "title": "Identity"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/PackageLifecycleState",
+          "default": "normalized"
+        },
+        "owner": {
+          "$ref": "#/$defs/PackageOwner"
+        },
+        "package_type": {
+          "$ref": "#/$defs/PackageType"
+        },
+        "schema_version": {
+          "const": "normalized-package/v1",
+          "default": "normalized-package/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/PackageSource"
+        }
+      },
+      "required": [
+        "package_type",
+        "identity",
+        "source",
+        "owner"
+      ],
+      "title": "NormalizedPackage",
+      "type": "object"
+    },
+    "OwnershipState": {
+      "description": "Ownership posture at intake; it is not a runtime state.",
+      "enum": [
+        "canonical",
+        "transitional",
+        "external"
+      ],
+      "title": "OwnershipState",
+      "type": "string"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageFileRole": {
+      "description": "The portable role of a file included in a package manifest.",
+      "enum": [
+        "skill_md",
+        "readme",
+        "reference",
+        "script",
+        "asset",
+        "eval"
+      ],
+      "title": "PackageFileRole",
+      "type": "string"
+    },
+    "PackageLifecycleState": {
+      "description": "Portable lifecycle state for a normalized package candidate.",
+      "enum": [
+        "discovered",
+        "normalized",
+        "admitted",
+        "blocked",
+        "retired"
+      ],
+      "title": "PackageLifecycleState",
+      "type": "string"
+    },
+    "PackageManifestFile": {
+      "additionalProperties": false,
+      "description": "One immutable file entry in a package manifest.",
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/PackageFileRole"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "role"
+      ],
+      "title": "PackageManifestFile",
+      "type": "object"
+    },
+    "PackageOwner": {
+      "additionalProperties": false,
+      "description": "Canonical ownership and rights evidence for one package candidate.",
+      "properties": {
+        "maintainer": {
+          "minLength": 1,
+          "title": "Maintainer",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ownership_state": {
+          "$ref": "#/$defs/OwnershipState"
+        },
+        "rights": {
+          "$ref": "#/$defs/RightsStatus"
+        },
+        "schema_version": {
+          "const": "package-owner/v1",
+          "default": "package-owner/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "maintainer",
+        "ownership_state",
+        "rights"
+      ],
+      "title": "PackageOwner",
+      "type": "object"
+    },
+    "PackageReceiptBlocker": {
+      "additionalProperties": false,
+      "description": "Stable typed blocker details for a package proof receipt.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageReceiptBlocker",
+      "type": "object"
+    },
+    "PackageSafetyEvidenceReference": {
+      "additionalProperties": false,
+      "description": "One digest-bound portable evidence artifact supplied by an adapter.",
+      "properties": {
+        "evidence_id": {
+          "not": {
+            "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "metadata",
+            "static_analysis",
+            "manual_review",
+            "external_review",
+            "policy"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Ref",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "kind",
+        "ref",
+        "sha256"
+      ],
+      "title": "PackageSafetyEvidenceReference",
+      "type": "object"
+    },
+    "PackageSafetyReviewer": {
+      "additionalProperties": false,
+      "description": "Secret-free identity for the caller-supplied review adapter.",
+      "properties": {
+        "adapter_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:[._/-][a-z0-9]+)*$",
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "adapter_version_or_digest": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$",
+          "title": "Adapter Version Or Digest",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "metadata",
+            "static_analysis",
+            "manual_review",
+            "external_review"
+          ],
+          "title": "Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter_id",
+        "adapter_version_or_digest",
+        "method"
+      ],
+      "title": "PackageSafetyReviewer",
+      "type": "object"
+    },
+    "PackageSource": {
+      "additionalProperties": false,
+      "description": "Source identity preserved before a package is normalized.",
+      "properties": {
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceProvenance"
+        },
+        "schema_version": {
+          "const": "package-source/v1",
+          "default": "package-source/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_kind": {
+          "$ref": "#/$defs/PackageSourceKind"
+        }
+      },
+      "required": [
+        "package_id",
+        "provenance",
+        "source_kind"
+      ],
+      "title": "PackageSource",
+      "type": "object"
+    },
+    "PackageSourceKind": {
+      "description": "How a package source was obtained before normalization.",
+      "enum": [
+        "git",
+        "archive",
+        "external",
+        "local"
+      ],
+      "title": "PackageSourceKind",
+      "type": "string"
+    },
+    "PackageType": {
+      "description": "Canonical package categories admitted by the Foundry.",
+      "enum": [
+        "skill",
+        "plugin"
+      ],
+      "title": "PackageType",
+      "type": "string"
+    },
+    "PluginIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Plugins identity, independent of a client adapter.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "plugin",
+          "default": "plugin",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "plugin-identity/v1",
+          "default": "plugin-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "PluginIdentity",
+      "type": "object"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    },
+    "ScenarioCoveragePlan": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/CoverageClaim"
+          },
+          "minItems": 1,
+          "title": "Claims",
+          "type": "array"
+        },
+        "gaps": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CoverageGap"
+          },
+          "title": "Gaps",
+          "type": "array"
+        },
+        "mappings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ClaimCoverage"
+          },
+          "title": "Mappings",
+          "type": "array"
+        },
+        "scenario_set_id": {
+          "minLength": 1,
+          "title": "Scenario Set Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "scenario-coverage-plan/v1",
+          "default": "scenario-coverage-plan/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "scenario_set_id",
+        "claims"
+      ],
+      "title": "ScenarioCoveragePlan",
+      "type": "object"
+    },
+    "ScenarioCoverageResult": {
+      "additionalProperties": false,
+      "properties": {
+        "active_case_ids": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Active Case Ids",
+          "type": "array"
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage_complete": {
+          "default": false,
+          "title": "Coverage Complete",
+          "type": "boolean"
+        },
+        "execution_performed": {
+          "const": false,
+          "default": false,
+          "title": "Execution Performed",
+          "type": "boolean"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ScenarioQualityFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "network_used": {
+          "const": false,
+          "default": false,
+          "title": "Network Used",
+          "type": "boolean"
+        },
+        "open_gap_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Open Gap Ids",
+          "type": "array"
+        },
+        "plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScenarioCoveragePlan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "promotion_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Promotion Authorized",
+          "type": "boolean"
+        },
+        "quality": {
+          "$ref": "#/$defs/ScenarioQualityReceiptV2"
+        },
+        "scenario_set_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scenario Set Id"
+        },
+        "schema_version": {
+          "const": "scenario-coverage/v1",
+          "default": "scenario-coverage/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "scenario_set_id",
+        "status",
+        "quality"
+      ],
+      "title": "ScenarioCoverageResult",
+      "type": "object"
+    },
+    "ScenarioQualityAppliedPolicyV2": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum_release_cases": {
+          "const": 10,
+          "title": "Maximum Release Cases",
+          "type": "integer"
+        },
+        "minimum_negative_or_edge": {
+          "const": 1,
+          "title": "Minimum Negative Or Edge",
+          "type": "integer"
+        },
+        "minimum_pressure_or_regression": {
+          "const": 1,
+          "title": "Minimum Pressure Or Regression",
+          "type": "integer"
+        },
+        "minimum_release_cases": {
+          "const": 10,
+          "title": "Minimum Release Cases",
+          "type": "integer"
+        },
+        "target_release_cases": {
+          "const": 10,
+          "title": "Target Release Cases",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minimum_release_cases",
+        "target_release_cases",
+        "maximum_release_cases",
+        "minimum_pressure_or_regression",
+        "minimum_negative_or_edge"
+      ],
+      "title": "ScenarioQualityAppliedPolicyV2",
+      "type": "object"
+    },
+    "ScenarioQualityFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ScenarioQualityFinding",
+      "type": "object"
+    },
+    "ScenarioQualityReceiptV2": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "effective_policy": {
+          "$ref": "#/$defs/ScenarioQualityAppliedPolicyV2"
+        },
+        "execution_performed": {
+          "const": false,
+          "default": false,
+          "title": "Execution Performed",
+          "type": "boolean"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ScenarioQualityFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "negative_or_edge_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Negative Or Edge Count",
+          "type": "integer"
+        },
+        "network_used": {
+          "const": false,
+          "default": false,
+          "title": "Network Used",
+          "type": "boolean"
+        },
+        "pressure_or_regression_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Pressure Or Regression Count",
+          "type": "integer"
+        },
+        "scenario_count": {
+          "minimum": 0,
+          "title": "Scenario Count",
+          "type": "integer"
+        },
+        "scenario_set_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scenario Set Id"
+        },
+        "schema_version": {
+          "const": "scenario-quality/v2",
+          "default": "scenario-quality/v2",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "all",
+            "release"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "status",
+        "scenario_count",
+        "effective_policy"
+      ],
+      "title": "ScenarioQualityReceiptV2",
+      "type": "object"
+    },
+    "ScorerCalibrationAppliedPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "max_false_negatives": {
+          "minimum": 0,
+          "title": "Max False Negatives",
+          "type": "integer"
+        },
+        "max_false_positives": {
+          "minimum": 0,
+          "title": "Max False Positives",
+          "type": "integer"
+        },
+        "minimum_examples": {
+          "minimum": 1,
+          "title": "Minimum Examples",
+          "type": "integer"
+        },
+        "minimum_true_negatives": {
+          "minimum": 1,
+          "title": "Minimum True Negatives",
+          "type": "integer"
+        },
+        "minimum_true_positives": {
+          "minimum": 1,
+          "title": "Minimum True Positives",
+          "type": "integer"
+        },
+        "threshold": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold",
+        "minimum_examples",
+        "minimum_true_positives",
+        "minimum_true_negatives",
+        "max_false_positives",
+        "max_false_negatives"
+      ],
+      "title": "ScorerCalibrationAppliedPolicy",
+      "type": "object"
+    },
+    "ScorerCalibrationMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "fn": {
+          "minimum": 0,
+          "title": "Fn",
+          "type": "integer"
+        },
+        "fp": {
+          "minimum": 0,
+          "title": "Fp",
+          "type": "integer"
+        },
+        "tn": {
+          "minimum": 0,
+          "title": "Tn",
+          "type": "integer"
+        },
+        "tp": {
+          "minimum": 0,
+          "title": "Tp",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tp",
+        "tn",
+        "fp",
+        "fn"
+      ],
+      "title": "ScorerCalibrationMetrics",
+      "type": "object"
+    },
+    "ScorerCalibrationRates": {
+      "additionalProperties": false,
+      "properties": {
+        "accuracy": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accuracy"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Precision"
+        },
+        "tnr": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tnr"
+        },
+        "tpr": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tpr"
+        }
+      },
+      "title": "ScorerCalibrationRates",
+      "type": "object"
+    },
+    "ScorerCalibrationReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confusion_matrix": {
+          "$ref": "#/$defs/ScorerCalibrationMetrics"
+        },
+        "effective_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScorerCalibrationAppliedPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "example_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Example Count",
+          "type": "integer"
+        },
+        "execution_performed": {
+          "const": false,
+          "default": false,
+          "title": "Execution Performed",
+          "type": "boolean"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ScenarioQualityFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "metrics": {
+          "$ref": "#/$defs/ScorerCalibrationRates"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "network_used": {
+          "const": false,
+          "default": false,
+          "title": "Network Used",
+          "type": "boolean"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScorerJudgeParameters"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "prompt_version": {
+          "default": "",
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "scorer-calibration/v1",
+          "default": "scorer-calibration/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scorer_id": {
+          "default": "",
+          "title": "Scorer Id",
+          "type": "string"
+        },
+        "scorer_version_or_digest": {
+          "default": "",
+          "title": "Scorer Version Or Digest",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ScorerCalibrationReceipt",
+      "type": "object"
+    },
+    "ScorerJudgeParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "temperature": {
+          "title": "Temperature",
+          "type": "number"
+        },
+        "trial_count": {
+          "minimum": 1,
+          "title": "Trial Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "temperature",
+        "trial_count"
+      ],
+      "title": "ScorerJudgeParameters",
+      "type": "object"
+    },
+    "ScorerQualityReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "calibration_probe_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Calibration Probe Count",
+          "type": "integer"
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "execution_performed": {
+          "const": false,
+          "default": false,
+          "title": "Execution Performed",
+          "type": "boolean"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ScenarioQualityFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "network_used": {
+          "const": false,
+          "default": false,
+          "title": "Network Used",
+          "type": "boolean"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScorerJudgeParameters"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pass_threshold": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pass Threshold"
+        },
+        "schema_version": {
+          "const": "scorer-quality/v1",
+          "default": "scorer-quality/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scorer_id": {
+          "default": "",
+          "title": "Scorer Id",
+          "type": "string"
+        },
+        "scorer_version_or_digest": {
+          "default": "",
+          "title": "Scorer Version Or Digest",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ScorerQualityReceipt",
+      "type": "object"
+    },
+    "SkillIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Skills identity, independent of runtime installation.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "skill",
+          "default": "skill",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "skill-identity/v1",
+          "default": "skill-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "SkillIdentity",
+      "type": "object"
+    },
+    "SkillPackageFinding": {
+      "additionalProperties": false,
+      "description": "One stable, evidence-bound standalone-skill finding.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "title": "SkillPackageFinding",
+      "type": "object"
+    },
+    "SkillPackageIntakeContext": {
+      "additionalProperties": false,
+      "description": "Caller-supplied source and admission evidence for portable intake.",
+      "properties": {
+        "checks": {
+          "$ref": "#/$defs/IntakeChecks"
+        },
+        "owner": {
+          "$ref": "#/$defs/PackageOwner",
+          "properties": {
+            "maintainer": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "owner": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "rights": {
+              "properties": {
+                "license": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "schema_version": {
+          "const": "skill-package-intake-context/v1",
+          "default": "skill-package-intake-context/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_kind": {
+          "enum": [
+            "git",
+            "external",
+            "local"
+          ],
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "source_path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Source Path",
+          "type": "string"
+        },
+        "source_repository": {
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\r\\n]"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_repository",
+        "source_revision",
+        "source_path",
+        "source_kind",
+        "owner",
+        "checks"
+      ],
+      "title": "SkillPackageIntakeContext",
+      "type": "object"
+    },
+    "SkillPackageIntakeReceipt": {
+      "additionalProperties": false,
+      "description": "Read-only structural intake and normalization result for one skill.",
+      "properties": {
+        "blocker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageReceiptBlocker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "context": {
+          "$ref": "#/$defs/SkillPackageIntakeContext"
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntakeDecision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "execution_performed": {
+          "const": false,
+          "default": false,
+          "title": "Execution Performed",
+          "type": "boolean"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "network_used": {
+          "const": false,
+          "default": false,
+          "title": "Network Used",
+          "type": "boolean"
+        },
+        "normalized_package": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NormalizedPackage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "properties": {
+            "owner": {
+              "properties": {
+                "maintainer": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                },
+                "owner": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                },
+                "rights": {
+                  "properties": {
+                    "license": {
+                      "not": {
+                        "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                      },
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "schema_version": {
+          "const": "skill-package-intake/v1",
+          "default": "skill-package-intake/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "enum": [
+            "normalized",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "validation": {
+          "$ref": "#/$defs/SkillPackageValidation"
+        }
+      },
+      "required": [
+        "status",
+        "context",
+        "validation"
+      ],
+      "title": "SkillPackageIntakeReceipt",
+      "type": "object"
+    },
+    "SkillPackageValidation": {
+      "additionalProperties": false,
+      "description": "Read-only structural result for one standalone skill candidate.",
+      "properties": {
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "files": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageManifestFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SkillPackageFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "skill-package-validation/v1",
+          "default": "skill-package-validation/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SkillPackageValidation",
+      "type": "object"
+    },
+    "SourceProvenance": {
+      "additionalProperties": false,
+      "description": "Immutable source identity retained for an inventory candidate.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "path",
+        "content_sha256"
+      ],
+      "title": "SourceProvenance",
+      "type": "object"
+    },
+    "ValidationSeverity": {
+      "description": "Whether a finding blocks immutable candidate construction.",
+      "enum": [
+        "warning",
+        "blocker"
+      ],
+      "title": "ValidationSeverity",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/local-check.v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Ordered local quality evidence; never admission or promotion permission.",
+  "properties": {
+    "applied_policy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LocalQualityPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "baseline_final_capture": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SkillPackageValidation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "blocked_stage": {
+      "anyOf": [
+        {
+          "enum": [
+            "baseline",
+            "intake",
+            "validate",
+            "scenario-coverage",
+            "scorer-quality",
+            "scorer-calibration",
+            "content-review"
+          ],
+          "type": "string"
+        },
+        {
+          "enum": [
+            "request",
+            "candidate_changed",
+            "final-capture"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Blocked Stage"
+    },
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageReceiptBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evaluation_executed": {
+      "const": false,
+      "default": false,
+      "title": "Evaluation Executed",
+      "type": "boolean"
+    },
+    "final_capture": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SkillPackageValidation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "promotion_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Promotion Authorized",
+      "type": "boolean"
+    },
+    "request": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LocalCheckRequestV2"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema_version": {
+      "const": "local-check/v2",
+      "default": "local-check/v2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stages": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/LocalQualityStage"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "local_checks_passed",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "request"
+  ],
+  "title": "LocalCheckResultV2",
+  "type": "object"
+}

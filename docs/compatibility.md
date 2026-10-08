@@ -13,6 +13,41 @@ parent observation does not restart it. Child invocation and failed-metadata
 completion timestamps preserve timeout classification even when packets are
 already queued. Timely startup and short callbacks remain valid.
 
+## Local quality composition v2
+
+`local-check-request/v2` and `local-check/v2` are additive closed contracts;
+the five-stage `local-check/v1` command remains unchanged. The v2 service and
+`check-quality` CLI bind explicit intent, applicable policy and complete claim
+coverage before content assessment. Updates observe the supplied baseline path
+and recheck it after the journey. Source paths are host inputs, not persisted
+contract fields. The result retains the selected request and upstream receipts,
+but is not an authenticated attestation of execution or semantic truth.
+Once intake runs, `applied_policy` retains the policy supplied to validation and
+must equal the selected request policy. Earlier blockers keep it null; missing
+or contradictory applied-policy evidence cannot support a passing result.
+
+Packaged JSON Schema enforces structural types and update-baseline presence.
+Models and `SchemaRegistry` additionally enforce candidate/lineage equality,
+ordered first-stop evidence, selected intake/coverage context, content lane and
+final capture relationships. Captures with a candidate bind their manifest
+digest even when blocked, and their file paths must retain canonical sorted
+order before hashing. Recovery blocker codes must match the reported failure.
+Passing calibration matches the selected scorer's
+identity, threshold and declared parameters; passing content review matches
+captured file digests and actual reference coverage. A last-stage receipt from
+a changed candidate remains a typed blocker, not a cross-candidate evidence join.
+Only the service observes source bytes and applies
+the selected policy. Generic schema validation cannot prove these observations.
+Both families remain outside the generic receipt parser. No earlier receipt
+family is reinterpreted as permission to execute, promote or publish.
+
+This is an SDK-owned composition of accepted intake, validation, scenario,
+scorer and content services, not a claim of complete Agent-Skills extraction.
+Static held-out artifact assessment is not fresh calibration execution. The
+API accepts explicit trusted callbacks; the CLI only accepts supplied review
+evidence and blocks an observed request without that callback. Tests and
+calibration probes do not enlarge the exactly ten active managed scenarios.
+
 ## Supplied content-review contracts
 
 Typed assessment inputs and callback results use the canonical

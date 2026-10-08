@@ -1,0 +1,504 @@
+{
+  "$comment": "Candidate equality and update lineage require the model or SchemaRegistry semantic validator.",
+  "$defs": {
+    "ClaimCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "case_ids": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Case Ids",
+          "type": "array"
+        },
+        "claim_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "gap_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "title": "Gap Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claim_id"
+      ],
+      "title": "ClaimCoverage",
+      "type": "object"
+    },
+    "CoverageClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "statement"
+      ],
+      "title": "CoverageClaim",
+      "type": "object"
+    },
+    "CoverageGap": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reason",
+        "owner"
+      ],
+      "title": "CoverageGap",
+      "type": "object"
+    },
+    "IntakeChecks": {
+      "additionalProperties": false,
+      "description": "Boolean proof lanes required before canonical admission.",
+      "properties": {
+        "identity": {
+          "title": "Identity",
+          "type": "boolean"
+        },
+        "owner_unchanged": {
+          "title": "Owner Unchanged",
+          "type": "boolean"
+        },
+        "provenance": {
+          "title": "Provenance",
+          "type": "boolean"
+        },
+        "rights": {
+          "title": "Rights",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "identity",
+        "provenance",
+        "rights",
+        "owner_unchanged"
+      ],
+      "title": "IntakeChecks",
+      "type": "object"
+    },
+    "LocalQualityPolicy": {
+      "additionalProperties": false,
+      "description": "Persist selected deterministic checks without asserting that they ran.",
+      "properties": {
+        "check_reference_content": {
+          "default": false,
+          "title": "Check Reference Content",
+          "type": "boolean"
+        },
+        "max_entrypoint_lines": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Entrypoint Lines"
+        },
+        "max_reference_depth": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Reference Depth"
+        },
+        "required_files": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Required Files",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "title": "LocalQualityPolicy",
+      "type": "object"
+    },
+    "OwnershipState": {
+      "description": "Ownership posture at intake; it is not a runtime state.",
+      "enum": [
+        "canonical",
+        "transitional",
+        "external"
+      ],
+      "title": "OwnershipState",
+      "type": "string"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageOwner": {
+      "additionalProperties": false,
+      "description": "Canonical ownership and rights evidence for one package candidate.",
+      "properties": {
+        "maintainer": {
+          "minLength": 1,
+          "title": "Maintainer",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ownership_state": {
+          "$ref": "#/$defs/OwnershipState"
+        },
+        "rights": {
+          "$ref": "#/$defs/RightsStatus"
+        },
+        "schema_version": {
+          "const": "package-owner/v1",
+          "default": "package-owner/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "maintainer",
+        "ownership_state",
+        "rights"
+      ],
+      "title": "PackageOwner",
+      "type": "object"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    },
+    "ScenarioCoveragePlan": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/CoverageClaim"
+          },
+          "minItems": 1,
+          "title": "Claims",
+          "type": "array"
+        },
+        "gaps": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CoverageGap"
+          },
+          "title": "Gaps",
+          "type": "array"
+        },
+        "mappings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ClaimCoverage"
+          },
+          "title": "Mappings",
+          "type": "array"
+        },
+        "scenario_set_id": {
+          "minLength": 1,
+          "title": "Scenario Set Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "scenario-coverage-plan/v1",
+          "default": "scenario-coverage-plan/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "scenario_set_id",
+        "claims"
+      ],
+      "title": "ScenarioCoveragePlan",
+      "type": "object"
+    },
+    "SkillPackageIntakeContext": {
+      "additionalProperties": false,
+      "description": "Caller-supplied source and admission evidence for portable intake.",
+      "properties": {
+        "checks": {
+          "$ref": "#/$defs/IntakeChecks"
+        },
+        "owner": {
+          "$ref": "#/$defs/PackageOwner",
+          "properties": {
+            "maintainer": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "owner": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "rights": {
+              "properties": {
+                "license": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "schema_version": {
+          "const": "skill-package-intake-context/v1",
+          "default": "skill-package-intake-context/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_kind": {
+          "enum": [
+            "git",
+            "external",
+            "local"
+          ],
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "source_path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Source Path",
+          "type": "string"
+        },
+        "source_repository": {
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\r\\n]"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_repository",
+        "source_revision",
+        "source_path",
+        "source_kind",
+        "owner",
+        "checks"
+      ],
+      "title": "SkillPackageIntakeContext",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/local-check-request.v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "update_baseline": {
+            "type": "null"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "intent": {
+            "const": "update"
+          }
+        },
+        "required": [
+          "intent"
+        ]
+      },
+      "then": {
+        "properties": {
+          "update_baseline": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "update_baseline"
+        ]
+      }
+    }
+  ],
+  "description": "Bind supplied workflow inputs; baseline and source still need observation.",
+  "properties": {
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "content_review_mode": {
+      "enum": [
+        "supplied",
+        "observed"
+      ],
+      "title": "Content Review Mode",
+      "type": "string"
+    },
+    "coverage_plan": {
+      "$ref": "#/$defs/ScenarioCoveragePlan"
+    },
+    "intake": {
+      "$ref": "#/$defs/SkillPackageIntakeContext"
+    },
+    "intent": {
+      "enum": [
+        "create",
+        "update",
+        "external-check"
+      ],
+      "title": "Intent",
+      "type": "string"
+    },
+    "policy": {
+      "$ref": "#/$defs/LocalQualityPolicy"
+    },
+    "schema_version": {
+      "const": "local-check-request/v2",
+      "default": "local-check-request/v2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "update_baseline": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "intent",
+    "candidate",
+    "intake",
+    "policy",
+    "coverage_plan",
+    "content_review_mode"
+  ],
+  "title": "LocalCheckRequestV2",
+  "type": "object"
+}
