@@ -1,5 +1,59 @@
 # Compatibility
 
+Content-review worker packets use a separate bounded wire budget: the public
+eight-MiB normalized assessment limit plus 64 KiB for the envelope. Compact
+UTF-8 serialization avoids ASCII escaping that expands Unicode assessments.
+The sender and receiver enforce the same per-packet bound; the public model
+limit and CLI wire-file limit remain unchanged. A valid exact-limit assessment
+can complete offline review; one byte beyond the model limit remains invalid.
+
+The content-review startup deadline is anchored immediately after the spawned
+process launch returns, outside the trusted adapter-transfer operation. Delayed
+parent observation does not restart it. Child invocation and failed-metadata
+completion timestamps preserve timeout classification even when packets are
+already queued. Timely startup and short callbacks remain valid.
+
+## Supplied content-review contracts
+
+Typed assessment inputs and callback results use the canonical
+`ContentReviewAssessment` model. Custom subclasses return an
+`invalid_content_review` blocker before their serializers run. Raw closed
+assessment data and canonical typed models remain supported.
+
+The same canonical-only rule applies to nested review contract models before
+their serializers run. Assessments have an eight-MiB normalized UTF-8 JSON
+budget, enforced by the direct model, services and `SchemaRegistry`.
+Packaged schemas annotate this semantic budget as
+`x-max-normalized-json-bytes`; generic JSON Schema validators do not enforce
+serialized byte length. The review CLI separately bounds the supplied JSON
+file at eight MiB, including whitespace, and reports `content_review_input_limit`
+for oversized files. Other intake-context readers keep their one-MiB budget.
+
+`content-review-assessment/v1`, `content-review/v1` and
+`content-review-execution/v1` are additive closed
+families. They do not reinterpret package validation or scenario-quality
+receipts. `SchemaRegistry` checks packaged structure and semantic model
+invariants, including same-path evidence for every completed disposition; owned
+gaps can remain incomplete and block. The public service additionally compares
+candidate, actual reference inventory and source-evidence digests with the captured package. A standalone
+schema cannot prove those filesystem relations or reviewer truth. These
+families remain outside the generic receipt parser and do not authorise
+execution, promotion, installation or publication.
+
+Review collections accept materialized lists or tuples, not streaming iterators.
+Blocked review results require a blocker-severity finding; warning-only findings
+cannot justify a blocked result. Returned review evidence requires observed
+adapter invocation. These semantic invariants are enforced by models and
+`SchemaRegistry`, not by standalone JSON Schema alone.
+
+The offline callback service runs a caller-selected, importable and safely
+pickleable adapter in a spawned process. It never falls back to in-process
+execution or unsafe `fork`. Script callers need a guarded main entrypoint.
+Child-local state changes do not update the original adapter object. Unsupported
+transfer is a typed blocker; supplied-review validation remains read-only and
+does not require process execution. See [API](api.md) for the separate startup,
+callback, trusted-transfer and cleanup boundaries.
+
 Skills SDK keeps portable contracts independent of Agent-Skills, Skills
 Foundry, Codex, Tessl, and any local runtime filesystem. Host adapters and
 providers consume the contracts through explicit boundaries; they are not

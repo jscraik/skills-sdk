@@ -37,7 +37,7 @@ existing-copy comparison and maintenance routes are documented in
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `intake`, `check-local`, `validate`,
+series. The implemented local commands are `intake`, `check-local`, `review-content`, `validate`,
 `build`, `eval scenario-quality`, `eval scorer-quality`,
 `eval scorer-calibration`, `eval selected-case`, `verify recurring-findings`,
 `verify pr-sweep-dirty-closeout`, `compare-copy`, and `maintain-entrypoint`.

@@ -25,7 +25,7 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 | Slice | Work | Completion proof | State |
 | --- | --- | --- | --- |
 | S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Accepted in PR #44 |
-| S2 | Add applicable package policy and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; source remains unchanged. | Package policy accepted in PR #45; claim coverage integrating; semantic work pending |
+| S2 | Add applicable package policy and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; source remains unchanged. | Package policy accepted in PR #45; claim coverage accepted in PR #46; bounded content-review adapter integrating |
 | S3 | Bind applicable security evidence and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass. | Queued |
 | S4 | Implement matched baseline/candidate evaluation, local then cloud adapter handoff, and failure ownership. | Frozen identities, both variants, same-model lift, calibrated judging, rejected drift, and controlled recovery; live runs separately authorised. | Queued |
 | S5 | Compose archive preparation/verification and supported private registry/readback/install boundaries. | Complete resources/modes, exact candidate/version/digest, controlled adapter failures and recovery; real external state separately proved. | Queued |
@@ -38,18 +38,20 @@ candidate revision, evidence reference, what it proves, and the next check.
 Do not turn a successful local gate into hosted, provider, registry, or runtime
 clearance. Required proof blocks completion of its dependent slice only.
 
-- Current accepted SDK base: `812e10cd149b2e07131078eb25d4354b02299d14`.
+- Current accepted SDK base: `a07b3324f5eb89d42bc6a0387b842ef4678fd3fa`.
 - Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
-- Current work: S2 candidate-bound claim coverage, integrated with the accepted
-  package-quality base. [PR #44](https://github.com/jscraik/skills-sdk/pull/44)
-  and [PR #45](https://github.com/jscraik/skills-sdk/pull/45) are merged.
-  PR #45's exact repair head `586bffaefc9f2fe0d5bdb14977f6234590072678`
-  passed hosted validation; its seven review threads are resolved. The hosted
-  merge was performed externally, not by this workflow's delivery agent.
-- Next action: prove the integrated coverage candidate, deliver it through the
-  normal signed receipt-gated route, then integrate and deliver semantic
-  content review. Keep supplied mapping, semantic review, scenario execution,
-  calibration and promotion evidence distinct.
+- Current work: bounded content review on the accepted package-quality and
+  claim-coverage base. [PR #46](https://github.com/jscraik/skills-sdk/pull/46)
+  merged externally on 2026-10-07; its exact repair head
+  `70079d5b75ed94042c76c002c865bfacb6a029b2` passed all five hosted check
+  contexts and all three review threads are resolved. The accepted merge tree
+  matches that repair head; this agent did not perform the hosted merge.
+- Next action: prove and deliver the integrated content-review candidate through
+  normal signed receipt-gated delivery. Supplied assessment validation is not
+  semantic execution. The separate offline adapter records observed callback
+  invocation, not general semantic accuracy or authenticated external review.
+  Keep supplied mapping, semantic review, scenario execution, calibration and
+  promotion evidence distinct; nine-area S2 and programme acceptance remain open.
 
 ### Historical evidence (superseded by the current state above)
 

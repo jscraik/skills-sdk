@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
 from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
@@ -65,6 +66,9 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (LocalCheckResult, "local-check.v1.schema.json"),
         (ScenarioCoveragePlan, "scenario-coverage-plan.v1.schema.json"),
         (ScenarioCoverageResult, "scenario-coverage.v1.schema.json"),
+        (ContentReviewAssessment, "content-review-assessment.v1.schema.json"),
+        (ContentReviewResult, "content-review.v1.schema.json"),
+        (ContentReviewExecutionResult, "content-review-execution.v1.schema.json"),
     )
 
 

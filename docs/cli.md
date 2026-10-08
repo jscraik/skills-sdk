@@ -15,13 +15,13 @@ do not by themselves implement the SDK's target create, update, full check,
 external-intake, private Tessl delivery, or Codex installation workflow:
 
 ```text
-inventory   intake   check-local   validate   build   eval   package   project   verify
+inventory   intake   check-local   validate   build   review-content   eval   package   project   verify
 tessl prepare   tessl verify
 compare-copy   maintain-entrypoint
 ```
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
-`intake`, `check-local`, `validate`, `build`, `eval scenario-quality`, `eval scorer-quality`,
+`intake`, `check-local`, `validate`, `build`, `review-content`, `eval scenario-quality`, `eval scorer-quality`,
 `eval scorer-calibration`, `eval scenario-coverage`, and `eval selected-case`
 are implemented local commands:
 
@@ -30,12 +30,24 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk check-local ./skills/example --context ./intake-context.json --scenario-set active-v2 --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk review-content ./skills/example --source-revision "<40-lowercase-hex>" --assessment ./assessment.json --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scenario-quality ./skills/example --source-revision "<40-lowercase-hex>" --scenario-set active-v2 --contract-version v2 --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scorer-quality ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval scorer-calibration ./skills/example --source-revision "<40-lowercase-hex>" --json --robot
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
+
+## Supplied content-review evidence
+
+`mise exec -- uv run --frozen skills-sdk review-content '<package>' --source-revision '<revision>' --assessment '<assessment.json>' --json`
+binds supplied reviewer metadata to the current candidate and its captured
+source files. It reads a bounded regular assessment file without following
+symlinks. Exit `0` means the supplied assessment is valid, complete for the
+actual file inventory and contains only clear dispositions; exit `2` returns
+a typed blocker for invalid inputs, stale evidence, findings or gaps.
+This command does not perform semantic review, execute a judge, contact a
+provider or authorise promotion. A passing result is not accuracy proof.
 
 The `intake`, `validate`, and `build` routes accept repeatable
 `--require-file references/README.md` and opt-in `--check-reference-content`.

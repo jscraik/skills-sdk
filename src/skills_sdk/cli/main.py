@@ -29,6 +29,10 @@ class _UnsupportedContextRead(OSError):
     """Safe context traversal is unavailable on this host."""
 
 
+class _ContextReadLimitExceeded(ValueError):
+    """The supplied regular file exceeds this command's read budget."""
+
+
 def _reject_duplicate_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
     """Build a JSON object while rejecting duplicate member names."""
     result: dict[str, object] = {}
@@ -63,24 +67,28 @@ def _open_intake_context(path: Path) -> int:
         os.close(parent)
 
 
-def _read_intake_context(path: Path) -> bytes:
+def _read_intake_context(path: Path, *, max_bytes: int = _MAX_INTAKE_CONTEXT_BYTES) -> bytes:
     """Read one bounded, regular, no-follow intake context file."""
     descriptor = _open_intake_context(path)
     try:
         before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_INTAKE_CONTEXT_BYTES:
+        if not stat.S_ISREG(before.st_mode):
             raise ValueError("invalid intake context file")
+        if before.st_size > max_bytes:
+            raise _ContextReadLimitExceeded("context file exceeds the command read budget")
         chunks: list[bytes] = []
         captured = 0
-        while captured <= _MAX_INTAKE_CONTEXT_BYTES:
-            chunk = os.read(descriptor, min(65_536, _MAX_INTAKE_CONTEXT_BYTES + 1 - captured))
+        while captured <= max_bytes:
+            chunk = os.read(descriptor, min(65_536, max_bytes + 1 - captured))
             if not chunk:
                 break
             chunks.append(chunk)
             captured += len(chunk)
         payload = b"".join(chunks)
         after = os.fstat(descriptor)
-        if len(payload) > _MAX_INTAKE_CONTEXT_BYTES or (
+        if len(payload) > max_bytes:
+            raise _ContextReadLimitExceeded("context file exceeds the command read budget")
+        if (
             before.st_size,
             before.st_mtime_ns,
             before.st_ino,
@@ -101,6 +109,15 @@ def _add_coverage_parser(commands: argparse._SubParsersAction[argparse.ArgumentP
     coverage.add_argument("--robot", action="store_true")
 
 
+def _add_content_review_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    review = commands.add_parser("review-content", help="bind supplied content review to the current package")
+    review.add_argument("package_root", type=Path)
+    review.add_argument("--source-revision", required=True)
+    review.add_argument("--assessment", type=Path, required=True)
+    review.add_argument("--json", action="store_true", dest="json_output")
+    review.add_argument("--robot", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -109,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
+    _add_content_review_parser(commands)
     for name, help_text in COMMAND_HELP.items():
         if name in {"intake", "check-local", "validate", "build", "eval", "verify"}:
             continue
@@ -223,7 +241,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
     """Return findings suitable for the human-readable command output."""
-    if command in {"validate", "scenario-quality", "scenario-coverage", "scorer-quality", "scorer-calibration"}:
+    if command in {
+        "validate",
+        "review-content",
+        "scenario-quality",
+        "scenario-coverage",
+        "scorer-quality",
+        "scorer-calibration",
+    }:
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 
@@ -298,6 +323,41 @@ def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int
     else:
         print(f"selected-case: blocked\n  {blocker.code}: {blocker.message}")
     return 2
+
+
+def _content_review(arguments: argparse.Namespace) -> int:
+    from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES
+    from skills_sdk.validation import assess_content_review
+
+    try:
+        assessment = json.loads(
+            _read_intake_context(arguments.assessment, max_bytes=CONTENT_REVIEW_ASSESSMENT_MAX_BYTES).decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_members,
+        )
+    except (_UnsupportedContextRead, _ContextReadLimitExceeded) as error:
+        from skills_sdk.models.packaging import PackageReceiptBlocker
+
+        blocker = PackageReceiptBlocker(
+            code="unsupported_context_read"
+            if isinstance(error, _UnsupportedContextRead)
+            else "content_review_input_limit",
+            message="safe descriptor-relative assessment reads are unavailable"
+            if isinstance(error, _UnsupportedContextRead)
+            else "assessment JSON exceeds the eight MiB read budget",
+            evidence_refs=("docs/compatibility.md",),
+        )
+        if arguments.json_output:
+            print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
+        else:
+            print(f"review-content: blocked\n  {blocker.code}: {blocker.message}")
+        return 2
+    except (OSError, ValueError, RecursionError):
+        assessment = None
+    result = assess_content_review(
+        arguments.package_root, source_revision=arguments.source_revision, assessment=assessment
+    )
+    _print_result("review-content", result, json_output=arguments.json_output)
+    return 0 if result.status == "pass" else 2
 
 
 def _scenario_coverage(arguments: argparse.Namespace) -> int:
@@ -516,6 +576,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.command == "review-content":
+        return _content_review(arguments)
     if arguments.command == "check-local":
         return _local_check(arguments, parser)
     if arguments.command == "verify":

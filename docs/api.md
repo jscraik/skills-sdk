@@ -10,6 +10,54 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 ## Contract families
 
+**Supplied content review:** `assess_content_review` from `skills_sdk.validation`
+checks a `ContentReviewAssessment` against the safely captured current package.
+Import that model and `ContentReviewResult` from `skills_sdk.models`. The supplied
+review covers description and progressive disclosure in `SKILL.md`, plus every
+actual file under `references/`. Each disposition is `clear`, `finding`, or an
+owned `gap`. Completed dispositions require declared, digest-bound source
+evidence for their own path; evidence for another file cannot satisfy that
+disposition. Missing coverage, stale candidate identity, wrong source digests,
+malformed assessment, findings and gaps block. Binary references are included
+in the review inventory without being interpreted as text.
+
+This service verifies supplied reviewer metadata and source binding. It does
+not independently establish accuracy, relevance, freshness, or an exhaustive
+gap inventory; `semantic_review_executed` and `promotion_authorized` remain
+false. It performs no reviewer or provider call. Source evidence digests are
+not proof that an external reviewer actually assessed those bytes. Actual
+review adapter execution uses the separate `execute_content_review` API from
+`skills_sdk.evaluation`. Supply a trusted caller-owned `OfflineContentReviewAdapter`
+with a secret-free local reviewer identity and an asynchronous `review` method.
+The adapter receives a `ContentReviewInput` containing candidate identity and
+private immutable source bytes. Treat those bytes as untrusted data, not host
+instructions. The SDK verifies the returned assessment and detects candidate
+drift, invalid results, reviewer mismatch and callback failure. The callback has
+a thirty-second deadline enforced by the parent outside the callback's event
+loop. A separate thirty-second startup deadline covers child imports and
+adapter metadata. An eight-MiB source limit applies after safe capture and
+before invocation. Caller cancellation stops the SDK-owned worker and propagates
+cancellation to the caller. Cleanup allows at most 250 milliseconds of process
+joins before returning; it does not wait for cooperative callback cancellation.
+
+`ContentReviewExecutionResult` records the observed callback invocation and
+returned assessment digest. It does not establish general semantic accuracy,
+authenticate an external reviewer, or grant promotion. The host owns adapter
+trust, sandboxing and side effects. Execution uses Python's `spawn` context,
+not `fork`: supply an importable, safely pickleable adapter and protect script
+entrypoints with `if __name__ == "__main__"`. Adapter transfer occurs before
+the startup timer and is trusted caller code, not a bounded untrusted ingress
+operation. Daemon process contexts cannot spawn this worker. Unsupported
+transfer or daemon contexts return `unsupported_content_review_isolation`
+without invoking the callback. Adapter state changes remain in the child, not
+the caller's object. Worker termination does not undo filesystem or other
+external side effects and does not guarantee callback `finally` blocks run.
+This is deadline isolation, not a security sandbox. The input limit is not a
+preallocation memory budget. The SDK
+does not load arbitrary plugins, retrieve credentials, or select a paid
+provider. The `review-content` CLI only checks supplied evidence; it does not
+dynamically invoke this adapter.
+
 **Declared scenario coverage:** `assess_scenario_coverage` from
 `skills_sdk.evaluation` audits a `ScenarioCoveragePlan` against the package's
 checked ten-case active set. Import the plan and `ScenarioCoverageResult` from

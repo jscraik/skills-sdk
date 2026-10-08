@@ -71,6 +71,9 @@ SCHEMA_NAMES = frozenset(
         "local-check.v1",
         "scenario-coverage-plan.v1",
         "scenario-coverage.v1",
+        "content-review-assessment.v1",
+        "content-review.v1",
+        "content-review-execution.v1",
         "selected-case-judge-evidence.v1",
         "scorer-profile.v1",
         "skill-package-validation.v1",
@@ -396,6 +399,18 @@ class SchemaRegistry:
             from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
 
             model = ScenarioCoveragePlan if name == "scenario-coverage-plan.v1" else ScenarioCoverageResult
+        elif name in {"content-review-assessment.v1", "content-review.v1", "content-review-execution.v1"}:
+            from skills_sdk.models.content_review import (
+                ContentReviewAssessment,
+                ContentReviewExecutionResult,
+                ContentReviewResult,
+            )
+
+            model = {
+                "content-review-assessment.v1": ContentReviewAssessment,
+                "content-review.v1": ContentReviewResult,
+                "content-review-execution.v1": ContentReviewExecutionResult,
+            }[name]
         elif name == "local-check.v1":
             from skills_sdk.models.local_check import LocalCheckResult
 
