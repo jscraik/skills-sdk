@@ -5,9 +5,15 @@ Agent Skills packages. It defines explicit, versioned contracts for inventory,
 intake, evaluation, risk, security, manifests, and receipts. Its local
 source-consuming services validate standalone packages and, after a candidate
 identity is resolved and validation passes, normalize intake context or build
-candidate-bound manifest and receipt data; inventory, evaluation, risk, and
-security remain caller-populated contract lanes. The core remains independent of a host
+candidate-bound manifest and receipt data. Bounded offline evaluation, supplied
+review assessment and static security screening have separate evidence limits;
+they do not establish live provider or reviewer truth. The core remains independent of a host
 repository, provider account, runtime installation, or registry.
+
+Within the [brAInwav product family](ARCHITECTURE.md#brainwav-product-family),
+`skills-sdk` owns reusable tooling. The future `skills-registry` is a separate
+repository for the service; its workers consume a pinned SDK package version.
+Its creation remains subject to the [registry start gate](docs/workflow.md#registry-transition).
 
 The Python API can deterministically prepare an intended runtime-lock
 transition with `plan_runtime_install`. The plan is portable and
@@ -37,9 +43,9 @@ existing-copy comparison and maintenance routes are documented in
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `intake`, `check-local`, `review-content`, `validate`,
+series. The implemented local commands are `intake`, `check-local`, `check-quality`, `review-content`, `validate`,
 `build`, `eval scenario-quality`, `eval scorer-quality`,
-`eval scorer-calibration`, `eval selected-case`, `verify recurring-findings`,
+`eval scorer-calibration`, `eval observed-calibration`, `eval selected-case`, `verify recurring-findings`,
 `verify pr-sweep-dirty-closeout`, `compare-copy`, and `maintain-entrypoint`.
 Comparison is read-only. Maintenance is read-only by
 default and requires explicit `--apply` to change an existing host file. The
@@ -52,7 +58,8 @@ anything, mutate a runtime, or publish to a registry.
 Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
 and executable orchestration for skill and plugin creation, updates, checks,
 external intake, and installation of selected checked versions. Its reusable
-core stays portable; supported Tessl and Codex adapters remain SDK integration
+core stays portable; supported registry and host adapters, initially Tessl and
+Codex, remain SDK integration
 responsibilities, not core dependencies. Most of this end-to-end route is still
 planned, not implemented. Agent-Skills is a transitional migration source and
 must not become a runtime, test, documentation, or release dependency. Skills
@@ -60,10 +67,16 @@ Foundry holds candidates awaiting SDK processing, including blocked candidates;
 holding is not SDK clearance, installation, distribution, or a requirement for
 permanent post-processing custody.
 
-The target managed flow is Foundry holding or new authoring/external intake,
-then SDK checking, a checked private version in Jamie's Tessl `jscraik`
-workspace, then selected Codex runtime copies sourced from that version in
-`~/.codex/skills` or `~/.codex/plugins` as applicable.
+The [target release format](docs/workflow.md#managed-release-format) is a complete
+Agent Plugins package with root `plugin.json`, even for one skill. Optional
+Foundry holding or new authoring/external intake leads to plugin normalisation,
+SDK checking, a verified registry version and selected host installation.
+Tessl `jscraik` is the initial private backend, not a permanent dependency.
+Do not start or create a separate registry, including a catalogue or prototype,
+until the SDK workflow is complete and publication to Jamie's private Tessl
+workspace is verified. That registry becomes primary only after further
+[publication, readback, download and installation proof](docs/workflow.md#registry-transition).
+Keep one canonical content source; Tessl exports belong to an explicit adapter.
 Neither a local receipt nor the current `tessl prepare` route proves this flow.
 Only Jamie chooses a public release. Verified OpenAI-provided plugins and
 OpenAI system skills remain on their provider-managed paths; names, locations,

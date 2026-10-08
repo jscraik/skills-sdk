@@ -1,5 +1,29 @@
 # Compatibility
 
+## Plugin-first and registry-independent migration target
+
+The [managed release policy](workflow.md#managed-release-format) selects root
+`plugin.json` and direct `skills/<skill-name>/SKILL.md` discovery for SDK-managed
+releases, including single-skill plugins. Current standalone-skill APIs and
+receipt schemas remain supported; migration needs explicit schema, behaviour
+and compatibility proof rather than retroactive reinterpretation or removal.
+Establish complete-plugin identity before release-bound evidence. A standalone
+skill's passing receipt is not clearance for a newly assembled plugin.
+
+Keep canonical skill contents in one source. A Tessl import/export adapter may
+emit a distinct artifact with a distinct digest, but must prove required bytes,
+paths and executable modes are preserved or block unsupported content. Keep
+SDK and Tessl evaluation provenance, score meaning and not-evaluated/blocked/
+stale states separate. No shared filename or passing lint substitutes for an
+archive round-trip or selected-host test.
+
+The [registry transition](workflow.md#registry-transition) makes Tessl the
+initial backend, not a permanent SDK dependency. Existing registry preparation
+contracts do not implement replacement-registry transport or establish a Tessl
+endpoint override. Recheck the chosen backend and host independently; a
+catalogue is not distribution, and runtime hooks may retain a CLI dependency
+after registry storage changes. This section records a target, not new APIs.
+
 ## Selected-case safety admission
 
 The additive `pre-execution-safety-evidence/v1` input retains actual artifacts
@@ -578,6 +602,11 @@ must bind the same candidate identity and report their own evidence.
 
 ## Tessl to Codex native-plugin compatibility question
 
+The following CLI 0.111.0 experiment concerns the older Codex compatibility
+layout. Retain it as historical evidence, not a claim about today's CLI or the
+new canonical root-manifest format. The next adapter proof must cover the
+portable plugin target and any explicitly selected compatibility import.
+
 The SDK does not yet claim that a Tessl plugin archive can carry a complete
 Codex-native plugin. Tessl's documented plugin manifest selects skills, rules,
 commands, MCP metadata, and hooks; OpenAI's native plugin also requires its
@@ -606,8 +635,8 @@ not a claim that the existing Tessl-format wrapper for skill evaluation is
 absent or unusable.
 
 Compatibility question for Tessl: what documented manifest field or package
-layout includes *all* referenced native-plugin resources, including
-`.codex-plugin/plugin.json`, assets, and scripts outside skill directories, in
+layout includes *all* required plugin resources, including canonical root
+`plugin.json`, any selected compatibility manifest, assets and scripts outside skill directories, in
 the versioned archive without changing their contents, relative paths, or
 executable modes? If that is supported, which Codex integration installs the
 complete archive as one plugin rather than only materializing its skills, MCP

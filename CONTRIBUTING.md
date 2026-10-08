@@ -42,6 +42,16 @@ in audit records rather than making their wording a permanent test contract.
 
 ## Validation and delivery
 
+A capability-changing PR must update the affected status descriptions, or
+explain in its description why none change. Use the existing
+[workflow](docs/workflow.md) for accepted capabilities and boundaries,
+[migration map](docs/migration-map.md) for legacy disposition, entrypoints,
+proof and remaining actions, and [task record](docs/projects/sdk-workflow/tasks.md)
+for delivery state. Review code and those documentation changes together.
+After merge, reconcile the accepted revision in the task record before selecting
+the next slice. Unmerged work remains labelled separately. Link and entrypoint
+checks must not infer semantic completeness, live execution or migration parity.
+
 Run:
 
 ```bash

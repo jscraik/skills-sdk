@@ -13,6 +13,45 @@ interaction, and publication remain outside the portable core. Supported
 integration adapters and their end-to-end orchestration are SDK-owned future
 work, not responsibilities left to Agent-Skills or Foundry.
 
+## brAInwav product family
+
+The owner-approved product structure has two separate repositories, not a
+combined runtime or a new SDK dependency:
+
+| Repository | Responsibilities |
+| --- | --- |
+| `skills-sdk` | Portable library, CLI and contracts; validation and evaluation; package preparation; registry and host adapters. |
+| `skills-registry` (future) | Website/API and search; publisher accounts; package/version catalogue; artifact storage and access; job scheduling and operations. Keep UI, API, administration and workers in this one registry repository initially. |
+
+Registry workers use an installed, pinned SDK package version for validation,
+evaluation and preparation through public APIs and versioned schemas. Production
+must not use neighbouring checkouts, editable installations, private SDK imports
+or duplicated validation rules. Record the package version with job evidence.
+The service owns worker scheduling and isolation; the SDK owns the reusable
+operation and its contracts. Shared repository custody does not grant untrusted
+evaluation workers the website's publishing credentials. Separate processes and
+permissions need not become separate repositories.
+
+SDK registry adapters may call supported APIs but must not import registry server
+code. Offline validation, preparation and applicable local evaluation require no
+registry account, database or running website. Neither project depends on
+Agent-Skills or Foundry at runtime. Prove both sides: isolated SDK operation and
+registry consumer tests against the installed SDK package actually deployed.
+Separate repositories alone do not prove independence or security.
+
+The SDK determines what candidate-bound evidence establishes; registry policy
+decides publication, storage, presentation and distribution. The target SDK icon
+gate validates approved artwork and binds packaged bytes; the registry displays
+that exact version's artwork and attributed evidence, never silently replaces
+released assets. Coordinate a boundary change through an SDK release or explicit
+candidate package and a tested registry dependency update, not shared source.
+Reconsider repository consolidation only if repeated cross-repository
+coordination becomes a demonstrated problem and Jamie approves that change.
+
+This is a responsibility boundary, not permission to create `skills-registry`
+now. The [registry start gate](docs/workflow.md#registry-transition) still
+requires completed SDK acceptance and verified private Tessl publication first.
+
 ## Product ownership and migration
 
 Use [the canonical workflow](docs/workflow.md) for the owner-approved gate
@@ -23,16 +62,42 @@ tracks bounded implementation and acceptance proof.
 Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
 and executable tooling to create, update, check, and admit external skills and
 plugins, then orchestrate installation of selected checked versions through
-supported Tessl and Codex adapters. This is target ownership, not a claim that
+supported registry and host adapters, initially Tessl and Codex. This is target ownership, not a claim that
 all routes currently execute. Skills Foundry holds candidates awaiting SDK
 processing, including blocked candidates; its custody does not grant approval,
 distribution, or installation and need not be permanent after processing.
 Agent-Skills is only a migration source; new SDK lifecycle behavior must not
 be added there.
 
-The target managed path is candidate holding/intake, SDK checking, private
-Tessl `jscraik` registry version, and selected Codex runtime copy. Only Jamie
-decides public release. Verify origin before exempting OpenAI-provided plugins
+The [managed release format](docs/workflow.md#managed-release-format) selects
+Agent Plugins as the release unit even for one skill, with root `plugin.json`
+canonical and client-specific settings behind extension/adapter boundaries.
+Whole-plugin identity precedes release-bound quality, security and evaluation
+evidence. Standalone skills remain intake and validation inputs, not a second
+managed release format. This target does not change the implemented skill-level
+services below or claim that the queued plugin implementation is accepted.
+
+The [mandatory icon policy](docs/workflow.md#icons-and-presentation) belongs to
+SDK release readiness. Bind approved artwork, its rights evidence and referenced
+presentation assets to the whole-plugin candidate. Portable capture belongs to
+the reusable core; destination image rules and observed display belong to the
+selected adapters. Asset generation, normalisation and repair are explicit
+preparation operations; validation and build remain read-only. Generic asset
+hashing is not image validation, approval or host-display proof.
+
+The target managed path is optional candidate holding/intake, whole-plugin
+SDK checking, a verified registry version and selected host installation.
+Tessl `jscraik` is the initial private distribution backend, not a permanent
+SDK dependency. Do not start or create the separate registry, even a catalogue
+or prototype, before completing the SDK workflow and verifying correct private
+Tessl publication. A separately operated registry becomes primary only after
+publication, readback, download and installation proof; see the
+[registry transition](docs/workflow.md#registry-transition). The SDK remains
+usable and testable while either registry service is unavailable. Registry
+services own storage, search, access control, presentation and distribution;
+they consume SDK validation/evaluation rather than duplicate it. Tessl-specific
+manifests are import/export adapter outputs over one canonical content source.
+Only Jamie decides public release. Verify origin before exempting OpenAI-provided plugins
 or OpenAI system skills; keep their provider-managed loading paths intact.
 None of these registry, installation, or exemption outcomes is proved by the
 current local SDK contracts.

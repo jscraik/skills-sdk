@@ -12,7 +12,7 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 The CLI exposes these routes. Existing-copy maintenance is the only route
 below that permits a host write, and requires explicit `--apply`. The names
 do not by themselves implement the SDK's target create, update, full check,
-external-intake, private Tessl delivery, or Codex installation workflow:
+external-intake, registry delivery, or host installation workflow:
 
 ```text
 inventory   intake   check-local   check-quality   validate   build   review-content   eval   package   project   verify
@@ -208,9 +208,13 @@ candidate-bound lanes:
 - `tessl prepare` and `tessl verify` name preparation and verification only;
   neither publishes or changes registry state.
 
-The intended managed installation source is an exact SDK-checked version in
-Jamie's private Tessl `jscraik` workspace, not Foundry or Agent-Skills files.
-No current CLI route publishes, reads back, or installs such a version. Only
+The intended managed installation source is an exact SDK-checked plugin version
+through a verified registry route, initially Jamie's private Tessl `jscraik`
+workspace, not Foundry or Agent-Skills files. The
+[registry-independent target](workflow.md#registry-transition) does not add a
+replacement-registry endpoint flag or turn the existing `tessl` discovery routes
+into generic registry clients. No current CLI route publishes, reads back, or
+installs such a version. Only
 Jamie chooses a public release. Origin-verified OpenAI-provided plugins and
 OpenAI system skills keep their provider-managed loading and installation
 routes. That route exemption does not waive applicable SDK checks or evidence
