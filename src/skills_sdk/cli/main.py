@@ -118,6 +118,16 @@ def _add_content_review_parser(commands: argparse._SubParsersAction[argparse.Arg
     review.add_argument("--robot", action="store_true")
 
 
+def _add_quality_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    quality = commands.add_parser("check-quality", help="run explicit v2 intent, policy and content quality checks")
+    quality.add_argument("package_root", type=Path)
+    quality.add_argument("--request", type=Path, required=True)
+    quality.add_argument("--baseline-root", type=Path)
+    quality.add_argument("--assessment", type=Path)
+    quality.add_argument("--json", action="store_true", dest="json_output")
+    quality.add_argument("--robot", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -127,6 +137,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
     _add_content_review_parser(commands)
+    _add_quality_parser(commands)
     for name, help_text in COMMAND_HELP.items():
         if name in {"intake", "check-local", "validate", "build", "eval", "verify"}:
             continue
@@ -572,10 +583,58 @@ def _local_check(arguments: argparse.Namespace, parser: argparse.ArgumentParser)
     return _emit_local_check(stages, blocked_stage=None, json_output=arguments.json_output)
 
 
+def _quality_check(arguments: argparse.Namespace) -> int:
+    """Read bounded no-follow inputs and return the v2 envelope even on rejection."""
+    from skills_sdk.evaluation import check_local_quality
+    from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES
+    from skills_sdk.models.packaging import PackageReceiptBlocker
+    from skills_sdk.models.quality_workflow import LocalCheckResultV2
+
+    try:
+        request = json.loads(
+            _read_intake_context(arguments.request).decode("utf-8"), object_pairs_hook=_reject_duplicate_members
+        )
+        assessment = None
+        if arguments.assessment is not None:
+            assessment = json.loads(
+                _read_intake_context(arguments.assessment, max_bytes=CONTENT_REVIEW_ASSESSMENT_MAX_BYTES).decode(
+                    "utf-8"
+                ),
+                object_pairs_hook=_reject_duplicate_members,
+            )
+    except (OSError, ValueError, RecursionError):
+        result = LocalCheckResultV2(
+            status="blocked",
+            request=None,
+            blocked_stage="request",
+            blocker=PackageReceiptBlocker(
+                code="invalid_quality_input", message="Quality inputs require bounded no-follow JSON files."
+            ),
+        )
+    else:
+        result = asyncio.run(
+            check_local_quality(
+                arguments.package_root,
+                request,
+                baseline_root=arguments.baseline_root,
+                assessment=assessment,
+            )
+        )
+    if arguments.json_output:
+        print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+    else:
+        print(f"check-quality: {result.status}")
+        if result.blocker is not None:
+            print(f"  {result.blocked_stage}: {result.blocker.code}: {result.blocker.message}")
+    return 0 if result.status == "local_checks_passed" else 2
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.command == "check-quality":
+        return _quality_check(arguments)
     if arguments.command == "review-content":
         return _content_review(arguments)
     if arguments.command == "check-local":

@@ -414,6 +414,18 @@ structural and model-level bindings. The context schema is registered as
 `skill-package-intake-context.v1`; neither family is supported by the generic
 `parse_receipt` function.
 
+The additive `skills_sdk.evaluation.check_local_quality` async service accepts
+a package path and a `LocalCheckRequestV2` or closed raw request. Keyword inputs
+are `baseline_root`, `assessment` and an explicit trusted offline `adapter`.
+It returns `LocalCheckResultV2` (`local-check/v2`) with ordered original service
+receipts and final source captures. Import request, policy, stage and result
+models from `skills_sdk.models`; validate serialized inputs and outputs through
+`SchemaRegistry` using `local-check-request.v2` and `local-check.v2`.
+Supplied and observed content evidence cannot be substituted for each other.
+Declared intake context and coverage plan must match their stage receipts.
+This composition does not execute scenario/judge evaluation or authorise
+promotion. Callback invocation is recorded only in its separate observed lane.
+
 The agent-facing `skills-sdk check-local` CLI emits the registry-only
 `local-check/v1` envelope. Use
 `SchemaRegistry().validate("local-check.v1", payload)` to check its ordered,

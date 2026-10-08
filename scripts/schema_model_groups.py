@@ -32,6 +32,7 @@ from skills_sdk.models.packaging import (
 )
 from skills_sdk.models.provider_call import ProviderCallPublicResult, TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
+from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckResultV2
 from skills_sdk.models.runtime_evidence import (
     ActivationObservation,
     DiscoveryObservation,
@@ -64,6 +65,8 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ScorerQualityReceipt, "scorer-quality.v1.schema.json"),
         (ScorerCalibrationReceipt, "scorer-calibration.v1.schema.json"),
         (LocalCheckResult, "local-check.v1.schema.json"),
+        (LocalCheckRequestV2, "local-check-request.v2.schema.json"),
+        (LocalCheckResultV2, "local-check.v2.schema.json"),
         (ScenarioCoveragePlan, "scenario-coverage-plan.v1.schema.json"),
         (ScenarioCoverageResult, "scenario-coverage.v1.schema.json"),
         (ContentReviewAssessment, "content-review-assessment.v1.schema.json"),

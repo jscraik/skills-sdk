@@ -96,6 +96,12 @@ from skills_sdk.models.provider_execution import (
     ProviderExecutionResult,
     ProviderUsageMetadata,
 )
+from skills_sdk.models.quality_workflow import (
+    LocalCheckRequestV2,
+    LocalCheckResultV2,
+    LocalQualityPolicy,
+    LocalQualityStage,
+)
 from skills_sdk.models.registry import (
     RegistryIdentity,
     RegistryPreparationBlocker,
@@ -161,6 +167,10 @@ __all__ = [
     "IntakeChecks",
     "IntakeDecision",
     "IntakeDecisionStatus",
+    "LocalCheckRequestV2",
+    "LocalCheckResultV2",
+    "LocalQualityPolicy",
+    "LocalQualityStage",
     "MantraAssessment",
     "MantraPrinciple",
     "MantraStatus",

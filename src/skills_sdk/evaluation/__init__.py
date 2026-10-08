@@ -16,6 +16,7 @@ __all__ = [
     "assess_scenario_quality",
     "assess_scorer_calibration",
     "assess_scorer_quality",
+    "check_local_quality",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_content_review",
@@ -27,6 +28,10 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     """Load optional evaluation services only when requested."""
+    if name == "check_local_quality":
+        from skills_sdk.evaluation.quality_workflow import check_local_quality
+
+        return check_local_quality
     if name in {"ContentReviewDocument", "ContentReviewInput", "OfflineContentReviewAdapter", "execute_content_review"}:
         from skills_sdk.evaluation import content_review
 

@@ -24,4 +24,6 @@ mise exec -- uv pip install --python "$smoke_venv_dir/bin/python" "${sdk_built_w
 "$smoke_venv_dir/bin/python" tests/installed_package_quality_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_scenario_coverage_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_content_review_smoke.py
+mise exec -- uv run --frozen python tests/installed_quality_workflow_smoke.py --prepare "$smoke_venv_dir/quality-inputs"
+"$smoke_venv_dir/bin/python" tests/installed_quality_workflow_smoke.py --check "$smoke_venv_dir/quality-inputs"
 git diff --check
