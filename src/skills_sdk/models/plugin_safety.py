@@ -105,8 +105,13 @@ def _required_checks(value: PluginPreExecutionSafetyEvidence) -> set[str]:
     if "mcp_auth" in categories or "system_service_modification" in codes:
         required.add("tools_and_privileges")
     paths = {item.path for item in value.validation.files}
-    if "mcp.json" in paths:
+    if any(path == "mcp.json" or path.endswith("/mcp.json") for path in paths):
         required.add("tools_and_privileges")
+    if any(
+        item.permission_mode & 0o111 or "scripts" in item.path.split("/")[:-1]
+        for item in value.validation.files
+    ):
+        required |= {"filesystem_and_subprocess", "dependencies_and_binaries"}
     return required
 
 
