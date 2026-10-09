@@ -86,6 +86,29 @@ def test_single_and_multiple_child_contexts_bind_complete_plugin(tmp_path: Path)
     assert str(root) not in json.dumps(payload)
 
 
+@pytest.mark.parametrize("reference", ["skills/beta/SKILL.md", "skills/beta/references/guide.md"])
+def test_unselected_child_references_block_and_selected_shared_recover(tmp_path: Path, reference: str) -> None:
+    """Runtime context must not silently widen declared per-skill selection."""
+    root = _plugin(tmp_path, ("alpha", "beta"))
+    for name in ("alpha", "beta"):
+        (root / "skills" / name / "references" / "guide.md").write_text(f"Private {name} instructions.\n")
+    definition, context = _prepared(root, ("skills/alpha",))
+    with pytest.raises(ContractError, match="selected child"):
+        prepare_matched_plugin_context(definition, replace(context, reference_paths=(reference,)))
+    safe = replace(context, reference_paths=("references/shared.md", "skills/alpha/references/guide.md"))
+    documents = prepare_matched_plugin_context(definition, safe)["plugin_context"]["documents"]
+    assert [item["path"] for item in documents] == [
+        "skills/alpha/SKILL.md",
+        "references/shared.md",
+        "skills/alpha/references/guide.md",
+    ]
+    assert "Private beta instructions." not in json.dumps(documents)
+    cross = replace(context, selected_skill_paths=("skills/alpha", "skills/beta"))
+    if reference.endswith("SKILL.md"):
+        reference = "skills/beta/references/guide.md"
+    assert prepare_matched_plugin_context(definition, replace(cross, reference_paths=(reference,)))
+
+
 def test_relative_plugin_root_retains_same_context_without_following_links(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

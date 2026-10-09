@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from skills_sdk.core.errors import ContractError
-from skills_sdk.evaluation.live_selected_case import SelectedCaseJudgeAdapter
+from skills_sdk.evaluation.matched_calibration import DimensionalJudgeAdapter
 from skills_sdk.evaluation.matched_plugin_context import PluginExecutionContext, _request_matches_plugin_context
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput, assess_pre_execution_safety
 from skills_sdk.evaluation.selected_case import (
@@ -17,7 +18,31 @@ from skills_sdk.models.matched_ingress import _canonical_matched_input
 from skills_sdk.models.matched_plugin_calibration import _require_variant_calibration
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.safety import PackageSafetyBlocker
-from skills_sdk.providers.call import TextProviderAdapter
+from skills_sdk.models.scorer_quality import ScorerJudgeParameters
+from skills_sdk.providers.types import CompleteTextProviderAdapter, StreamingTextProviderAdapter
+
+
+class MatchedCompleteProviderAdapter(CompleteTextProviderAdapter, Protocol):
+    """Complete-mode provider exposing the frozen matched generation settings."""
+
+    parameters: ScorerJudgeParameters
+
+
+class MatchedStreamingProviderAdapter(StreamingTextProviderAdapter, Protocol):
+    """Pull-stream provider exposing the frozen matched generation settings."""
+
+    parameters: ScorerJudgeParameters
+
+
+type MatchedProviderAdapter = MatchedCompleteProviderAdapter | MatchedStreamingProviderAdapter
+
+
+@dataclass(frozen=True, slots=True)
+class MatchedTrialAdapters:
+    """Fresh host capabilities for one additional trial, with single-call cleanup."""
+
+    provider: MatchedProviderAdapter
+    judge: DimensionalJudgeAdapter
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,9 +52,10 @@ class MatchedVariantExecution:
     definition: SelectedCaseDefinition
     request: ProviderExecutionRequest
     inputs: SelectedCaseExecutionInput
-    provider: TextProviderAdapter
-    judge: SelectedCaseJudgeAdapter
+    provider: MatchedProviderAdapter
+    judge: DimensionalJudgeAdapter
     plugin_context: PluginExecutionContext | None = None
+    additional_trials: tuple[MatchedTrialAdapters, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,11 +158,14 @@ def preflight_matched_lane(
             _require_calibration(parsed, specification, variant, receipt)
         if type(executions) is not tuple or len(executions) != 10:
             raise ValueError("matched execution must cover all ten active cases")
+        adapter_ids: set[int] = set()
         for index, pair in enumerate(executions):
             if type(pair) is not MatchedCaseExecution:
                 raise ValueError("matched execution requires paired capabilities")
             _require_variant(parsed, specification, index, "baseline", pair.baseline)
             _require_variant(parsed, specification, index, "candidate", pair.candidate)
+            for item in (pair.baseline, pair.candidate):
+                _require_trial_adapters(item, specification.generator_parameters.trial_count, adapter_ids)
     except ContractError as error:
         if error.code in {"matched_plugin_safety_evidence_required", "matched_plugin_safety_rejected"}:
             return PackageSafetyBlocker(
@@ -149,3 +178,19 @@ def preflight_matched_lane(
             message="Matched execution requires a complete source-bound calibrated batch.",
         )
     return None
+
+
+def _require_trial_adapters(item: MatchedVariantExecution, trials: int, seen: set[int]) -> None:
+    """Admit a bounded fresh-capability schedule without inspecting host properties."""
+    additional = item.additional_trials
+    if type(additional) is not tuple or len(additional) != trials - 1:
+        raise ValueError("matched execution requires fresh capabilities for every declared trial")
+    schedule = (MatchedTrialAdapters(item.provider, item.judge), *additional)
+    for adapters in schedule:
+        if type(adapters) is not MatchedTrialAdapters:
+            raise ValueError("matched trial capabilities require the public adapter pair")
+        for adapter in (adapters.provider, adapters.judge):
+            identity = id(adapter)
+            if identity in seen:
+                raise ValueError("matched trials cannot reuse an adapter after cleanup")
+            seen.add(identity)

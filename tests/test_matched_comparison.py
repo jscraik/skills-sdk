@@ -51,7 +51,7 @@ def _plan() -> MatchedComparisonPlan:
             "adapter_id": "controlled",
             "adapter_version_or_digest": "v1",
         }
-        parameters = {"model": identity["model_id"], "temperature": 0.0, "trial_count": 1}
+        parameters = {"model": identity["model_id"], "temperature": 0.0, "trial_count": 2}
         lanes.append(
             {
                 "lane": lane,
@@ -220,6 +220,31 @@ def test_plan_changes_invalidate_identity_and_unmatched_cases_reject() -> None:
     changed["candidate_scenarios"][0]["cases"][0]["prompt"] = "Different task."
     with pytest.raises(ValidationError):
         MatchedComparisonPlan.model_validate(changed)
+
+
+@pytest.mark.parametrize("form", ["raw", "json", "copy", "construct"])
+def test_lane_trials_must_meet_selection_minimum_at_every_ingress(form: str) -> None:
+    """Reject plans guaranteed to remain inconclusive while retaining a valid neighbour."""
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+
+    plan = _plan()
+    raw = plan.model_dump(mode="json")
+    raw["lanes"][0]["generator_parameters"]["trial_count"] = 1
+    raw["lanes"][0]["judge_parameters"]["trial_count"] = 1
+    candidate: object = raw
+    if form == "copy":
+        candidate = plan.model_copy(update={"lanes": raw["lanes"]})
+    elif form == "construct":
+        candidate = MatchedComparisonPlan.model_construct(**raw)
+    with pytest.raises(ValidationError, match="frozen selection policy"):
+        if form == "json":
+            MatchedComparisonPlan.model_validate_json(json.dumps(raw))
+        else:
+            MatchedComparisonPlan.model_validate(candidate)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("matched-comparison-plan.v1", raw)
+    assert MatchedComparisonPlan.model_validate(plan) == plan
 
 
 def test_copied_nested_and_forged_decisions_reject_without_claiming_execution() -> None:

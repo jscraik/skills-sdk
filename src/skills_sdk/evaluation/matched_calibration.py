@@ -78,7 +78,8 @@ class _DimensionalCalibrationJudge:
         return CalibrationJudgeVerdict(evidence=judgment.evidence, score=score)
 
     async def cleanup(self) -> None:
-        await self.delegate.cleanup()
+        if await self.delegate.cleanup() is not None:
+            raise ValueError("dimensional judge cleanup must resolve to None")
 
 
 async def execute_matched_calibration(

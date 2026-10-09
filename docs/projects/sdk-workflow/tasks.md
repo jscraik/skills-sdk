@@ -289,27 +289,40 @@ Documenting these commands does not claim a new test run.
 - PR #52 closeout: Jamie merged the signed repair head `4cdfefb` at accepted
   `1125d0e`. The source and accepted trees agree. This records the hosted merge;
   it does not recast the earlier blocked review gate as an agent-performed merge.
-- Current work: reconcile the preserved S4 candidate against `1125d0e`.
-  The baseline integration passed 244 focused tests on 2026-10-09. A subsequent
-  identity-padding regression reproduced Python/schema disagreement, then
-  passed all 16 rejection/recovery cases after the matched-only ingress repair.
-  Whole-plugin source/context and child-specific calibration joins are now
-  integrated with explicit callback/time budgets and descriptive selection
-  policy. Exactly ten active cases cover one through nine captured children;
-  probes and repeats remain outside that active set. Whole-plugin supplied
-  safety and fresh static screening supplement selected-child safety.
-  Focused runtime guard and full-plugin tests passed 16 cases; focused offline
-  CLI and feedback tests passed 18 cases. The upper-bound nine-child CLI fixture
-  reproduced the old 1 MiB envelope limit; the matched-only 16 MiB allowance
-  passed the corrected acceptance/rejection/recovery test. Other command limits
-  remain unchanged. The policy, receipt and comparison route passed 128 tests,
-  including strict Boolean scalar/collection neighbours and recovery. A stale
-  bundle-as-receipt test fixture was corrected without changing production
-  validation. The disposable installed wheel passed public API/CLI acceptance,
-  rejection and recovery with supplied-offline fixtures. These are local
-  controlled-callback results, not external review, hosted checks or live
-  quality. Final aggregate results belong in delivery evidence and remain
-  independent of focused and installed checks.
+- S4 delivery evidence: PR #53's signed candidate
+  `ca1db74570a945f4843013d61d47b2e2eea77e73` integrates against accepted base
+  `1125d0e4fe339a4c4c60a47a11952ae70367a842`. Its retained final command was:
+
+  ```sh
+  PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS=-x bash scripts/validate-repository.sh
+  ```
+
+  Result on 2026-10-09: `pass`, 3,182 tests passed, one skipped in 2,411.55
+  seconds; generated schemas, code style, wheel build, installed smoke checks
+  and diff checks passed. Execution used `UV_OFFLINE=1` and disposable
+  `MISE_STATE_DIR` and `UV_CACHE_DIR` bindings; private cache paths are not
+  committed. The wrapper selects this checkout's pinned environment.
+  `PYTEST_ADDOPTS=-x` stopped on first failure without excluding tests.
+  This is historical local evidence for that exact PR #53 candidate, not
+  accepted-main, hosted-check or live-provider proof.
+- Current PR #53 repairs address reference-context exclusion, selected-child
+  reference ownership, trial feasibility and identity, adapter contracts and
+  fresh per-trial capability lifetimes,
+  receipt validation cost and safety requirements. These edits postdate
+  `ca1db745`; its aggregate does not validate them. Latest combined-candidate
+  validation, signed delivery and review-thread state belong to
+  [PR #53](https://github.com/jscraik/skills-sdk/pull/53); they require fresh
+  evidence and do not change the accepted-main baseline recorded above.
+  Exactly ten active cases, one through nine captured children and
+  separate calibration probes/repeats remain the intended scope. Intermediate
+  counts without retained exact commands are omitted rather than promoted into
+  reproducible validation evidence.
+- Remaining calibration ownership assessment: the accepted
+  `execute_scorer_calibration` trial expansion reuses each probe's supplied
+  capabilities; matched calibration composes that route. The new matched-lane
+  capability schedule does not change this accepted contract. Before claiming
+  stateful host calibration support, reproduce closing-adapter behaviour and
+  choose a compatible fresh-capability route with focused lifecycle proof.
 - Presentation is a separate signed, locally validated candidate `0c6eea3`:
   2,949 tests passed, one skipped, plus installed base and optional-image checks.
   It remains unpushed while permission to export its complete diff to the

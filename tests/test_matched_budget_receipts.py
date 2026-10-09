@@ -131,16 +131,21 @@ def test_elapsed_blocker_boundary_retains_valid_prefix(completed: MatchedExecuti
     _rejected({**raw, "elapsed_seconds": deadline - 1.0}, completed, "raw")
 
 
-def test_selection_minimum_trials_and_derived_only_boundary(completed: MatchedExecutionReceipt) -> None:
-    """Completed callbacks need sufficient repeated evidence before selecting."""
+def test_selection_minimum_cannot_exceed_lane_trials(completed: MatchedExecutionReceipt) -> None:
+    """A receipt cannot retrofit a selection minimum its frozen lane could never meet."""
     assert completed.summary.decision == "candidate"
+    assert "summary" not in completed.model_dump(mode="json")
     raw = completed.model_dump(mode="json")
     raw["plan"]["selection_policy"]["minimum_trials_per_case"] = 3
-    limited = MatchedExecutionReceipt.model_validate(raw)
-    assert limited.summary.decision == "inconclusive"
-    assert "summary" not in limited.model_dump(mode="json")
-    SchemaRegistry().validate("matched-execution.v1", raw)
-    _rejected({**raw, "summary": completed.summary.model_dump(mode="json")}, completed, "raw")
+    with pytest.raises(ValidationError, match="frozen selection policy"):
+        MatchedExecutionReceipt.model_validate(raw)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("matched-execution.v1", raw)
+    _rejected(
+        {**completed.model_dump(mode="json"), "summary": completed.summary.model_dump(mode="json")},
+        completed,
+        "raw",
+    )
     assert MatchedExecutionReceipt.model_validate(completed).summary.decision == "candidate"
 
 

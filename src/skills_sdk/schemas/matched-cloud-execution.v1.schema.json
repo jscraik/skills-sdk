@@ -645,6 +645,9 @@
           "title": "Baseline Input Sha256",
           "type": "string"
         },
+        "baseline_request": {
+          "$ref": "#/$defs/ProviderExecutionRequest"
+        },
         "candidate": {
           "$ref": "#/$defs/MatchedVariantJudgment"
         },
@@ -655,6 +658,9 @@
           "pattern": "^[0-9a-f]{64}$",
           "title": "Candidate Input Sha256",
           "type": "string"
+        },
+        "candidate_request": {
+          "$ref": "#/$defs/ProviderExecutionRequest"
         },
         "case_id": {
           "title": "Case Id",
@@ -673,6 +679,8 @@
         "candidate",
         "baseline_evaluation",
         "candidate_evaluation",
+        "baseline_request",
+        "candidate_request",
         "baseline_input_sha256",
         "candidate_input_sha256"
       ],
@@ -1816,6 +1824,184 @@
         "source_sha256"
       ],
       "title": "PortablePluginManifest",
+      "type": "object"
+    },
+    "ProviderExecutionBlocker": {
+      "additionalProperties": false,
+      "description": "Typed, secret-free reason that execution could not proceed.",
+      "properties": {
+        "category": {
+          "enum": [
+            "policy",
+            "safety",
+            "provider",
+            "adapter",
+            "transport",
+            "input",
+            "unknown"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "category"
+      ],
+      "title": "ProviderExecutionBlocker",
+      "type": "object"
+    },
+    "ProviderExecutionRequest": {
+      "additionalProperties": false,
+      "description": "Prepared provider request metadata; this model performs no execution.",
+      "properties": {
+        "blocker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderExecutionBlocker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "case_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Case Id",
+          "type": "string"
+        },
+        "cost_claimed": {
+          "const": false,
+          "title": "Cost Claimed",
+          "type": "boolean"
+        },
+        "credentials_included": {
+          "const": false,
+          "title": "Credentials Included",
+          "type": "boolean"
+        },
+        "declared_capability": {
+          "enum": [
+            "response_generation",
+            "agent_run",
+            "embedding",
+            "classification",
+            "other"
+          ],
+          "title": "Declared Capability",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "idempotency_key_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Idempotency Key Sha256",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "package_safety_receipt_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Safety Receipt Id",
+          "type": "string"
+        },
+        "package_safety_receipt_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Package Safety Receipt Sha256",
+          "type": "string"
+        },
+        "prepared_at": {
+          "format": "date-time",
+          "title": "Prepared At",
+          "type": "string"
+        },
+        "provider": {
+          "$ref": "#/$defs/ProviderIdentityV2"
+        },
+        "provider_execution_performed": {
+          "const": false,
+          "title": "Provider Execution Performed",
+          "type": "boolean"
+        },
+        "raw_payloads_included": {
+          "const": false,
+          "title": "Raw Payloads Included",
+          "type": "boolean"
+        },
+        "request_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "scenario_set_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Scenario Set Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "provider-execution-request/v1",
+          "default": "provider-execution-request/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "prepared",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "candidate",
+        "scenario_set_id",
+        "case_id",
+        "provider",
+        "declared_capability",
+        "input_sha256",
+        "idempotency_key_sha256",
+        "package_safety_receipt_id",
+        "package_safety_receipt_sha256",
+        "prepared_at",
+        "status",
+        "provider_execution_performed",
+        "credentials_included",
+        "raw_payloads_included",
+        "cost_claimed"
+      ],
+      "title": "ProviderExecutionRequest",
       "type": "object"
     },
     "ProviderIdentityV2": {

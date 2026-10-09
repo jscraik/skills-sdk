@@ -38,7 +38,7 @@ def _replace_safety(batch: tuple[object, ...], safety: object) -> tuple[object, 
 def _assert_completed(plan: object, calibrations: tuple[object, object], batch: tuple[object, ...]) -> None:
     """Prove the original corrected batch remains executable after a rejection."""
     receipt = asyncio.run(matched_execution.execute_matched_lane(plan, "local", calibrations, batch))
-    assert receipt.status == "completed" and len(receipt.pairs) == 10
+    assert receipt.status == "completed" and len(receipt.pairs) == 20
 
 
 def test_source_stale_immediately_after_preflight_never_reads_adapters_and_recovers(
@@ -51,9 +51,11 @@ def test_source_stale_immediately_after_preflight_never_reads_adapters_and_recov
     original_source = source.read_bytes()
     original_preflight = matched_execution.preflight_matched_lane
     accesses: list[str] = []
-    trap = _CapabilityTrap(accesses)
     first = batch[0]
-    trapped = replace(first, baseline=replace(first.baseline, provider=trap, judge=trap))
+    trapped = replace(
+        first,
+        baseline=replace(first.baseline, provider=_CapabilityTrap(accesses), judge=_CapabilityTrap(accesses)),
+    )
 
     def stale_after_preflight(*args: object, **kwargs: object) -> object:
         result = original_preflight(*args, **kwargs)

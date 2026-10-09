@@ -156,6 +156,10 @@ class MatchedComparisonPlan(_MatchedContractModel):
             raise ValueError("managed matched coverage requires a regression case")
         if tuple(item.lane for item in self.lanes) != ("local", "cloud"):
             raise ValueError("matched lanes must declare local before cloud")
+        if any(
+            item.generator_parameters.trial_count < self.selection_policy.minimum_trials_per_case for item in self.lanes
+        ):
+            raise ValueError("matched lane trials cannot satisfy the frozen selection policy")
         if sum(item.generator_parameters.trial_count * 20 for item in self.lanes) > 128:
             raise ValueError("matched comparison exceeds its execution budget")
         return self

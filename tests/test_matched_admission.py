@@ -72,7 +72,7 @@ def _calibrated(root: Path, count: int = 6) -> tuple[MatchedComparisonPlan, Matc
     )
     events.clear()
     receipt = asyncio.run(execute_matched_calibration(calibration, plan.rubric, executions))
-    assert receipt.status == "pass" and events.count("dimensional_judge") == count
+    assert receipt.status == "pass" and events.count("dimensional_judge") == 2 * count
     incomplete = target.model_copy(update={"receipt": receipt, "scorer": calibration.scorer})
     return plan, bundle.model_copy(update={"targets": (incomplete, *bundle.targets[1:])}), events
 

@@ -12,6 +12,8 @@ import yaml
 from pydantic import ValidationError, model_serializer
 
 from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.errors import ContractError
+from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import plugin_safety as service
 from skills_sdk.evaluation.plugin_safety import assess_plugin_pre_execution_safety, screen_plugin_security
 from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI
@@ -184,6 +186,62 @@ def test_host_clock_rejects_stale_and_future_assessment(tmp_path: Path, offset: 
     blocker = assess_plugin_pre_execution_safety(root, evidence, checked_at=NOW + timedelta(seconds=offset))
     assert blocker is not None and blocker.code == code
     assert assess_plugin_pre_execution_safety(root, evidence, checked_at=NOW) is None
+
+
+@pytest.mark.parametrize(
+    "path,mode,check_id",
+    [
+        ("scripts/data.txt", 0o644, "dependencies_and_binaries"),
+        ("skills/alpha/scripts/data.txt", 0o644, "dependencies_and_binaries"),
+        ("assets/helper.txt", 0o755, "filesystem_and_subprocess"),
+        ("assets/helper.txt", 0o711, "dependencies_and_binaries"),
+        ("mcp.json", 0o644, "tools_and_privileges"),
+        ("skills/alpha/mcp.json", 0o644, "tools_and_privileges"),
+    ],
+)
+def test_file_capability_review_cannot_be_marked_inapplicable(
+    tmp_path: Path, path: str, mode: int, check_id: str
+) -> None:
+    """Reject omitted source capabilities even without a matching text signature."""
+    root = _plugin(tmp_path)
+    added = root / path
+    added.parent.mkdir(parents=True, exist_ok=True)
+    added.write_text("{}\n", encoding="utf-8")
+    added.chmod(mode)
+    evidence = _evidence(root, risky="scripts" in path.split("/"))
+    payload = evidence.model_dump(mode="json")
+    check = next(item for item in payload["checklist"] if item["check_id"] == check_id)
+    check["status"] = "not_applicable"
+    checklist = next(item for item in payload["evidence"] if item["evidence_id"] == "capability-checklist")
+    checklist["sha256"] = canonical_json_sha256(
+        {"version": payload["checklist_version"], "checks": payload["checklist"]}
+    )
+    with pytest.raises(ValidationError, match="applicable checks"):
+        PluginPreExecutionSafetyEvidence.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-pre-execution-safety-evidence.v1", payload)
+    copied = evidence.model_copy(
+        update={"checklist": tuple(payload["checklist"]), "evidence": tuple(payload["evidence"])}
+    )
+    for forged in (payload, copied):
+        assert assess_plugin_pre_execution_safety(root, forged, checked_at=NOW) is not None
+    assert assess_plugin_pre_execution_safety(root, evidence, checked_at=NOW) is None
+
+
+def test_inert_resources_retain_not_applicable_neighbour(tmp_path: Path) -> None:
+    """Keep explicit non-capability assessments valid for ordinary inert content."""
+    root = _plugin(tmp_path)
+    evidence = _evidence(root)
+    payload = evidence.model_dump(mode="json")
+    optional = {"filesystem_and_subprocess", "dependencies_and_binaries", "tools_and_privileges"}
+    for check in payload["checklist"]:
+        if check["check_id"] in optional:
+            check["status"] = "not_applicable"
+    checklist = next(item for item in payload["evidence"] if item["evidence_id"] == "capability-checklist")
+    checklist["sha256"] = canonical_json_sha256(
+        {"version": payload["checklist_version"], "checks": payload["checklist"]}
+    )
+    assert assess_plugin_pre_execution_safety(root, payload, checked_at=NOW) is None
 
 
 @pytest.mark.parametrize("mutation", ["capture", "screening", "checklist", "reviewer", "applicable"])

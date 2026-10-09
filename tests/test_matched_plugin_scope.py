@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
-from skills_sdk.models.matched_plugin_scope import MatchedPluginScope
+from skills_sdk.models.matched_plugin_scope import MatchedPluginCaseScope, MatchedPluginScope
 from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI
 from skills_sdk.validation import validate_plugin_package
 
@@ -215,3 +215,50 @@ def test_actual_nested_copied_capture_mode_forgery_rejects(tmp_path: Path) -> No
     with pytest.raises(ValueError):
         MatchedPluginScope.model_validate(forged)
     assert MatchedPluginScope.model_validate(good) == good
+
+
+@pytest.mark.parametrize("reference", ["skills/skill-1/SKILL.md", "skills/skill-1/references/guide.md"])
+@pytest.mark.parametrize("form", ["raw", "json", "copy", "construct"])
+def test_case_references_cannot_select_an_unselected_child(tmp_path: Path, reference: str, form: str) -> None:
+    """References cannot widen a per-skill declaration into undeclared sibling instructions."""
+    scope = MatchedPluginScope.model_validate(_fixture(tmp_path))
+    good = scope.cases[0]
+    raw = good.model_dump(mode="json")
+    raw["reference_paths"] = [reference]
+    forged = raw
+    if form == "copy":
+        forged = good.model_copy(update={"reference_paths": (reference,)})
+    elif form == "construct":
+        forged = MatchedPluginCaseScope.model_construct(**raw)
+    with pytest.raises(ValueError, match="selected child"):
+        if form == "json":
+            MatchedPluginCaseScope.model_validate_json(json.dumps(raw))
+        else:
+            MatchedPluginCaseScope.model_validate(forged)
+    # Structural JSON Schema cannot express this cross-field membership join.
+    Draft202012Validator(MatchedPluginCaseScope.model_json_schema()).validate(raw)
+    safe = good.model_copy(update={"reference_paths": ("references/shared.md", "skills/skill-0/references/guide.MD")})
+    assert MatchedPluginCaseScope.model_validate(safe) == safe
+    cross = scope.cases[-1].model_copy(update={"reference_paths": (reference,)})
+    assert MatchedPluginCaseScope.model_validate(cross) == cross
+
+
+def test_registry_rejects_unselected_child_reference_and_recovers() -> None:
+    """Packaged registry semantic validation retains the selected-child boundary."""
+    from test_matched_comparison import _plan
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+
+    good = _plan().model_dump(mode="json")
+    forged = deepcopy(good)
+    case = forged["plugin_scope"]["cases"][0]
+    unselected = next(
+        child
+        for child in forged["plugin_scope"]["baseline"]["skills"]
+        if child["path"] not in case["selected_skill_paths"]
+    )
+    case["reference_paths"] = [f"{unselected['path']}/SKILL.md"]
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("matched-comparison-plan.v1", forged)
+    SchemaRegistry().validate("matched-comparison-plan.v1", good)

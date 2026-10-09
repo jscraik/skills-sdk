@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.live_selected_case import SelectedCaseJudgeInput, _execute_selected_case_with_judge
 from skills_sdk.evaluation.matched_admission import (
     MatchedCaseExecution,
+    MatchedTrialAdapters,
     MatchedVariantExecution,
     _require_plugin_safety,
     preflight_matched_lane,
@@ -22,12 +24,14 @@ from skills_sdk.models.matched_execution import MatchedExecutedPair, MatchedExec
 from skills_sdk.models.matched_ingress import _canonical_matched_input
 from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrationBundle
 from skills_sdk.models.matched_policy import MatchedRunBudget
+from skills_sdk.models.matched_trial import matched_trial_identity
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.safety import PackageSafetyBlocker
 from skills_sdk.models.scorer_quality import ScorerJudgeParameters
 from skills_sdk.providers import JsonValue, ProviderAdapterComplete
+from skills_sdk.providers.types import ProviderAdapterStreamItem
 
 
 @dataclass(slots=True)
@@ -76,6 +80,7 @@ class _MatchedProvider:
     ) -> None:
         self.delegate, self.specification, self.budget, self.invocations = delegate, specification, budget, 0
         self.guard = guard
+        self._stream_iterator: AsyncIterator[ProviderAdapterStreamItem] | None = None
 
     @property
     def descriptor(self) -> TextProviderAdapterDescriptor:
@@ -103,7 +108,50 @@ class _MatchedProvider:
         return result
 
     async def cleanup(self) -> None:
-        await self.delegate.cleanup()
+        try:
+            iterator, self._stream_iterator = self._stream_iterator, None
+            close = getattr(iterator, "aclose", None)
+            if callable(close):
+                await close()
+        finally:
+            if await self.delegate.cleanup() is not None:
+                raise ValueError("matched provider cleanup must resolve to None")
+
+    async def stream(self, request: object, input_payload: JsonValue) -> AsyncIterator[ProviderAdapterStreamItem]:
+        """Preserve descriptor-selected pull streaming with one counted invocation."""
+        self.guard.check()
+        before = self.descriptor
+        callback = self.delegate.stream
+        if not callable(callback):
+            raise ValueError("matched generator stream callback is unavailable")
+        self.guard.check()
+        self.budget.begin("provider")
+        self.invocations += 1
+        iterator = await callback(request, input_payload)
+        self._stream_iterator = iterator
+        self.guard.check()
+        self.budget.finish()
+        if self.descriptor != before:
+            raise ValueError("matched stream identity changed while opening")
+
+        async def guarded() -> AsyncIterator[ProviderAdapterStreamItem]:
+            """Guard each pull without buffering or consuming the stream eagerly."""
+            while True:
+                self.guard.check()
+                self.budget.finish()
+                if self.descriptor != before:
+                    raise ValueError("matched stream identity changed before a pull")
+                try:
+                    value = await anext(iterator)
+                except StopAsyncIteration:
+                    return
+                self.guard.check()
+                self.budget.finish()
+                if self.descriptor != before:
+                    raise ValueError("matched stream identity changed during a pull")
+                yield value
+
+        return guarded()
 
 
 class _BudgetedJudgeDelegate:
@@ -134,7 +182,8 @@ class _BudgetedJudgeDelegate:
         return result
 
     async def cleanup(self) -> None:
-        await self.delegate.cleanup()
+        if await self.delegate.cleanup() is not None:
+            raise ValueError("matched judge cleanup must resolve to None")
 
 
 class _MatchedJudge:
@@ -228,6 +277,20 @@ def _receipt(
     )
 
 
+def _snapshot_executions(executions: tuple[MatchedCaseExecution, ...]) -> tuple[MatchedCaseExecution, ...]:
+    """Retain admitted adapter references before any host callback can replace them."""
+
+    def snapshot(item: MatchedVariantExecution) -> MatchedVariantExecution:
+        return replace(
+            item,
+            additional_trials=tuple(
+                MatchedTrialAdapters(trial.provider, trial.judge) for trial in item.additional_trials
+            ),
+        )
+
+    return tuple(MatchedCaseExecution(snapshot(pair.baseline), snapshot(pair.candidate)) for pair in executions)
+
+
 async def execute_matched_lane(
     plan: object, lane: str, calibrations: tuple[object, object], executions: tuple[MatchedCaseExecution, ...]
 ) -> MatchedExecutionReceipt:
@@ -246,17 +309,28 @@ async def execute_matched_lane(
         problem = preflight_matched_lane(parsed, lane, calibrations, executions)
         if problem is not None:
             return _receipt((parsed, selected, ()), [], (0, 0), problem.code)
+        executions = _snapshot_executions(executions)
         retained = tuple(MatchedVariantCalibrationBundle.model_validate(item) for item in calibrations)
     except (TypeError, ValueError, ContractError):
         return _receipt((None, None, ()), [], (0, 0), "invalid_matched_execution")
     binding = (parsed, selected, retained)
     specification = next(item for item in parsed.lanes if item.lane == selected)
     budget = _RuntimeBudget(specification.budget, time.monotonic())
+    plan_digest = parsed.digest
     pairs: list[MatchedExecutedPair] = []
     for pair in executions:
         for trial in range(specification.generator_parameters.trial_count):
             outcomes = []
-            for item in (pair.baseline, pair.candidate):
+            for variant, supplied_item in (("baseline", pair.baseline), ("candidate", pair.candidate)):
+                request_id, idempotency = matched_trial_identity(
+                    plan_digest, selected, supplied_item.request.case_id, variant, trial
+                )
+                request_data = supplied_item.request.model_dump(mode="json")
+                request_data.update(request_id=request_id, idempotency_key_sha256=idempotency)
+                item = replace(supplied_item, request=ProviderExecutionRequest.model_validate(request_data))
+                if trial:
+                    adapters = supplied_item.additional_trials[trial - 1]
+                    item = replace(item, provider=adapters.provider, judge=adapters.judge)
                 guard = _PluginGuard(item)
                 provider, judge = (
                     _MatchedProvider(item.provider, specification, budget, guard),
@@ -306,6 +380,8 @@ async def execute_matched_lane(
                     candidate_evaluation=right[2],
                     baseline_input_sha256=left[0].request.input_sha256,
                     candidate_input_sha256=right[0].request.input_sha256,
+                    baseline_request=left[0].request,
+                    candidate_request=right[0].request,
                 )
             )
     return _receipt(

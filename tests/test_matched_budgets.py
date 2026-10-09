@@ -38,20 +38,20 @@ def test_exact_declared_callback_budget_completes_with_elapsed_receipt(
 ) -> None:
     """Allow exactly the required provider and judge calls and retain elapsed time."""
     plan, calibrations, batch, events = _matched(tmp_path)
-    plan = _budgeted(plan, maximum_provider_invocations=20, maximum_judge_invocations=20)
+    plan = _budgeted(plan, maximum_provider_invocations=40, maximum_judge_invocations=40)
     clock = Clock(12.0)
     monkeypatch.setattr(service, "time", SimpleNamespace(monotonic=clock))
     result = asyncio.run(service.execute_matched_lane(plan, "local", calibrations, batch))
     assert result.status == "completed" and result.elapsed_seconds == 0.0
-    assert result.provider_invocation_count == result.judge_invocation_count == 20
-    assert events.count("provider") == events.count("dimensional_judge") == 20
+    assert result.provider_invocation_count == result.judge_invocation_count == 40
+    assert events.count("provider") == events.count("dimensional_judge") == 40
 
 
 @pytest.mark.parametrize(
     ("updates", "code"),
     [
-        ({"maximum_provider_invocations": 19}, "matched_run_budget_insufficient"),
-        ({"maximum_judge_invocations": 19}, "matched_run_budget_insufficient"),
+        ({"maximum_provider_invocations": 39}, "matched_run_budget_insufficient"),
+        ({"maximum_judge_invocations": 39}, "matched_run_budget_insufficient"),
         (
             {"maximum_reported_cost": "1.00", "currency": "GBP"},
             "matched_cost_budget_unavailable",
@@ -165,7 +165,7 @@ def test_final_cleanup_deadline_is_typed_blocker_and_recovers(tmp_path: Path, mo
     plan = _budgeted(plan, maximum_elapsed_seconds=1.0)
     clock = Clock()
     monkeypatch.setattr(service, "time", SimpleNamespace(monotonic=clock))
-    judge = batch[-1].candidate.judge
+    judge = batch[-1].candidate.additional_trials[-1].judge
     original = judge.cleanup
 
     async def slow_cleanup() -> None:
@@ -175,9 +175,9 @@ def test_final_cleanup_deadline_is_typed_blocker_and_recovers(tmp_path: Path, mo
     judge.cleanup = slow_cleanup
     result = asyncio.run(service.execute_matched_lane(plan, "local", calibrations, batch))
     assert result.status == "blocked" and result.blocker.code == "matched_time_budget_exhausted"
-    assert result.elapsed_seconds == 2.0 and len(result.pairs) == 9
-    assert result.provider_invocation_count == result.judge_invocation_count == 20
-    assert events.count("dimensional_cleanup") == 20
+    assert result.elapsed_seconds == 2.0 and len(result.pairs) == 19
+    assert result.provider_invocation_count == result.judge_invocation_count == 40
+    assert events.count("dimensional_cleanup") == 40
     judge.cleanup = original
     clock.value = 0.0
     assert asyncio.run(service.execute_matched_lane(plan, "local", calibrations, batch)).status == "completed"

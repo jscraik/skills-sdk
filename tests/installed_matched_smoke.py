@@ -93,25 +93,35 @@ def _variant(raw: dict[str, object]) -> object:
 
     provider, judge = raw["provider"], raw["judge"]
     context = raw["plugin_context"]
+    provider_parameters = models.ScorerJudgeParameters.model_validate(provider["parameters"])
+    judge_parameters = models.ScorerJudgeParameters.model_validate(judge["parameters"])
+
+    def adapters() -> object:
+        return evaluation.MatchedTrialAdapters(
+            FixtureProvider(
+                evaluation.SuppliedTextProviderAdapter(
+                    TextProviderAdapterDescriptor.model_validate(provider["descriptor"]),
+                    provider["output_text"],
+                    tuple(provider["evidence_refs"]),
+                ),
+                provider_parameters,
+            ),
+            FixtureJudge(
+                models.ProviderIdentityV2.model_validate(judge["identity"]),
+                judge_parameters,
+                models.MatchedVariantJudgment.model_validate(judge["judgment"]),
+            ),
+        )
+
+    first = adapters()
     return evaluation.MatchedVariantExecution(
         evaluation.load_selected_case(
             Path(raw["package_root"]), source_revision=raw["source_revision"], case_id=raw["case_id"], mode="release"
         ),
         models.ProviderExecutionRequest.model_validate(raw["request"]),
         SelectedCaseExecutionInput(raw["input_payload"], raw["safety_evidence"]),
-        FixtureProvider(
-            evaluation.SuppliedTextProviderAdapter(
-                TextProviderAdapterDescriptor.model_validate(provider["descriptor"]),
-                provider["output_text"],
-                tuple(provider["evidence_refs"]),
-            ),
-            models.ScorerJudgeParameters.model_validate(provider["parameters"]),
-        ),
-        FixtureJudge(
-            models.ProviderIdentityV2.model_validate(judge["identity"]),
-            models.ScorerJudgeParameters.model_validate(judge["parameters"]),
-            models.MatchedVariantJudgment.model_validate(judge["judgment"]),
-        ),
+        first.provider,
+        first.judge,
         evaluation.PluginExecutionContext(
             root=Path(context["root"]),
             validation=models.PluginPackageValidation.model_validate(context["validation"]),
@@ -121,6 +131,7 @@ def _variant(raw: dict[str, object]) -> object:
             policy=models.PluginValidationPolicy.model_validate(context["policy"]),
             safety_evidence=models.PluginPreExecutionSafetyEvidence.model_validate(context["safety_evidence"]),
         ),
+        tuple(adapters() for _ in range(provider_parameters.trial_count - 1)),
     )
 
 
@@ -133,7 +144,7 @@ def _api(payload: dict[str, object]) -> None:
     for frames, expected in ((batch, "completed"), (batch[:-1], "blocked"), (batch, "completed")):
         receipt = asyncio.run(evaluation.execute_matched_lane(payload["plan"], "local", calibrations, frames))
         assert receipt.status == expected
-        assert receipt.provider_invocation_count == (20 if expected == "completed" else 0)
+        assert receipt.provider_invocation_count == (40 if expected == "completed" else 0)
         SchemaRegistry().validate("matched-execution.v1", receipt.model_dump(mode="json"))
         if expected == "completed":
             pair = receipt.comparison(0)
@@ -222,7 +233,7 @@ def check(root: Path) -> None:
     _api(local)
     for payload, code in ((local, 0), (dict(local, executions=local["executions"][:-1]), 2), (local, 0)):
         result = _cli(root, "matched-local", payload, "matched-execution.v1", code)
-        assert result["provider_invocation_count"] == (20 if code == 0 else 0)
+        assert result["provider_invocation_count"] == (40 if code == 0 else 0)
     numeric = json.loads((root / "calibration.json").read_text())
     for payload, code in ((numeric, 0), (dict(numeric, extra=True), 2), (numeric, 0)):
         result = _cli(root, "matched-calibration", payload, "matched-calibration.v1", code)

@@ -19,6 +19,23 @@ from skills_sdk.evaluation import prepare_matched_cloud_handoff
 from skills_sdk.models.matched_comparison import MatchedVariantJudgment
 
 
+def test_offline_trial_allocation_rejects_unbounded_fixture_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.cli import matched_offline
+
+    plan, _calibrations, batch, _events = _matched(tmp_path)
+    payload = _variant(batch[0].baseline, plan.rubric)
+    payload["provider"]["parameters"]["trial_count"] = 10**9
+
+    def unexpected_adapter(*args: object, **kwargs: object) -> object:
+        raise AssertionError("unbounded trial input reached adapter allocation")
+
+    monkeypatch.setattr(matched_offline, "_FixtureProvider", unexpected_adapter)
+    with pytest.raises(ValueError, match="trial allocation"):
+        matched_offline._variant(payload, matched=True)
+
+
 def _variant(item: object, rubric: object) -> dict[str, object]:
     judgment = MatchedVariantJudgment(
         evidence=_evidence(item.definition, item.request, item.provider.text),
@@ -87,8 +104,8 @@ def test_offline_local_cli_whole_batch_rejection_and_recovery(
         assert main(command) == expected
         receipt = json.loads(capsys.readouterr().out)
         SchemaRegistry().validate("matched-execution.v1", receipt)
-        assert receipt["provider_invocation_count"] == (0 if expected else 20)
-        assert receipt["judge_invocation_count"] == (0 if expected else 20)
+        assert receipt["provider_invocation_count"] == (0 if expected else 40)
+        assert receipt["judge_invocation_count"] == (0 if expected else 40)
         assert receipt["external_authenticity_verified"] is False
 
 
@@ -138,7 +155,7 @@ def test_relative_plugin_host_paths_use_same_bound_candidate(
     raw = capsys.readouterr().out
     assert str(tmp_path) not in raw
     receipt = json.loads(raw)
-    assert receipt["status"] == "completed" and receipt["provider_invocation_count"] == 20
+    assert receipt["status"] == "completed" and receipt["provider_invocation_count"] == 40
 
 
 @pytest.mark.parametrize(
@@ -216,4 +233,4 @@ def test_offline_local_regression_cli_retains_failure_and_rerun(
     closed = _run("matched-regression", payload, tmp_path, capsys)
     SchemaRegistry().validate("matched-regression.v1", closed)
     assert closed["status"] == "closed" and closed["initial"] == initial.model_dump(mode="json")
-    assert closed["rerun"]["provider_invocation_count"] == 20
+    assert closed["rerun"]["provider_invocation_count"] == 40

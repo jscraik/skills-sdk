@@ -158,14 +158,34 @@ requires sufficient trials, confidence, stability and directional evidence;
 `unchanged` and `inconclusive` are not promotion signals. Summary is a derived
 API property, not an additional serialised receipt field.
 
+Matched lane capabilities use a distinct provider and judge instance for every
+trial. `MatchedVariantExecution.additional_trials` supplies each later pair as
+`MatchedTrialAdapters`; missing, extra or reused instances block admission
+before host property access. Existing per-call cleanup and cancellation stay
+unchanged; uninvoked capabilities remain caller-owned. These private host
+capabilities are not portable receipt fields. Draft receipts produced before
+the request-binding repair must be regenerated; the matched family did not
+exist on the accepted base and is not a frozen released format yet.
+
 Cloud handoff preserves the qualifying local plugin as baseline and freezes
 scope, coverage and scoring objectives. Regression closure requires owned
 failures, a complete controlled ten-case rerun and unchanged fixture source.
 The supplied-offline CLI observes callbacks without external authenticity,
 live-quality, spending, publication or promotion proof. See
 [API families](api.md#matched-whole-plugin-evaluation-candidate) and
-[CLI commands](cli.md#matched-evaluation-candidate). Acceptance still requires
-the repository's focused schema, behaviour, compatibility and delivery gates.
+[CLI commands](cli.md#matched-evaluation-candidate). The retained historical
+validation command for PR #53 candidate
+`ca1db74570a945f4843013d61d47b2e2eea77e73` was
+`PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS=-x bash scripts/validate-repository.sh`:
+`pass`, 3,182 tests passed and one skipped. Its disposable offline cache
+bindings and proof limits are recorded in the
+[task record](projects/sdk-workflow/tasks.md). This result does not validate
+the subsequent reference-context, selected-child ownership, trial-feasibility,
+trial-identity, adapter-contract, receipt-cost or safety repairs. Those require
+fresh combined validation and delivery evidence in
+[PR #53](https://github.com/jscraik/skills-sdk/pull/53); neither the historical
+result nor this candidate establishes accepted-main contracts, live quality or
+hosted clearance.
 
 ## Supplied content-review contracts
 

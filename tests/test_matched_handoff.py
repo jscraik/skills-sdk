@@ -31,9 +31,9 @@ def test_actual_local_winner_becomes_cloud_baseline(tmp_path: Path) -> None:
     assert handoff.status == "ready" and handoff.cloud_plan.baseline == local.plan.candidate
     assert MatchedCloudHandoff.model_validate_json(handoff.model_dump_json()) == handoff
     result = asyncio.run(execute_matched_cloud(handoff, calibrations, batch))
-    assert result.status == "completed" and result.execution.lane == "cloud" and len(result.execution.pairs) == 10
-    assert result.execution.provider_invocation_count == result.execution.judge_invocation_count == 20
-    assert events.count("provider") == events.count("dimensional_judge") == 20
+    assert result.status == "completed" and result.execution.lane == "cloud" and len(result.execution.pairs) == 20
+    assert result.execution.provider_invocation_count == result.execution.judge_invocation_count == 40
+    assert events.count("provider") == events.count("dimensional_judge") == 40
     assert result.execution.plan.baseline == local.plan.candidate
     assert result.handoff == handoff
     assert MatchedCloudExecutionReceipt.model_validate_json(result.model_dump_json()) == result
@@ -44,7 +44,7 @@ def test_actual_local_winner_becomes_cloud_baseline(tmp_path: Path) -> None:
 
 def test_exact_threshold_local_lift_is_eligible(tmp_path: Path) -> None:
     local, plan, _, _, _ = _journey(tmp_path, local_candidate_score=3.0)
-    assert all(local.comparison(index).decision == "candidate" for index in range(10))
+    assert all(local.comparison(index).decision == "candidate" for index in range(20))
     assert prepare_matched_cloud_handoff(local, plan).status == "ready"
 
 

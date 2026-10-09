@@ -76,6 +76,8 @@ def _validated_paths(context: PluginExecutionContext) -> tuple[str, ...]:
             raise _error("invalid_matched_plugin_context", "plugin context paths must be portable") from None
     for path in references:
         parsed = PurePosixPath(path)
+        if parsed.parts[0] == "skills" and "/".join(parsed.parts[:2]) not in selected:
+            raise _error("invalid_matched_plugin_context", "plugin references within skills require a selected child")
         if parsed.suffix.casefold() not in {".md", ".markdown"} or any(
             term in part.casefold() for part in parsed.parts for term in _EXCLUDED_REFERENCE_TERMS
         ):

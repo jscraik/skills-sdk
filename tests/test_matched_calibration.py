@@ -88,6 +88,25 @@ def test_six_dimensional_callbacks_retain_recomputable_scores(tmp_path: Path) ->
     assert MatchedCalibrationReceipt.model_validate_json(result.model_dump_json()) == result
 
 
+@pytest.mark.parametrize("invalid_result", [False, {"cleanup": "invalid"}])
+def test_dimensional_cleanup_return_is_not_discarded_then_recovers(tmp_path: Path, invalid_result: object) -> None:
+    plan, batch, events = _dimensions(tmp_path)
+    original_cleanup = batch[0].judge.cleanup
+
+    async def malformed_cleanup() -> object:
+        await original_cleanup()
+        return invalid_result
+
+    batch[0].judge.cleanup = malformed_cleanup
+    blocked = asyncio.run(execute_matched_calibration(plan, _plan().rubric, batch))
+    assert blocked.status == "blocked" and not blocked.judgments
+    assert events.count("provider") == events.count("dimensional_judge") == 1
+    assert events.count("dimensional_cleanup") == 1
+    batch[0].judge.cleanup = original_cleanup
+    events.clear()
+    assert asyncio.run(execute_matched_calibration(plan, _plan().rubric, batch)).status == "pass"
+
+
 def test_maximum_declared_batch_retains_all_dimensions(tmp_path: Path) -> None:
     plan, batch, events = _dimensions(tmp_path, count=64, trials=2)
     raw = _plan().rubric.model_dump(mode="json")

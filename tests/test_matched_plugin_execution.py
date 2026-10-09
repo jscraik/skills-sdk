@@ -16,12 +16,12 @@ from skills_sdk.evaluation import execute_matched_lane
 def test_complete_plugin_executes_exactly_ten_cases(children: int, tmp_path: Path) -> None:
     plan, calibrations, batch, events = _matched(tmp_path, child_count=children)
     receipt = asyncio.run(execute_matched_lane(plan, "local", calibrations, batch))
-    assert receipt.status == "completed" and len(receipt.pairs) == 10
+    assert receipt.status == "completed" and len(receipt.pairs) == 20
     assert len(receipt.plan.plugin_scope.candidate.skills) == children
     assert len(receipt.plan.plugin_scope.cases[-1].selected_skill_paths) == children
     assert len(receipt.calibrations[0].targets) == children
-    assert receipt.provider_invocation_count == receipt.judge_invocation_count == 20
-    assert events.count("provider") == events.count("dimensional_judge") == 20
+    assert receipt.provider_invocation_count == receipt.judge_invocation_count == 40
+    assert events.count("provider") == events.count("dimensional_judge") == 40
     assert not receipt.promotion_authorized and not receipt.external_authenticity_verified
 
 

@@ -133,5 +133,5 @@ def test_cloud_recovery_requires_original_lineage_before_capability_access(tmp_p
         SchemaRegistry().validate("matched-cloud-regression.v1", blocked.model_dump(mode="json"))
     recovered = asyncio.run(evaluation.execute_matched_cloud_regression(failed, owners, plan, calibrations, batch))
     assert recovered.status == "closed" and recovered.initial == failed and recovered.handoff.local == local
-    assert events.count("provider") == events.count("dimensional_judge") == 20
+    assert events.count("provider") == events.count("dimensional_judge") == 40
     SchemaRegistry().validate("matched-cloud-regression.v1", recovered.model_dump(mode="json"))

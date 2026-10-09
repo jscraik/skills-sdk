@@ -20,7 +20,7 @@ from test_plugin_pre_execution_safety import _evidence as plugin_safety_fixture
 from test_selected_case_evaluation import REVISION, _case, _prepared_request, _safety_for, _skill
 
 from skills_sdk.core.digests import canonical_json_sha256
-from skills_sdk.evaluation.matched_admission import MatchedCaseExecution, MatchedVariantExecution
+from skills_sdk.evaluation.matched_admission import MatchedCaseExecution, MatchedTrialAdapters, MatchedVariantExecution
 from skills_sdk.evaluation.matched_calibration import execute_matched_calibration
 from skills_sdk.evaluation.matched_execution import execute_matched_lane
 from skills_sdk.evaluation.matched_plugin_context import PluginExecutionContext, prepare_matched_plugin_context
@@ -179,34 +179,40 @@ def _variant(
         rubric=rubric,
         targets=tuple(targets[key] for key in sorted(targets)),
     )
-    executions = tuple(
-        MatchedVariantExecution(
-            definition,
-            request,
-            SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
-            MatchedProvider(request, events),
-            DimensionJudge(
-                SimpleNamespace(
-                    identity=request.provider, parameters=parameters, definition=definition, request=request
-                ),
-                score,
-                events,
-            ),
-            context,
+
+    def adapters(definition: object, request: object) -> MatchedTrialAdapters:
+        provider = MatchedProvider(request, events)
+        provider.parameters = parameters
+        judge = DimensionJudge(
+            SimpleNamespace(identity=request.provider, parameters=parameters, definition=definition, request=request),
+            score,
+            events,
         )
-        for definition, request, payload, context in zip(definitions, requests, inputs, contexts, strict=True)
-    )
-    for execution in executions:
-        execution.provider.parameters = parameters
+        return MatchedTrialAdapters(provider, judge)
+
+    executions = []
+    for definition, request, payload, context in zip(definitions, requests, inputs, contexts, strict=True):
+        first = adapters(definition, request)
+        executions.append(
+            MatchedVariantExecution(
+                definition,
+                request,
+                SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+                first.provider,
+                first.judge,
+                context,
+                tuple(adapters(definition, request) for _ in range(trials - 1)),
+            )
+        )
     scorers = tuple(
         targets[(context.driver_skill_path, definition.assertion_contract_sha256)].scorer
         for context, definition in zip(contexts, definitions, strict=True)
     )
-    return scorers, bundle, executions
+    return scorers, bundle, tuple(executions)
 
 
 def _matched(
-    root: Path, trials: int = 1, variants: tuple[float, float, str] = (2.5, 4.5, "local"), child_count: int = 1
+    root: Path, trials: int = 2, variants: tuple[float, float, str] = (2.5, 4.5, "local"), child_count: int = 1
 ) -> tuple[object, tuple[object, object], tuple[object, ...], list[str]]:
     rubric = _plan().rubric
     events: list[str] = []
@@ -267,10 +273,10 @@ def _matched(
 def test_actual_ten_case_pairs_and_context(tmp_path: Path) -> None:
     plan, calibrations, batch, events = _matched(tmp_path)
     result = asyncio.run(execute_matched_lane(plan, "local", calibrations, batch))
-    assert result.status == "completed" and len(result.pairs) == 10
-    assert result.provider_invocation_count == result.judge_invocation_count == 20
-    assert events.count("provider") == events.count("dimensional_judge") == 20
-    assert all(result.comparison(index).decision == "candidate" for index in range(10))
+    assert result.status == "completed" and len(result.pairs) == 20
+    assert result.provider_invocation_count == result.judge_invocation_count == 40
+    assert events.count("provider") == events.count("dimensional_judge") == 40
+    assert all(result.comparison(index).decision == "candidate" for index in range(20))
 
 
 def test_incomplete_batch_zero_access_then_recovers(tmp_path: Path) -> None:
@@ -281,6 +287,19 @@ def test_incomplete_batch_zero_access_then_recovers(tmp_path: Path) -> None:
         and result.provider_invocation_count == result.judge_invocation_count == 0
         and not events
     )
+    assert asyncio.run(execute_matched_lane(plan, "local", calibrations, batch)).status == "completed"
+
+
+def test_insufficient_lane_trials_reject_before_callbacks_and_recover(tmp_path: Path) -> None:
+    """Reject a plan that cannot meet its selection policy before capability access."""
+    plan, calibrations, batch, events = _matched(tmp_path)
+    raw = plan.model_dump(mode="json")
+    raw["lanes"][0]["generator_parameters"]["trial_count"] = 1
+    raw["lanes"][0]["judge_parameters"]["trial_count"] = 1
+    forged = MatchedComparisonPlan.model_construct(**raw)
+    blocked = asyncio.run(execute_matched_lane(forged, "local", calibrations, batch))
+    assert blocked.status == "blocked" and blocked.blocker.code == "invalid_matched_execution"
+    assert blocked.provider_invocation_count == blocked.judge_invocation_count == 0 and not events
     assert asyncio.run(execute_matched_lane(plan, "local", calibrations, batch)).status == "completed"
 
 
@@ -344,13 +363,13 @@ def test_retained_receipt_round_trip_and_forgery_rejection(tmp_path: Path) -> No
 
 
 def test_maximum_local_trials_observe_each_pair_and_round_trip(tmp_path: Path) -> None:
-    plan, calibrations, batch, events = _matched(tmp_path, trials=5)
+    plan, calibrations, batch, events = _matched(tmp_path, trials=4)
     result = asyncio.run(execute_matched_lane(plan, "local", calibrations, batch))
-    assert result.status == "completed" and len(result.pairs) == 50
-    assert result.provider_invocation_count == result.judge_invocation_count == 100
-    assert events.count("provider") == events.count("dimensional_judge") == 100
+    assert result.status == "completed" and len(result.pairs) == 40
+    assert result.provider_invocation_count == result.judge_invocation_count == 80
+    assert events.count("provider") == events.count("dimensional_judge") == 80
     assert [(pair.case_id, pair.trial_index) for pair in result.pairs] == [
-        (f"case-{case}", trial) for case in range(10) for trial in range(5)
+        (f"case-{case}", trial) for case in range(10) for trial in range(4)
     ]
     assert MatchedExecutionReceipt.model_validate_json(result.model_dump_json()) == result
 
@@ -367,8 +386,8 @@ def test_late_judge_drift_retains_only_completed_prefix_and_recovers(tmp_path: P
 
     judge.judge = drift
     result = asyncio.run(execute_matched_lane(plan, "local", calibrations, batch))
-    assert result.status == "blocked" and len(result.pairs) == 3
-    assert result.provider_invocation_count == result.judge_invocation_count == 8
+    assert result.status == "blocked" and len(result.pairs) == 6
+    assert result.provider_invocation_count == result.judge_invocation_count == 14
     assert MatchedExecutionReceipt.model_validate_json(result.model_dump_json()) == result
     judge.parameters = plan.lanes[0].judge_parameters
     judge.judge = original

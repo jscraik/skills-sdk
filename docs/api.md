@@ -500,7 +500,21 @@ calibration with at least six held-out probes and the shared judge, settings
 and rubric. Probes and repeated trials do not enlarge the ten active cases.
 
 Host adapters remain private `MatchedCaseExecution` / `MatchedVariantExecution`
-capabilities. `PluginExecutionContext` and
+capabilities. Providers implement `MatchedCompleteProviderAdapter` or
+`MatchedStreamingProviderAdapter`, including frozen `parameters`; judges
+implement `DimensionalJudgeAdapter`, including their own frozen `parameters`.
+The first trial uses the variant's provider and judge; `additional_trials`
+contains exactly one fresh `MatchedTrialAdapters(provider, judge)` pair for
+each later trial. Admission rejects reused adapter instances anywhere in the
+lane before host property access. Each invoked adapter receives the existing
+bounded single-call cleanup; later unused capabilities remain caller-owned.
+Hosts must supply fresh capabilities again for a separate lane execution.
+Distinct instances do not prove that a host has avoided aliasing an external
+session behind different wrappers; that remains the host's responsibility.
+The provider descriptor selects complete or pull-stream mode. Streaming remains
+bounded by the provider lifecycle, with source, settings and elapsed-budget
+checks at every pull and iterator cleanup on success or rejection.
+`PluginExecutionContext` and
 `prepare_matched_plugin_context(definition, context)` bind the selected driver,
 selected child documents and permitted references to fresh whole-plugin source.
 Hidden evaluation, scorer, calibration and rubric documents are excluded from
@@ -524,6 +538,13 @@ selection from a completed lane. Minimum repeated-trial coverage, qualifying
 confidence, trial-range stability, directional case count and mean threshold
 control `candidate`, `baseline`, `unchanged` or `inconclusive`. The summary is a
 derived API property, not a serialised receipt field or a statistical guarantee.
+Plans whose lane trial count cannot meet the selection policy are rejected
+before callbacks. Each case, variant and trial gets a distinct request and
+idempotency identity derived from the frozen plan digest and lane. Execution
+receipts retain those actual requests and reject swapped or reused trial
+identities. Repeating the identical frozen experiment reproduces those identities;
+this separates trials within one experiment but does not bypass transport-side
+caching or establish authentication across separate runs.
 
 A cloud handoff requires a qualifying local candidate and no unresolved
 regressions. Its complete capture becomes the cloud baseline while case scope,

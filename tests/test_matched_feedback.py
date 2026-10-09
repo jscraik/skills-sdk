@@ -31,16 +31,16 @@ def test_actual_failure_remains_open_and_corrected_full_rerun_closes(tmp_path: P
     owners = ({"case_id": "case-0", "owner": "SDK evaluation maintainer"},)
     result = asyncio.run(execute_matched_regression(failed, owners, plan, calibrations, batch))
     assert result.status == "open" and result.rerun.requires_regression
-    assert events.count("provider") == events.count("dimensional_judge") == 20
+    assert events.count("provider") == events.count("dimensional_judge") == 40
     batch[0].candidate.provider.text = "behavior preserved"
     events.clear()
     corrected = asyncio.run(execute_matched_regression(failed, owners, plan, calibrations, batch))
-    assert corrected.status == "closed" and len(corrected.rerun.pairs) == 10
+    assert corrected.status == "closed" and len(corrected.rerun.pairs) == 20
     assert corrected.fixture_before.candidate == plan.candidate
     assert corrected.fixture_before == corrected.fixture_after
     assert corrected.fixture_paths == ("skills/simplify/references/evals.yaml",)
     assert set(corrected.fixture_paths) <= {item.path for item in corrected.fixture_after.files}
-    assert events.count("provider") == events.count("dimensional_judge") == 20
+    assert events.count("provider") == events.count("dimensional_judge") == 40
     assert MatchedRegressionReceipt.model_validate_json(corrected.model_dump_json()) == corrected
     inconsistent = corrected.model_dump(mode="json")
     inconsistent["fixture_after"]["mode_manifest_sha256"] = "e" * 64
@@ -134,7 +134,7 @@ def test_changed_candidate_closes_only_with_its_own_capture_and_complete_rerun(t
     )
     assert result.status == "closed" and result.fixture_after.candidate == plan.candidate
     assert len(result.rerun.plan.candidate_scenarios) == 10
-    assert events.count("provider") == events.count("dimensional_judge") == 20
+    assert events.count("provider") == events.count("dimensional_judge") == 40
     forged = result.model_dump(mode="json")
     forged["fixture_after"]["candidate"] = failed.plan.candidate.model_dump(mode="json")
     with pytest.raises(ValidationError, match="capture"):

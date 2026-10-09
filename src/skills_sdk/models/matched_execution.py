@@ -22,6 +22,8 @@ from skills_sdk.models.matched_comparison import (
 from skills_sdk.models.matched_ingress import _MatchedContractModel
 from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrationBundle, _require_variant_calibration
 from skills_sdk.models.matched_policy import MatchedLaneSummary, build_matched_lane_summary
+from skills_sdk.models.matched_trial import matched_trial_identity
+from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.safety import PackageSafetyBlocker, _public_text_is_redaction_safe
 
 
@@ -50,6 +52,8 @@ class MatchedExecutedPair(_MatchedContractModel):
     candidate: MatchedVariantJudgment
     baseline_evaluation: EvaluationReceiptV2
     candidate_evaluation: EvaluationReceiptV2
+    baseline_request: ProviderExecutionRequest
+    candidate_request: ProviderExecutionRequest
     baseline_input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     candidate_input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -107,6 +111,7 @@ class MatchedExecutionReceipt(_MatchedContractModel):
                 for binding in self.plan.case_bindings
                 for trial in range(specification.generator_parameters.trial_count)
             ]
+            plan_digest = self.plan.digest
             if len(self.pairs) > len(expected) or self.provider_invocation_count > 2 * len(expected):
                 raise ValueError("matched execution cannot exceed its declared coverage")
             for pair, (case_id, trial) in zip(self.pairs, expected[: len(self.pairs)], strict=True):
@@ -119,6 +124,7 @@ class MatchedExecutionReceipt(_MatchedContractModel):
                 ):
                     raise ValueError("matched observations require the frozen variant input digests")
                 _matched_pair_values(self.plan, self.lane, pair.baseline, pair.candidate)
+                _require_trial_requests(pair, plan_digest, self.lane)
                 for judgment, evaluation in (
                     (pair.baseline, pair.baseline_evaluation),
                     (pair.candidate, pair.candidate_evaluation),
@@ -228,9 +234,16 @@ class MatchedExecutionReceipt(_MatchedContractModel):
         return any(
             pair.candidate_evaluation.status != "pass"
             or any(item.status != "pass" for item in pair.candidate_evaluation.case_results)
-            or self.comparison(index).regression_required
-            for index, pair in enumerate(self.pairs)
+            or self._pair_regression_required(pair)
+            for pair in self.pairs
         )
+
+    def _pair_regression_required(self, pair: MatchedExecutedPair) -> bool:
+        """Reuse bound scores without rebuilding the complete public assessment."""
+        if self.plan is None or self.lane is None:
+            raise ValueError("matched receipt has no bound comparison")
+        left, right, _ = _matched_pair_values(self.plan, self.lane, pair.baseline, pair.candidate)
+        return right < left
 
     def comparison(self, index: int) -> MatchedPairAssessment:
         """Recompute one retained within-model comparison, never a cross-model score."""
@@ -250,6 +263,28 @@ class MatchedExecutionReceipt(_MatchedContractModel):
             decision=decision,
             regression_required=right < left,
         )
+
+
+def _require_trial_requests(pair: MatchedExecutedPair, plan_digest: str, lane: str) -> None:
+    """Bind the actual request retained for each independent case/variant/trial."""
+    for variant, request, judgment, input_sha256 in (
+        ("baseline", pair.baseline_request, pair.baseline, pair.baseline_input_sha256),
+        ("candidate", pair.candidate_request, pair.candidate, pair.candidate_input_sha256),
+    ):
+        request_id, idempotency = matched_trial_identity(plan_digest, lane, pair.case_id, variant, pair.trial_index)
+        evidence = judgment.evidence
+        if (
+            request.status != "prepared"
+            or request.declared_capability != "response_generation"
+            or request.request_id != request_id
+            or request.idempotency_key_sha256 != idempotency
+            or request.candidate != evidence.candidate
+            or request.provider != evidence.provider
+            or request.scenario_set_id != evidence.scenario_set_id
+            or request.case_id != pair.case_id
+            or request.input_sha256 != input_sha256
+        ):
+            raise ValueError("matched trial requires its unique bound observed request")
 
 
 def _require_budget_evidence(receipt: MatchedExecutionReceipt, specification: MatchedLaneSpec) -> None:

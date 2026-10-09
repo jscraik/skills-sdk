@@ -13,6 +13,8 @@ from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.providers import DEFAULT_PROVIDER_CALL_LIMITS, JsonValue
 from skills_sdk.validation.skill_package import SkillValidationPolicy, _scan_files
 
+_EXCLUDED_REFERENCE_TERMS = ("eval", "scorer", "rubric", "calibration", "heldout", "held-out", "hidden")
+
 
 def prepare_selected_case_context(
     definition: SelectedCaseDefinition, reference_paths: tuple[str, ...] = ()
@@ -35,8 +37,8 @@ def prepare_selected_case_context(
         parsed = PurePosixPath(path)
         if (
             parsed.parts[0] != "references"
-            or parsed.suffix not in {".md", ".markdown"}
-            or any(word in parsed.name.casefold() for word in ("eval", "scorer", "rubric", "calibration"))
+            or parsed.suffix.casefold() not in {".md", ".markdown"}
+            or any(term in part.casefold() for part in parsed.parts for term in _EXCLUDED_REFERENCE_TERMS)
         ):
             raise ValueError("skill context excludes hidden evaluation inputs")
     files, findings, captured = _scan_files(validated._package_root, SkillValidationPolicy())

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from copy import deepcopy
 from pathlib import Path
 
@@ -23,20 +24,20 @@ class ContextProvider(_Provider):
     async def complete(self, request: object, input_payload: object) -> ProviderAdapterComplete:
         assert request.input_sha256 == canonical_json_sha256(input_payload)
         documents = input_payload["skill_context"]["documents"]
-        assert [item["path"] for item in documents] == ["SKILL.md", "references/guide.md"]
+        assert [item["path"].casefold() for item in documents] == ["skill.md", "references/guide.md"]
         assert "Follow the captured reference." in documents[1]["text"]
         assert "acceptance" not in str(input_payload)
         self.events.append("context_provider")
         return ProviderAdapterComplete(text=self.text, evidence_refs=("evidence/provider-result.json",))
 
 
-def _context(root: Path) -> tuple[object, object, object, list[str]]:
+def _context(root: Path, reference_path: str = "references/guide.md") -> tuple[object, object, object, list[str]]:
     definition, _, _, events = _setup(root)
-    (definition._package_root / "references/guide.md").write_text("Follow the captured reference.\n", encoding="utf-8")
+    (definition._package_root / reference_path).write_text("Follow the captured reference.\n", encoding="utf-8")
     definition = load_selected_case(
         definition._package_root, source_revision=REVISION, case_id="happy-diff", mode="release"
     )
-    payload = prepare_selected_case_context(definition, ("references/guide.md",))
+    payload = prepare_selected_case_context(definition, (reference_path,))
     return definition, payload, _prepared_request(definition, payload), events
 
 
@@ -57,6 +58,51 @@ def test_actual_context_is_sent_and_digest_bound(tmp_path: Path) -> None:
     receipt = _run(definition, payload, request, events)
     assert receipt.status == "pass" and events == ["context_provider", "provider_cleanup", "judge", "judge_cleanup"]
     assert "Follow the captured reference." not in receipt.model_dump_json()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "references/heldout.md",
+        "references/held-out.md",
+        "references/hidden.md",
+        "references/HeLdOuT/guide.md",
+        "references/held-out/nested/guide.md",
+        "references/hidden/guide.md",
+        "references/evals/guide.md",
+        "references/scorer/rubric/calibration/guide.md",
+    ],
+)
+def test_hidden_path_segments_block_context_and_callbacks_then_recover(tmp_path: Path, path: str) -> None:
+    """Captured hidden documents cannot enter provider context through path selection."""
+    definition, _, _, events = _context(tmp_path)
+    hidden = definition._package_root / path
+    hidden.parent.mkdir(parents=True, exist_ok=True)
+    hidden.write_text("Private held-out labels.\n", encoding="utf-8")
+    definition = load_selected_case(
+        definition._package_root, source_revision=REVISION, case_id="happy-diff", mode="release"
+    )
+    payload = prepare_selected_case_context(definition, ("references/guide.md",))
+    forged = deepcopy(payload)
+    forged["skill_context"]["documents"].append(
+        {
+            "path": path,
+            "sha256": hashlib.sha256(hidden.read_bytes()).hexdigest(),
+            "text": hidden.read_text(encoding="utf-8"),
+        }
+    )
+    request = _prepared_request(definition, forged)
+    with pytest.raises(ValueError, match="hidden evaluation inputs"):
+        prepare_selected_case_context(definition, (path,))
+    assert _run(definition, forged, request, events).status == "blocked" and not events
+    assert _run(definition, payload, _prepared_request(definition, payload), events).status == "pass"
+
+
+def test_uppercase_safe_markdown_is_sent_to_provider(tmp_path: Path) -> None:
+    """Safe Markdown selection is case-insensitive without normalising its bound path."""
+    definition, payload, request, events = _context(tmp_path, "references/guide.MD")
+    assert payload["skill_context"]["documents"][1]["path"] == "references/guide.MD"
+    assert _run(definition, payload, request, events).status == "pass"
 
 
 @pytest.mark.parametrize("change", ["text", "digest", "candidate", "extra", "prompt"])

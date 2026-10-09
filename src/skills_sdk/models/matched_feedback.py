@@ -26,8 +26,8 @@ def _failed_case_ids(execution: MatchedExecutionReceipt) -> tuple[str, ...]:
     return tuple(
         dict.fromkeys(
             pair.case_id
-            for index, pair in enumerate(execution.pairs)
-            if pair.candidate_evaluation.status != "pass" or execution.comparison(index).regression_required
+            for pair in execution.pairs
+            if pair.candidate_evaluation.status != "pass" or execution._pair_regression_required(pair)
         )
     )
 

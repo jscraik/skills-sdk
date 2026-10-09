@@ -10,6 +10,10 @@ __all__ = [
     "DimensionalJudgeAdapter",
     "DimensionalJudgeInput",
     "MatchedCaseExecution",
+    "MatchedCompleteProviderAdapter",
+    "MatchedProviderAdapter",
+    "MatchedStreamingProviderAdapter",
+    "MatchedTrialAdapters",
     "MatchedVariantExecution",
     "OfflineContentReviewAdapter",
     "PluginExecutionContext",
@@ -56,7 +60,14 @@ def __getattr__(name: str) -> object:
         from skills_sdk.evaluation import plugin_safety
 
         return getattr(plugin_safety, name)
-    if name in {"MatchedCaseExecution", "MatchedVariantExecution"}:
+    if name in {
+        "MatchedCaseExecution",
+        "MatchedVariantExecution",
+        "MatchedCompleteProviderAdapter",
+        "MatchedStreamingProviderAdapter",
+        "MatchedProviderAdapter",
+        "MatchedTrialAdapters",
+    }:
         from skills_sdk.evaluation import matched_admission
 
         return getattr(matched_admission, name)

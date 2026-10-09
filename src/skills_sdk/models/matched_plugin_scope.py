@@ -105,6 +105,11 @@ class MatchedPluginCaseScope(_MatchedContractModel):
             raise ValueError("per-skill scope selects exactly its driver")
         if self.scope == "cross_skill" and len(self.selected_skill_paths) < 2:
             raise ValueError("cross-skill scope requires at least two selected children")
+        if any(
+            path.split("/")[0] == "skills" and "/".join(path.split("/")[:2]) not in self.selected_skill_paths
+            for path in self.reference_paths
+        ):
+            raise ValueError("matched references within skills must belong to a selected child")
         if self.baseline_scorer.model_dump(exclude={"candidate"}) != self.candidate_scorer.model_dump(
             exclude={"candidate"}
         ):

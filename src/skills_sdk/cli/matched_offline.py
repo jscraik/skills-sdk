@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from skills_sdk.evaluation.matched_admission import MatchedVariantExecution
+    from skills_sdk.evaluation.matched_admission import MatchedTrialAdapters, MatchedVariantExecution
     from skills_sdk.evaluation.matched_calibration import DimensionalJudgeInput
     from skills_sdk.evaluation.matched_plugin_context import PluginExecutionContext
     from skills_sdk.models.matched_comparison import MatchedVariantJudgment
@@ -107,7 +107,7 @@ def _plugin_context(raw: object) -> PluginExecutionContext:
 
 def _variant(raw: object, *, matched: bool = False) -> MatchedVariantExecution:
     from skills_sdk.evaluation import SuppliedTextProviderAdapter, load_selected_case
-    from skills_sdk.evaluation.matched_admission import MatchedVariantExecution
+    from skills_sdk.evaluation.matched_admission import MatchedTrialAdapters, MatchedVariantExecution
     from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
     from skills_sdk.models.matched_comparison import MatchedVariantJudgment
     from skills_sdk.models.provider import ProviderIdentityV2
@@ -139,24 +139,37 @@ def _variant(raw: object, *, matched: bool = False) -> MatchedVariantExecution:
     judge = _object(item["judge"], {"identity", "parameters", "judgment"})
     if not isinstance(provider["output_text"], str) or not isinstance(provider["evidence_refs"], list):
         raise ValueError("offline provider fixture is invalid")
+    provider_parameters = ScorerJudgeParameters.model_validate(provider["parameters"])
+    judge_parameters = ScorerJudgeParameters.model_validate(judge["parameters"])
+    if matched and provider_parameters.trial_count * 20 > 128:
+        raise ValueError("offline matched trial allocation exceeds the lane callback bound")
+
+    def adapters() -> MatchedTrialAdapters:
+        return MatchedTrialAdapters(
+            _FixtureProvider(
+                SuppliedTextProviderAdapter(
+                    TextProviderAdapterDescriptor.model_validate(provider["descriptor"]),
+                    provider["output_text"],
+                    tuple(provider["evidence_refs"]),
+                ),
+                provider_parameters,
+            ),
+            _FixtureJudge(
+                ProviderIdentityV2.model_validate(judge["identity"]),
+                judge_parameters,
+                MatchedVariantJudgment.model_validate(judge["judgment"]),
+            ),
+        )
+
+    first = adapters()
     return MatchedVariantExecution(
         definition,
         ProviderExecutionRequest.model_validate(item["request"]),
         SelectedCaseExecutionInput(cast(JsonValue, item["input_payload"]), item["safety_evidence"]),
-        _FixtureProvider(
-            SuppliedTextProviderAdapter(
-                TextProviderAdapterDescriptor.model_validate(provider["descriptor"]),
-                provider["output_text"],
-                tuple(provider["evidence_refs"]),
-            ),
-            ScorerJudgeParameters.model_validate(provider["parameters"]),
-        ),
-        _FixtureJudge(
-            ProviderIdentityV2.model_validate(judge["identity"]),
-            ScorerJudgeParameters.model_validate(judge["parameters"]),
-            MatchedVariantJudgment.model_validate(judge["judgment"]),
-        ),
+        first.provider,
+        first.judge,
         _plugin_context(item["plugin_context"]) if matched else None,
+        tuple(adapters() for _ in range(provider_parameters.trial_count - 1)) if matched else (),
     )
 
 
