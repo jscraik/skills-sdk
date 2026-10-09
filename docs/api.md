@@ -62,7 +62,7 @@ they do not prove that selected-settings digests or projected metadata were
 derived from actual source bytes. They cannot authenticate source provenance or
 reconstruct unavailable bytes. Raw settings are never echoed.
 
-The repair candidate adds
+The accepted portable-plugin route includes
 `verify_plugin_package_validation(plugin_root, validation, *, source_revision, policy=None)`
 in `skills_sdk.validation`. It normalises the supplied full envelope and compares
 it with fresh no-follow `validate_plugin_package` capture using the caller's
@@ -91,8 +91,8 @@ unassessed warning; blocked children and missing required version or description
 metadata retain their specific blocker findings even when other blockers exist.
 Capture rejects known non-regular files from no-follow metadata before opening
 them. Post-open checks remain necessary for races; capture is not an atomic snapshot.
-This unmerged verifier requires current repair proof before delivery; historical
-validation of the earlier candidate does not establish that proof.
+This verifier was accepted in PR #52. Its structural source comparison does not
+establish the separate matched evaluation or release gates described below.
 
 The public API is the typed contract layer under `skills_sdk`. The top-level
 package exports the inventory, risk, evaluation, and provider execution
@@ -471,6 +471,78 @@ or completed reviewer execution.
   `SchemaRegistry` enforce its lock-digest and mutation semantics; Draft
   2020-12 enforces the operation-to-mutation rule, while equality between lock
   digest fields remains a semantic check.
+
+## Matched whole-plugin evaluation candidate
+
+This S4 implementation is unmerged integration work, not accepted-main
+functionality or complete workflow parity. It adds the public evaluation APIs
+`assess_matched_pair`, `execute_matched_calibration`, `execute_matched_lane`,
+`prepare_matched_cloud_handoff`, `execute_matched_cloud`,
+`execute_matched_regression` and `execute_matched_cloud_regression`.
+
+`MatchedComparisonPlan` requires a `MatchedPluginScope` containing two passing
+complete `PluginPackageValidation` captures, including file-mode digests.
+The bounded slice supports one through nine child skills with the same logical
+child paths in both variants. It requires exactly ten ordered unique active
+cases, per-skill driver coverage for every child, and a cross-skill case when
+there is more than one child. Existing `ScenarioCoveragePlan` claims and
+mappings must preserve the same objective without open gaps. This verifies
+mapping consistency, not the truth or completeness of supplied claims.
+
+Each case has child-bound scorers, selected skill paths and optional shared
+reference paths retained by both captures. The ten singleton `ScenarioSetV2`
+values on each side use `release=False`; together they form the managed active
+set, rather than ten independent release sets. Plugin identity properties derive
+from complete captures, not caller-supplied parent aliases.
+`MatchedVariantCalibrationBundle` binds the plugin candidate and modes to exact
+child/assertion/scorer targets. Every target retains observed dimensional
+calibration with at least six held-out probes and the shared judge, settings
+and rubric. Probes and repeated trials do not enlarge the ten active cases.
+
+Host adapters remain private `MatchedCaseExecution` / `MatchedVariantExecution`
+capabilities. `PluginExecutionContext` and
+`prepare_matched_plugin_context(definition, context)` bind the selected driver,
+selected child documents and permitted references to fresh whole-plugin source.
+Hidden evaluation, scorer, calibration and rubric documents are excluded from
+the generator context. Context paths and source bytes remain private inputs;
+portable receipts retain identities and digests instead of source text.
+
+Admission requires selected-child safety plus complete
+`PluginPreExecutionSafetyEvidence`. `screen_plugin_security` applies bounded
+static signatures across captured files; `assess_plugin_pre_execution_safety`
+joins fresh source, screening, applicable supplied checklist evidence and
+freshness. These are supplied assessments and static screening, not authenticated
+independent security review or proof that executable resources are harmless.
+
+Each lane requires explicit `MatchedRunBudget` and `MatchedSelectionPolicy`.
+Provider and judge allowances are at most 128 each; elapsed time is checked
+before and after callbacks. Expiry stops later admission but cannot cancel a
+running callback. A requested reported-cost bound blocks before callbacks
+because adapters provide no cost observations; it is not an enforced spend cap.
+`MatchedExecutionReceipt.summary` recomputes equal-case-weight descriptive
+selection from a completed lane. Minimum repeated-trial coverage, qualifying
+confidence, trial-range stability, directional case count and mean threshold
+control `candidate`, `baseline`, `unchanged` or `inconclusive`. The summary is a
+derived API property, not a serialised receipt field or a statistical guarantee.
+
+A cloud handoff requires a qualifying local candidate and no unresolved
+regressions. Its complete capture becomes the cloud baseline while case scope,
+coverage, assertions, input commitments, rubric and selection policy remain
+bound. Failed cases require explicit owners and a full ten-case controlled
+rerun; closure requires retained passing rerun evidence and unchanged captured
+fixture source. Declaring an owner alone cannot close a regression.
+
+The additive wire families are `matched-comparison-plan/v1`,
+`matched-pair-assessment/v1`, `matched-calibration/v1`,
+`matched-variant-calibration/v1`, `matched-execution/v1`,
+`matched-cloud-handoff/v1`, `matched-cloud-execution/v1`,
+`matched-regression/v1`, `matched-cloud-regression/v1` and
+`plugin-pre-execution-safety-evidence/v1`. Their corresponding dotted resource
+names are available through `SchemaRegistry`; semantic checks supplement JSON
+Schema. Callback observations may be supplied offline. They prove neither
+external authenticity, live-model quality, promotion authority nor provider
+spending. See [CLI input boundaries](cli.md#matched-evaluation-candidate) and
+[compatibility limits](compatibility.md#matched-evaluation-integration-candidate).
 
 ## Read-only intake
 

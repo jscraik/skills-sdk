@@ -127,9 +127,9 @@ def _add_quality_parser(commands: argparse._SubParsersAction[argparse.ArgumentPa
 
 def _add_scorer_parsers(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     """Register read-only assessments and the explicitly offline execution route."""
-    from skills_sdk.cli.observed_calibration import add_parser as add_calibration_parser
+    from skills_sdk.cli.matched import add_parsers as add_evidence_parsers
 
-    add_calibration_parser(commands)
+    add_evidence_parsers(commands)
     for name, help_text in (
         ("scorer-quality", "assess candidate scorer declarations without executing a judge"),
         ("scorer-calibration", "assess candidate-bound held-out scorer artifacts"),
@@ -678,10 +678,10 @@ def _evaluation_command(arguments: argparse.Namespace) -> int:
         return 0 if quality_result.status == "pass" else 2
     if arguments.eval_command == "selected-case":
         return _selected_case_eval(arguments)
-    if arguments.eval_command == "observed-calibration":
-        from skills_sdk.cli.observed_calibration import run as run_calibration
+    if arguments.eval_command == "observed-calibration" or arguments.eval_command.startswith("matched-"):
+        from skills_sdk.cli.matched import run_evidence
 
-        return run_calibration(arguments, _read_intake_context, _reject_duplicate_members)
+        return run_evidence(arguments, _read_intake_context, _reject_duplicate_members)
     from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
 
     assessor = assess_scorer_quality if arguments.eval_command == "scorer-quality" else assess_scorer_calibration

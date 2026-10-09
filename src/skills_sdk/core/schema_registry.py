@@ -71,6 +71,16 @@ SCHEMA_NAMES = frozenset(
         "scorer-calibration.v1",
         "observed-calibration-plan.v1",
         "observed-calibration.v1",
+        "matched-comparison-plan.v1",
+        "matched-pair-assessment.v1",
+        "matched-calibration.v1",
+        "matched-variant-calibration.v1",
+        "plugin-pre-execution-safety-evidence.v1",
+        "matched-execution.v1",
+        "matched-cloud-handoff.v1",
+        "matched-cloud-execution.v1",
+        "matched-regression.v1",
+        "matched-cloud-regression.v1",
         "local-check.v1",
         "local-check-request.v2",
         "local-check.v2",
@@ -377,6 +387,10 @@ class SchemaRegistry:
             from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
 
             model = PreExecutionSafetyEvidence
+        elif name == "plugin-pre-execution-safety-evidence.v1":
+            from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
+
+            model = PluginPreExecutionSafetyEvidence
         elif name == "package-safety-evidence.v1":
             from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 
@@ -405,6 +419,35 @@ class SchemaRegistry:
             from skills_sdk.models.scorer_quality import ScorerCalibrationReceipt
 
             model = ScorerCalibrationReceipt
+        elif name in {
+            "matched-comparison-plan.v1",
+            "matched-pair-assessment.v1",
+            "matched-calibration.v1",
+            "matched-variant-calibration.v1",
+            "matched-execution.v1",
+            "matched-cloud-handoff.v1",
+            "matched-cloud-execution.v1",
+            "matched-regression.v1",
+            "matched-cloud-regression.v1",
+        }:
+            from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt
+            from skills_sdk.models.matched_comparison import MatchedComparisonPlan, MatchedPairAssessment
+            from skills_sdk.models.matched_execution import MatchedExecutionReceipt
+            from skills_sdk.models.matched_feedback import MatchedCloudRegressionReceipt, MatchedRegressionReceipt
+            from skills_sdk.models.matched_handoff import MatchedCloudExecutionReceipt, MatchedCloudHandoff
+            from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrationBundle
+
+            model = {
+                "matched-comparison-plan.v1": MatchedComparisonPlan,
+                "matched-pair-assessment.v1": MatchedPairAssessment,
+                "matched-calibration.v1": MatchedCalibrationReceipt,
+                "matched-variant-calibration.v1": MatchedVariantCalibrationBundle,
+                "matched-execution.v1": MatchedExecutionReceipt,
+                "matched-cloud-handoff.v1": MatchedCloudHandoff,
+                "matched-cloud-execution.v1": MatchedCloudExecutionReceipt,
+                "matched-regression.v1": MatchedRegressionReceipt,
+                "matched-cloud-regression.v1": MatchedCloudRegressionReceipt,
+            }[name]
         elif name in {"observed-calibration-plan.v1", "observed-calibration.v1"}:
             from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 

@@ -54,6 +54,32 @@ from skills_sdk.models.maintenance import (
     EntrypointMaintenanceResult,
     RuntimeCopyComparison,
 )
+from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt
+from skills_sdk.models.matched_comparison import (
+    MatchedCaseBinding,
+    MatchedComparisonPlan,
+    MatchedComparisonRubric,
+    MatchedDimensionJudgment,
+    MatchedLaneSpec,
+    MatchedPairAssessment,
+    MatchedRubricDimension,
+    MatchedVariantJudgment,
+)
+from skills_sdk.models.matched_execution import MatchedExecutedPair, MatchedExecutionReceipt
+from skills_sdk.models.matched_feedback import (
+    MatchedCloudRegressionReceipt,
+    MatchedRegressionAssignment,
+    MatchedRegressionReceipt,
+)
+from skills_sdk.models.matched_handoff import MatchedCloudExecutionReceipt, MatchedCloudHandoff
+from skills_sdk.models.matched_plugin_calibration import MatchedCalibrationTarget, MatchedVariantCalibrationBundle
+from skills_sdk.models.matched_plugin_scope import MatchedPluginCaseScope, MatchedPluginScope
+from skills_sdk.models.matched_policy import (
+    MatchedCaseSummary,
+    MatchedLaneSummary,
+    MatchedRunBudget,
+    MatchedSelectionPolicy,
+)
 from skills_sdk.models.observed_calibration import (
     CalibrationJudgeVerdict,
     HeldOutCalibrationProbe,
@@ -96,6 +122,7 @@ from skills_sdk.models.plugin import (
     PluginValidationPolicy,
     PortablePluginManifest,
 )
+from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
@@ -192,6 +219,30 @@ __all__ = [
     "MantraAssessment",
     "MantraPrinciple",
     "MantraStatus",
+    "MatchedCalibrationReceipt",
+    "MatchedCalibrationTarget",
+    "MatchedCaseBinding",
+    "MatchedCaseSummary",
+    "MatchedCloudExecutionReceipt",
+    "MatchedCloudHandoff",
+    "MatchedCloudRegressionReceipt",
+    "MatchedComparisonPlan",
+    "MatchedComparisonRubric",
+    "MatchedDimensionJudgment",
+    "MatchedExecutedPair",
+    "MatchedExecutionReceipt",
+    "MatchedLaneSpec",
+    "MatchedLaneSummary",
+    "MatchedPairAssessment",
+    "MatchedPluginCaseScope",
+    "MatchedPluginScope",
+    "MatchedRegressionAssignment",
+    "MatchedRegressionReceipt",
+    "MatchedRubricDimension",
+    "MatchedRunBudget",
+    "MatchedSelectionPolicy",
+    "MatchedVariantCalibrationBundle",
+    "MatchedVariantJudgment",
     "MutationRaceEvidence",
     "NormalizedPackage",
     "ObservedCalibrationPlan",
@@ -229,6 +280,7 @@ __all__ = [
     "PluginCapturedFile",
     "PluginIdentity",
     "PluginPackageValidation",
+    "PluginPreExecutionSafetyEvidence",
     "PluginSkillBinding",
     "PluginValidationPolicy",
     "PortablePluginManifest",

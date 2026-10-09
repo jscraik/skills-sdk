@@ -7,13 +7,20 @@ __all__ = [
     "CalibrationProbeExecution",
     "ContentReviewDocument",
     "ContentReviewInput",
+    "DimensionalJudgeAdapter",
+    "DimensionalJudgeInput",
+    "MatchedCaseExecution",
+    "MatchedVariantExecution",
     "OfflineContentReviewAdapter",
+    "PluginExecutionContext",
     "ScenarioQualityPolicy",
     "SelectedCaseDefinition",
     "SelectedCaseExecutionInput",
     "SelectedCaseJudgeAdapter",
     "SelectedCaseJudgeInput",
     "SuppliedTextProviderAdapter",
+    "assess_matched_pair",
+    "assess_plugin_pre_execution_safety",
     "assess_pre_execution_safety",
     "assess_scenario_coverage",
     "assess_scenario_quality",
@@ -23,15 +30,60 @@ __all__ = [
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_content_review",
+    "execute_matched_calibration",
+    "execute_matched_cloud",
+    "execute_matched_cloud_regression",
+    "execute_matched_lane",
+    "execute_matched_regression",
     "execute_scorer_calibration",
     "execute_selected_case",
     "execute_selected_case_with_judge",
     "load_selected_case",
+    "prepare_matched_cloud_handoff",
+    "prepare_matched_plugin_context",
+    "prepare_selected_case_context",
+    "screen_plugin_security",
 ]
 
 
 def __getattr__(name: str) -> object:
     """Load optional evaluation services only when requested."""
+    if name in {"PluginExecutionContext", "prepare_matched_plugin_context"}:
+        from skills_sdk.evaluation import matched_plugin_context
+
+        return getattr(matched_plugin_context, name)
+    if name in {"assess_plugin_pre_execution_safety", "screen_plugin_security"}:
+        from skills_sdk.evaluation import plugin_safety
+
+        return getattr(plugin_safety, name)
+    if name in {"MatchedCaseExecution", "MatchedVariantExecution"}:
+        from skills_sdk.evaluation import matched_admission
+
+        return getattr(matched_admission, name)
+    if name in {"DimensionalJudgeAdapter", "DimensionalJudgeInput", "execute_matched_calibration"}:
+        from skills_sdk.evaluation import matched_calibration
+
+        return getattr(matched_calibration, name)
+    if name in {"execute_matched_cloud", "prepare_matched_cloud_handoff"}:
+        from skills_sdk.evaluation import matched_handoff
+
+        return getattr(matched_handoff, name)
+    if name in {"execute_matched_regression", "execute_matched_cloud_regression"}:
+        from skills_sdk.evaluation import matched_feedback
+
+        return getattr(matched_feedback, name)
+    if name == "execute_matched_lane":
+        from skills_sdk.evaluation.matched_execution import execute_matched_lane
+
+        return execute_matched_lane
+    if name == "assess_matched_pair":
+        from skills_sdk.evaluation.matched_comparison import assess_matched_pair
+
+        return assess_matched_pair
+    if name == "prepare_selected_case_context":
+        from skills_sdk.evaluation.skill_context import prepare_selected_case_context
+
+        return prepare_selected_case_context
     if name in {"CalibrationProbeExecution", "execute_scorer_calibration"}:
         from skills_sdk.evaluation import observed_calibration
 

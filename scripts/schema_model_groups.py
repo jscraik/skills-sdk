@@ -23,6 +23,12 @@ from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageInta
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
 from skills_sdk.models.local_check import LocalCheckResult
 from skills_sdk.models.maintenance import EntrypointMaintenanceResult, RuntimeCopyComparison
+from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt
+from skills_sdk.models.matched_comparison import MatchedComparisonPlan, MatchedPairAssessment
+from skills_sdk.models.matched_execution import MatchedExecutionReceipt
+from skills_sdk.models.matched_feedback import MatchedCloudRegressionReceipt, MatchedRegressionReceipt
+from skills_sdk.models.matched_handoff import MatchedCloudExecutionReceipt, MatchedCloudHandoff
+from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrationBundle
 from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 from skills_sdk.models.packaging import (
     PackageArchiveVerificationReceipt,
@@ -32,6 +38,7 @@ from skills_sdk.models.packaging import (
     PackageReceiptV2,
 )
 from skills_sdk.models.plugin import PluginPackageValidation
+from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
 from skills_sdk.models.provider_call import ProviderCallPublicResult, TextProviderAdapterDescriptor
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderExecutionResult
@@ -69,6 +76,15 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ScorerCalibrationReceipt, "scorer-calibration.v1.schema.json"),
         (ObservedCalibrationPlan, "observed-calibration-plan.v1.schema.json"),
         (ObservedCalibrationReceipt, "observed-calibration.v1.schema.json"),
+        (MatchedComparisonPlan, "matched-comparison-plan.v1.schema.json"),
+        (MatchedPairAssessment, "matched-pair-assessment.v1.schema.json"),
+        (MatchedCalibrationReceipt, "matched-calibration.v1.schema.json"),
+        (MatchedVariantCalibrationBundle, "matched-variant-calibration.v1.schema.json"),
+        (MatchedExecutionReceipt, "matched-execution.v1.schema.json"),
+        (MatchedCloudHandoff, "matched-cloud-handoff.v1.schema.json"),
+        (MatchedCloudExecutionReceipt, "matched-cloud-execution.v1.schema.json"),
+        (MatchedRegressionReceipt, "matched-regression.v1.schema.json"),
+        (MatchedCloudRegressionReceipt, "matched-cloud-regression.v1.schema.json"),
         (LocalCheckResult, "local-check.v1.schema.json"),
         (LocalCheckRequestV2, "local-check-request.v2.schema.json"),
         (LocalCheckResultV2, "local-check.v2.schema.json"),
@@ -87,6 +103,7 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ProviderExecutionRequest, "provider-execution-request.v1.schema.json"),
         (ProviderExecutionResult, "provider-execution-result.v1.schema.json"),
         (PreExecutionSafetyEvidence, "pre-execution-safety-evidence.v1.schema.json"),
+        (PluginPreExecutionSafetyEvidence, "plugin-pre-execution-safety-evidence.v1.schema.json"),
     )
 
 

@@ -1,0 +1,252 @@
+"""Explicit supplied-offline capabilities for guarded matched execution."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from skills_sdk.evaluation.matched_admission import MatchedVariantExecution
+    from skills_sdk.evaluation.matched_calibration import DimensionalJudgeInput
+    from skills_sdk.evaluation.matched_plugin_context import PluginExecutionContext
+    from skills_sdk.models.matched_comparison import MatchedVariantJudgment
+    from skills_sdk.models.provider import ProviderIdentityV2
+    from skills_sdk.models.scorer_quality import ScorerJudgeParameters
+
+
+@dataclass(frozen=True, slots=True)
+class _FixtureJudge:
+    identity: ProviderIdentityV2
+    parameters: ScorerJudgeParameters
+    judgment: MatchedVariantJudgment
+
+    async def judge(self, inputs: DimensionalJudgeInput) -> object:
+        """Return explicit fixture evidence, not external model authenticity."""
+        del inputs
+        return self.judgment
+
+    async def cleanup(self) -> None:
+        """The fixture owns no external resources."""
+
+
+@dataclass(frozen=True, slots=True)
+class _FixtureProvider:
+    delegate: object
+    parameters: ScorerJudgeParameters
+
+    @property
+    def descriptor(self) -> object:
+        return self.delegate.descriptor
+
+    async def complete(self, request: object, input_payload: object) -> object:
+        return await self.delegate.complete(request, input_payload)
+
+    async def cleanup(self) -> None:
+        await self.delegate.cleanup()
+
+
+def add_parsers(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    """Require an explicit offline mode for every callback execution route."""
+    for name in (
+        "matched-calibration",
+        "matched-local",
+        "matched-cloud",
+        "matched-regression",
+        "matched-cloud-regression",
+    ):
+        parser = commands.add_parser(name, help="execute guarded supplied-offline matched callbacks")
+        parser.add_argument("--input", type=Path, required=True)
+        parser.add_argument("--adapter-mode", choices=("supplied-offline",), required=True)
+        parser.add_argument("--json", action="store_true", dest="json_output")
+        parser.add_argument("--robot", action="store_true")
+
+
+def _object(raw: object, fields: set[str]) -> dict[str, object]:
+    if not isinstance(raw, dict) or set(raw) != fields:
+        raise ValueError("offline matched input requires exact members")
+    return raw
+
+
+def _plugin_context(raw: object) -> PluginExecutionContext:
+    """Parse explicit host capabilities separately from portable matched receipts."""
+    from skills_sdk.evaluation import PluginExecutionContext
+    from skills_sdk.models import PluginPackageValidation, PluginPreExecutionSafetyEvidence, PluginValidationPolicy
+
+    data = _object(
+        raw,
+        {
+            "root",
+            "validation",
+            "driver_skill_path",
+            "selected_skill_paths",
+            "reference_paths",
+            "policy",
+            "safety_evidence",
+        },
+    )
+    if any(type(data[key]) is not str or not data[key] for key in ("root", "driver_skill_path")):
+        raise ValueError("offline plugin source selection is invalid")
+    for key, maximum in (("selected_skill_paths", 9), ("reference_paths", 64)):
+        if type(data[key]) is not list or len(data[key]) > maximum or any(type(path) is not str for path in data[key]):
+            raise ValueError("offline plugin document selection is invalid")
+    return PluginExecutionContext(
+        root=Path(data["root"]),
+        validation=PluginPackageValidation.model_validate(data["validation"]),
+        driver_skill_path=data["driver_skill_path"],
+        selected_skill_paths=tuple(data["selected_skill_paths"]),
+        reference_paths=tuple(data["reference_paths"]),
+        policy=PluginValidationPolicy.model_validate(data["policy"]),
+        safety_evidence=PluginPreExecutionSafetyEvidence.model_validate(data["safety_evidence"]),
+    )
+
+
+def _variant(raw: object, *, matched: bool = False) -> MatchedVariantExecution:
+    from skills_sdk.evaluation import SuppliedTextProviderAdapter, load_selected_case
+    from skills_sdk.evaluation.matched_admission import MatchedVariantExecution
+    from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
+    from skills_sdk.models.matched_comparison import MatchedVariantJudgment
+    from skills_sdk.models.provider import ProviderIdentityV2
+    from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
+    from skills_sdk.models.provider_execution import ProviderExecutionRequest
+    from skills_sdk.models.scorer_quality import ScorerJudgeParameters
+    from skills_sdk.providers import JsonValue
+
+    item = _object(
+        raw,
+        {
+            "package_root",
+            "source_revision",
+            "case_id",
+            "request",
+            "input_payload",
+            "safety_evidence",
+            "provider",
+            "judge",
+        }
+        | ({"plugin_context"} if matched else set()),
+    )
+    if any(not isinstance(item[key], str) or not item[key] for key in ("package_root", "source_revision", "case_id")):
+        raise ValueError("offline matched source selection is invalid")
+    definition = load_selected_case(
+        Path(item["package_root"]), source_revision=item["source_revision"], case_id=item["case_id"], mode="release"
+    )
+    provider = _object(item["provider"], {"descriptor", "parameters", "output_text", "evidence_refs"})
+    judge = _object(item["judge"], {"identity", "parameters", "judgment"})
+    if not isinstance(provider["output_text"], str) or not isinstance(provider["evidence_refs"], list):
+        raise ValueError("offline provider fixture is invalid")
+    return MatchedVariantExecution(
+        definition,
+        ProviderExecutionRequest.model_validate(item["request"]),
+        SelectedCaseExecutionInput(cast(JsonValue, item["input_payload"]), item["safety_evidence"]),
+        _FixtureProvider(
+            SuppliedTextProviderAdapter(
+                TextProviderAdapterDescriptor.model_validate(provider["descriptor"]),
+                provider["output_text"],
+                tuple(provider["evidence_refs"]),
+            ),
+            ScorerJudgeParameters.model_validate(provider["parameters"]),
+        ),
+        _FixtureJudge(
+            ProviderIdentityV2.model_validate(judge["identity"]),
+            ScorerJudgeParameters.model_validate(judge["parameters"]),
+            MatchedVariantJudgment.model_validate(judge["judgment"]),
+        ),
+        _plugin_context(item["plugin_context"]) if matched else None,
+    )
+
+
+def _batch(raw: object) -> tuple[object, ...]:
+    from skills_sdk.evaluation.matched_admission import MatchedCaseExecution
+
+    if not isinstance(raw, list) or len(raw) != 10:
+        raise ValueError("offline matched execution requires exactly ten pairs")
+    pairs = tuple(_object(item, {"baseline", "candidate"}) for item in raw)
+    return tuple(
+        MatchedCaseExecution(_variant(pair["baseline"], matched=True), _variant(pair["candidate"], matched=True))
+        for pair in pairs
+    )
+
+
+async def _execute(command: str, raw: object) -> object:
+    from skills_sdk.evaluation import (
+        execute_matched_calibration,
+        execute_matched_cloud,
+        execute_matched_cloud_regression,
+        execute_matched_lane,
+        execute_matched_regression,
+    )
+    from skills_sdk.evaluation.observed_calibration import CalibrationProbeExecution
+
+    if command == "matched-calibration":
+        data = _object(raw, {"plan", "rubric", "executions"})
+        if not isinstance(data["executions"], list) or not 2 <= len(data["executions"]) <= 64:
+            raise ValueError("offline matched calibration requires bounded probes")
+        variants = tuple(_variant(item) for item in data["executions"])
+        frames = tuple(
+            CalibrationProbeExecution(item.definition, item.request, item.inputs, item.provider, item.judge)
+            for item in variants
+        )
+        return await execute_matched_calibration(data["plan"], data["rubric"], frames)
+    fields = {"plan", "calibrations", "executions"}
+    if command == "matched-cloud":
+        fields = {"handoff", "calibrations", "executions"}
+    elif command in {"matched-regression", "matched-cloud-regression"}:
+        fields |= {"initial", "assignments"}
+    data = _object(raw, fields)
+    if not isinstance(data["calibrations"], list) or len(data["calibrations"]) != 2:
+        raise ValueError("both offline calibration receipts are required")
+    calibrations = tuple(data["calibrations"])
+    batch = _batch(data["executions"])
+    if command == "matched-cloud":
+        return await execute_matched_cloud(data["handoff"], calibrations, batch)
+    if command in {"matched-regression", "matched-cloud-regression"}:
+        if not isinstance(data["assignments"], list) or len(data["assignments"]) > 10:
+            raise ValueError("offline feedback ownership is invalid")
+        service = execute_matched_regression if command == "matched-regression" else execute_matched_cloud_regression
+        return await service(data["initial"], tuple(data["assignments"]), data["plan"], calibrations, batch)
+    return await execute_matched_lane(data["plan"], "local", calibrations, batch)
+
+
+async def _invalid(command: str) -> object:
+    from skills_sdk.evaluation import (
+        execute_matched_calibration,
+        execute_matched_cloud,
+        execute_matched_cloud_regression,
+        execute_matched_lane,
+        execute_matched_regression,
+    )
+
+    if command == "matched-calibration":
+        return await execute_matched_calibration(None, None, ())
+    if command == "matched-cloud":
+        return await execute_matched_cloud(None, (None, None), ())
+    if command in {"matched-regression", "matched-cloud-regression"}:
+        service = execute_matched_regression if command == "matched-regression" else execute_matched_cloud_regression
+        return await service(None, (), None, (None, None), ())
+    return await execute_matched_lane(None, "local", (None, None), ())
+
+
+def run(arguments: argparse.Namespace, read_input: Callable[[Path], bytes], pairs: Callable[..., object]) -> int:
+    """Observe supplied-offline callbacks and emit the service's portable receipt."""
+    from skills_sdk.core.errors import ContractError
+
+    try:
+        raw = json.loads(read_input(arguments.input).decode("utf-8"), object_pairs_hook=pairs)
+        receipt = asyncio.run(_execute(arguments.eval_command, raw))
+    except (ContractError, OSError, RecursionError, TypeError, ValueError):
+        receipt = asyncio.run(_invalid(arguments.eval_command))
+    if arguments.json_output:
+        print(json.dumps(receipt.model_dump(mode="json"), sort_keys=True))
+    else:
+        print(f"{arguments.eval_command}: {receipt.status} (supplied-offline callbacks; no external authenticity)")
+        blocker = getattr(receipt, "blocker", None)
+        if blocker is None:
+            blocker = getattr(getattr(receipt, "execution", None), "blocker", None)
+        if blocker is not None:
+            print(f"  {blocker.code}: {blocker.message}")
+    return 0 if receipt.status in {"pass", "completed", "closed"} else 2

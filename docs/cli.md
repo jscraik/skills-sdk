@@ -31,11 +31,11 @@ means structural pass, `2` means a typed blocked result. Both emit
 retains per-skill findings. No execution, admission, wrapping, publication or
 installation occurs. MCP transport validity and artwork approval are not proved.
 See [the API boundary](api.md#portable-plugin-validation) for capture limits and
-[delivery state](projects/sdk-workflow/tasks.md) before treating this candidate
-route as accepted-main functionality. Existing `validate` and `build` remain
+[delivery state](projects/sdk-workflow/tasks.md) for subsequent workflow slices.
+Portable plugin inspection was accepted in PR #52. Existing `validate` and `build` remain
 standalone-skill commands; they do not auto-detect plugins.
 
-The repair candidate adds `--verify-evidence FILE` to this same command. Keep
+The accepted route includes `--verify-evidence FILE` on this same command. Keep
 the evidence file outside the plugin source root to avoid self-inclusion and a
 changed candidate. Supply the same source revision and explicit
 `--require-version` / `--require-description` flags used for the original capture; the CLI
@@ -50,8 +50,8 @@ Verification is not permission or release approval. Settings values are not echo
 metadata-policy flags remain in blocked output, including evidence read, JSON
 and mismatch failures. Corrected evidence retains the same requested policy.
 The default
-validation route without this option is unchanged. This is unmerged candidate
-behaviour, pending current repair validation and delivery.
+validation route without this option is unchanged. Structural verification does
+not establish matched evaluation, execution permission or release readiness.
 
 ### Existing local routes
 
@@ -259,6 +259,55 @@ Run `bash scripts/validate-repository.sh` for the repository's complete local
 schema, lint, test, build, and diff checks. Do not pass credentials or machine
 paths through portable receipt contracts; host paths belong only in explicit
 local adapter arguments.
+
+## Matched evaluation candidate
+
+These S4 commands are unmerged integration work. They use supplied evidence or
+explicit supplied-offline callbacks, not discovered live model adapters.
+Use the [API contract](api.md#matched-whole-plugin-evaluation-candidate) for the
+full-plugin, ten-case, child calibration, safety and budget requirements.
+
+```bash
+skills-sdk eval matched-assessment --input ./assessment.json --json --robot
+skills-sdk eval matched-handoff --input ./handoff.json --json --robot
+skills-sdk eval matched-calibration --input ./calibration.json --adapter-mode supplied-offline --json --robot
+skills-sdk eval matched-local --input ./local.json --adapter-mode supplied-offline --json --robot
+skills-sdk eval matched-cloud --input ./cloud.json --adapter-mode supplied-offline --json --robot
+skills-sdk eval matched-regression --input ./regression.json --adapter-mode supplied-offline --json --robot
+skills-sdk eval matched-cloud-regression --input ./cloud-regression.json --adapter-mode supplied-offline --json --robot
+```
+
+Use the pinned `mise exec -- uv run --frozen skills-sdk` command prefix when
+working from this repository. Input JSON is external host input, not a plugin
+manifest; keep it outside the plugin source tree. The shared reader applies
+no-follow input checks with a 16 MiB matched-input limit and rejects duplicate
+members or malformed JSON. The larger matched allowance holds repeated complete
+plugin and calibration evidence; existing intake and calibration limits are unchanged.
+
+- `matched-assessment` requires exactly `plan`, `lane`, `baseline` and
+  `candidate`; it assesses supplied paired judgments without execution.
+- `matched-handoff` requires exactly `local` and `cloud_plan`; readiness binds
+  a qualified local candidate to the cloud baseline without authorising spend.
+- `matched-calibration` requires exactly `plan`, `rubric` and `executions`;
+  the ordered probe callbacks return supplied dimensional judgments.
+- `matched-local` requires exactly `plan`, `calibrations` and `executions`.
+  `calibrations` contains both child-target bundles; `executions` contains
+  exactly ten baseline/candidate pairs with explicit private plugin context
+  and safety inputs.
+- `matched-cloud` replaces `plan` with `handoff` while retaining both bundles
+  and the complete execution batch.
+- Both regression routes require `initial`, `assignments`, `plan`,
+  `calibrations` and `executions`. Assignments identify failed-case owners;
+  a complete rerun and unchanged source are required for closure.
+
+Exit `0` means assessed, ready, passing calibration, completed execution or
+closed regression as appropriate; exit `2` means blocked or open. JSON emits
+the corresponding versioned contract, not hidden source documents. The lane
+summary is currently a derived API property and is not emitted as a JSON field.
+Offline callbacks do not prove externally generated answers or judge scores,
+live-model improvement, authenticated review, publication or promotion.
+Reported-cost limits block before callbacks because cost observations are not
+available; elapsed deadlines prevent later callbacks but are not hard cancellation.
 
 ## Existing-copy maintenance and comparison
 

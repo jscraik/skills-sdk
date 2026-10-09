@@ -126,7 +126,46 @@ offline verdicts; it does not discover executables, read credentials, spend
 provider credits, or authenticate scores and labels. Controlled installed API/CLI
 tests prove acceptance, preflight rejection and corrected-input recovery without
 Agent-Skills or Foundry imports. They do not prove a real model's calibration.
-Fresh model execution and matched local/cloud comparison remain separate work.
+Fresh model execution remains a separate evidence lane. The unmerged matched
+integration candidate below adds controlled callback composition without
+claiming live-model proof.
+
+## Matched evaluation integration candidate
+
+The S4 matched families are additive unmerged integration work, not accepted
+main contracts or proof of full Agent-Skills parity. They preserve existing
+`observed-calibration-plan/v1`, `observed-calibration/v1` and read-only
+`scorer-calibration/v1` semantics. Supplied artifact checks cannot become
+executed calibration merely by declaring completed probes.
+
+The current strict plan requires two complete passing plugin captures and mode
+digests, one through nine matching child paths, exactly ten ordered active
+cases, per-child driver coverage and multi-child cross-skill coverage. Scenarios
+are child-bound singleton `ScenarioSetV2` values with `release=False`; full
+coverage uses the existing claims/mappings with no open gaps. Captured file
+identity and modes, case scope, assertions and scorer contracts remain separate
+but joined evidence. Complete child/assertion calibration bundles require at
+least six observed held-out probes per target. These probes and trial repeats
+do not create extra active cases.
+
+Private execution context requires fresh source binding, selected-child safety
+and complete supplied plugin safety evidence with applicable checks and static
+screening. This does not authenticate review or prove runtime safety. Explicit
+callback and elapsed budgets retain first-stop observations; elapsed checks
+cannot interrupt a running callback. Requested cost budgets produce a
+zero-callback blocker rather than a claimed spend cap. Descriptive selection
+requires sufficient trials, confidence, stability and directional evidence;
+`unchanged` and `inconclusive` are not promotion signals. Summary is a derived
+API property, not an additional serialised receipt field.
+
+Cloud handoff preserves the qualifying local plugin as baseline and freezes
+scope, coverage and scoring objectives. Regression closure requires owned
+failures, a complete controlled ten-case rerun and unchanged fixture source.
+The supplied-offline CLI observes callbacks without external authenticity,
+live-quality, spending, publication or promotion proof. See
+[API families](api.md#matched-whole-plugin-evaluation-candidate) and
+[CLI commands](cli.md#matched-evaluation-candidate). Acceptance still requires
+the repository's focused schema, behaviour, compatibility and delivery gates.
 
 ## Supplied content-review contracts
 
@@ -485,14 +524,14 @@ part of candidate file identity.
 
 Hash-only model and SchemaRegistry validation establish supplied envelope
 consistency, not derivation of metadata or selected settings from actual source.
-The unmerged repair adds `verify_plugin_package_validation` and CLI
+PR #52 accepted `verify_plugin_package_validation` and CLI
 `validate-plugin --verify-evidence FILE` to compare a normalised full envelope
 with fresh no-follow capture under the caller's revision and policy. Invalid,
 stale, mismatched or unreadable inputs block. Raw settings remain private and
 verification grants no execution, permission or release authority. The CLI reads
 regular no-follow JSON up to 16 MiB and rejects duplicate members and malformed
-input; default inspection behaviour remains unchanged. Current repair proof is
-required independently of the earlier candidate's historical validation.
+input; default inspection behaviour remains unchanged. That accepted structural
+verification does not establish the separate unmerged S4 execution route.
 Blocked outputs preserve validated caller policy across evidence and revision
 failures; malformed caller policy remains a typed input blocker before capture.
 Blocked children also retain path-bound candidate IDs, including the unchanged
