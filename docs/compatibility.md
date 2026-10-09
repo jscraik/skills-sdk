@@ -464,23 +464,35 @@ SDK whole-plugin preparation and evaluation, not the future registry service.
 Deliberate differences: root manifest replaces Tessl metadata authority; no
 required workspace/private field or directory-name match; base optional metadata
 stays optional; unknown root fields and malformed `extensions` warn and are
-ignored. Immediate child discovery replaces selectors. OpenAI inline objects
+ignored. Unknown diagnostics retain all sorted JSON-escaped key names, not
+values, in an aggregated warning bounded by the metadata input budget.
+Immediate child discovery replaces selectors and requires literal `SKILL.md`,
+not lookalike filenames. Child file-role checks join retained roles to captured
+relative paths without changing frozen standalone roles. OpenAI inline objects
 replace, never merge, fallback settings. An ignored fallback is captured but
 not parsed. Selected malformed fallback JSON blocks with typed invalid input.
-The manifest retains the selected settings object and derives its canonical
-JSON digest. Direct model and `SchemaRegistry` validation reject a conflicting
-supplied digest or selected settings without an object. Standalone JSON Schema
-checks structure; the service establishes selection from captured source bytes.
 
 The SDK rejects all symlinks and imposes documented capture/parsing budgets,
 stricter than the portable standard's containment rules. Child assessment keeps
 the existing SDK standalone semantics; an invalid child blocks this SDK result
-while retaining sibling findings. No skills is structurally valid, not proof
+while retaining sibling findings. A plugin with no discovered skills may be
+structurally valid; that is not proof
 of a useful managed release. MCP bytes and selected settings are bound without
 claiming transport, destination, permissions or artwork validation. Ordinary
 file modes have their own digest; the frozen candidate content formula is
 unchanged. Empty directories are observed for capture stability but are not
 part of candidate file identity.
+
+Hash-only model and SchemaRegistry validation establish supplied envelope
+consistency, not derivation of metadata or selected settings from actual source.
+The unmerged repair adds `verify_plugin_package_validation` and CLI
+`validate-plugin --verify-evidence FILE` to compare a normalised full envelope
+with fresh no-follow capture under the caller's revision and policy. Invalid,
+stale, mismatched or unreadable inputs block. Raw settings remain private and
+verification grants no execution, permission or release authority. The CLI reads
+regular no-follow JSON up to 16 MiB and rejects duplicate members and malformed
+input; default inspection behaviour remains unchanged. Current repair proof is
+required independently of the earlier candidate's historical validation.
 
 Synthetic accepted/rejected/recovery cases are in
 [`test_plugin_package.py`](../tests/test_plugin_package.py) and

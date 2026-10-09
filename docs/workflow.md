@@ -12,7 +12,9 @@ every gate is executable. The table describes that accepted baseline; branch
 prototypes and local test passes do not add capabilities to it.
 
 The current portable-plugin candidate adds the bounded
-[`validate-plugin` inspection route](cli.md#portable-plugin-inspection), tracked
+[`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including
+fresh source comparison through `--verify-evidence` for supplied validation,
+tracked
 in the [task record](projects/sdk-workflow/tasks.md). It binds complete files and
 immediate skill subtrees, not release approval. This addition remains separate
 from the accepted-baseline status table until its PR is merged.

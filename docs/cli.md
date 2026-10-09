@@ -35,6 +35,19 @@ See [the API boundary](api.md#portable-plugin-validation) for capture limits and
 route as accepted-main functionality. Existing `validate` and `build` remain
 standalone-skill commands; they do not auto-detect plugins.
 
+The repair candidate adds `--verify-evidence FILE` to this same command. Keep
+the evidence file outside the plugin source root to avoid self-inclusion and a
+changed candidate. Supply the same source revision and explicit
+`--require-version` / `--require-description` flags used for the original capture; the CLI
+compares the supplied envelope with a fresh capture of the actual plugin root
+through `verify_plugin_package_validation`. Evidence must be a regular no-follow
+JSON file of at most 16 MiB. Duplicate members, malformed JSON, invalid or stale
+evidence, mismatches and unreadable source return typed blocked output with exit
+`2`. A matching structural result uses the existing output and exit conventions,
+not permission or release approval. Settings values are not echoed. The default
+validation route without this option is unchanged. This is unmerged candidate
+behaviour, pending current repair validation and delivery.
+
 ### Existing local routes
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The

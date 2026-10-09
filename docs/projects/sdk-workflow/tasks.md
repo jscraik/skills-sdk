@@ -108,17 +108,38 @@ proof for each applicable lane; these are not interchangeable completion labels.
   [PR #51](https://github.com/jscraik/skills-sdk/pull/51) at `c38a769`. It records the plugin-first
   target, mandatory icon policy and strengthened acceptance without changing
   executable services or live-operation authority.
-- Current work: portable plugin inspection and binding, validated locally on
+- Current work: portable plugin inspection and binding, locally validated on
   `codex/sdk-portable-plugin-intake` with documentation from PR #51. The additive
   `validate_plugin_package` / `validate-plugin` route captures root-manifest
   candidates, complete file bytes and modes, per-skill findings and OpenAI
   settings precedence. Focused and installed proof live in
   [plugin tests](../../../tests/test_plugin_package.py) and
   [installed smoke](../../../tests/installed_plugin_intake_smoke.py).
-  `bash scripts/validate-repository.sh` passed on 2026-10-08: 2,566 tests passed, one skipped,
-  with wheel build and all installed-entrypoint checks passing. This is unmerged
-  work; local validation and hosted delivery are separate states.
-- Next action: normal signed PR delivery for portable inspection. Preserve the accepted calibration service
+  Historical proof for `41c2dfcf373f4c345ec0fc03ba38633bb0484d58`:
+  `bash scripts/validate-repository.sh` passed on 2026-10-08 with 2,566 tests
+  passed, one skipped, wheel build and all installed-entrypoint checks passing.
+  The pre-reconciliation repair passed that command on 2026-10-08 with 2,629 tests
+  passed, one skipped, wheel build and all installed-entrypoint checks passing.
+  It repairs child-role binding, literal entrypoint discovery and named
+  unknown-key diagnostics. It also adds source-backed full-envelope
+  verification through `verify_plugin_package_validation` and
+  `validate-plugin --verify-evidence FILE`; hash-only contract consistency does
+  not establish source derivation. This work remains unmerged against accepted
+  main `c38a769`; local proof and hosted delivery are separate states.
+- PR #52 reconciliation follows the completed bot task at `86760d2`. The local
+  candidate preserves digest-only receipts instead of retaining arbitrary raw
+  settings. Canonical digest tests cover inline and fallback nested settings,
+  private-value non-disclosure, tamper rejection and corrected-input recovery.
+  Focused plugin, evidence, CLI and public-boundary checks passed on 2026-10-08:
+  133 tests. The evidence module then passed all 12 tests after restoring the
+  no-settings orphan-digest regression. The reconciled candidate then passed
+  `bash scripts/validate-repository.sh` on 2026-10-08: 2,632 tests passed, one
+  skipped, with schema, code style, build, installed-entrypoint and diff checks
+  passing. Earlier aggregate proof remains historical; signed delivery and
+  current-head hosted evidence are separate closeout requirements.
+- Next action: publish the signed repair, then reconcile current-head hosted
+  review and checks for PR #52 before receipt-gated merge.
+  Preserve the accepted calibration service
   and queued local-winner handoff; integrate downstream work only after the
   complete-plugin identity seam is ready. Earlier branch-local validation does
   not prove the new product contract.

@@ -1,6 +1,5 @@
 {
   "$defs": {
-    "JsonValue": {},
     "PackageCandidateIdentity": {
       "additionalProperties": false,
       "description": "Immutable identity shared by intake and downstream proof receipts.",
@@ -185,21 +184,6 @@
           "pattern": "^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$",
           "title": "Name",
           "type": "string"
-        },
-        "openai_settings": {
-          "anyOf": [
-            {
-              "additionalProperties": {
-                "$ref": "#/$defs/JsonValue"
-              },
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Openai Settings"
         },
         "openai_settings_sha256": {
           "anyOf": [

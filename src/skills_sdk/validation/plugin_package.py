@@ -8,12 +8,13 @@ from pathlib import Path
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.models.package import PackageCandidateIdentity
-from skills_sdk.models.packaging import PackageManifestFile
+from skills_sdk.models.packaging import PackageManifestFile, _file_role
 from skills_sdk.models.plugin import (
     PluginCapturedFile,
     PluginPackageValidation,
     PluginSkillBinding,
     PluginValidationPolicy,
+    _is_skill_entrypoint,
     plugin_candidate_id,
 )
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
@@ -23,7 +24,6 @@ from skills_sdk.validation.skill_package import (
     SkillValidationPolicy,
     _candidate,
     _captured_skill_identity,
-    _file_role,
     _finding,
     _package_policy_findings,
 )
@@ -39,7 +39,7 @@ def _child(
             path=item.path[len(prefix) :],
             sha256=item.sha256,
             size_bytes=item.size_bytes,
-            role=_file_role(Path(item.path[len(prefix) :])),
+            role=_file_role(item.path[len(prefix) :]),
         )
         for item in files
         if item.path.startswith(prefix)
@@ -63,7 +63,7 @@ def _component_findings(payloads: dict[str, bytes], directories: tuple[str, ...]
     findings: list[SkillPackageFinding] = []
     if "skills" in payloads or "mcp.json" in directories:
         findings.append(_finding("plugin_component_kind_invalid", "portable component location has the wrong kind"))
-    if any(re.fullmatch(r"skills/[^/]+/SKILL\.md", path) for path in directories):
+    if any(_is_skill_entrypoint(path) for path in directories):
         findings.append(_finding("plugin_component_kind_invalid", "skill entrypoint must be a regular file"))
     if "mcp.json" in payloads:
         findings.append(
@@ -98,7 +98,7 @@ def validate_plugin_package(
         diagnostic = "root plugin.json and selected settings require bounded valid JSON and supported field types"
         manifest, warnings = parse_plugin_manifest(payloads)
         diagnostic = "plugin child discovery and captured skill metadata must satisfy their input bounds"
-        paths = sorted(path.rsplit("/", 1)[0] for path in payloads if re.fullmatch(r"skills/[^/]+/SKILL\.md", path))
+        paths = sorted(path.rsplit("/", 1)[0] for path in payloads if _is_skill_entrypoint(path))
         if len(paths) > 128:
             raise ValueError("plugin skill count exceeds bound")
         children = tuple(_child(path, files, payloads, source_revision) for path in paths)

@@ -24,7 +24,12 @@ and `sdk_plugin_lifecycle`: `validate_plugin_package` / `validate-plugin` add
 root-manifest inspection, whole-file/mode binding, immediate skill findings and
 OpenAI settings selection. Proof lives in
 [plugin regressions](../tests/test_plugin_package.py) and the
-[installed smoke](../tests/installed_plugin_intake_smoke.py). This is not
+[installed smoke](../tests/installed_plugin_intake_smoke.py). Its repair candidate
+adds `verify_plugin_package_validation` / `validate-plugin --verify-evidence`
+for fresh source-backed comparison of supplied envelopes; see
+[verification proof](../tests/test_plugin_evidence.py). Schema validation alone
+cannot establish selected-settings derivation from unavailable source bytes.
+This is not
 standalone wrapping, admission, artwork approval, MCP transport validation or
 release delivery. Complete those separate gates after accepting this bounded
 slice; the table below still records accepted main, not this candidate.

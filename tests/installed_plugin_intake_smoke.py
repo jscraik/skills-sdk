@@ -10,7 +10,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 
-def _cli(root: Path, expected: str) -> None:
+def _cli(root: Path, expected: str, evidence: Path | None = None) -> None:
     completed = subprocess.run(
         [
             sys.executable,
@@ -22,6 +22,7 @@ def _cli(root: Path, expected: str) -> None:
             "1" * 40,
             "--json",
             "--robot",
+            *(["--verify-evidence", str(evidence)] if evidence is not None else []),
         ],
         cwd=root.parent,
         capture_output=True,
@@ -32,6 +33,34 @@ def _cli(root: Path, expected: str) -> None:
     value = json.loads(completed.stdout)
     assert value["status"] == expected
     assert not value["execution_authorized"] and not value["release_ready"] and not value["mutation_performed"]
+
+
+def _verify(root: Path, payload: dict[str, object]) -> None:
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.validation import verify_plugin_package_validation
+
+    evidence = root.parent / "validation.json"
+    good = json.dumps(payload)
+    assert "SYNTHETIC-PRIVATE-SETTING" not in good
+    assert verify_plugin_package_validation(root, payload, source_revision="1" * 40).status == "pass"
+    evidence.write_text(good, encoding="utf-8")
+    _cli(root, "pass", evidence)
+    forged_role = json.loads(good)
+    forged_role["skills"][0]["validation"]["files"][0]["role"] = "asset"
+    try:
+        SchemaRegistry().validate("plugin-package-validation.v1", forged_role)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("installed schema path accepted a forged SKILL.md role")
+    forged = json.loads(good)
+    forged["manifest"]["openai_settings_sha256"] = "0" * 64
+    assert verify_plugin_package_validation(root, forged, source_revision="1" * 40).status == "blocked"
+    evidence.write_text(json.dumps(forged), encoding="utf-8")
+    _cli(root, "blocked", evidence)
+    evidence.write_text(good, encoding="utf-8")
+    _cli(root, "pass", evidence)
 
 
 def main() -> int:
@@ -49,7 +78,11 @@ def main() -> int:
         (child / "SKILL.md").write_bytes(skill)
         (root / "assets").mkdir()
         (root / "assets" / "icon.txt").write_text("Synthetic icon", encoding="utf-8")
-        metadata = {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", "name": "fixture-.plugin"}
+        metadata = {
+            "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+            "name": "fixture-.plugin",
+            "extensions": {"com.openai": {"private": "SYNTHETIC-PRIVATE-SETTING"}},
+        }
         manifest = root / "plugin.json"
         for content, expected in ((json.dumps(metadata), "pass"), ("{}", "blocked"), (json.dumps(metadata), "pass")):
             manifest.write_text(content, encoding="utf-8")
@@ -63,6 +96,7 @@ def main() -> int:
                 SchemaRegistry().validate("plugin-package-validation.v1", result.model_dump(mode="json"))
             _cli(root, expected)
             assert (child / "SKILL.md").read_bytes() == skill
+        _verify(root, result.model_dump(mode="json"))
     print("installed portable plugin API and CLI: accepted/rejected/recovery pass")
     return 0
 

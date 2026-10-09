@@ -18,7 +18,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.package_safety import UNSAFE_PACKAGE_DIRECTORIES, unsafe_package_file_reason
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity
-from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile
+from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile, _file_role
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 from skills_sdk.validation.skill_ir import SkillIR, build_skill_ir, read_frontmatter
 
@@ -199,19 +199,6 @@ def _candidate(package_root: Path, source_revision: str, files: list[PackageMani
     )
 
 
-def _file_role(relative: Path) -> PackageFileRole:
-    if relative == Path("SKILL.md"):
-        return PackageFileRole.SKILL_MD
-    if relative == Path("README.md"):
-        return PackageFileRole.README
-    return {
-        "references": PackageFileRole.REFERENCE,
-        "scripts": PackageFileRole.SCRIPT,
-        "assets": PackageFileRole.ASSET,
-        "evals": PackageFileRole.EVAL,
-    }.get(relative.parts[0], PackageFileRole.ASSET)
-
-
 def _regular_file(
     parent_fd: int, relative: Path, role: PackageFileRole
 ) -> tuple[PackageManifestFile | None, SkillPackageFinding | None, bytes | None]:
@@ -344,7 +331,7 @@ def _scan_files(
                         relative,
                     )
                 )
-            record, finding, payload = _regular_file(directory_fd, relative_path, _file_role(relative_path))
+            record, finding, payload = _regular_file(directory_fd, relative_path, _file_role(relative_path.as_posix()))
             if record is not None and payload is not None:
                 files.append(record)
                 captured[relative] = payload

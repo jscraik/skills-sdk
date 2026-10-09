@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI, PortablePluginManifest
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 
@@ -86,17 +87,17 @@ def _known_fields(value: dict[str, object]) -> None:
 
 
 def parse_plugin_manifest(payloads: dict[str, bytes]) -> tuple[PortablePluginManifest, tuple[SkillPackageFinding, ...]]:
-    """Retain root identity and selected OpenAI settings, never merge overlays."""
+    """Retain root identity and selected OpenAI settings digest, never merge overlays."""
     payload = payloads["plugin.json"]
     value = _object(payload)
     _known_fields(value)
     warnings: list[SkillPackageFinding] = []
-    if set(value) - _KNOWN:
+    if unknown := sorted(set(value) - _KNOWN):
         warnings.append(
             SkillPackageFinding(
                 code="plugin_unknown_fields_ignored",
                 severity=ValidationSeverity.WARNING,
-                message="unknown root manifest fields were ignored",
+                message="unknown root manifest fields were ignored: " + json.dumps(unknown, ensure_ascii=True),
                 evidence_refs=("plugin.json",),
             )
         )
@@ -124,6 +125,6 @@ def parse_plugin_manifest(payloads: dict[str, bytes]) -> tuple[PortablePluginMan
             "description": value.get("description"),
             "source_sha256": hashlib.sha256(payload).hexdigest(),
             "openai_settings_source": source,
-            "openai_settings": selected,
+            "openai_settings_sha256": canonical_json_sha256(selected) if selected is not None else None,
         }
     ), tuple(warnings)

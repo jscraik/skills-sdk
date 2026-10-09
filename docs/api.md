@@ -14,6 +14,10 @@ projection, all captured file hashes/sizes/ordinary permissions, a separate mode
 digest, and each immediate `skills/<name>/SKILL.md` subtree's existing
 `SkillPackageValidation`. Invalid child findings remain visible and block the
 plugin; deeper nested skills are resources, not automatically discovered skills.
+Discovery requires the literal filename `SKILL.md`; lookalikes such as
+`SKILL-md` and `SKILLXmd` do not create children or duplicate a discovered child.
+An exact entrypoint that is a directory blocks. Retained child file roles must
+match their captured relative paths, preserving the standalone role semantics.
 Existing standalone APIs do not auto-detect or wrap plugins.
 
 Root `plugin.json` supplies the canonical name and declares
@@ -27,7 +31,10 @@ shared assets and integration files. Permission changes affect
 lanes when consuming a capture.
 
 Unknown root fields and non-object `extensions` produce warning findings and
-are ignored. Other known fields with wrong types block. The result records which
+are ignored. The unknown-field diagnostic lists all unknown keys in sorted,
+JSON-escaped form, including misspellings, without their values. It uses one
+aggregated warning within the existing metadata parsing budget rather than one
+finding per key. Other known fields with wrong types block. The result records which
 OpenAI settings object is selected and its canonical JSON digest: an inline
 `extensions.com.openai` object replaces the complete compatibility overlay;
 otherwise `.codex-plugin/plugin.json`, if present, supplies the object. It never
@@ -50,9 +57,22 @@ publication and installation remain separate gates. `mutation_performed`,
 through `SchemaRegistry().validate("plugin-package-validation.v1", payload)`;
 semantic binding checks supplement JSON Schema. This is not a generic receipt
 accepted by `parse_receipt`.
-Envelope validation checks supplied evidence consistency; it cannot authenticate
-source provenance or reconstruct unavailable source bytes. Use a fresh service
-capture before relying on a supplied envelope for the current filesystem.
+The hash-only envelope model and SchemaRegistry check supplied consistency;
+they do not prove that selected-settings digests or projected metadata were
+derived from actual source bytes. They cannot authenticate source provenance or
+reconstruct unavailable bytes. Raw settings are never echoed.
+
+The repair candidate adds
+`verify_plugin_package_validation(plugin_root, validation, *, source_revision, policy=None)`
+in `skills_sdk.validation`. It normalises the supplied full envelope and compares
+it with fresh no-follow `validate_plugin_package` capture using the caller's
+revision and policy. Invalid, mismatched, stale or unreadable source/evidence
+returns a typed blocked result; corrected evidence can recover. Neither a
+match nor verification grants execution, permissions or release authority.
+Keep any serialised evidence file outside the plugin root; including it changes
+the captured candidate. Supply the original capture's explicit policy.
+This unmerged verifier requires current repair proof before delivery; historical
+validation of the earlier candidate does not establish that proof.
 
 The public API is the typed contract layer under `skills_sdk`. The top-level
 package exports the inventory, risk, evaluation, and provider execution

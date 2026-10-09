@@ -699,7 +699,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "verify":
         return _verify(arguments)
     if arguments.command == "validate-plugin":
-        return run_plugin_validation(arguments)
+        return run_plugin_validation(
+            arguments,
+            lambda path: _read_intake_context(path, max_bytes=16 * 1024 * 1024),
+            _reject_duplicate_members,
+        )
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)
     if arguments.command == "compare-copy":
