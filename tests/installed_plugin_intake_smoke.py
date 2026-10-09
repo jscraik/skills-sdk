@@ -218,6 +218,79 @@ def _verify_component_kind(root: Path) -> None:
     _cli(candidate, "pass", evidence)
 
 
+def _verify_exact_identities(root: Path) -> None:
+    """Reject padded root and child identities through installed boundaries and recover."""
+    from skills_sdk.validation import validate_plugin_package, verify_plugin_package_validation
+
+    good = validate_plugin_package(root, source_revision="1" * 40)
+    for child in (False, True):
+        for field in ("package_id", "source_revision", "content_sha256"):
+            payload = good.model_dump(mode="json")
+            candidate = payload["skills"][0]["validation"]["candidate"] if child else payload["candidate"]
+            candidate[field] = " " + candidate[field] + "\t"
+            _reject_envelope(root, payload)
+    assert verify_plugin_package_validation(root, good, source_revision="1" * 40) == good
+    evidence = root.parent / "exact-identity.json"
+    evidence.write_text(good.model_dump_json(), encoding="utf-8")
+    _cli(root, "pass", evidence)
+
+
+def _verify_retained_settings_and_mcp(root: Path) -> None:
+    """Require retained settings selection and the explicit unassessed MCP warning."""
+    from skills_sdk.validation import validate_plugin_package, verify_plugin_package_validation
+
+    overlay = root / ".codex-plugin" / "plugin.json"
+    overlay.parent.mkdir()
+    overlay.write_text("invalid but superseded by inline settings", encoding="utf-8")
+    (root / "mcp.json").write_bytes(b"unparsed synthetic MCP data")
+    good = validate_plugin_package(root, source_revision="1" * 40)
+    assert good.status == "pass" and good.manifest.openai_settings_source == "inline"
+    forged = good.model_dump(mode="json")
+    forged["manifest"].update(openai_settings_source="none", openai_settings_sha256=None)
+    _reject_envelope(root, forged)
+    forged = good.model_dump(mode="json")
+    forged["findings"] = [item for item in forged["findings"] if item["code"] != "plugin_mcp_not_assessed"]
+    _reject_envelope(root, forged)
+    forged = good.model_dump(mode="json")
+    for finding in forged["findings"]:
+        finding["code"] = " " + finding["code"] + "\t"
+    _reject_envelope(root, forged)
+    assert verify_plugin_package_validation(root, good, source_revision="1" * 40) == good
+    evidence = root.parent / "retained-settings.json"
+    evidence.write_text(good.model_dump_json(), encoding="utf-8")
+    _cli(root, "pass", evidence)
+
+
+def _verify_required_metadata_findings(root: Path) -> None:
+    """Reject erased policy reasons without erasing genuine blocked evidence or recovery."""
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.models import PluginValidationPolicy
+    from skills_sdk.validation import validate_plugin_package
+
+    manifest = root / "plugin.json"
+    original = manifest.read_bytes()
+    metadata = json.loads(original)
+    metadata.pop("version", None)
+    metadata.pop("description", None)
+    manifest.write_text(json.dumps(metadata), encoding="utf-8")
+    policy = PluginValidationPolicy(require_version=True, require_description=True)
+    blocked = validate_plugin_package(root, source_revision="1" * 40, policy=policy)
+    assert blocked.status == "blocked" and blocked.candidate is not None
+    SchemaRegistry().validate("plugin-package-validation.v1", blocked.model_dump(mode="json"))
+    for field in ("version", "description"):
+        forged = blocked.model_dump(mode="json")
+        forged["findings"] = [
+            item for item in forged["findings"] if item["code"] != "sdk_plugin_" + field + "_required"
+        ]
+        _reject_envelope(root, forged)
+    manifest.write_bytes(original)
+    recovered = validate_plugin_package(root, source_revision="1" * 40, policy=policy)
+    assert recovered.status == "pass"
+    evidence = root.parent / "recovered-policy.json"
+    evidence.write_text(recovered.model_dump_json(), encoding="utf-8")
+    _cli(root, "pass", evidence, ("--require-version", "--require-description"))
+
+
 def main() -> int:
     """Exercise complete-source acceptance, rejection and recovery without siblings."""
     import skills_sdk
@@ -257,6 +330,9 @@ def main() -> int:
         _verify_special_file(root)
         _verify_canonical_sizes(root)
         _verify_component_kind(root)
+        _verify_exact_identities(root)
+        _verify_retained_settings_and_mcp(root)
+        _verify_required_metadata_findings(root)
     print("installed portable plugin API and CLI: accepted/rejected/recovery pass")
     return 0
 

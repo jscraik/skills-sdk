@@ -44,6 +44,9 @@ def _normalise(value: object, budget: list[int], depth: int = 0) -> object:
             raise ValueError("plugin evidence requires string keys")
         if "size_bytes" in value and type(value["size_bytes"]) is not int:
             raise ValueError("plugin evidence requires integer file sizes without coercion")
+        for key in ("package_id", "source_revision", "content_sha256", "sha256", "name", "code"):
+            if key in value and (type(value[key]) is not str or value[key] != value[key].strip()):
+                raise ValueError("plugin evidence requires canonical identifiers without padding")
         for flag in ("mutation_performed", "execution_authorized", "release_ready"):
             if flag in value and value[flag] is not False:
                 raise ValueError("plugin evidence cannot coerce authority flags")
@@ -171,6 +174,26 @@ def _validate_component_kinds(paths: set[str], findings: tuple[SkillPackageFindi
         raise ValueError("captured component kinds require their blocker finding")
 
 
+def _validate_retained_findings(
+    manifest: PortablePluginManifest,
+    policy: PluginValidationPolicy,
+    paths: set[str],
+    skills: tuple[PluginSkillBinding, ...],
+    findings: tuple[SkillPackageFinding, ...],
+) -> None:
+    """Retain typed reasons and limitations independently proved by the envelope."""
+    required: set[tuple[str, ValidationSeverity]] = set()
+    if "mcp.json" in paths:
+        required.add(("plugin_mcp_not_assessed", ValidationSeverity.WARNING))
+    if any(child.validation.status == "blocked" for child in skills):
+        required.add(("plugin_child_blocked", ValidationSeverity.BLOCKER))
+    for field in ("version", "description"):
+        if getattr(policy, "require_" + field) and not (getattr(manifest, field) or "").strip():
+            required.add(("sdk_plugin_" + field + "_required", ValidationSeverity.BLOCKER))
+    if not required.issubset({(item.code, item.severity) for item in findings}):
+        raise ValueError("plugin evidence must retain its required typed findings")
+
+
 class PluginPackageValidation(_ContractModel):
     """Whole-plugin structural proof, with no execution or release authority."""
 
@@ -228,18 +251,14 @@ class PluginPackageValidation(_ContractModel):
             raise ValueError("manifest projection must bind captured root bytes")
         if self.manifest.openai_settings_source == "compatibility" and ".codex-plugin/plugin.json" not in paths:
             raise ValueError("compatibility settings require the captured overlay")
+        if ".codex-plugin/plugin.json" in path_set and self.manifest.openai_settings_source == "none":
+            raise ValueError("captured overlay must be selected or superseded by inline settings")
         expected = tuple(sorted(path.rsplit("/", 1)[0] for path in paths if _is_skill_entrypoint(path)))
         if tuple(item.path for item in self.skills) != expected:
             raise ValueError("retained children must equal all discovered immediate skills")
         for child in self.skills:
             _validate_child(child, self.files, self.candidate.source_revision)
-        if self.status == "pass":
-            if any(item.validation.status != "pass" for item in self.skills):
-                raise ValueError("passing plugin cannot contain blocked skills")
-            if self.policy.require_version and not (self.manifest.version or "").strip():
-                raise ValueError("passing plugin must satisfy its SDK version policy")
-            if self.policy.require_description and not (self.manifest.description or "").strip():
-                raise ValueError("passing plugin must satisfy its SDK description policy")
+        _validate_retained_findings(self.manifest, self.policy, path_set, self.skills, self.findings)
         return self
 
 

@@ -504,6 +504,15 @@ they directly prove, including nonempty descendants of file-only locations;
 empty directories still require source verification. The shared CLI context
 reader rejects known special leaves before opening, while preserving no-follow,
 post-open type, read-budget and drift checks for its existing callers.
+The plugin-only ingress also rejects padded candidate identities, child identity
+names, file hashes and finding codes before shared models can trim them. Frozen standalone
+normalisation is unchanged; already-normalised objects cannot reveal their input
+history. Descriptive whitespace remains valid. Captured fallback presence excludes
+the `none` settings selection, while inline settings may still supersede malformed
+unused fallback bytes. Retained MCP files require their unassessed warning, and
+blocked children or missing required metadata retain their specific blocker codes
+and severities. These checks apply to bound envelopes, not empty input blockers;
+they do not establish source authenticity or MCP execution safety.
 
 Synthetic accepted/rejected/recovery cases are in
 [`test_plugin_package.py`](../tests/test_plugin_package.py) and

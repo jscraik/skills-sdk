@@ -239,8 +239,55 @@ Documenting these commands does not claim a new test run.
   API/CLI acceptance/rejection/recovery check and `git diff --check` passed.
   The earlier 2,674-test aggregate remains historical. Synthetic device metadata
   and temporary FIFO fixtures do not establish atomic capture or live host proof.
-- Next action: publish the input-boundary follow-up and focused-command record, then
-  reconcile current-head hosted review and checks for PR #52 before receipt-gated merge.
+- The input-boundary follow-up was published as signed revision
+  [`4738fb9`](https://github.com/jscraik/skills-sdk/commit/4738fb9309bfcc861ced95ae0a8f9354b025b7f2).
+  Review `5467831856` then identified padded candidate fields, erased fallback
+  selection, an erased MCP warning and a suppressed required-version blocker.
+  The next repair keeps canonical identity strings exact and retains observable
+  findings for blocked and passing envelopes. Its bounded sibling check includes
+  child hashes and names, required descriptions and the blocked-child finding;
+  frozen standalone parsing and descriptive whitespace remain unchanged.
+  The initial regression command reproduced 85 failures with 22 passing tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -q
+  ```
+
+  Result: `fail` before repair on 2026-10-09. After repair and added neighbouring
+  cases, this command passed 112 tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -q --tb=short
+  ```
+
+  Result: `pass` on 2026-10-09. The combined plugin, evidence and frozen-contract
+  regression command then passed 448 tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_child_binding.py tests/test_plugin_capture_preopen.py tests/test_plugin_package.py tests/test_plugin_review_regressions.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q --tb=short
+  ```
+
+  Result: `pass` on 2026-10-09. Two read-only repair reviews found no actionable
+  defect within the identity and retained-finding changes. A final bounded check
+  of regex-constrained strings found the same padding issue in finding codes.
+  The aggregate was deliberately stopped after 141 passing tests, not recorded
+  as a pass. This additional regression command reproduced six failures:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -k padded_finding_codes -q --tb=short
+  ```
+
+  Result: `fail` before adding finding codes to the plugin-only ingress rule.
+  The same command then returned `pass`: six tests passed, 112 deselected on
+  2026-10-09. The final `bash scripts/validate-repository.sh` result was `pass`:
+  2,801 tests passed, one skipped, with generated schemas, code style, wheel
+  build, every installed API/CLI acceptance/rejection/recovery check and
+  `git diff --check` passing. The installed plugin route proves the four
+  reported rejection classes and finding-code sibling with corrected recovery.
+  The earlier 2,705-test result remains historical evidence for `4738fb9`.
+- Next action: publish the validated retained-evidence follow-up, then
+  reconcile current-head hosted review and checks
+  for PR #52 before receipt-gated merge.
   Preserve the accepted calibration service
   and queued local-winner handoff; integrate downstream work only after the
   complete-plugin identity seam is ready. Earlier branch-local validation does

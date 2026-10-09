@@ -82,6 +82,13 @@ this plugin-envelope boundary does not change standalone manifest parsing.
 Retained paths must preserve component-kind blockers they prove: a root `skills`
 file or descendants beneath file-only `mcp.json` or skill-entrypoint locations.
 Empty directory kinds are not retained and still require fresh source assessment.
+Raw and copied envelope identities, child names, file hashes and finding codes reject padding
+before shared models can trim it. Already-normalised shared objects expose only
+their canonical values, not their original input history. Versions and descriptions
+retain their existing whitespace semantics. A captured settings overlay must be
+selected or superseded by inline settings. Retained MCP files require the explicit
+unassessed warning; blocked children and missing required version or description
+metadata retain their specific blocker findings even when other blockers exist.
 Capture rejects known non-regular files from no-follow metadata before opening
 them. Post-open checks remain necessary for races; capture is not an atomic snapshot.
 This unmerged verifier requires current repair proof before delivery; historical
