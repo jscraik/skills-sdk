@@ -120,12 +120,13 @@ def test_forged_retained_trial_request_rejected_then_recovers(
         target["candidate"]["source_revision"] = "other-revision"
     with pytest.raises(ValidationError):
         MatchedExecutionReceipt.model_validate(raw)
-    with pytest.raises(ContractError):
-        SchemaRegistry().validate("matched-execution/v1", raw)
+    with pytest.raises(ContractError, match=r"^contract_validation_failed:"):
+        SchemaRegistry().validate("matched-execution.v1", raw)
     forged = receipt.model_copy(update={"pairs": tuple(raw["pairs"])})
     with pytest.raises(ValidationError):
         MatchedExecutionReceipt.model_validate(forged)
     assert MatchedExecutionReceipt.model_validate(receipt) == receipt
+    SchemaRegistry().validate("matched-execution.v1", receipt.model_dump(mode="json"))
 
 
 class StreamingProvider:

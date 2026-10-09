@@ -224,23 +224,32 @@ def _failure(payload: dict[str, object]) -> dict[str, object]:
     return changed
 
 
-def check(root: Path) -> None:
-    """Use installed public API and CLI with supplied-offline fixtures."""
-    assert "site-packages" in str(Path(skills_sdk.__file__).resolve())
-    assert "pytest" not in sys.modules
-    local = json.loads((root / "local.json").read_text())
-    _ingress(local)
-    _api(local)
-    for payload, code in ((local, 0), (dict(local, executions=local["executions"][:-1]), 2), (local, 0)):
+def _provider_mode(payload: dict[str, object], mode: str) -> dict[str, object]:
+    """Select a protocol in fixture JSON without changing source or evidence."""
+    changed = json.loads(json.dumps(payload))
+    for execution in changed["executions"]:
+        variants = execution.values() if "baseline" in execution else (execution,)
+        for variant in variants:
+            variant["provider"]["descriptor"]["mode"] = mode
+    return changed
+
+
+def _cli_workflow(root: Path, local: dict[str, object], numeric: object, cloud: object) -> None:
+    """Prove all five installed routes for the selected fixture protocol."""
+    for payload, code in (
+        (local, 0),
+        (dict(local, executions=local["executions"][:-1]), 2),
+        (_provider_mode(local, "unsupported"), 2),
+        (local, 0),
+    ):
         result = _cli(root, "matched-local", payload, "matched-execution.v1", code)
         assert result["provider_invocation_count"] == (40 if code == 0 else 0)
-    numeric = json.loads((root / "calibration.json").read_text())
     for payload, code in ((numeric, 0), (dict(numeric, extra=True), 2), (numeric, 0)):
         result = _cli(root, "matched-calibration", payload, "matched-calibration.v1", code)
         assert result["status"] == ("pass" if code == 0 else "blocked")
     for command, schema, payload in (
         ("matched-local", "matched-regression.v1", local),
-        ("matched-cloud", "matched-cloud-regression.v1", json.loads((root / "cloud.json").read_text())),
+        ("matched-cloud", "matched-cloud-regression.v1", cloud),
     ):
         initial_schema = "matched-execution.v1" if command == "matched-local" else "matched-cloud-execution.v1"
         initial = _cli(root, command, _failure(payload), initial_schema)
@@ -256,8 +265,24 @@ def check(root: Path) -> None:
         _cli(root, route, dict(recovery, assignments=[]), schema, 2)
         result = _cli(root, route, recovery, schema)
         assert result["status"] == "closed" and result["initial"] == initial
+
+
+def check(root: Path) -> None:
+    """Use installed public API and CLI with supplied-offline fixtures."""
+    assert "site-packages" in str(Path(skills_sdk.__file__).resolve())
+    assert "pytest" not in sys.modules
+    local = json.loads((root / "local.json").read_text())
+    numeric = json.loads((root / "calibration.json").read_text())
+    cloud = json.loads((root / "cloud.json").read_text())
+    _ingress(local)
+    _api(local)
+    for mode in ("complete", "stream"):
+        _cli_workflow(root, _provider_mode(local, mode), _provider_mode(numeric, mode), _provider_mode(cloud, mode))
     assert not any("agent_skills" in name or "skills_foundry" in name for name in sys.modules)
-    print("installed matched public API/CLI acceptance, rejection and recovery: pass (supplied-offline only)")
+    print(
+        "installed matched API complete and CLI complete/stream: "
+        "acceptance, rejection and recovery pass (supplied-offline)"
+    )
 
 
 if __name__ == "__main__":

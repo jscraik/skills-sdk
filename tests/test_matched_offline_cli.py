@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -11,12 +13,67 @@ from test_matched_comparison import _plan
 from test_matched_execution import _matched
 from test_matched_feedback import _failure
 from test_matched_handoff import _journey
+from test_provider_call import _provider_request
 from test_selected_case_evaluation import _evidence
 
 from skills_sdk.cli.main import main
+from skills_sdk.cli.matched_offline import _FixtureProvider
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import prepare_matched_cloud_handoff
 from skills_sdk.models.matched_comparison import MatchedVariantJudgment
+from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
+from skills_sdk.providers import DEFAULT_PROVIDER_CALL_LIMITS, execute_provider_call
+
+
+@pytest.mark.parametrize("provider_mode", ["complete", "stream"])
+@pytest.mark.parametrize(
+    "text", ["", "a" * 16_385, "\U0001f642" * 4_097], ids=["empty", "ascii-chunks", "unicode-chunks"]
+)
+def test_offline_provider_preserves_output_evidence_and_cleanup(
+    provider_mode: str, text: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def wrong_mode(*args: object) -> object:
+        raise AssertionError("the descriptor selected the other provider protocol")
+
+    monkeypatch.setattr(_FixtureProvider, "complete" if provider_mode == "stream" else "stream", wrong_mode)
+    request = _provider_request()
+    adapter = _FixtureProvider(
+        TextProviderAdapterDescriptor(provider=request.provider, mode=provider_mode),
+        _plan().lanes[0].generator_parameters,
+        text,
+        ("evidence/provider-result.json",),
+    )
+    result = asyncio.run(execute_provider_call(request, None, adapter))
+    assert result.complete_text == text
+    public = result.public_result
+    assert public.status == "completed" and public.mode == provider_mode
+    assert public.output_bytes == len(text.encode("utf-8"))
+    assert public.output_sha256 == hashlib.sha256(text.encode("utf-8")).hexdigest()
+    assert public.cleanup_attempted and public.cleanup_succeeded
+    assert public.execution.evidence_refs == ("evidence/provider-result.json",)
+    if provider_mode == "stream" and text:
+        assert public.event_count > 2 and public.max_inflight_pulls == 1
+
+
+@pytest.mark.parametrize("provider_mode", ["complete", "stream"])
+def test_offline_provider_output_limit_rejects_then_recovers(provider_mode: str) -> None:
+    request = _provider_request()
+    for text, rejected in (("a" * (DEFAULT_PROVIDER_CALL_LIMITS.output_bytes + 1), True), ("recovered", False)):
+        adapter = _FixtureProvider(
+            TextProviderAdapterDescriptor(provider=request.provider, mode=provider_mode),
+            _plan().lanes[0].generator_parameters,
+            text,
+            ("evidence/provider-result.json",),
+        )
+        if rejected:
+            with pytest.raises(ContractError, match=r"^provider_output_too_large:"):
+                asyncio.run(execute_provider_call(request, None, adapter))
+        else:
+            result = asyncio.run(execute_provider_call(request, None, adapter))
+            assert result.public_result.status == "completed"
+            assert result.public_result.cleanup_attempted and result.public_result.cleanup_succeeded
+            assert result.complete_text == text
 
 
 def test_offline_trial_allocation_rejects_unbounded_fixture_settings(
@@ -36,7 +93,7 @@ def test_offline_trial_allocation_rejects_unbounded_fixture_settings(
         matched_offline._variant(payload, matched=True)
 
 
-def _variant(item: object, rubric: object) -> dict[str, object]:
+def _variant(item: object, rubric: object, provider_mode: str | None = None) -> dict[str, object]:
     judgment = MatchedVariantJudgment(
         evidence=_evidence(item.definition, item.request, item.provider.text),
         confidence="medium",
@@ -69,6 +126,8 @@ def _variant(item: object, rubric: object) -> dict[str, object]:
             "judgment": judgment.model_dump(mode="json"),
         },
     }
+    if provider_mode is not None:
+        result["provider"]["descriptor"]["mode"] = provider_mode
     context = getattr(item, "plugin_context", None)
     if context is not None:
         result["plugin_context"] = {
@@ -83,15 +142,12 @@ def _variant(item: object, rubric: object) -> dict[str, object]:
     return result
 
 
-@pytest.mark.parametrize("children", [1, 2, 9])
+@pytest.mark.parametrize("children,provider_mode", [(1, "complete"), (2, "complete"), (9, "complete"), (2, "stream")])
 def test_offline_local_cli_whole_batch_rejection_and_recovery(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], children: int
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], children: int, provider_mode: str
 ) -> None:
     plan, calibrations, batch, _ = _matched(tmp_path, child_count=children)
-    pairs = [
-        {"baseline": _variant(item.baseline, plan.rubric), "candidate": _variant(item.candidate, plan.rubric)}
-        for item in batch
-    ]
+    pairs = _pairs(batch, plan.rubric, provider_mode)
     payload = {
         "plan": plan.model_dump(mode="json"),
         "calibrations": [item.model_dump(mode="json") for item in calibrations],
@@ -109,14 +165,17 @@ def test_offline_local_cli_whole_batch_rejection_and_recovery(
         assert receipt["external_authenticity_verified"] is False
 
 
-def test_offline_dimensional_calibration_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+@pytest.mark.parametrize("provider_mode", ["complete", "stream"])
+def test_offline_dimensional_calibration_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str
+) -> None:
     plan, batch, _ = _dimensions(tmp_path)
     rubric = _plan().rubric
     source = tmp_path / "calibration.json"
     payload = {
         "plan": plan.model_dump(mode="json"),
         "rubric": rubric.model_dump(mode="json"),
-        "executions": [_variant(item, rubric) for item in batch],
+        "executions": [_variant(item, rubric, provider_mode) for item in batch],
     }
     command = ["eval", "matched-calibration", "--input", str(source), "--adapter-mode", "supplied-offline", "--json"]
     for data, expected in ((dict(payload, extra=True), 2), (payload, 0)):
@@ -184,14 +243,19 @@ def _run(command: str, payload: object, root: Path, capsys: pytest.CaptureFixtur
     return json.loads(capsys.readouterr().out)
 
 
-def _pairs(batch: tuple[object, ...], rubric: object) -> list[dict[str, object]]:
+def _pairs(batch: tuple[object, ...], rubric: object, provider_mode: str | None = None) -> list[dict[str, object]]:
     return [
-        {"baseline": _variant(item.baseline, rubric), "candidate": _variant(item.candidate, rubric)} for item in batch
+        {
+            "baseline": _variant(item.baseline, rubric, provider_mode),
+            "candidate": _variant(item.candidate, rubric, provider_mode),
+        }
+        for item in batch
     ]
 
 
+@pytest.mark.parametrize("provider_mode", ["complete", "stream"])
 def test_offline_cloud_cli_retains_handoff_and_closes_regression(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str
 ) -> None:
     local, plan, calibrations, batch, _ = _journey(tmp_path)
     handoff = prepare_matched_cloud_handoff(local, plan)
@@ -199,7 +263,7 @@ def test_offline_cloud_cli_retains_handoff_and_closes_regression(
     payload = {
         "handoff": handoff.model_dump(mode="json"),
         "calibrations": [item.model_dump(mode="json") for item in calibrations],
-        "executions": _pairs(batch, plan.rubric),
+        "executions": _pairs(batch, plan.rubric, provider_mode),
     }
     failure = _run("matched-cloud", payload, tmp_path, capsys)
     SchemaRegistry().validate("matched-cloud-execution.v1", failure)
@@ -210,7 +274,7 @@ def test_offline_cloud_cli_retains_handoff_and_closes_regression(
         "assignments": [{"case_id": "case-0", "owner": "SDK maintainer"}],
         "plan": plan.model_dump(mode="json"),
         "calibrations": payload["calibrations"],
-        "executions": _pairs(batch, plan.rubric),
+        "executions": _pairs(batch, plan.rubric, provider_mode),
     }
     closed = _run("matched-cloud-regression", recovery, tmp_path, capsys)
     SchemaRegistry().validate("matched-cloud-regression.v1", closed)
@@ -218,8 +282,9 @@ def test_offline_cloud_cli_retains_handoff_and_closes_regression(
     assert closed["handoff"]["local"] == local.model_dump(mode="json")
 
 
+@pytest.mark.parametrize("provider_mode", ["complete", "stream"])
 def test_offline_local_regression_cli_retains_failure_and_rerun(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str
 ) -> None:
     initial, plan, calibrations, batch, _ = _failure(tmp_path)
     batch[0].candidate.provider.text = "behavior preserved"
@@ -228,7 +293,7 @@ def test_offline_local_regression_cli_retains_failure_and_rerun(
         "assignments": [{"case_id": "case-0", "owner": "SDK maintainer"}],
         "plan": plan.model_dump(mode="json"),
         "calibrations": [item.model_dump(mode="json") for item in calibrations],
-        "executions": _pairs(batch, plan.rubric),
+        "executions": _pairs(batch, plan.rubric, provider_mode),
     }
     closed = _run("matched-regression", payload, tmp_path, capsys)
     SchemaRegistry().validate("matched-regression.v1", closed)

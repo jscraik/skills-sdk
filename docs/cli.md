@@ -284,6 +284,13 @@ no-follow input checks with a 16 MiB matched-input limit and rejects duplicate
 members or malformed JSON. The larger matched allowance holds repeated complete
 plugin and calibration evidence; existing intake and calibration limits are unchanged.
 
+All five supplied-offline execution routes honour the provider descriptor's
+`complete` or `stream` mode. Stream fixtures deliver the supplied `output_text`
+as bounded Unicode-safe chunks followed by terminal evidence; they do not
+accept arbitrary event scripts or contact a provider. Existing provider-call
+byte, event, timeout and cleanup limits still apply. Invalid modes return a
+typed blocked receipt; corrected inputs can be retried without changing source.
+
 - `matched-assessment` requires exactly `plan`, `lane`, `baseline` and
   `candidate`; it assesses supplied paired judgments without execution.
 - `matched-handoff` requires exactly `local` and `cloud_plan`; readiness binds

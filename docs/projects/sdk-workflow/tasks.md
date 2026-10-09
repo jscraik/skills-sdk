@@ -307,7 +307,8 @@ Documenting these commands does not claim a new test run.
   accepted-main, hosted-check or live-provider proof.
 - Current PR #53 repairs address reference-context exclusion, selected-child
   reference ownership, trial feasibility and identity, adapter contracts and
-  fresh per-trial capability lifetimes,
+  fresh per-trial capability lifetimes, schema-registry rejection proof and
+  descriptor-selected complete/stream fixtures across all five offline CLI routes,
   receipt validation cost and safety requirements. These edits postdate
   `ca1db745`; its aggregate does not validate them. Latest combined-candidate
   validation, signed delivery and review-thread state belong to

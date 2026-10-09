@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -16,7 +16,11 @@ if TYPE_CHECKING:
     from skills_sdk.evaluation.matched_plugin_context import PluginExecutionContext
     from skills_sdk.models.matched_comparison import MatchedVariantJudgment
     from skills_sdk.models.provider import ProviderIdentityV2
+    from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
+    from skills_sdk.models.provider_execution import ProviderExecutionRequest
     from skills_sdk.models.scorer_quality import ScorerJudgeParameters
+    from skills_sdk.providers import JsonValue, ProviderAdapterComplete
+    from skills_sdk.providers.types import ProviderAdapterStreamItem
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,18 +40,39 @@ class _FixtureJudge:
 
 @dataclass(frozen=True, slots=True)
 class _FixtureProvider:
-    delegate: object
+    """Expose supplied text through the descriptor-selected offline protocol."""
+
+    descriptor: TextProviderAdapterDescriptor
     parameters: ScorerJudgeParameters
+    text: str
+    evidence_refs: tuple[str, ...]
 
-    @property
-    def descriptor(self) -> object:
-        return self.delegate.descriptor
+    async def complete(self, request: ProviderExecutionRequest, input_payload: JsonValue) -> ProviderAdapterComplete:
+        """Return supplied output without invoking an external model."""
+        from skills_sdk.providers import ProviderAdapterComplete
 
-    async def complete(self, request: object, input_payload: object) -> object:
-        return await self.delegate.complete(request, input_payload)
+        del request, input_payload
+        return ProviderAdapterComplete(text=self.text, evidence_refs=self.evidence_refs)
+
+    async def stream(
+        self, request: ProviderExecutionRequest, input_payload: JsonValue
+    ) -> AsyncIterator[ProviderAdapterStreamItem]:
+        """Yield bounded Unicode chunks and terminal evidence on demand."""
+        from skills_sdk.providers import DEFAULT_PROVIDER_CALL_LIMITS, ProviderAdapterChunk, ProviderAdapterTerminal
+
+        del request, input_payload
+
+        async def events() -> AsyncIterator[ProviderAdapterStreamItem]:
+            # UTF-8 uses at most four bytes per character; do not split encoded characters.
+            characters = DEFAULT_PROVIDER_CALL_LIMITS.chunk_bytes // 4
+            for offset in range(0, len(self.text), characters):
+                yield ProviderAdapterChunk(text=self.text[offset : offset + characters])
+            yield ProviderAdapterTerminal(evidence_refs=self.evidence_refs)
+
+        return events()
 
     async def cleanup(self) -> None:
-        await self.delegate.cleanup()
+        """The fixture owns no external resources."""
 
 
 def add_parsers(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -106,7 +131,7 @@ def _plugin_context(raw: object) -> PluginExecutionContext:
 
 
 def _variant(raw: object, *, matched: bool = False) -> MatchedVariantExecution:
-    from skills_sdk.evaluation import SuppliedTextProviderAdapter, load_selected_case
+    from skills_sdk.evaluation import load_selected_case
     from skills_sdk.evaluation.matched_admission import MatchedTrialAdapters, MatchedVariantExecution
     from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
     from skills_sdk.models.matched_comparison import MatchedVariantJudgment
@@ -147,12 +172,10 @@ def _variant(raw: object, *, matched: bool = False) -> MatchedVariantExecution:
     def adapters() -> MatchedTrialAdapters:
         return MatchedTrialAdapters(
             _FixtureProvider(
-                SuppliedTextProviderAdapter(
-                    TextProviderAdapterDescriptor.model_validate(provider["descriptor"]),
-                    provider["output_text"],
-                    tuple(provider["evidence_refs"]),
-                ),
+                TextProviderAdapterDescriptor.model_validate(provider["descriptor"]),
                 provider_parameters,
+                provider["output_text"],
+                tuple(provider["evidence_refs"]),
             ),
             _FixtureJudge(
                 ProviderIdentityV2.model_validate(judge["identity"]),

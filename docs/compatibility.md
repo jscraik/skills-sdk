@@ -171,7 +171,10 @@ Cloud handoff preserves the qualifying local plugin as baseline and freezes
 scope, coverage and scoring objectives. Regression closure requires owned
 failures, a complete controlled ten-case rerun and unchanged fixture source.
 The supplied-offline CLI observes callbacks without external authenticity,
-live-quality, spending, publication or promotion proof. See
+live-quality, spending, publication or promotion proof. Matched offline
+fixtures support descriptor-selected complete and pull-stream protocols across
+calibration, local, cloud and both regression routes. This does not widen the
+existing public `SuppliedTextProviderAdapter` complete-only contract. See
 [API families](api.md#matched-whole-plugin-evaluation-candidate) and
 [CLI commands](cli.md#matched-evaluation-candidate). The retained historical
 validation command for PR #53 candidate
