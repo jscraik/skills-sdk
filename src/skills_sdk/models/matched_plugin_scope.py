@@ -139,6 +139,8 @@ class MatchedPluginScope(_MatchedContractModel):
         for capture in (self.baseline, self.candidate):
             if capture.status != "pass" or capture.candidate is None:
                 raise ValueError("matched plugin scope requires passing complete captures")
+        if self.baseline.candidate == self.candidate.candidate:
+            raise ValueError("matched plugin scope requires distinct complete candidate identities")
         left = {child.path: child.validation.candidate for child in self.baseline.skills}
         right = {child.path: child.validation.candidate for child in self.candidate.skills}
         if set(left) != set(right):

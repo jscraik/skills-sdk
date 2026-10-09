@@ -305,7 +305,14 @@ typed blocked receipt; corrected inputs can be retried without changing source.
   and the complete execution batch.
 - Both regression routes require `initial`, `assignments`, `plan`,
   `calibrations` and `executions`. Assignments identify failed-case owners;
-  a complete rerun and unchanged source are required for closure.
+  a complete rerun and unchanged source are required for closure. All candidate
+  contexts must use the same absolute plugin root; distinct copies block even
+  with matching initial captures. Equivalent relative paths remain accepted.
+
+Matched plans require distinct complete baseline and candidate identities.
+An identical A/A input returns a typed blocker; corrected distinct inputs can
+be retried. The same package identifier with a different source revision or
+content digest remains valid.
 
 Exit `0` means assessed, ready, passing calibration, completed execution or
 closed regression as appropriate; exit `2` means blocked or open. JSON emits

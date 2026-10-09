@@ -482,6 +482,9 @@ functionality or complete workflow parity. It adds the public evaluation APIs
 
 `MatchedComparisonPlan` requires a `MatchedPluginScope` containing two passing
 complete `PluginPackageValidation` captures, including file-mode digests.
+Their complete candidate identities must differ; an identical baseline and
+candidate is not an improvement comparison. A shared package identifier with
+a different revision or content digest remains admissible.
 The bounded slice supports one through nine child skills with the same logical
 child paths in both variants. It requires exactly ten ordered unique active
 cases, per-skill driver coverage for every child, and a cross-skill case when
@@ -551,7 +554,11 @@ regressions. Its complete capture becomes the cloud baseline while case scope,
 coverage, assertions, input commitments, rubric and selection policy remain
 bound. Failed cases require explicit owners and a full ten-case controlled
 rerun; closure requires retained passing rerun evidence and unchanged captured
-fixture source. Declaring an owner alone cannot close a regression.
+fixture source. All rerun candidate contexts must name the same absolute plugin
+root, so the retained before/after capture covers every executed candidate case.
+Different source copies block before provider or judge access even when their
+initial captures agree; equivalent relative and absolute paths remain accepted.
+Declaring an owner alone cannot close a regression.
 
 The additive wire families are `matched-comparison-plan/v1`,
 `matched-pair-assessment/v1`, `matched-calibration/v1`,

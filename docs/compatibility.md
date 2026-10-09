@@ -139,7 +139,7 @@ main contracts or proof of full Agent-Skills parity. They preserve existing
 executed calibration merely by declaring completed probes.
 
 The current strict plan requires two complete passing plugin captures and mode
-digests, one through nine matching child paths, exactly ten ordered active
+digests with distinct complete candidate identities, one through nine matching child paths, exactly ten ordered active
 cases, per-child driver coverage and multi-child cross-skill coverage. Scenarios
 are child-bound singleton `ScenarioSetV2` values with `release=False`; full
 coverage uses the existing claims/mappings with no open gaps. Captured file
@@ -170,6 +170,11 @@ exist on the accepted base and is not a frozen released format yet.
 Cloud handoff preserves the qualifying local plugin as baseline and freezes
 scope, coverage and scoring objectives. Regression closure requires owned
 failures, a complete controlled ten-case rerun and unchanged fixture source.
+The full rerun uses one absolute candidate root; distinct source copies reject
+before host callbacks even when their initial captures match. This private
+host-input restriction adds no filesystem paths to portable receipts. Identical
+baseline and candidate identities reject at plan validation; sharing only a
+package identifier, revision or content digest is not itself a rejection.
 The supplied-offline CLI observes callbacks without external authenticity,
 live-quality, spending, publication or promotion proof. Matched offline
 fixtures support descriptor-selected complete and pull-stream protocols across

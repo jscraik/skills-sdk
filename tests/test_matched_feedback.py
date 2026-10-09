@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 from dataclasses import replace
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation.matched_execution import execute_matched_lane
 from skills_sdk.evaluation.matched_feedback import execute_matched_regression
+from skills_sdk.evaluation.selected_case import load_selected_case
 from skills_sdk.models.matched_feedback import MatchedRegressionReceipt
 
 
@@ -118,6 +120,58 @@ def test_source_drift_during_rerun_cannot_close_then_recovers(tmp_path: Path) ->
     source.write_bytes(content)
     provider.complete = original
     assert asyncio.run(execute_matched_regression(failed, owners, plan, calibrations, batch)).status == "closed"
+
+
+def test_distinct_candidate_roots_reject_before_late_callback_drift_then_recover(tmp_path: Path) -> None:
+    failed, plan, calibrations, batch, events = _failure(tmp_path)
+    owners = ({"case_id": "case-0", "owner": "SDK maintainer"},)
+    batch[0].candidate.provider.text = "behavior preserved"
+    original_context = batch[1].candidate.plugin_context
+    duplicate_root = tmp_path / "duplicate-candidate"
+    shutil.copytree(original_context.root, duplicate_root)
+    duplicate = replace(
+        batch[1].candidate,
+        definition=load_selected_case(
+            duplicate_root / original_context.driver_skill_path,
+            source_revision=plan.candidate.source_revision,
+            case_id=batch[1].candidate.request.case_id,
+            mode="release",
+        ),
+        plugin_context=replace(original_context, root=duplicate_root),
+    )
+    mixed = (batch[0], replace(batch[1], candidate=duplicate), *batch[2:])
+    source = duplicate_root / original_context.driver_skill_path / "SKILL.md"
+    content = source.read_bytes()
+    provider = batch[-1].candidate.provider
+    original = provider.complete
+
+    async def drift(request: object, payload: object) -> object:
+        result = await original(request, payload)
+        source.write_bytes(content + b"\nChanged after this root finished execution.\n")
+        return result
+
+    provider.complete = drift
+    rejected = asyncio.run(execute_matched_regression(failed, owners, plan, calibrations, mixed))
+    assert rejected.status == "blocked" and rejected.blocker.code == "invalid_matched_feedback"
+    assert rejected.rerun is None and not events and source.read_bytes() == content
+    provider.complete = original
+    recovered = asyncio.run(execute_matched_regression(failed, owners, plan, calibrations, batch))
+    assert recovered.status == "closed" and recovered.fixture_before == recovered.fixture_after
+
+
+def test_equivalent_absolute_candidate_roots_allow_regression_recovery(tmp_path: Path, monkeypatch: object) -> None:
+    failed, plan, calibrations, batch, _ = _failure(tmp_path)
+    batch[0].candidate.provider.text = "behavior preserved"
+    monkeypatch.chdir(tmp_path)
+    candidate = batch[1].candidate
+    equivalent = replace(candidate, plugin_context=replace(candidate.plugin_context, root=Path("candidate")))
+    mixed = (batch[0], replace(batch[1], candidate=equivalent), *batch[2:])
+    recovered = asyncio.run(
+        execute_matched_regression(
+            failed, ({"case_id": "case-0", "owner": "SDK maintainer"},), plan, calibrations, mixed
+        )
+    )
+    assert recovered.status == "closed" and recovered.fixture_before == recovered.fixture_after
 
 
 def test_changed_candidate_closes_only_with_its_own_capture_and_complete_rerun(tmp_path: Path) -> None:

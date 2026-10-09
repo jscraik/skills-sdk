@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from pydantic import model_serializer
@@ -175,6 +176,7 @@ def _ingress(payload: dict[str, object]) -> None:
     hidden = HiddenProvider.model_construct(**dict(lane.judge.__dict__, provider_kind="bogus"))
     _rejected(models.MatchedLaneSpec, dict(lane.__dict__, judge=hidden))
     _rejected(models.MatchedLaneSpec, lane.model_copy(update={"unknown": True}))
+    _rejected(models.MatchedComparisonPlan, _identical_variants(payload)["plan"])
     dimension = models.MatchedDimensionJudgment(
         dimension_id="success", score=3.0, rationale="Evidence retained.", evidence_refs=("evidence/judgment.json",)
     )
@@ -234,12 +236,78 @@ def _provider_mode(payload: dict[str, object], mode: str) -> dict[str, object]:
     return changed
 
 
+def _identical_variants(payload: dict[str, object]) -> dict[str, object]:
+    """Build a consistently bound A/A input, not an unrelated field mismatch."""
+    changed = json.loads(json.dumps(payload))
+    plan = changed["plan"]
+    scope = plan["plugin_scope"]
+    scope["candidate"] = scope["baseline"]
+    scope["candidate_coverage"] = scope["baseline_coverage"]
+    plan["candidate_scenarios"] = plan["baseline_scenarios"]
+    for case in scope["cases"]:
+        case["candidate_scorer"] = case["baseline_scorer"]
+    for binding in plan["case_bindings"]:
+        binding["candidate_input_sha256"] = binding["baseline_input_sha256"]
+        binding["candidate_scenario_set_id"] = binding["baseline_scenario_set_id"]
+    for lane in plan["lanes"]:
+        lane["candidate_calibration_sha256"] = lane["baseline_calibration_sha256"]
+    changed["calibrations"][1] = changed["calibrations"][0]
+    for pair in changed["executions"]:
+        pair["candidate"] = pair["baseline"]
+    return changed
+
+
+def _mixed_roots(root: Path, payload: dict[str, object]) -> dict[str, object]:
+    """Retain exact source identities while moving one case to another copy."""
+    changed = json.loads(json.dumps(payload))
+    variant = changed["executions"][1]["candidate"]
+    context = variant["plugin_context"]
+    shutil.copytree(Path(context["root"]), root)
+    variant["package_root"] = str(root / context["driver_skill_path"])
+    context["root"] = str(root)
+    return changed
+
+
+def _feedback_api(recovery: dict[str, object], mixed: dict[str, object]) -> None:
+    """Reject multiple roots before host access, then close a corrected public API run."""
+
+    class Trap:
+        def __getattribute__(self, name: str) -> object:
+            raise AssertionError(f"premature regression capability access: {name}")
+
+    def frames(payload: dict[str, object], trap: bool) -> tuple[object, ...]:
+        batch = tuple(
+            evaluation.MatchedCaseExecution(_variant(item["baseline"]), _variant(item["candidate"]))
+            for item in payload["executions"]
+        )
+        return tuple(
+            replace(pair, candidate=replace(pair.candidate, provider=Trap(), judge=Trap())) if trap else pair
+            for pair in batch
+        )
+
+    for payload, guarded, expected in ((mixed, True, "blocked"), (recovery, False, "closed")):
+        receipt = asyncio.run(
+            evaluation.execute_matched_regression(
+                payload["initial"],
+                tuple(payload["assignments"]),
+                payload["plan"],
+                tuple(payload["calibrations"]),
+                frames(payload, guarded),
+            )
+        )
+        assert receipt.status == expected
+        if expected == "blocked":
+            assert receipt.blocker.code == "invalid_matched_feedback" and receipt.rerun is None
+        SchemaRegistry().validate("matched-regression.v1", receipt.model_dump(mode="json"))
+
+
 def _cli_workflow(root: Path, local: dict[str, object], numeric: object, cloud: object) -> None:
     """Prove all five installed routes for the selected fixture protocol."""
     for payload, code in (
         (local, 0),
         (dict(local, executions=local["executions"][:-1]), 2),
         (_provider_mode(local, "unsupported"), 2),
+        (_identical_variants(local), 2),
         (local, 0),
     ):
         result = _cli(root, "matched-local", payload, "matched-execution.v1", code)
@@ -263,6 +331,13 @@ def _cli_workflow(root: Path, local: dict[str, object], numeric: object, cloud: 
         }
         route = "matched-regression" if command == "matched-local" else "matched-cloud-regression"
         _cli(root, route, dict(recovery, assignments=[]), schema, 2)
+        mode = payload["executions"][0]["candidate"]["provider"]["descriptor"]["mode"]
+        mixed = _mixed_roots(root / f"{route}-{mode}-copy", recovery)
+        rejected = _cli(root, route, mixed, schema, 2)
+        feedback = rejected if command == "matched-local" else rejected["feedback"]
+        assert feedback["status"] == "blocked" and feedback["rerun"] is None
+        if command == "matched-local" and mode == "complete":
+            _feedback_api(recovery, mixed)
         result = _cli(root, route, recovery, schema)
         assert result["status"] == "closed" and result["initial"] == initial
 

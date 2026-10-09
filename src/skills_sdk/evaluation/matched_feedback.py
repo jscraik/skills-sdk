@@ -41,7 +41,9 @@ async def execute_matched_regression(
         if problem is not None:
             raise ValueError("regression requires an admitted complete batch")
         context = executions[0].candidate.plugin_context
-        root = context.root
+        root = context.root.absolute()
+        if any(item.candidate.plugin_context.root.absolute() != root for item in executions):
+            raise ValueError("regression fixture requires one candidate root for the complete batch")
         before = validate_plugin_package(
             root, source_revision=selected.candidate.source_revision, policy=context.policy
         )
