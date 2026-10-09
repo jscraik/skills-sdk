@@ -42,7 +42,8 @@ def _open_intake_context(path: Path) -> int:
     nonblock = getattr(os, "O_NONBLOCK", None)
     if (
         any(not isinstance(flag, int) or flag == 0 for flag in (directory, nofollow, nonblock))
-        or os.open not in os.supports_dir_fd
+        or not {os.open, os.stat}.issubset(os.supports_dir_fd)
+        or os.stat not in os.supports_follow_symlinks
     ):
         raise _UnsupportedContextRead("safe descriptor-relative context reads are unavailable")
     if ".." in path.parts:
@@ -54,6 +55,9 @@ def _open_intake_context(path: Path) -> int:
             child = os.open(component, os.O_RDONLY | directory | nofollow, dir_fd=parent)
             os.close(parent)
             parent = child
+        leaf = os.stat(absolute.name, dir_fd=parent, follow_symlinks=False)
+        if not stat.S_ISREG(leaf.st_mode):
+            raise ValueError("invalid intake context file")
         return os.open(absolute.name, os.O_RDONLY | nonblock | nofollow, dir_fd=parent)
     finally:
         os.close(parent)

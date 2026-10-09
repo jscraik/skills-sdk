@@ -77,6 +77,11 @@ capture; they cannot override policy through the supplied envelope.
 Child candidate IDs remain bound to their directory names even when malformed
 skill metadata blocks identity discovery. Invalid directory names retain the
 standalone validator's deterministic fallback ID; supplied IDs cannot replace it.
+Nested child file sizes must be integers without string or boolean coercion;
+this plugin-envelope boundary does not change standalone manifest parsing.
+Retained paths must preserve component-kind blockers they prove: a root `skills`
+file or descendants beneath file-only `mcp.json` or skill-entrypoint locations.
+Empty directory kinds are not retained and still require fresh source assessment.
 Capture rejects known non-regular files from no-follow metadata before opening
 them. Post-open checks remain necessary for races; capture is not an atomic snapshot.
 This unmerged verifier requires current repair proof before delivery; historical

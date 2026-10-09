@@ -146,6 +146,78 @@ def _verify_special_file(root: Path) -> None:
     _cli(root, "pass")
 
 
+def _reject_envelope(root: Path, payload: dict[str, object]) -> None:
+    """Reject malformed retained evidence through installed schema, service and CLI."""
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.validation import verify_plugin_package_validation
+
+    try:
+        SchemaRegistry().validate("plugin-package-validation.v1", payload)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("installed schema accepted invalid plugin evidence")
+    rejected = verify_plugin_package_validation(root, payload, source_revision="1" * 40)
+    assert rejected.status == "blocked" and rejected.findings[0].code == "plugin_evidence_invalid"
+    evidence = root.parent / "invalid-envelope.json"
+    evidence.write_text(json.dumps(payload), encoding="utf-8")
+    assert _cli(root, "blocked", evidence)["findings"][0]["code"] == "plugin_evidence_invalid"
+
+
+def _verify_canonical_sizes(root: Path) -> None:
+    """Reject coerced child sizes and recover through the installed public entrypoints."""
+    from skills_sdk.validation import validate_plugin_package, verify_plugin_package_validation
+
+    asset = root / "skills" / "fixture-skill" / "one-byte.txt"
+    asset.write_bytes(b"x")
+    good = validate_plugin_package(root, source_revision="1" * 40)
+    assert good.status == "pass"
+    for size in ("1", True):
+        payload = good.model_dump(mode="json")
+        for item in payload["skills"][0]["validation"]["files"]:
+            if item["path"] == asset.name:
+                item["size_bytes"] = size
+        _reject_envelope(root, payload)
+    assert verify_plugin_package_validation(root, good, source_revision="1" * 40) == good
+    evidence = root.parent / "canonical-evidence.json"
+    evidence.write_text(good.model_dump_json(), encoding="utf-8")
+    _cli(root, "pass", evidence)
+    evidence.unlink()
+    os.mkfifo(evidence)
+    _cli(root, "blocked", evidence)
+    evidence.unlink()
+    evidence.write_text(good.model_dump_json(), encoding="utf-8")
+    _cli(root, "pass", evidence)
+    assert asset.read_bytes() == b"x"
+
+
+def _verify_component_kind(root: Path) -> None:
+    """Retain a root skills-file blocker and recover without disturbing child fixtures."""
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.validation import validate_plugin_package
+
+    candidate = root.parent / "wrong-kind-plugin"
+    candidate.mkdir()
+    (candidate / "plugin.json").write_bytes((root / "plugin.json").read_bytes())
+    component = candidate / "skills"
+    component.write_bytes(b"ordinary file, invalid component")
+    blocked = validate_plugin_package(candidate, source_revision="1" * 40)
+    assert blocked.status == "blocked" and blocked.candidate is not None
+    SchemaRegistry().validate("plugin-package-validation.v1", blocked.model_dump(mode="json"))
+    _cli(candidate, "blocked")
+    forged = blocked.model_dump(mode="json")
+    forged.update(status="pass", findings=[])
+    _reject_envelope(candidate, forged)
+    component.unlink()
+    component.mkdir()
+    recovered = validate_plugin_package(candidate, source_revision="1" * 40)
+    assert recovered.status == "pass"
+    evidence = root.parent / "corrected-kind.json"
+    evidence.write_text(recovered.model_dump_json(), encoding="utf-8")
+    _cli(candidate, "pass", evidence)
+
+
 def main() -> int:
     """Exercise complete-source acceptance, rejection and recovery without siblings."""
     import skills_sdk
@@ -183,6 +255,8 @@ def main() -> int:
         _verify_policy(root)
         _verify_blocked_child(root)
         _verify_special_file(root)
+        _verify_canonical_sizes(root)
+        _verify_component_kind(root)
     print("installed portable plugin API and CLI: accepted/rejected/recovery pass")
     return 0
 

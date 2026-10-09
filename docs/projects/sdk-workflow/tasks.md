@@ -103,6 +103,11 @@ Name delivery state separately: proposed, implemented locally, validated locally
 under review, merged, published, or verified in a host. Record exact revision and
 proof for each applicable lane; these are not interchangeable completion labels.
 
+The focused commands below are historical runs in the pinned Python 3.12
+environment. Their repository command text is retained; transient local cache
+and tool-state environment overrides are omitted from this portable record.
+Documenting these commands does not claim a new test run.
+
 - Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
 - Documentation reconciliation merged in
   [PR #51](https://github.com/jscraik/skills-sdk/pull/51) at `c38a769`. It records the plugin-first
@@ -130,9 +135,20 @@ proof for each applicable lane; these are not interchangeable completion labels.
   candidate preserves digest-only receipts instead of retaining arbitrary raw
   settings. Canonical digest tests cover inline and fallback nested settings,
   private-value non-disclosure, tamper rejection and corrected-input recovery.
-  Focused plugin, evidence, CLI and public-boundary checks passed on 2026-10-08:
-  133 tests. The evidence module then passed all 12 tests after restoring the
-  no-settings orphan-digest regression. The reconciled candidate then passed
+  Focused plugin, evidence, CLI and public-boundary checks on 2026-10-08:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_review_regressions.py tests/test_plugin_package.py tests/test_public_repository_boundary.py -q
+  ```
+
+  Result: `pass` — 133 tests passed. After restoring the no-settings
+  orphan-digest regression:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py -q
+  ```
+
+  Result: `pass` — 12 tests passed. The reconciled candidate then passed
   `bash scripts/validate-repository.sh` on 2026-10-08: 2,632 tests passed, one
   skipped, with schema, code style, build, installed-entrypoint and diff checks
   passing. Earlier aggregate proof remains historical; signed delivery and
@@ -143,15 +159,27 @@ proof for each applicable lane; these are not interchangeable completion labels.
   base review then found a blocked-output policy-retention defect. The follow-up
   repair preserves valid caller policy across malformed or mismatched evidence,
   CLI read and JSON failures, and invalid source revisions. Invalid policy
-  fails before source capture. Focused policy, evidence and plugin tests passed:
-  103 tests on 2026-10-09. The earlier 2,632-test aggregate result applies to
+  fails before source capture. Focused policy, evidence and plugin checks on
+  2026-10-09:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_package.py -q
+  ```
+
+  Result: `pass` — 103 tests passed. The earlier 2,632-test aggregate result applies to
   the previous repair; the final follow-up result is recorded below.
   Hosted review `5466755715` then identified missing candidate-ID binding for
   blocked children. The same follow-up repairs that boundary, including invalid
   directory-name fallback IDs. Its manifest-allowlist allegation was refuted by
   the committed allowlist and passing typed-model roundtrip tests. The expanded
-  focused plugin, standalone, core and receipt suite passed 352 tests with one
-  skip on 2026-10-09. Independent delta reviews found no actionable issues.
+  focused plugin, standalone, core and receipt suite ran on 2026-10-09:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_child_binding.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_package.py tests/test_plugin_review_regressions.py tests/test_skill_package_validation.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q
+  ```
+
+  Result: `pass` — 352 tests passed, one skipped. Independent delta reviews
+  found no actionable issues.
   Review `5466988582` added a pre-open special-file finding and repeated the
   policy-mismatch finding already covered by the repair. The follow-up also
   rejects known non-regular files before opening them, including the standalone
@@ -159,11 +187,59 @@ proof for each applicable lane; these are not interchangeable completion labels.
   The in-progress aggregate was interrupted to include this final correction;
   partial test output is not a passing aggregate result.
   After correcting the new test's message assertion to the existing sanitised
-  public diagnostic, all 13 pre-open regressions passed. The final candidate
+  public diagnostic, the pre-open regression command was:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_capture_preopen.py -q
+  ```
+
+  Result: `pass` — 13 tests passed on 2026-10-09. The final candidate
   passed `bash scripts/validate-repository.sh` on 2026-10-09: 2,674 tests passed,
   one skipped, with generated schemas, code style, build, all installed-entrypoint
   acceptance/rejection/recovery checks and `git diff --check` passing.
-- Next action: publish the signed input and evidence follow-up, then
+- Signed input and evidence repair
+  [`ed488df`](https://github.com/jscraik/skills-sdk/commit/ed488dfcfdb665143d9a0551c48be08acc0fbfe8)
+  was published in PR #52 through signed reconciliation commit
+  [`3629e329`](https://github.com/jscraik/skills-sdk/commit/3629e3293facfa2da9425be62b2c9dd4b4439801)
+  on 2026-10-09. The reconciliation tree is identical to the validated repair
+  tree. Review `5467338707` requested the exact focused commands recorded above;
+  this documentation correction does not change implementation or test inputs.
+- Review `5467422704` added three input-boundary findings on `3629e329`:
+  coercible nested child sizes, erased component-kind blockers, and known
+  special evidence files opened before rejection. The follow-up rejects those
+  inputs, preserves standalone size parsing and shared CLI success semantics,
+  and retains post-open checks. A bounded sibling check also covers component
+  directories proved by captured descendants; empty directories are not inferred.
+  The new regression command reproduced 27 failures with one passing race check
+  before repair, then passed all 28 cases after repair:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py -q
+  ```
+
+  Result: `pass` on 2026-10-09 for that initial repaired test set. The expanded
+  neighbouring-input, unsupported-host, shared-caller and contract suite ran:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_child_binding.py tests/test_plugin_capture_preopen.py tests/test_intake_cli.py tests/test_content_review.py tests/test_local_check_cli.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q
+  ```
+
+  Result: `pass` — 402 tests passed on 2026-10-09. The first aggregate stopped
+  at the 800-line module limit before pytest. Combining the equivalent
+  descriptor-support conditions repaired that failure without changing the limit.
+  The reader regression command then passed all nine cases:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_context_preopen.py -q
+  ```
+
+  Result: `pass` on 2026-10-09. The final
+  `bash scripts/validate-repository.sh` result was `pass`: 2,705 tests passed,
+  one skipped, generated schemas, code style, wheel build, every installed
+  API/CLI acceptance/rejection/recovery check and `git diff --check` passed.
+  The earlier 2,674-test aggregate remains historical. Synthetic device metadata
+  and temporary FIFO fixtures do not establish atomic capture or live host proof.
+- Next action: publish the input-boundary follow-up and focused-command record, then
   reconcile current-head hosted review and checks for PR #52 before receipt-gated merge.
   Preserve the accepted calibration service
   and queued local-winner handoff; integrate downstream work only after the

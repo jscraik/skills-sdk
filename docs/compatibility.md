@@ -498,9 +498,18 @@ failures; malformed caller policy remains a typed input blocker before capture.
 Blocked children also retain path-bound candidate IDs, including the unchanged
 standalone fallback formula for invalid directory names. Model and registered
 schema validation reject replaced IDs even when child identity is absent.
+Plugin evidence also rejects coercible nested file sizes before parsing the
+unchanged standalone manifest model. File paths retain component-kind blockers
+they directly prove, including nonempty descendants of file-only locations;
+empty directories still require source verification. The shared CLI context
+reader rejects known special leaves before opening, while preserving no-follow,
+post-open type, read-budget and drift checks for its existing callers.
 
 Synthetic accepted/rejected/recovery cases are in
 [`test_plugin_package.py`](../tests/test_plugin_package.py) and
+[`test_plugin_envelope_review.py`](../tests/test_plugin_envelope_review.py), with
+safe synthetic pre-open cases in
+[`test_plugin_context_preopen.py`](../tests/test_plugin_context_preopen.py) and
 [`installed_plugin_intake_smoke.py`](../tests/installed_plugin_intake_smoke.py).
 The latter uses the installed wheel's public API, packaged schema and CLI with
 no sibling project, provider, registry or editable SDK import. See the task

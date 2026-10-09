@@ -42,6 +42,8 @@ def _normalise(value: object, budget: list[int], depth: int = 0) -> object:
     if type(value) is dict:
         if any(type(key) is not str for key in value):
             raise ValueError("plugin evidence requires string keys")
+        if "size_bytes" in value and type(value["size_bytes"]) is not int:
+            raise ValueError("plugin evidence requires integer file sizes without coercion")
         for flag in ("mutation_performed", "execution_authorized", "release_ready"):
             if flag in value and value[flag] is not False:
                 raise ValueError("plugin evidence cannot coerce authority flags")
@@ -155,6 +157,20 @@ def _validate_child(binding: PluginSkillBinding, files: tuple[PluginCapturedFile
         raise ValueError("child identity must bind the direct skill name")
 
 
+def _validate_component_kinds(paths: set[str], findings: tuple[SkillPackageFinding, ...]) -> None:
+    """Retain kind blockers proved by files or their nonempty ancestor paths."""
+    invalid_kind = "skills" in paths or any(
+        path.startswith("mcp.json/")
+        or (len(path.split("/")) > 3 and _is_skill_entrypoint("/".join(path.split("/")[:3])))
+        for path in paths
+    )
+    if invalid_kind and not any(
+        item.code == "plugin_component_kind_invalid" and item.severity == ValidationSeverity.BLOCKER
+        for item in findings
+    ):
+        raise ValueError("captured component kinds require their blocker finding")
+
+
 class PluginPackageValidation(_ContractModel):
     """Whole-plugin structural proof, with no execution or release authority."""
 
@@ -194,6 +210,7 @@ class PluginPackageValidation(_ContractModel):
         if paths != tuple(sorted(set(paths))) or "plugin.json" not in paths:
             raise ValueError("plugin capture requires unique sorted paths and root plugin.json")
         path_set = set(paths)
+        _validate_component_kinds(path_set, self.findings)
         if any(
             "/".join(path.split("/")[:index]) in path_set for path in paths for index in range(1, len(path.split("/")))
         ):

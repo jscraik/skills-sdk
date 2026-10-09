@@ -44,7 +44,9 @@ through `verify_plugin_package_validation`. Evidence must be a regular no-follow
 JSON file of at most 16 MiB. Duplicate members, malformed JSON, invalid or stale
 evidence, mismatches and unreadable source return typed blocked output with exit
 `2`. A matching structural result uses the existing output and exit conventions,
-not permission or release approval. Settings values are not echoed. Explicit
+and known special evidence files are rejected before opening the leaf. Post-open
+type and drift checks remain; this is not an atomic filesystem snapshot.
+Verification is not permission or release approval. Settings values are not echoed. Explicit
 metadata-policy flags remain in blocked output, including evidence read, JSON
 and mismatch failures. Corrected evidence retains the same requested policy.
 The default
