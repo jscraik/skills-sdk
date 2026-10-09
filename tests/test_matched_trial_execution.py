@@ -121,7 +121,7 @@ def test_forged_retained_trial_request_rejected_then_recovers(
     with pytest.raises(ValidationError):
         MatchedExecutionReceipt.model_validate(raw)
     with pytest.raises(ContractError):
-        SchemaRegistry().validate("matched-execution/v1", raw)
+        SchemaRegistry().validate("matched-execution.v1", raw)
     forged = receipt.model_copy(update={"pairs": tuple(raw["pairs"])})
     with pytest.raises(ValidationError):
         MatchedExecutionReceipt.model_validate(forged)
