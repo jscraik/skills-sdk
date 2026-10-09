@@ -8,7 +8,7 @@ from typing import ClassVar, Literal, Self
 from pydantic import Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import require_matched_reference_path, require_portable_relative_path
 from skills_sdk.models.coverage import ScenarioCoveragePlan
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.inventory import PortablePath
@@ -105,11 +105,8 @@ class MatchedPluginCaseScope(_MatchedContractModel):
             raise ValueError("per-skill scope selects exactly its driver")
         if self.scope == "cross_skill" and len(self.selected_skill_paths) < 2:
             raise ValueError("cross-skill scope requires at least two selected children")
-        if any(
-            path.split("/")[0] == "skills" and "/".join(path.split("/")[:2]) not in self.selected_skill_paths
-            for path in self.reference_paths
-        ):
-            raise ValueError("matched references within skills must belong to a selected child")
+        for path in self.reference_paths:
+            require_matched_reference_path(path, self.selected_skill_paths)
         if self.baseline_scorer.model_dump(exclude={"candidate"}) != self.candidate_scorer.model_dump(
             exclude={"candidate"}
         ):

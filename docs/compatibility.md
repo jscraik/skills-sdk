@@ -147,6 +147,11 @@ identity and modes, case scope, assertions and scorer contracts remain separate
 but joined evidence. Complete child/assertion calibration bundles require at
 least six observed held-out probes per target. These probes and trial repeats
 do not create extra active cases.
+Matched reference eligibility is checked consistently at plan admission and
+runtime context preparation: hidden evaluation inputs, non-Markdown files and
+duplicates of automatically selected child `SKILL.md` entrypoints reject.
+Ordinary captured Markdown references remain supported. These semantic rules
+supplement JSON Schema through the registered models.
 
 Private execution context requires fresh source binding, selected-child safety
 and complete supplied plugin safety evidence with applicable checks and static
@@ -175,6 +180,10 @@ before host callbacks even when their initial captures match. This private
 host-input restriction adds no filesystem paths to portable receipts. Identical
 baseline and candidate identities reject at plan validation; sharing only a
 package identifier, revision or content digest is not itself a rejection.
+Baseline calibration commitments cannot change during regression recovery,
+even if both bundles pass. Corrected-candidate calibration can change while the
+baseline controls remain frozen. Retained regression receipts enforce the same
+rule; old draft receipts that violated it must be regenerated.
 The supplied-offline CLI observes callbacks without external authenticity,
 live-quality, spending, publication or promotion proof. Matched offline
 fixtures support descriptor-selected complete and pull-stream protocols across

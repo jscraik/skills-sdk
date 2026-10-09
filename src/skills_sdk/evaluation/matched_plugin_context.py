@@ -4,19 +4,17 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import require_matched_reference_path, require_portable_relative_path
 from skills_sdk.evaluation.selected_case import SelectedCaseDefinition, _revalidate_definition
 from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding, PluginValidationPolicy
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.providers import DEFAULT_PROVIDER_CALL_LIMITS, JsonValue
 from skills_sdk.validation.plugin_capture import capture_plugin_source
 from skills_sdk.validation.plugin_evidence import verify_plugin_package_validation
-
-_EXCLUDED_REFERENCE_TERMS = ("eval", "scorer", "rubric", "calibration", "heldout", "held-out", "hidden")
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,13 +73,10 @@ def _validated_paths(context: PluginExecutionContext) -> tuple[str, ...]:
         except (TypeError, ValueError, ContractError):
             raise _error("invalid_matched_plugin_context", "plugin context paths must be portable") from None
     for path in references:
-        parsed = PurePosixPath(path)
-        if parsed.parts[0] == "skills" and "/".join(parsed.parts[:2]) not in selected:
-            raise _error("invalid_matched_plugin_context", "plugin references within skills require a selected child")
-        if parsed.suffix.casefold() not in {".md", ".markdown"} or any(
-            term in part.casefold() for part in parsed.parts for term in _EXCLUDED_REFERENCE_TERMS
-        ):
-            raise _error("invalid_matched_plugin_context", "plugin context excludes hidden evaluation inputs")
+        try:
+            require_matched_reference_path(path, selected)
+        except (TypeError, ValueError, ContractError) as error:
+            raise _error("invalid_matched_plugin_context", str(error)) from None
     return references
 
 

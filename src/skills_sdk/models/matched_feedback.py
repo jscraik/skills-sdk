@@ -60,16 +60,10 @@ def _require_regression_controls(initial: MatchedExecutionReceipt, plan: Matched
         != tuple(item.check_contract_sha256 for item in plan.case_bindings)
         or tuple(item.baseline_input_sha256 for item in old.case_bindings)
         != tuple(item.baseline_input_sha256 for item in plan.case_bindings)
-        or [
-            item.model_dump(exclude={"baseline_calibration_sha256", "candidate_calibration_sha256"})
-            for item in old.lanes
-        ]
-        != [
-            item.model_dump(exclude={"baseline_calibration_sha256", "candidate_calibration_sha256"})
-            for item in plan.lanes
-        ]
+        or [item.model_dump(exclude={"candidate_calibration_sha256"}) for item in old.lanes]
+        != [item.model_dump(exclude={"candidate_calibration_sha256"}) for item in plan.lanes]
     ):
-        raise ValueError("regression rerun must preserve baseline, cases, assertions and model controls")
+        raise ValueError("regression rerun must preserve baseline calibration, cases, assertions and model controls")
 
 
 class MatchedRegressionReceipt(_MatchedContractModel):

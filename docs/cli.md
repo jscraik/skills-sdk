@@ -308,16 +308,24 @@ typed blocked receipt; corrected inputs can be retried without changing source.
   a complete rerun and unchanged source are required for closure. All candidate
   contexts must use the same absolute plugin root; distinct copies block even
   with matching initial captures. Equivalent relative paths remain accepted.
+  Baseline calibration commitments remain frozen; candidate calibration can be
+  rebound after a correction. A different passing baseline bundle still blocks
+  recovery because it changes the retained experiment controls.
 
 Matched plans require distinct complete baseline and candidate identities.
 An identical A/A input returns a typed blocker; corrected distinct inputs can
 be retried. The same package identifier with a different source revision or
 content digest remains valid.
+Selected references must be eligible Markdown files, not hidden evaluation
+inputs or duplicate automatically included child `SKILL.md` entrypoints.
 
 Exit `0` means assessed, ready, passing calibration, completed execution or
 closed regression as appropriate; exit `2` means blocked or open. JSON emits
-the corresponding versioned contract, not hidden source documents. The lane
-summary is currently a derived API property and is not emitted as a JSON field.
+the corresponding versioned contract, not hidden source documents. Text output
+includes available top-level and cloud-execution blockers, and input-blocked
+cloud-regression feedback codes and reasons. Full nested rerun evidence remains
+available in JSON. The lane summary is currently a derived API property and is
+not emitted as a JSON field.
 Offline callbacks do not prove externally generated answers or judge scores,
 live-model improvement, authenticated review, publication or promotion.
 Reported-cost limits block before callbacks because cost observations are not

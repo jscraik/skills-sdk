@@ -283,6 +283,8 @@ def run(arguments: argparse.Namespace, read_input: Callable[[Path], bytes], pair
         blocker = getattr(receipt, "blocker", None)
         if blocker is None:
             blocker = getattr(getattr(receipt, "execution", None), "blocker", None)
+        if blocker is None:
+            blocker = getattr(getattr(receipt, "feedback", None), "blocker", None)
         if blocker is not None:
             print(f"  {blocker.code}: {blocker.message}")
     return 0 if receipt.status in {"pass", "completed", "closed"} else 2

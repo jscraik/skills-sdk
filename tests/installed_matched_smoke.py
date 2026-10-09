@@ -15,6 +15,7 @@ from pydantic import model_serializer
 
 import skills_sdk
 from skills_sdk import evaluation, models
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.schema_registry import SchemaRegistry
 
 
@@ -142,8 +143,18 @@ def _api(payload: dict[str, object]) -> None:
         for item in payload["executions"]
     )
     calibrations = tuple(payload["calibrations"])
-    for frames, expected in ((batch, "completed"), (batch[:-1], "blocked"), (batch, "completed")):
-        receipt = asyncio.run(evaluation.execute_matched_lane(payload["plan"], "local", calibrations, frames))
+    invalid = _invalid_reference(payload, "SKILL.md")
+    invalid_batch = tuple(
+        evaluation.MatchedCaseExecution(_variant(item["baseline"]), _variant(item["candidate"]))
+        for item in invalid["executions"]
+    )
+    for plan, frames, expected in (
+        (payload["plan"], batch, "completed"),
+        (payload["plan"], batch[:-1], "blocked"),
+        (invalid["plan"], invalid_batch, "blocked"),
+        (payload["plan"], batch, "completed"),
+    ):
+        receipt = asyncio.run(evaluation.execute_matched_lane(plan, "local", calibrations, frames))
         assert receipt.status == expected
         assert receipt.provider_invocation_count == (40 if expected == "completed" else 0)
         SchemaRegistry().validate("matched-execution.v1", receipt.model_dump(mode="json"))
@@ -177,6 +188,8 @@ def _ingress(payload: dict[str, object]) -> None:
     _rejected(models.MatchedLaneSpec, dict(lane.__dict__, judge=hidden))
     _rejected(models.MatchedLaneSpec, lane.model_copy(update={"unknown": True}))
     _rejected(models.MatchedComparisonPlan, _identical_variants(payload)["plan"])
+    for reference in ("SKILL.md", "references/evals.yaml"):
+        _rejected(models.MatchedComparisonPlan, _invalid_reference(payload, reference)["plan"])
     dimension = models.MatchedDimensionJudgment(
         dimension_id="success", score=3.0, rationale="Evidence retained.", evidence_refs=("evidence/judgment.json",)
     )
@@ -257,6 +270,59 @@ def _identical_variants(payload: dict[str, object]) -> dict[str, object]:
     return changed
 
 
+def _invalid_reference(payload: dict[str, object], reference: str) -> dict[str, object]:
+    """Retain captured source while supplying an ineligible generator reference."""
+    changed = json.loads(json.dumps(payload))
+    scope = changed["plan"]["plugin_scope"]
+    case = scope["cases"][0]
+    assert case["driver_skill_path"] in case["selected_skill_paths"]
+    path = f"{case['driver_skill_path']}/{reference}"
+    for capture in (scope["baseline"], scope["candidate"]):
+        assert path in {item["path"] for item in capture["files"]}
+    case["reference_paths"] = [path]
+    for variant in changed["executions"][0].values():
+        variant["plugin_context"]["reference_paths"] = [path]
+    return changed
+
+
+def _changed_baseline_calibration(recovery: dict[str, object]) -> dict[str, object]:
+    """Keep calibration passing but change the frozen baseline experiment control."""
+    changed = json.loads(json.dumps(recovery))
+    bundle = changed["calibrations"][0]
+    bundle["targets"][0]["receipt"]["calibration"]["plan"]["policy"]["max_false_positives"] = 1
+    assert models.MatchedVariantCalibrationBundle.model_validate(bundle).targets[0].receipt.status == "pass"
+    initial = changed["initial"].get("execution") or changed["initial"]
+    for lane in changed["plan"]["lanes"]:
+        if lane["lane"] == initial["lane"]:
+            lane["baseline_calibration_sha256"] = canonical_json_sha256(bundle)
+    models.MatchedComparisonPlan.model_validate(changed["plan"])
+    return changed
+
+
+def _cloud_blocker_text(root: Path) -> None:
+    """Require the installed text route to expose the same blocker as JSON."""
+    receipt = _cli(root, "matched-cloud-regression", {}, "matched-cloud-regression.v1", 2)
+    executable = Path(sys.executable).with_name("skills-sdk.exe" if sys.platform == "win32" else "skills-sdk")
+    result = subprocess.run(
+        [
+            str(executable),
+            "eval",
+            "matched-cloud-regression",
+            "--input",
+            str(root / "host-input.json"),
+            "--adapter-mode",
+            "supplied-offline",
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    blocker = receipt["feedback"]["blocker"]
+    assert result.returncode == 2 and not result.stderr, (result.returncode, result.stdout, result.stderr)
+    assert f"{blocker['code']}: {blocker['message']}" in result.stdout
+
+
 def _mixed_roots(root: Path, payload: dict[str, object]) -> dict[str, object]:
     """Retain exact source identities while moving one case to another copy."""
     changed = json.loads(json.dumps(payload))
@@ -269,7 +335,7 @@ def _mixed_roots(root: Path, payload: dict[str, object]) -> dict[str, object]:
 
 
 def _feedback_api(recovery: dict[str, object], mixed: dict[str, object]) -> None:
-    """Reject multiple roots before host access, then close a corrected public API run."""
+    """Reject changed controls before host access, then close a corrected public API run."""
 
     class Trap:
         def __getattribute__(self, name: str) -> object:
@@ -285,7 +351,11 @@ def _feedback_api(recovery: dict[str, object], mixed: dict[str, object]) -> None
             for pair in batch
         )
 
-    for payload, guarded, expected in ((mixed, True, "blocked"), (recovery, False, "closed")):
+    for payload, guarded, expected in (
+        (mixed, True, "blocked"),
+        (_changed_baseline_calibration(recovery), True, "blocked"),
+        (recovery, False, "closed"),
+    ):
         receipt = asyncio.run(
             evaluation.execute_matched_regression(
                 payload["initial"],
@@ -308,6 +378,8 @@ def _cli_workflow(root: Path, local: dict[str, object], numeric: object, cloud: 
         (dict(local, executions=local["executions"][:-1]), 2),
         (_provider_mode(local, "unsupported"), 2),
         (_identical_variants(local), 2),
+        (_invalid_reference(local, "SKILL.md"), 2),
+        (_invalid_reference(local, "references/evals.yaml"), 2),
         (local, 0),
     ):
         result = _cli(root, "matched-local", payload, "matched-execution.v1", code)
@@ -331,6 +403,9 @@ def _cli_workflow(root: Path, local: dict[str, object], numeric: object, cloud: 
         }
         route = "matched-regression" if command == "matched-local" else "matched-cloud-regression"
         _cli(root, route, dict(recovery, assignments=[]), schema, 2)
+        changed_calibration = _cli(root, route, _changed_baseline_calibration(recovery), schema, 2)
+        feedback = changed_calibration if command == "matched-local" else changed_calibration["feedback"]
+        assert feedback["status"] == "blocked" and feedback["rerun"] is None
         mode = payload["executions"][0]["candidate"]["provider"]["descriptor"]["mode"]
         mixed = _mixed_roots(root / f"{route}-{mode}-copy", recovery)
         rejected = _cli(root, route, mixed, schema, 2)
@@ -351,6 +426,7 @@ def check(root: Path) -> None:
     cloud = json.loads((root / "cloud.json").read_text())
     _ingress(local)
     _api(local)
+    _cloud_blocker_text(root)
     for mode in ("complete", "stream"):
         _cli_workflow(root, _provider_mode(local, mode), _provider_mode(numeric, mode), _provider_mode(cloud, mode))
     assert not any("agent_skills" in name or "skills_foundry" in name for name in sys.modules)

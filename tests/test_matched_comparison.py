@@ -340,9 +340,9 @@ def test_reference_paths_bind_both_captures_before_coercion() -> None:
     """Common retained references pass, while padding and bytes cannot become paths."""
     plan = _plan()
     raw = plan.model_dump(mode="json")
-    raw["plugin_scope"]["cases"][0]["reference_paths"] = ["skills/skill-0/SKILL.md"]
+    raw["plugin_scope"]["cases"][0]["reference_paths"] = ["README.md"]
     bound = MatchedComparisonPlan.model_validate(raw)
-    for path in (" skills/skill-0/SKILL.md ", b"skills/skill-0/SKILL.md"):
+    for path in (" README.md ", b"README.md"):
         changed = deepcopy(raw)
         changed["plugin_scope"]["cases"][0]["reference_paths"] = [path]
         with pytest.raises(ValidationError):

@@ -309,9 +309,13 @@ Documenting these commands does not claim a new test run.
   reference ownership, trial feasibility and identity, adapter contracts and
   fresh per-trial capability lifetimes, schema-registry rejection proof and
   descriptor-selected complete/stream fixtures across all five offline CLI routes,
-  receipt validation cost and safety requirements. The next review repair binds
+  receipt validation cost and safety requirements. The signed `743c389` repair binds
   all regression candidate contexts to one absolute fixture root and rejects
-  identical complete baseline/candidate identities at plan validation. These edits postdate
+  identical complete baseline/candidate identities at plan validation. Later
+  review repairs align reference eligibility between plan and runtime, freeze
+  baseline calibration commitments during recovery and expose nested cloud
+  regression blockers in text output. Their focused and installed regression
+  checks retain rejected inputs and corrected-input recovery. These edits postdate
   `ca1db745`; its aggregate does not validate them. Latest combined-candidate
   validation, signed delivery and review-thread state belong to
   [PR #53](https://github.com/jscraik/skills-sdk/pull/53); they require fresh

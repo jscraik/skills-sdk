@@ -493,7 +493,11 @@ mappings must preserve the same objective without open gaps. This verifies
 mapping consistency, not the truth or completeness of supplied claims.
 
 Each case has child-bound scorers, selected skill paths and optional shared
-reference paths retained by both captures. The ten singleton `ScenarioSetV2`
+reference paths retained by both captures. Both plan admission and runtime
+context require eligible Markdown references and reject hidden evaluation,
+scorer, rubric, calibration and held-out paths. References cannot duplicate
+the selected children's automatically included `SKILL.md` entrypoints; ordinary
+captured files such as root `README.md` remain eligible. The ten singleton `ScenarioSetV2`
 values on each side use `release=False`; together they form the managed active
 set, rather than ten independent release sets. Plugin identity properties derive
 from complete captures, not caller-supplied parent aliases.
@@ -558,7 +562,10 @@ fixture source. All rerun candidate contexts must name the same absolute plugin
 root, so the retained before/after capture covers every executed candidate case.
 Different source copies block before provider or judge access even when their
 initial captures agree; equivalent relative and absolute paths remain accepted.
-Declaring an owner alone cannot close a regression.
+Baseline calibration commitments also remain frozen across recovery. Corrected
+candidate calibration may be rebound, but substituting another passing baseline
+bundle changes the experiment controls and blocks both execution and retained
+receipt validation. Declaring an owner alone cannot close a regression.
 
 The additive wire families are `matched-comparison-plan/v1`,
 `matched-pair-assessment/v1`, `matched-calibration/v1`,

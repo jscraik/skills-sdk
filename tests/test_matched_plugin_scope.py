@@ -17,6 +17,7 @@ from skills_sdk.validation import validate_plugin_package
 def _capture(root: Path, count: int, revision: str) -> dict[str, object]:
     """Use the accepted capture producer rather than constructing a fake file ledger."""
     root.mkdir()
+    (root / "README.md").write_text("# Public matched fixture guidance\n", encoding="utf-8")
     (root / "plugin.json").write_text(
         json.dumps(
             {
@@ -240,7 +241,11 @@ def test_case_references_cannot_select_an_unselected_child(tmp_path: Path, refer
     safe = good.model_copy(update={"reference_paths": ("references/shared.md", "skills/skill-0/references/guide.MD")})
     assert MatchedPluginCaseScope.model_validate(safe) == safe
     cross = scope.cases[-1].model_copy(update={"reference_paths": (reference,)})
-    assert MatchedPluginCaseScope.model_validate(cross) == cross
+    if reference.endswith("SKILL.md"):
+        with pytest.raises(ValueError, match="automatic selected entrypoints"):
+            MatchedPluginCaseScope.model_validate(cross)
+    else:
+        assert MatchedPluginCaseScope.model_validate(cross) == cross
 
 
 def test_registry_rejects_unselected_child_reference_and_recovers() -> None:
