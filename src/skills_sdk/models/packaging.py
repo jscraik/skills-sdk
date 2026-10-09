@@ -27,6 +27,20 @@ class PackageFileRole(StrEnum):
     EVAL = "eval"
 
 
+def _file_role(relative: str) -> PackageFileRole:
+    """Classify a canonical skill-relative path consistently across captures."""
+    if relative == "SKILL.md":
+        return PackageFileRole.SKILL_MD
+    if relative == "README.md":
+        return PackageFileRole.README
+    return {
+        "references": PackageFileRole.REFERENCE,
+        "scripts": PackageFileRole.SCRIPT,
+        "assets": PackageFileRole.ASSET,
+        "evals": PackageFileRole.EVAL,
+    }.get(relative.split("/", 1)[0], PackageFileRole.ASSET)
+
+
 class PackageManifestFile(_ContractModel):
     """One immutable file entry in a package manifest."""
 

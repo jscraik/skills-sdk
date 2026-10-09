@@ -447,6 +447,85 @@ rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
 
+### Portable plugin capture increment
+
+The additive `plugin-package-validation/v1` family does not reinterpret
+`PluginIdentity`, `SkillIdentity`, standalone validation, intake, build or their
+existing schemas. Only `validate-plugin` selects this new route. The canonical
+source is root `plugin.json` under Agent Plugins 1.0.0, assessed against the
+[normative specification](https://agent-plugins.org/specification) and
+[OpenAI packaging semantics](https://developers.openai.com/plugins/build/plugins)
+on 2026-10-08. This is a new portable contract, not executed Agent-Skills parity.
+
+Source inspection of the queued Tessl-format implementation at revision
+`02a43847f926a0ba7f9b4c29d763237d2805c939` supplied the bounded no-follow capture,
+child/subtree binding and second-capture mechanisms. The consumer is subsequent
+SDK whole-plugin preparation and evaluation, not the future registry service.
+Deliberate differences: root manifest replaces Tessl metadata authority; no
+required workspace/private field or directory-name match; base optional metadata
+stays optional; unknown root fields and malformed `extensions` warn and are
+ignored. Unknown diagnostics retain all sorted JSON-escaped key names, not
+values, in an aggregated warning bounded by the metadata input budget.
+Immediate child discovery replaces selectors and requires literal `SKILL.md`,
+not lookalike filenames. Child file-role checks join retained roles to captured
+relative paths without changing frozen standalone roles. OpenAI inline objects
+replace, never merge, fallback settings. An ignored fallback is captured but
+not parsed. Selected malformed fallback JSON blocks with typed invalid input.
+
+The SDK rejects all symlinks and imposes documented capture/parsing budgets,
+stricter than the portable standard's containment rules. Child assessment keeps
+the existing SDK standalone semantics; an invalid child blocks this SDK result
+while retaining sibling findings. A plugin with no discovered skills may be
+structurally valid; that is not proof
+of a useful managed release. MCP bytes and selected settings are bound without
+claiming transport, destination, permissions or artwork validation. Ordinary
+file modes have their own digest; the frozen candidate content formula is
+unchanged. Empty directories are observed for capture stability but are not
+part of candidate file identity.
+
+Hash-only model and SchemaRegistry validation establish supplied envelope
+consistency, not derivation of metadata or selected settings from actual source.
+The unmerged repair adds `verify_plugin_package_validation` and CLI
+`validate-plugin --verify-evidence FILE` to compare a normalised full envelope
+with fresh no-follow capture under the caller's revision and policy. Invalid,
+stale, mismatched or unreadable inputs block. Raw settings remain private and
+verification grants no execution, permission or release authority. The CLI reads
+regular no-follow JSON up to 16 MiB and rejects duplicate members and malformed
+input; default inspection behaviour remains unchanged. Current repair proof is
+required independently of the earlier candidate's historical validation.
+Blocked outputs preserve validated caller policy across evidence and revision
+failures; malformed caller policy remains a typed input blocker before capture.
+Blocked children also retain path-bound candidate IDs, including the unchanged
+standalone fallback formula for invalid directory names. Model and registered
+schema validation reject replaced IDs even when child identity is absent.
+Plugin evidence also rejects coercible nested file sizes before parsing the
+unchanged standalone manifest model. File paths retain component-kind blockers
+they directly prove, including nonempty descendants of file-only locations;
+empty directories still require source verification. The shared CLI context
+reader rejects known special leaves before opening, while preserving no-follow,
+post-open type, read-budget and drift checks for its existing callers.
+The plugin-only ingress also rejects padded candidate identities, child identity
+names, file hashes and finding codes before shared models can trim them. Frozen standalone
+normalisation is unchanged; already-normalised objects cannot reveal their input
+history. Descriptive whitespace remains valid. Captured fallback presence excludes
+the `none` settings selection, while inline settings may still supersede malformed
+unused fallback bytes. Retained MCP files require their unassessed warning, and
+blocked children or missing required metadata retain their specific blocker codes
+and severities. These checks apply to bound envelopes, not empty input blockers;
+they do not establish source authenticity or MCP execution safety.
+
+Synthetic accepted/rejected/recovery cases are in
+[`test_plugin_package.py`](../tests/test_plugin_package.py) and
+[`test_plugin_envelope_review.py`](../tests/test_plugin_envelope_review.py), with
+safe synthetic pre-open cases in
+[`test_plugin_context_preopen.py`](../tests/test_plugin_context_preopen.py) and
+[`installed_plugin_intake_smoke.py`](../tests/installed_plugin_intake_smoke.py).
+The latter uses the installed wheel's public API, packaged schema and CLI with
+no sibling project, provider, registry or editable SDK import. See the task
+record for validation/delivery state; test presence alone is not passing proof.
+
+### Existing migration increments
+
 The additive `scenario-coverage-plan/v1` and `scenario-coverage/v1` families
 audit caller-declared claim-to-case-or-gap mappings against the package's
 ten active scenarios. Existing scenario-quality v1/v2 receipts, local-check v1,

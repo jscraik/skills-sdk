@@ -10,19 +10,10 @@ from pathlib import Path
 from typing import Any, cast
 
 from skills_sdk import __version__
+from skills_sdk.cli import COMMAND_HELP
+from skills_sdk.cli.plugin import add_plugin_parser, run_plugin_validation
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 
-COMMAND_HELP = {
-    "inventory": "inspect a read-only source inventory",
-    "intake": "run read-only package intake and normalization",
-    "check-local": "run read-only intake and candidate-bound local checks",
-    "validate": "run package contract validation",
-    "build": "build an immutable package candidate",
-    "eval": "run candidate-bound evaluation lanes",
-    "package": "prepare a distributable package",
-    "project": "project a candidate into a selected runtime surface",
-    "verify": "verify candidate-bound evidence",
-}
 _MAX_INTAKE_CONTEXT_BYTES = 1_048_576
 
 
@@ -51,7 +42,8 @@ def _open_intake_context(path: Path) -> int:
     nonblock = getattr(os, "O_NONBLOCK", None)
     if (
         any(not isinstance(flag, int) or flag == 0 for flag in (directory, nofollow, nonblock))
-        or os.open not in os.supports_dir_fd
+        or not {os.open, os.stat}.issubset(os.supports_dir_fd)
+        or os.stat not in os.supports_follow_symlinks
     ):
         raise _UnsupportedContextRead("safe descriptor-relative context reads are unavailable")
     if ".." in path.parts:
@@ -63,6 +55,9 @@ def _open_intake_context(path: Path) -> int:
             child = os.open(component, os.O_RDONLY | directory | nofollow, dir_fd=parent)
             os.close(parent)
             parent = child
+        leaf = os.stat(absolute.name, dir_fd=parent, follow_symlinks=False)
+        if not stat.S_ISREG(leaf.st_mode):
+            raise ValueError("invalid intake context file")
         return os.open(absolute.name, os.O_RDONLY | nonblock | nofollow, dir_fd=parent)
     finally:
         os.close(parent)
@@ -156,6 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", title="commands")
     _add_content_review_parser(commands)
     _add_quality_parser(commands)
+    add_plugin_parser(commands)
     for name, help_text in COMMAND_HELP.items():
         if name in {"intake", "check-local", "validate", "build", "eval", "verify"}:
             continue
@@ -706,6 +702,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _local_check(arguments, parser)
     if arguments.command == "verify":
         return _verify(arguments)
+    if arguments.command == "validate-plugin":
+        return run_plugin_validation(
+            arguments,
+            lambda path: _read_intake_context(path, max_bytes=16 * 1024 * 1024),
+            _reject_duplicate_members,
+        )
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)
     if arguments.command == "compare-copy":

@@ -17,8 +17,43 @@ external-intake, registry delivery, or host installation workflow:
 ```text
 inventory   intake   check-local   check-quality   validate   build   review-content   eval   package   project   verify
 tessl prepare   tessl verify
-compare-copy   maintain-entrypoint
+compare-copy   maintain-entrypoint   validate-plugin
 ```
+
+### Portable plugin inspection
+
+Use `skills-sdk validate-plugin ./my-plugin --source-revision "<40-lowercase-hex>" --json --robot`
+to inspect root `plugin.json` and bind the complete captured package. Add
+`--require-version` and `--require-description` for those explicit SDK metadata
+policies. Base-format optionality is preserved without those flags. Exit `0`
+means structural pass, `2` means a typed blocked result. Both emit
+`plugin-package-validation/v1`; human output labels the release limitation and
+retains per-skill findings. No execution, admission, wrapping, publication or
+installation occurs. MCP transport validity and artwork approval are not proved.
+See [the API boundary](api.md#portable-plugin-validation) for capture limits and
+[delivery state](projects/sdk-workflow/tasks.md) before treating this candidate
+route as accepted-main functionality. Existing `validate` and `build` remain
+standalone-skill commands; they do not auto-detect plugins.
+
+The repair candidate adds `--verify-evidence FILE` to this same command. Keep
+the evidence file outside the plugin source root to avoid self-inclusion and a
+changed candidate. Supply the same source revision and explicit
+`--require-version` / `--require-description` flags used for the original capture; the CLI
+compares the supplied envelope with a fresh capture of the actual plugin root
+through `verify_plugin_package_validation`. Evidence must be a regular no-follow
+JSON file of at most 16 MiB. Duplicate members, malformed JSON, invalid or stale
+evidence, mismatches and unreadable source return typed blocked output with exit
+`2`. A matching structural result uses the existing output and exit conventions,
+and known special evidence files are rejected before opening the leaf. Post-open
+type and drift checks remain; this is not an atomic filesystem snapshot.
+Verification is not permission or release approval. Settings values are not echoed. Explicit
+metadata-policy flags remain in blocked output, including evidence read, JSON
+and mismatch failures. Corrected evidence retains the same requested policy.
+The default
+validation route without this option is unchanged. This is unmerged candidate
+behaviour, pending current repair validation and delivery.
+
+### Existing local routes
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
 `intake`, `check-local`, `validate`, `build`, `review-content`, `eval scenario-quality`, `eval scorer-quality`,

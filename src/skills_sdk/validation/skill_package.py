@@ -17,8 +17,8 @@ from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.package_safety import UNSAFE_PACKAGE_DIRECTORIES, unsafe_package_file_reason
 from skills_sdk.core.paths import require_portable_relative_path
-from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity
-from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile
+from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity, _candidate_package_id
+from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile, _file_role
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 from skills_sdk.validation.skill_ir import SkillIR, build_skill_ir, read_frontmatter
 
@@ -129,6 +129,10 @@ def _package_policy_findings(captured: dict[str, bytes], policy: SkillValidation
 
 
 def _read_regular_bytes(parent_fd: int, name: str) -> tuple[bytes, bool]:
+    """Reject known special entries before opening and verify the opened descriptor."""
+    value = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if not stat.S_ISREG(value.st_mode):
+        raise OSError(f"not a regular file: {name}")
     flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(name, flags, dir_fd=parent_fd)
     try:
@@ -188,28 +192,11 @@ def _source_changed_finding(relative_directory: Path) -> SkillPackageFinding:
 
 def _candidate(package_root: Path, source_revision: str, files: list[PackageManifestFile]) -> PackageCandidateIdentity:
     content_sha256 = candidate_content_sha256(files)
-    package_id = package_root.name
-    if not _PACKAGE_ID_RE.fullmatch(package_id):
-        root_digest = hashlib.sha256(package_root.name.encode("utf-8", errors="surrogateescape")).hexdigest()[:6]
-        package_id = f"invalid-package-{root_digest}-{content_sha256[:12]}"
     return PackageCandidateIdentity(
-        package_id=package_id,
+        package_id=_candidate_package_id(package_root.name, content_sha256),
         source_revision=source_revision,
         content_sha256=content_sha256,
     )
-
-
-def _file_role(relative: Path) -> PackageFileRole:
-    if relative == Path("SKILL.md"):
-        return PackageFileRole.SKILL_MD
-    if relative == Path("README.md"):
-        return PackageFileRole.README
-    return {
-        "references": PackageFileRole.REFERENCE,
-        "scripts": PackageFileRole.SCRIPT,
-        "assets": PackageFileRole.ASSET,
-        "evals": PackageFileRole.EVAL,
-    }.get(relative.parts[0], PackageFileRole.ASSET)
 
 
 def _regular_file(
@@ -253,6 +240,7 @@ def _regular_file(
 def _scan_files(
     package_root: Path, policy: SkillValidationPolicy
 ) -> tuple[list[PackageManifestFile], list[SkillPackageFinding], dict[str, bytes]]:
+    """Return sorted file records, safety findings and bytes captured through directory descriptors."""
     files: list[PackageManifestFile] = []
     findings: list[SkillPackageFinding] = []
     captured: dict[str, bytes] = {}
@@ -272,6 +260,7 @@ def _scan_files(
         )
 
     def visit(directory_fd: int, relative_directory: Path, depth: int) -> None:
+        """Walk one directory safely, accumulating captured files and policy or source-drift findings."""
         before = os.fstat(directory_fd)
         try:
             entries = sorted(os.scandir(directory_fd), key=lambda entry: entry.name)
@@ -344,7 +333,7 @@ def _scan_files(
                         relative,
                     )
                 )
-            record, finding, payload = _regular_file(directory_fd, relative_path, _file_role(relative_path))
+            record, finding, payload = _regular_file(directory_fd, relative_path, _file_role(relative_path.as_posix()))
             if record is not None and payload is not None:
                 files.append(record)
                 captured[relative] = payload
@@ -399,6 +388,28 @@ def _validate_ir(
     return identity, findings
 
 
+def _captured_skill_identity(
+    root: Path,
+    payload: bytes | None,
+    policy: SkillValidationPolicy,
+) -> tuple[SkillIdentity | None, list[SkillPackageFinding]]:
+    """Apply existing entrypoint semantics to already captured bytes only."""
+    try:
+        if payload is None:
+            raise OSError("SKILL.md was not captured as a regular file")
+        text = payload.decode("utf-8")
+        _frontmatter, _body, closed = read_frontmatter(text)
+        if not closed:
+            return None, [_finding("invalid_frontmatter", "SKILL.md requires closed frontmatter", "SKILL.md")]
+        return _validate_ir(root, text, build_skill_ir(root / "SKILL.md", text=text), policy)
+    except UnicodeDecodeError:
+        return None, [_finding("invalid_utf8", "SKILL.md must be UTF-8", "SKILL.md")]
+    except OSError:
+        return None, [_finding("unreadable_skill_md", "SKILL.md must remain a readable regular file", "SKILL.md")]
+    except (ValueError, yaml.YAMLError):
+        return None, [_finding("invalid_frontmatter", "SKILL.md frontmatter must be valid YAML", "SKILL.md")]
+
+
 def validate_skill_package(
     package_root: Path,
     *,
@@ -438,26 +449,8 @@ def validate_skill_package(
             files, file_findings, captured = _scan_files(root, active_policy)
             findings.extend(file_findings)
             findings.extend(_package_policy_findings(captured, active_policy))
-            try:
-                skill_payload = captured.get("SKILL.md")
-                if skill_payload is None:
-                    raise OSError("SKILL.md was not captured as a regular file")
-                text = skill_payload.decode("utf-8")
-                _frontmatter, _body, closed = read_frontmatter(text)
-                if not closed:
-                    findings.append(_finding("invalid_frontmatter", "SKILL.md requires closed frontmatter", "SKILL.md"))
-                else:
-                    ir = build_skill_ir(skill_md, text=text)
-                    identity, ir_findings = _validate_ir(root, text, ir, active_policy)
-                    findings.extend(ir_findings)
-            except UnicodeDecodeError:
-                findings.append(_finding("invalid_utf8", "SKILL.md must be UTF-8", "SKILL.md"))
-            except OSError:
-                findings.append(
-                    _finding("unreadable_skill_md", "SKILL.md must remain a readable regular file", "SKILL.md")
-                )
-            except (ValueError, yaml.YAMLError):
-                findings.append(_finding("invalid_frontmatter", "SKILL.md frontmatter must be valid YAML", "SKILL.md"))
+            identity, ir_findings = _captured_skill_identity(root, captured.get("SKILL.md"), active_policy)
+            findings.extend(ir_findings)
     candidate = _candidate(root, source_revision, files) if revision_is_valid else None
     status: Literal["pass", "blocked"] = (
         "blocked" if any(item.severity is ValidationSeverity.BLOCKER for item in findings) else "pass"

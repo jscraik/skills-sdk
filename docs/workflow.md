@@ -6,10 +6,18 @@ workflow and its current implementation boundaries. Maintain it with each
 public route change; use [the migration map](migration-map.md) for legacy
 coverage and [the task record](projects/sdk-workflow/tasks.md) for execution state.
 
-Accepted implementation baseline: [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012),
+Accepted implementation baseline: [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a),
 verified on 2026-10-08. The diagram is the intended process, not a claim that
 every gate is executable. The table describes that accepted baseline; branch
 prototypes and local test passes do not add capabilities to it.
+
+The current portable-plugin candidate adds the bounded
+[`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including
+fresh source comparison through `--verify-evidence` for supplied validation,
+tracked
+in the [task record](projects/sdk-workflow/tasks.md). It binds complete files and
+immediate skill subtrees, not release approval. This addition remains separate
+from the accepted-baseline status table until its PR is merged.
 
 ## Entry routes and independence
 
@@ -70,7 +78,7 @@ my-plugin/
 
 OpenAI-specific settings belong in `extensions.com.openai`. The older
 `.codex-plugin/plugin.json` is a compatibility input/fallback, not a second
-canonical output. OpenAI selects the inline extension when present rather than
+canonical output. OpenAI selects the inline extension when it is an object rather than
 merging it with that fallback. A skill-only plugin needs no MCP server; a
 portable `mcp.json` requires its own schema and transport fields, so converting
 legacy `.mcp.json` is not a filename-only operation. See

@@ -72,7 +72,7 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 
 ## Accepted delivery ledger
 
-Accepted SDK baseline: [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012),
+Accepted SDK baseline: [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a),
 verified on 2026-10-08. The workflow and migration map describe this same
 revision. These merges accept the bounded capabilities below, not all acceptance
 criteria of their parent slices.
@@ -86,6 +86,7 @@ criteria of their parent slices.
 | [PR #48](https://github.com/jscraik/skills-sdk/pull/48) | [`b208b1d`](https://github.com/jscraik/skills-sdk/commit/b208b1d20f1ff948013b4594336c4d7f260164d1) | Ordered local quality workflow with typed stop and recovery boundaries. |
 | [PR #49](https://github.com/jscraik/skills-sdk/pull/49) | [`40139ca`](https://github.com/jscraik/skills-sdk/commit/40139ca2e813cd6e3555cff0366cd2262fdd5972) | Bounded static screening and candidate-bound safety gates before selected-case execution. |
 | [PR #50](https://github.com/jscraik/skills-sdk/pull/50) | [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012) | Observed numeric scorer-calibration callbacks; the CLI consumes supplied-offline fixtures. |
+| [PR #51](https://github.com/jscraik/skills-sdk/pull/51) | [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a) | Reconciled accepted coverage and plugin-first release policy, mandatory icons and the separate registry start gate; no executable capability added. |
 
 Repository tests and installed-entrypoint proof are linked in the migration map.
 The ledger records hosted acceptance; it does not replace exact candidate
@@ -102,14 +103,192 @@ Name delivery state separately: proposed, implemented locally, validated locally
 under review, merged, published, or verified in a host. Record exact revision and
 proof for each applicable lane; these are not interchangeable completion labels.
 
+The focused commands below are historical runs in the pinned Python 3.12
+environment. Their repository command text is retained; transient local cache
+and tool-state environment overrides are omitted from this portable record.
+Documenting these commands does not claim a new test run.
+
 - Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
-- Current work: this bounded documentation reconciliation, under review in
-  [PR #51](https://github.com/jscraik/skills-sdk/pull/51), records the accepted PRs
-  above, plugin-first target, mandatory icon policy and strengthened acceptance.
-  It changes no executable service, schema, active scenario set, or live-operation
-  authority. Plugin-first support remains implementation work, not a doc-only pass.
-- Next action: finish this documentation PR, then implement the bounded portable
-  plugin intake/binding slice below. Preserve the accepted calibration service
+- Documentation reconciliation merged in
+  [PR #51](https://github.com/jscraik/skills-sdk/pull/51) at `c38a769`. It records the plugin-first
+  target, mandatory icon policy and strengthened acceptance without changing
+  executable services or live-operation authority.
+- Current work: portable plugin inspection and binding, locally validated on
+  `codex/sdk-portable-plugin-intake` with documentation from PR #51. The additive
+  `validate_plugin_package` / `validate-plugin` route captures root-manifest
+  candidates, complete file bytes and modes, per-skill findings and OpenAI
+  settings precedence. Focused and installed proof live in
+  [plugin tests](../../../tests/test_plugin_package.py) and
+  [installed smoke](../../../tests/installed_plugin_intake_smoke.py).
+  Historical proof for `41c2dfcf373f4c345ec0fc03ba38633bb0484d58`:
+  `bash scripts/validate-repository.sh` passed on 2026-10-08 with 2,566 tests
+  passed, one skipped, wheel build and all installed-entrypoint checks passing.
+  The pre-reconciliation repair passed that command on 2026-10-08 with 2,629 tests
+  passed, one skipped, wheel build and all installed-entrypoint checks passing.
+  It repairs child-role binding, literal entrypoint discovery and named
+  unknown-key diagnostics. It also adds source-backed full-envelope
+  verification through `verify_plugin_package_validation` and
+  `validate-plugin --verify-evidence FILE`; hash-only contract consistency does
+  not establish source derivation. This work remains unmerged against accepted
+  main `c38a769`; local proof and hosted delivery are separate states.
+- PR #52 reconciliation follows the completed bot task at `86760d2`. The local
+  candidate preserves digest-only receipts instead of retaining arbitrary raw
+  settings. Canonical digest tests cover inline and fallback nested settings,
+  private-value non-disclosure, tamper rejection and corrected-input recovery.
+  Focused plugin, evidence, CLI and public-boundary checks on 2026-10-08:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_review_regressions.py tests/test_plugin_package.py tests/test_public_repository_boundary.py -q
+  ```
+
+  Result: `pass` — 133 tests passed. After restoring the no-settings
+  orphan-digest regression:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py -q
+  ```
+
+  Result: `pass` — 12 tests passed. The reconciled candidate then passed
+  `bash scripts/validate-repository.sh` on 2026-10-08: 2,632 tests passed, one
+  skipped, with schema, code style, build, installed-entrypoint and diff checks
+  passing. Earlier aggregate proof remains historical; signed delivery and
+  current-head hosted evidence are separate closeout requirements.
+- Signed repair `49fd6fc367dca04e97cd0319913b8c5f4aaaed10` was pushed to
+  [PR #52](https://github.com/jscraik/skills-sdk/pull/52) on 2026-10-09. Its five
+  hosted review threads were resolved by their reviewers or the owner. A local
+  base review then found a blocked-output policy-retention defect. The follow-up
+  repair preserves valid caller policy across malformed or mismatched evidence,
+  CLI read and JSON failures, and invalid source revisions. Invalid policy
+  fails before source capture. Focused policy, evidence and plugin checks on
+  2026-10-09:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_package.py -q
+  ```
+
+  Result: `pass` — 103 tests passed. The earlier 2,632-test aggregate result applies to
+  the previous repair; the final follow-up result is recorded below.
+  Hosted review `5466755715` then identified missing candidate-ID binding for
+  blocked children. The same follow-up repairs that boundary, including invalid
+  directory-name fallback IDs. Its manifest-allowlist allegation was refuted by
+  the committed allowlist and passing typed-model roundtrip tests. The expanded
+  focused plugin, standalone, core and receipt suite ran on 2026-10-09:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_child_binding.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_package.py tests/test_plugin_review_regressions.py tests/test_skill_package_validation.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q
+  ```
+
+  Result: `pass` — 352 tests passed, one skipped. Independent delta reviews
+  found no actionable issues.
+  Review `5466988582` added a pre-open special-file finding and repeated the
+  policy-mismatch finding already covered by the repair. The follow-up also
+  rejects known non-regular files before opening them, including the standalone
+  reader found by the bounded sibling check. Post-open race checks remain.
+  The in-progress aggregate was interrupted to include this final correction;
+  partial test output is not a passing aggregate result.
+  After correcting the new test's message assertion to the existing sanitised
+  public diagnostic, the pre-open regression command was:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_capture_preopen.py -q
+  ```
+
+  Result: `pass` — 13 tests passed on 2026-10-09. The final candidate
+  passed `bash scripts/validate-repository.sh` on 2026-10-09: 2,674 tests passed,
+  one skipped, with generated schemas, code style, build, all installed-entrypoint
+  acceptance/rejection/recovery checks and `git diff --check` passing.
+- Signed input and evidence repair
+  [`ed488df`](https://github.com/jscraik/skills-sdk/commit/ed488dfcfdb665143d9a0551c48be08acc0fbfe8)
+  was published in PR #52 through signed reconciliation commit
+  [`3629e329`](https://github.com/jscraik/skills-sdk/commit/3629e3293facfa2da9425be62b2c9dd4b4439801)
+  on 2026-10-09. The reconciliation tree is identical to the validated repair
+  tree. Review `5467338707` requested the exact focused commands recorded above;
+  this documentation correction does not change implementation or test inputs.
+- Review `5467422704` added three input-boundary findings on `3629e329`:
+  coercible nested child sizes, erased component-kind blockers, and known
+  special evidence files opened before rejection. The follow-up rejects those
+  inputs, preserves standalone size parsing and shared CLI success semantics,
+  and retains post-open checks. A bounded sibling check also covers component
+  directories proved by captured descendants; empty directories are not inferred.
+  The new regression command reproduced 27 failures with one passing race check
+  before repair, then passed all 28 cases after repair:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py -q
+  ```
+
+  Result: `pass` on 2026-10-09 for that initial repaired test set. The expanded
+  neighbouring-input, unsupported-host, shared-caller and contract suite ran:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_child_binding.py tests/test_plugin_capture_preopen.py tests/test_intake_cli.py tests/test_content_review.py tests/test_local_check_cli.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q
+  ```
+
+  Result: `pass` — 402 tests passed on 2026-10-09. The first aggregate stopped
+  at the 800-line module limit before pytest. Combining the equivalent
+  descriptor-support conditions repaired that failure without changing the limit.
+  The reader regression command then passed all nine cases:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_context_preopen.py -q
+  ```
+
+  Result: `pass` on 2026-10-09. The final
+  `bash scripts/validate-repository.sh` result was `pass`: 2,705 tests passed,
+  one skipped, generated schemas, code style, wheel build, every installed
+  API/CLI acceptance/rejection/recovery check and `git diff --check` passed.
+  The earlier 2,674-test aggregate remains historical. Synthetic device metadata
+  and temporary FIFO fixtures do not establish atomic capture or live host proof.
+- The input-boundary follow-up was published as signed revision
+  [`4738fb9`](https://github.com/jscraik/skills-sdk/commit/4738fb9309bfcc861ced95ae0a8f9354b025b7f2).
+  Review `5467831856` then identified padded candidate fields, erased fallback
+  selection, an erased MCP warning and a suppressed required-version blocker.
+  The next repair keeps canonical identity strings exact and retains observable
+  findings for blocked and passing envelopes. Its bounded sibling check includes
+  child hashes and names, required descriptions and the blocked-child finding;
+  frozen standalone parsing and descriptive whitespace remain unchanged.
+  The initial regression command reproduced 85 failures with 22 passing tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -q
+  ```
+
+  Result: `fail` before repair on 2026-10-09. After repair and added neighbouring
+  cases, this command passed 112 tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -q --tb=short
+  ```
+
+  Result: `pass` on 2026-10-09. The combined plugin, evidence and frozen-contract
+  regression command then passed 448 tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_child_binding.py tests/test_plugin_capture_preopen.py tests/test_plugin_package.py tests/test_plugin_review_regressions.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q --tb=short
+  ```
+
+  Result: `pass` on 2026-10-09. Two read-only repair reviews found no actionable
+  defect within the identity and retained-finding changes. A final bounded check
+  of regex-constrained strings found the same padding issue in finding codes.
+  The aggregate was deliberately stopped after 141 passing tests, not recorded
+  as a pass. This additional regression command reproduced six failures:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -k padded_finding_codes -q --tb=short
+  ```
+
+  Result: `fail` before adding finding codes to the plugin-only ingress rule.
+  The same command then returned `pass`: six tests passed, 112 deselected on
+  2026-10-09. The final `bash scripts/validate-repository.sh` result was `pass`:
+  2,801 tests passed, one skipped, with generated schemas, code style, wheel
+  build, every installed API/CLI acceptance/rejection/recovery check and
+  `git diff --check` passing. The installed plugin route proves the four
+  reported rejection classes and finding-code sibling with corrected recovery.
+  The earlier 2,705-test result remains historical evidence for `4738fb9`.
+- Next action: publish the validated retained-evidence follow-up, then
+  reconcile current-head hosted review and checks
+  for PR #52 before receipt-gated merge.
+  Preserve the accepted calibration service
   and queued local-winner handoff; integrate downstream work only after the
   complete-plugin identity seam is ready. Earlier branch-local validation does
   not prove the new product contract.
@@ -144,7 +323,7 @@ within one cloud model lane. Preserve it. Callers still supply the refined
 candidate; neither candidate authoring nor live cloud quality is established.
 These are source-inspection results, not new test runs or accepted-main claims.
 
-Next slice: **canonical portable plugin intake and binding**, within the existing
+Active slice: **canonical portable plugin intake and binding**, within the existing
 validation, intake, packaging, model/schema and CLI seams. No registry server,
 provider execution, publication or installation is part of this slice.
 
