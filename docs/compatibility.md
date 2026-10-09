@@ -493,6 +493,11 @@ verification grants no execution, permission or release authority. The CLI reads
 regular no-follow JSON up to 16 MiB and rejects duplicate members and malformed
 input; default inspection behaviour remains unchanged. Current repair proof is
 required independently of the earlier candidate's historical validation.
+Blocked outputs preserve validated caller policy across evidence and revision
+failures; malformed caller policy remains a typed input blocker before capture.
+Blocked children also retain path-bound candidate IDs, including the unchanged
+standalone fallback formula for invalid directory names. Model and registered
+schema validation reject replaced IDs even when child identity is absent.
 
 Synthetic accepted/rejected/recovery cases are in
 [`test_plugin_package.py`](../tests/test_plugin_package.py) and

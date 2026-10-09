@@ -11,6 +11,7 @@ from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI, PluginPackageValidation, PluginValidationPolicy
+from skills_sdk.validation import plugin_evidence as evidence_service
 from skills_sdk.validation.plugin_evidence import verify_plugin_package_validation
 from skills_sdk.validation.plugin_package import validate_plugin_package
 
@@ -18,6 +19,7 @@ REVISION = "1" * 40
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, PluginPackageValidation]:
+    """Create a plugin with inline and fallback settings and return its passing validation."""
     root = tmp_path.resolve() / "source"
     root.mkdir()
     (root / "plugin.json").write_text(
@@ -41,10 +43,18 @@ def _fixture(tmp_path: Path) -> tuple[Path, PluginPackageValidation]:
 
 
 def _code(result: PluginPackageValidation) -> str:
+    """Assert an empty blocked capture without authority and return its first finding code."""
     assert result.status == "blocked"
     assert result.candidate is None and not result.files and not result.skills
     assert not result.execution_authorized and not result.release_ready and not result.mutation_performed
     return result.findings[0].code
+
+
+POLICIES = (
+    PluginValidationPolicy(require_version=True),
+    PluginValidationPolicy(require_description=True),
+    PluginValidationPolicy(require_version=True, require_description=True),
+)
 
 
 @pytest.mark.parametrize(
@@ -57,6 +67,7 @@ def _code(result: PluginPackageValidation) -> str:
     ],
 )
 def test_structural_projection_tamper_needs_source_rejection(tmp_path: Path, field: str, value: str) -> None:
+    """Verify fresh source rejects altered metadata that passes structural envelope checks."""
     root, good = _fixture(tmp_path)
     raw = good.model_dump(mode="json")
     raw["manifest"][field] = value
@@ -72,6 +83,7 @@ def test_structural_projection_tamper_needs_source_rejection(tmp_path: Path, fie
 
 
 def test_invalid_raw_and_nested_copied_inputs_fail_before_source(tmp_path: Path) -> None:
+    """Verify malformed, forged and cyclic envelopes yield invalid-evidence blockers."""
     root, good = _fixture(tmp_path)
     malformed = good.model_copy(update={"manifest": good.manifest.model_copy(update={"undeclared": True})})
     for invalid in ({}, malformed, good.model_copy(update={"release_ready": True})):
@@ -88,7 +100,58 @@ def test_invalid_raw_and_nested_copied_inputs_fail_before_source(tmp_path: Path)
     assert verify_plugin_package_validation(root, good.model_dump(mode="json"), source_revision=REVISION) == good
 
 
+@pytest.mark.parametrize("policy", POLICIES)
+def test_explicit_policy_survives_invalid_mismatch_and_recovery(tmp_path: Path, policy: PluginValidationPolicy) -> None:
+    """Retain caller policy through rejected evidence and corrected-input recovery."""
+    root, good = _fixture(tmp_path)
+    strict = validate_plugin_package(root, source_revision=REVISION, policy=policy)
+    assert strict.status == "pass" and strict.policy == policy
+    invalid_inputs = (
+        {},
+        good.model_copy(update={"release_ready": True}),
+    )
+    for invalid in invalid_inputs:
+        rejected = verify_plugin_package_validation(root, invalid, source_revision=REVISION, policy=policy)
+        assert _code(rejected) == "plugin_evidence_invalid"
+        assert rejected.policy == policy
+    forged = strict.model_dump(mode="json")
+    forged["manifest"]["openai_settings_sha256"] = "0" * 64
+    mismatch = verify_plugin_package_validation(root, forged, source_revision=REVISION, policy=policy)
+    assert _code(mismatch) == "plugin_evidence_mismatch"
+    assert mismatch.policy == policy
+    recovered = verify_plugin_package_validation(root, strict, source_revision=REVISION, policy=policy)
+    assert recovered == strict and recovered.policy == policy
+    assert not recovered.execution_authorized and not recovered.release_ready and not recovered.mutation_performed
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        {"require_version": 1},
+        {"require_description": "true"},
+        {"require_version": False, "unknown": True},
+        PluginValidationPolicy().model_copy(update={"require_version": 1}),
+    ],
+)
+def test_invalid_policy_fails_before_source_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, policy: object
+) -> None:
+    """Reject malformed or copied policies before any source validation call."""
+    root, good = _fixture(tmp_path)
+
+    def source_access(*args: object, **kwargs: object) -> PluginPackageValidation:
+        """Fail if invalid policy reaches the source reader."""
+        raise AssertionError("invalid caller policy reached source validation")
+
+    monkeypatch.setattr(evidence_service, "validate_plugin_package", source_access)
+    rejected = verify_plugin_package_validation(root, good, source_revision=REVISION, policy=policy)
+    assert _code(rejected) == "plugin_input_invalid"
+    assert rejected.policy == PluginValidationPolicy()
+    assert not rejected.execution_authorized and not rejected.release_ready and not rejected.mutation_performed
+
+
 def test_revision_and_policy_are_caller_explicit(tmp_path: Path) -> None:
+    """Require supplied evidence to match the caller-selected revision and metadata policy."""
     root, good = _fixture(tmp_path)
     assert _code(verify_plugin_package_validation(root, good, source_revision="2" * 40)) == "plugin_evidence_mismatch"
     policy = PluginValidationPolicy(require_version=True, require_description=True)
@@ -104,6 +167,7 @@ def test_revision_and_policy_are_caller_explicit(tmp_path: Path) -> None:
 
 
 def test_source_change_malformed_and_symlink_recover(tmp_path: Path) -> None:
+    """Reject changed, malformed or symlinked source and accept the restored original."""
     root, good = _fixture(tmp_path)
     manifest = root / "plugin.json"
     original = manifest.read_bytes()
@@ -120,6 +184,7 @@ def test_source_change_malformed_and_symlink_recover(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("inline", [{}, False])
 def test_selection_and_unused_overlay_bound_without_echo(tmp_path: Path, inline: object) -> None:
+    """Verify settings selection and retained overlay bytes without exposing raw settings."""
     root, _ = _fixture(tmp_path)
     manifest = root / "plugin.json"
     metadata = json.loads(manifest.read_text(encoding="utf-8"))
@@ -136,6 +201,7 @@ def test_selection_and_unused_overlay_bound_without_echo(tmp_path: Path, inline:
 
 @pytest.mark.parametrize("source", ["inline", "compatibility"])
 def test_nested_selected_settings_are_hash_bound_without_raw_retention(tmp_path: Path, source: str) -> None:
+    """Verify nested settings are represented by a digest and reject forged or raw settings evidence."""
     root, _ = _fixture(tmp_path)
     manifest = root / "plugin.json"
     metadata = json.loads(manifest.read_text(encoding="utf-8"))
@@ -160,6 +226,7 @@ def test_nested_selected_settings_are_hash_bound_without_raw_retention(tmp_path:
 
 
 def test_no_selected_settings_rejects_orphan_digest(tmp_path: Path) -> None:
+    """Reject an orphan settings digest across model, registry and source verification boundaries."""
     root, _ = _fixture(tmp_path)
     manifest = root / "plugin.json"
     metadata = json.loads(manifest.read_text(encoding="utf-8"))

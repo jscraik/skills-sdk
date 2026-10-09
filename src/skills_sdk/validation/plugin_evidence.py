@@ -18,21 +18,27 @@ def verify_plugin_package_validation(
     policy: PluginValidationPolicy | None = None,
 ) -> PluginPackageValidation:
     """Recompute every observation without trusting supplied metadata or policy."""
+    active = PluginValidationPolicy()
+    code = "plugin_input_invalid"
+    diagnostic = "plugin policy must contain only supported boolean requirements"
     try:
+        active = PluginValidationPolicy.model_validate(policy if policy is not None else {})
+        code = "plugin_evidence_invalid"
+        diagnostic = "supplied plugin evidence must satisfy its bounded contract"
         supplied = PluginPackageValidation.model_validate(validation)
     except (ContractError, ValueError, TypeError, RecursionError):
         return PluginPackageValidation(
             status="blocked",
-            findings=(
-                _finding("plugin_evidence_invalid", "supplied plugin evidence must satisfy its bounded contract"),
-            ),
+            policy=active,
+            findings=(_finding(code, diagnostic),),
         )
-    fresh = validate_plugin_package(plugin_root, source_revision=source_revision, policy=policy)
+    fresh = validate_plugin_package(plugin_root, source_revision=source_revision, policy=active)
     if fresh.status == "blocked":
         return fresh
     if fresh != supplied:
         return PluginPackageValidation(
             status="blocked",
+            policy=active,
             findings=(
                 _finding("plugin_evidence_mismatch", "supplied plugin evidence differs from fresh source validation"),
             ),

@@ -49,6 +49,7 @@ def _validation_result(
     except (OSError, ValueError, RecursionError):
         return PluginPackageValidation(
             status="blocked",
+            policy=policy,
             findings=(
                 SkillPackageFinding(
                     code="plugin_evidence_invalid",

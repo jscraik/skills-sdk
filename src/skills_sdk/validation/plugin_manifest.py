@@ -27,6 +27,7 @@ _KNOWN = frozenset(
 
 
 def _pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Build a JSON object while rejecting duplicate member names."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
@@ -36,10 +37,12 @@ def _pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 def _reject_constant(value: str) -> None:
+    """Reject nonstandard JSON constants such as NaN and Infinity."""
     raise ValueError("plugin metadata requires standard JSON constants")
 
 
 def _check_json_budget(value: object) -> None:
+    """Reject excessive nesting, oversized value counts, invalid Unicode and nonfinite numbers."""
     stack, remaining = [(value, 0)], 65536
     while stack:
         item, depth = stack.pop()
@@ -57,6 +60,7 @@ def _check_json_budget(value: object) -> None:
 
 
 def _object(payload: bytes) -> dict[str, object]:
+    """Decode a bounded UTF-8 JSON object with unique keys and standard finite values."""
     if len(payload) > 1_048_576:
         raise ValueError("plugin metadata exceeds one MiB")
     parsed = json.loads(payload.decode("utf-8"), object_pairs_hook=_pairs, parse_constant=_reject_constant)
@@ -67,6 +71,7 @@ def _object(payload: bytes) -> dict[str, object]:
 
 
 def _known_fields(value: dict[str, object]) -> None:
+    """Require the supported schema and name and validate known optional metadata types."""
     if value.get("$schema") != PLUGIN_SCHEMA_URI or type(value.get("name")) is not str:
         raise ValueError("plugin requires its supported schema and name")
     for key in ("version", "description", "homepage", "repository", "license"):

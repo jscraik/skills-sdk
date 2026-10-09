@@ -137,8 +137,34 @@ proof for each applicable lane; these are not interchangeable completion labels.
   skipped, with schema, code style, build, installed-entrypoint and diff checks
   passing. Earlier aggregate proof remains historical; signed delivery and
   current-head hosted evidence are separate closeout requirements.
-- Next action: publish the signed repair, then reconcile current-head hosted
-  review and checks for PR #52 before receipt-gated merge.
+- Signed repair `49fd6fc367dca04e97cd0319913b8c5f4aaaed10` was pushed to
+  [PR #52](https://github.com/jscraik/skills-sdk/pull/52) on 2026-10-09. Its five
+  hosted review threads were resolved by their reviewers or the owner. A local
+  base review then found a blocked-output policy-retention defect. The follow-up
+  repair preserves valid caller policy across malformed or mismatched evidence,
+  CLI read and JSON failures, and invalid source revisions. Invalid policy
+  fails before source capture. Focused policy, evidence and plugin tests passed:
+  103 tests on 2026-10-09. The earlier 2,632-test aggregate result applies to
+  the previous repair; the final follow-up result is recorded below.
+  Hosted review `5466755715` then identified missing candidate-ID binding for
+  blocked children. The same follow-up repairs that boundary, including invalid
+  directory-name fallback IDs. Its manifest-allowlist allegation was refuted by
+  the committed allowlist and passing typed-model roundtrip tests. The expanded
+  focused plugin, standalone, core and receipt suite passed 352 tests with one
+  skip on 2026-10-09. Independent delta reviews found no actionable issues.
+  Review `5466988582` added a pre-open special-file finding and repeated the
+  policy-mismatch finding already covered by the repair. The follow-up also
+  rejects known non-regular files before opening them, including the standalone
+  reader found by the bounded sibling check. Post-open race checks remain.
+  The in-progress aggregate was interrupted to include this final correction;
+  partial test output is not a passing aggregate result.
+  After correcting the new test's message assertion to the existing sanitised
+  public diagnostic, all 13 pre-open regressions passed. The final candidate
+  passed `bash scripts/validate-repository.sh` on 2026-10-09: 2,674 tests passed,
+  one skipped, with generated schemas, code style, build, all installed-entrypoint
+  acceptance/rejection/recovery checks and `git diff --check` passing.
+- Next action: publish the signed input and evidence follow-up, then
+  reconcile current-head hosted review and checks for PR #52 before receipt-gated merge.
   Preserve the accepted calibration service
   and queued local-winner handoff; integrate downstream work only after the
   complete-plugin identity seam is ready. Earlier branch-local validation does

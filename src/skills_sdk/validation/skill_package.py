@@ -17,7 +17,7 @@ from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.package_safety import UNSAFE_PACKAGE_DIRECTORIES, unsafe_package_file_reason
 from skills_sdk.core.paths import require_portable_relative_path
-from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity
+from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity, _candidate_package_id
 from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile, _file_role
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 from skills_sdk.validation.skill_ir import SkillIR, build_skill_ir, read_frontmatter
@@ -129,6 +129,10 @@ def _package_policy_findings(captured: dict[str, bytes], policy: SkillValidation
 
 
 def _read_regular_bytes(parent_fd: int, name: str) -> tuple[bytes, bool]:
+    """Reject known special entries before opening and verify the opened descriptor."""
+    value = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if not stat.S_ISREG(value.st_mode):
+        raise OSError(f"not a regular file: {name}")
     flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(name, flags, dir_fd=parent_fd)
     try:
@@ -188,12 +192,8 @@ def _source_changed_finding(relative_directory: Path) -> SkillPackageFinding:
 
 def _candidate(package_root: Path, source_revision: str, files: list[PackageManifestFile]) -> PackageCandidateIdentity:
     content_sha256 = candidate_content_sha256(files)
-    package_id = package_root.name
-    if not _PACKAGE_ID_RE.fullmatch(package_id):
-        root_digest = hashlib.sha256(package_root.name.encode("utf-8", errors="surrogateescape")).hexdigest()[:6]
-        package_id = f"invalid-package-{root_digest}-{content_sha256[:12]}"
     return PackageCandidateIdentity(
-        package_id=package_id,
+        package_id=_candidate_package_id(package_root.name, content_sha256),
         source_revision=source_revision,
         content_sha256=content_sha256,
     )
@@ -240,6 +240,7 @@ def _regular_file(
 def _scan_files(
     package_root: Path, policy: SkillValidationPolicy
 ) -> tuple[list[PackageManifestFile], list[SkillPackageFinding], dict[str, bytes]]:
+    """Return sorted file records, safety findings and bytes captured through directory descriptors."""
     files: list[PackageManifestFile] = []
     findings: list[SkillPackageFinding] = []
     captured: dict[str, bytes] = {}
@@ -259,6 +260,7 @@ def _scan_files(
         )
 
     def visit(directory_fd: int, relative_directory: Path, depth: int) -> None:
+        """Walk one directory safely, accumulating captured files and policy or source-drift findings."""
         before = os.fstat(directory_fd)
         try:
             entries = sorted(os.scandir(directory_fd), key=lambda entry: entry.name)

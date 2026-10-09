@@ -20,11 +20,13 @@ MAX_DEPTH = 64
 
 
 def _metadata(descriptor: int) -> tuple[int, ...]:
+    """Return descriptor identity, mode, size and timestamps for detecting capture drift."""
     value = os.fstat(descriptor)
     return (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
 
 
 def _read_file(parent: int, name: str) -> tuple[bytes, int]:
+    """Read a bounded regular file without following links and return bytes and permissions."""
     descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
     try:
         before = _metadata(descriptor)
@@ -55,6 +57,7 @@ def capture_plugin_source(root: Path) -> tuple[tuple[PluginCapturedFile, ...], d
     resource_count, total_size = 0, 0
 
     def visit(descriptor: int, prefix: str, depth: int) -> None:
+        """Collect files and directories recursively while enforcing budgets and detecting drift."""
         nonlocal resource_count, total_size
         before = _metadata(descriptor)
         if depth > MAX_DEPTH or before[2] & 0o7000:
@@ -81,6 +84,8 @@ def capture_plugin_source(root: Path) -> tuple[tuple[PluginCapturedFile, ...], d
                 finally:
                     os.close(child)
             else:
+                if not stat.S_ISREG(value.st_mode):
+                    raise ValueError("plugin files require bounded ordinary regular-file bytes")
                 if len(records) >= MAX_FILES or total_size + value.st_size > MAX_TOTAL_BYTES:
                     raise ValueError("plugin capture exceeds its resource budget")
                 payload, mode = _read_file(descriptor, name)

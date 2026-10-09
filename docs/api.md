@@ -71,6 +71,14 @@ returns a typed blocked result; corrected evidence can recover. Neither a
 match nor verification grants execution, permissions or release authority.
 Keep any serialised evidence file outside the plugin root; including it changes
 the captured candidate. Supply the original capture's explicit policy.
+Blocked results retain a valid caller policy even when evidence or the revision
+is invalid. Invalid caller policies return `plugin_input_invalid` before source
+capture; they cannot override policy through the supplied envelope.
+Child candidate IDs remain bound to their directory names even when malformed
+skill metadata blocks identity discovery. Invalid directory names retain the
+standalone validator's deterministic fallback ID; supplied IDs cannot replace it.
+Capture rejects known non-regular files from no-follow metadata before opening
+them. Post-open checks remain necessary for races; capture is not an atomic snapshot.
 This unmerged verifier requires current repair proof before delivery; historical
 validation of the earlier candidate does not establish that proof.
 

@@ -32,6 +32,7 @@ from skills_sdk.validation.skill_package import (
 def _child(
     path: str, files: tuple[PluginCapturedFile, ...], payloads: dict[str, bytes], revision: str
 ) -> PluginSkillBinding:
+    """Validate one direct skill from captured bytes and bind its files to the supplied revision."""
     prefix, policy = path + "/", SkillValidationPolicy()
     captured = {name[len(prefix) :]: data for name, data in payloads.items() if name.startswith(prefix)}
     records = tuple(
@@ -60,6 +61,7 @@ def _child(
 
 
 def _component_findings(payloads: dict[str, bytes], directories: tuple[str, ...]) -> list[SkillPackageFinding]:
+    """Report invalid component kinds and warn that captured MCP bytes remain unassessed."""
     findings: list[SkillPackageFinding] = []
     if "skills" in payloads or "mcp.json" in directories:
         findings.append(_finding("plugin_component_kind_invalid", "portable component location has the wrong kind"))
@@ -85,12 +87,12 @@ def validate_plugin_package(
 ) -> PluginPackageValidation:
     """Capture a root-manifest plugin; pass is neither admission nor release clearance."""
     active = PluginValidationPolicy()
-    diagnostic = "source revision must be forty lowercase hexadecimal characters"
+    diagnostic = "plugin policy must contain only supported boolean requirements"
     try:
+        active = PluginValidationPolicy.model_validate(policy if policy is not None else {})
+        diagnostic = "source revision must be forty lowercase hexadecimal characters"
         if type(source_revision) is not str or not re.fullmatch(r"[0-9a-f]{40}", source_revision):
             raise ValueError("invalid source revision")
-        diagnostic = "plugin policy must contain only supported boolean requirements"
-        active = PluginValidationPolicy.model_validate(policy if policy is not None else {})
         diagnostic = "plugin source requires bounded ordinary files and safe no-follow paths"
         if not isinstance(plugin_root, Path) or ".." in plugin_root.parts:
             raise ValueError("plugin root requires a safe path")
