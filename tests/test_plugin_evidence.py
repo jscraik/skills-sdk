@@ -18,6 +18,7 @@ REVISION = "1" * 40
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, PluginPackageValidation]:
+    """Create a plugin with inline and fallback settings and return its passing validation."""
     root = tmp_path.resolve() / "source"
     root.mkdir()
     (root / "plugin.json").write_text(
@@ -41,6 +42,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, PluginPackageValidation]:
 
 
 def _code(result: PluginPackageValidation) -> str:
+    """Assert an empty blocked capture without authority and return its first finding code."""
     assert result.status == "blocked"
     assert result.candidate is None and not result.files and not result.skills
     assert not result.execution_authorized and not result.release_ready and not result.mutation_performed
@@ -57,6 +59,7 @@ def _code(result: PluginPackageValidation) -> str:
     ],
 )
 def test_structural_projection_tamper_needs_source_rejection(tmp_path: Path, field: str, value: str) -> None:
+    """Verify fresh source rejects altered metadata that passes structural envelope checks."""
     root, good = _fixture(tmp_path)
     raw = good.model_dump(mode="json")
     raw["manifest"][field] = value
@@ -72,6 +75,7 @@ def test_structural_projection_tamper_needs_source_rejection(tmp_path: Path, fie
 
 
 def test_invalid_raw_and_nested_copied_inputs_fail_before_source(tmp_path: Path) -> None:
+    """Verify malformed, forged and cyclic envelopes yield invalid-evidence blockers."""
     root, good = _fixture(tmp_path)
     malformed = good.model_copy(update={"manifest": good.manifest.model_copy(update={"undeclared": True})})
     for invalid in ({}, malformed, good.model_copy(update={"release_ready": True})):
@@ -89,6 +93,7 @@ def test_invalid_raw_and_nested_copied_inputs_fail_before_source(tmp_path: Path)
 
 
 def test_revision_and_policy_are_caller_explicit(tmp_path: Path) -> None:
+    """Require supplied evidence to match the caller-selected revision and metadata policy."""
     root, good = _fixture(tmp_path)
     assert _code(verify_plugin_package_validation(root, good, source_revision="2" * 40)) == "plugin_evidence_mismatch"
     policy = PluginValidationPolicy(require_version=True, require_description=True)
@@ -104,6 +109,7 @@ def test_revision_and_policy_are_caller_explicit(tmp_path: Path) -> None:
 
 
 def test_source_change_malformed_and_symlink_recover(tmp_path: Path) -> None:
+    """Reject changed, malformed or symlinked source and accept the restored original."""
     root, good = _fixture(tmp_path)
     manifest = root / "plugin.json"
     original = manifest.read_bytes()
@@ -120,6 +126,7 @@ def test_source_change_malformed_and_symlink_recover(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("inline", [{}, False])
 def test_selection_and_unused_overlay_bound_without_echo(tmp_path: Path, inline: object) -> None:
+    """Verify settings selection and retained overlay bytes without exposing raw settings."""
     root, _ = _fixture(tmp_path)
     manifest = root / "plugin.json"
     metadata = json.loads(manifest.read_text(encoding="utf-8"))
@@ -136,6 +143,7 @@ def test_selection_and_unused_overlay_bound_without_echo(tmp_path: Path, inline:
 
 @pytest.mark.parametrize("source", ["inline", "compatibility"])
 def test_nested_selected_settings_are_hash_bound_without_raw_retention(tmp_path: Path, source: str) -> None:
+    """Verify nested settings are represented by a digest and reject forged or raw settings evidence."""
     root, _ = _fixture(tmp_path)
     manifest = root / "plugin.json"
     metadata = json.loads(manifest.read_text(encoding="utf-8"))
@@ -160,6 +168,7 @@ def test_nested_selected_settings_are_hash_bound_without_raw_retention(tmp_path:
 
 
 def test_no_selected_settings_rejects_orphan_digest(tmp_path: Path) -> None:
+    """Reject an orphan settings digest across model, registry and source verification boundaries."""
     root, _ = _fixture(tmp_path)
     manifest = root / "plugin.json"
     metadata = json.loads(manifest.read_text(encoding="utf-8"))

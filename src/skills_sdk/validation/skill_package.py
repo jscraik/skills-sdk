@@ -240,6 +240,7 @@ def _regular_file(
 def _scan_files(
     package_root: Path, policy: SkillValidationPolicy
 ) -> tuple[list[PackageManifestFile], list[SkillPackageFinding], dict[str, bytes]]:
+    """Return sorted file records, safety findings and bytes captured through directory descriptors."""
     files: list[PackageManifestFile] = []
     findings: list[SkillPackageFinding] = []
     captured: dict[str, bytes] = {}
@@ -259,6 +260,7 @@ def _scan_files(
         )
 
     def visit(directory_fd: int, relative_directory: Path, depth: int) -> None:
+        """Walk one directory safely, accumulating captured files and policy or source-drift findings."""
         before = os.fstat(directory_fd)
         try:
             entries = sorted(os.scandir(directory_fd), key=lambda entry: entry.name)

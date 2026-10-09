@@ -26,6 +26,7 @@ ROLE_PATHS = (
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
+    """Create a plugin whose direct skill exercises every canonical package file role."""
     root = tmp_path.resolve() / "plugin"
     child = root / "skills" / "fixture-skill"
     child.mkdir(parents=True)
@@ -44,16 +45,19 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
 
 
 def _manifest(root: Path, metadata: dict[str, object]) -> None:
+    """Write the supplied metadata as the root plugin.json fixture."""
     (root / "plugin.json").write_text(json.dumps(metadata), encoding="utf-8")
 
 
 def _valid(root: Path) -> PluginPackageValidation:
+    """Validate the fixture at the fixed revision and assert a passing result."""
     result = validate_plugin_package(root, source_revision=REVISION)
     assert result.status == "pass", result.model_dump(mode="json")
     return result
 
 
 def _forged_role(good: PluginPackageValidation, path: str, form: str) -> object:
+    """Replace one child file role in a raw, copied or constructed validation envelope."""
     child = good.skills[0]
     records = tuple(
         item.model_copy(
@@ -77,6 +81,7 @@ def _forged_role(good: PluginPackageValidation, path: str, form: str) -> object:
 @pytest.mark.parametrize("form", ["raw", "copy", "construct"])
 @pytest.mark.parametrize("boundary", ["model", "registry"])
 def test_child_file_roles_are_bound(tmp_path: Path, path: str, form: str, boundary: str) -> None:
+    """Reject forged child roles through model and registry boundaries while accepting canonical roles."""
     root, _ = _fixture(tmp_path)
     good = _valid(root)
     forged = _forged_role(good, path, form)
@@ -92,6 +97,7 @@ def test_child_file_roles_are_bound(tmp_path: Path, path: str, form: str, bounda
 
 
 def test_all_canonical_child_roles_preserve_standalone_compatibility(tmp_path: Path) -> None:
+    """Verify every canonical child role matches standalone validation and passes both schemas."""
     root, _ = _fixture(tmp_path)
     good = _valid(root)
     standalone = validate_skill_package(root / "skills" / "fixture-skill", source_revision=REVISION)
@@ -102,12 +108,14 @@ def test_all_canonical_child_roles_preserve_standalone_compatibility(tmp_path: P
 
 
 def _warning_messages(result: PluginPackageValidation) -> tuple[str, ...]:
+    """Return ignored-field messages after checking their severity and manifest evidence reference."""
     warnings = tuple(item for item in result.findings if item.code == "plugin_unknown_fields_ignored")
     assert warnings and all(item.severity == "warning" and item.evidence_refs == ("plugin.json",) for item in warnings)
     return tuple(item.message for item in warnings)
 
 
 def test_unknown_keys_are_json_escaped_named_sorted_without_values(tmp_path: Path) -> None:
+    """Verify unknown keys are escaped and sorted in warnings without disclosing their values."""
     root, metadata = _fixture(tmp_path)
     names = ("z-last", "descrption", 'quoted"key', "line\nkey", "a-first")
     metadata.update(dict.fromkeys(names, "DO-NOT-RETAIN-UNKNOWN-VALUE"))
@@ -124,6 +132,7 @@ def test_unknown_keys_are_json_escaped_named_sorted_without_values(tmp_path: Pat
 
 
 def test_many_unknown_keys_pass_with_bounded_deterministic_diagnostic(tmp_path: Path) -> None:
+    """Verify many ignored keys produce one bounded, repeatable warning containing no field values."""
     root, metadata = _fixture(tmp_path)
     metadata.update({f"unknown-{index:04d}": "PRIVATE-UNKNOWN-VALUE" for index in range(2050)})
     _manifest(root, metadata)
@@ -139,6 +148,7 @@ def test_many_unknown_keys_pass_with_bounded_deterministic_diagnostic(tmp_path: 
 @pytest.mark.parametrize("name", ["SKILL-md", "SKILLXmd"])
 @pytest.mark.parametrize("actual", [False, True])
 def test_discovery_requires_literal_entrypoint(tmp_path: Path, name: str, actual: bool) -> None:
+    """Ignore lookalike filenames and discover a child only when literal SKILL.md exists."""
     root, _ = _fixture(tmp_path)
     entry = root / "skills" / "fixture-skill" / "SKILL.md"
     (entry.parent / name).write_bytes(entry.read_bytes())
@@ -154,6 +164,7 @@ def test_discovery_requires_literal_entrypoint(tmp_path: Path, name: str, actual
 
 @pytest.mark.parametrize("name", ["SKILL-md", "SKILLXmd", "SKILL.md"])
 def test_entrypoint_directory_kind_is_literal(tmp_path: Path, name: str) -> None:
+    """Block a directory named SKILL.md, allow lookalikes and accept a restored entrypoint file."""
     root, _ = _fixture(tmp_path)
     entry = root / "skills" / "fixture-skill" / "SKILL.md"
     original = entry.read_bytes()

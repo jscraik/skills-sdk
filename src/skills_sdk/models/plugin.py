@@ -70,12 +70,14 @@ class PortablePluginManifest(_ContractModel):
     @field_validator("name")
     @classmethod
     def portable_name(cls, value: str) -> str:
+        """Reject repeated separators in an otherwise valid portable plugin name."""
         if "--" in value or ".." in value:
             raise ValueError("portable plugin name cannot contain repeated separators")
         return value
 
     @model_validator(mode="after")
     def selected_settings(self) -> Self:
+        """Require a settings digest exactly when a settings source is selected."""
         if (self.openai_settings_source == "none") != (self.openai_settings_sha256 is None):
             raise ValueError("selected settings require exactly one object digest")
         return self
@@ -93,6 +95,7 @@ class PluginCapturedFile(_ContractModel):
     @field_validator("path")
     @classmethod
     def portable_path(cls, value: str) -> str:
+        """Require a UTF-8 encodable portable relative path for a captured file."""
         value.encode("utf-8")
         require_portable_relative_path(value)
         return value
@@ -107,6 +110,7 @@ class PluginSkillBinding(_ContractModel):
     @field_validator("path")
     @classmethod
     def direct_skill(cls, value: str) -> str:
+        """Require the binding path to name a direct child of skills/."""
         path = require_portable_relative_path(value)
         if len(path.parts) != 2 or path.parts[0] != "skills":
             raise ValueError("plugin skills must be direct children of skills/")
@@ -123,10 +127,12 @@ class PluginValidationPolicy(_ContractModel):
     @model_validator(mode="before")
     @classmethod
     def canonical_policy(cls, value: object) -> object:
+        """Normalize policy input within a fixed budget before validating its fields."""
         return _normalise(value, [128])
 
 
 def _validate_child(binding: PluginSkillBinding, files: tuple[PluginCapturedFile, ...], revision: str) -> None:
+    """Require child files, roles, identity and revision to match the captured subtree."""
     child, prefix = binding.validation, binding.path + "/"
     expected = tuple(
         (item.path[len(prefix) :], item.sha256, item.size_bytes, _file_role(item.path[len(prefix) :]))
@@ -169,10 +175,12 @@ class PluginPackageValidation(_ContractModel):
     @model_validator(mode="before")
     @classmethod
     def copied_inputs(cls, value: object) -> object:
+        """Normalize the full envelope and reject forged model members before validation."""
         return _normalise(value, [131072])
 
     @model_validator(mode="after")
     def bind_capture(self) -> Self:
+        """Require status, digests, manifest and children to agree with the retained capture."""
         blockers = any(item.severity == ValidationSeverity.BLOCKER for item in self.findings)
         if (self.status == "blocked") != blockers:
             raise ValueError("plugin status must agree with blocker findings")

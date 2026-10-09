@@ -29,6 +29,7 @@ REVISION = "1" * 40
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
+    """Create a plugin containing one skill and an asset, returning its root and metadata."""
     root = tmp_path.resolve() / "arbitrary-source-directory"
     child = root / "skills" / "fixture-skill"
     child.mkdir(parents=True)
@@ -43,21 +44,25 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
 
 
 def _manifest(root: Path, payload: dict[str, object]) -> None:
+    """Write the supplied metadata as the root plugin.json fixture."""
     (root / "plugin.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _valid(root: Path) -> PluginPackageValidation:
+    """Validate the fixture at the fixed revision and assert a passing result."""
     result = validate_plugin_package(root, source_revision=REVISION)
     assert result.status == "pass", result.model_dump(mode="json")
     return result
 
 
 def _reject(value: object) -> None:
+    """Assert that the plugin validation model rejects the supplied envelope."""
     with pytest.raises(ValueError):
         PluginPackageValidation.model_validate(value)
 
 
 def test_complete_capture_schema_and_standalone_compatibility(tmp_path: Path) -> None:
+    """Verify complete capture, schema acceptance and equivalence to standalone child validation."""
     root, _ = _fixture(tmp_path)
     result = _valid(root)
     assert result.candidate is not None and result.manifest is not None
@@ -72,6 +77,7 @@ def test_complete_capture_schema_and_standalone_compatibility(tmp_path: Path) ->
 
 
 def test_optional_metadata_and_explicit_release_policy_recovery(tmp_path: Path) -> None:
+    """Require optional metadata only under explicit policy and accept corrected input."""
     root, payload = _fixture(tmp_path)
     _valid(root)
     policy = PluginValidationPolicy(require_version=True, require_description=True)
@@ -100,6 +106,7 @@ def test_optional_metadata_and_explicit_release_policy_recovery(tmp_path: Path) 
     ],
 )
 def test_malformed_root_rejection_and_recovery(tmp_path: Path, payload: bytes) -> None:
+    """Block malformed root manifests and accept restored valid metadata."""
     root, metadata = _fixture(tmp_path)
     (root / "plugin.json").write_bytes(payload)
     result = validate_plugin_package(root, source_revision=REVISION)
@@ -109,6 +116,7 @@ def test_malformed_root_rejection_and_recovery(tmp_path: Path, payload: bytes) -
 
 
 def test_unknown_metadata_extensions_and_mcp_are_not_clearance(tmp_path: Path) -> None:
+    """Verify ignored metadata and unassessed MCP content produce warnings without authority."""
     root, metadata = _fixture(tmp_path)
     metadata.update(unknown={"ignored": True}, extensions="not-an-object")
     _manifest(root, metadata)
@@ -124,6 +132,7 @@ def test_unknown_metadata_extensions_and_mcp_are_not_clearance(tmp_path: Path) -
 
 
 def test_openai_selection_replaces_overlay_without_merging(tmp_path: Path) -> None:
+    """Verify inline settings replace fallback settings and their digest ignores key order."""
     root, metadata = _fixture(tmp_path)
     overlay = root / ".codex-plugin" / "plugin.json"
     overlay.parent.mkdir()
@@ -151,6 +160,7 @@ def test_openai_selection_replaces_overlay_without_merging(tmp_path: Path) -> No
 
 
 def test_immediate_discovery_and_child_recovery(tmp_path: Path) -> None:
+    """Discover only direct skills, block invalid child metadata and accept its repair."""
     root, _ = _fixture(tmp_path)
     nested = root / "skills" / "group" / "nested"
     nested.mkdir(parents=True)
@@ -170,6 +180,7 @@ def test_immediate_discovery_and_child_recovery(tmp_path: Path) -> None:
     "kind", ["missing_child", "child_revision", "child_name", "candidate_id", "mode", "manifest", "authority"]
 )
 def test_raw_and_copied_nested_forgery_rejected(tmp_path: Path, kind: str) -> None:
+    """Reject tampered bindings and authority across raw, copied, constructed and registry inputs."""
     root, _ = _fixture(tmp_path)
     good = _valid(root)
     raw = good.model_dump(mode="json")
@@ -227,6 +238,7 @@ def test_raw_and_copied_nested_forgery_rejected(tmp_path: Path, kind: str) -> No
 
 
 def test_extra_copied_members_and_closure_rejected(tmp_path: Path) -> None:
+    """Reject extra copied fields, incomplete child files and unsorted capture records."""
     root, _ = _fixture(tmp_path)
     good = _valid(root)
     forged = good.files[0].model_copy(update={"undeclared": True})
@@ -250,6 +262,7 @@ def test_extra_copied_members_and_closure_rejected(tmp_path: Path) -> None:
 
 
 def test_ordinary_modes_bound_separately(tmp_path: Path) -> None:
+    """Verify permission changes affect the mode digest while preserving the content candidate."""
     root, _ = _fixture(tmp_path)
     before = _valid(root)
     resource = root / "assets" / "icon.txt"
@@ -266,6 +279,7 @@ def test_unsafe_resource_rejection_and_recovery(
     monkeypatch: pytest.MonkeyPatch,
     kind: str,
 ) -> None:
+    """Block unsafe files or modes and accept the plugin after removing the offending resource."""
     root, _ = _fixture(tmp_path)
     resource = root / "assets" / (".env" if kind == "credential" else "unsafe")
     if kind == "symlink":
@@ -278,6 +292,7 @@ def test_unsafe_resource_rejection_and_recovery(
             original = plugin_capture._metadata
 
             def special_metadata(descriptor: int) -> tuple[int, ...]:
+                """Simulate a setuid bit on regular files while preserving the remaining descriptor metadata."""
                 value = original(descriptor)
                 return (*value[:2], value[2] | 0o4000, *value[3:]) if stat.S_ISREG(value[2]) else value
 
@@ -289,11 +304,13 @@ def test_unsafe_resource_rejection_and_recovery(
 
 
 def test_second_capture_observes_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reject source changes observed during confirming capture and accept a stable retry."""
     root, _ = _fixture(tmp_path)
     original = service.capture_plugin_source
     calls = 0
 
     def capture(path: Path) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
+        """Change an asset just before the second capture to simulate source drift."""
         nonlocal calls
         calls += 1
         if calls == 2:
@@ -308,6 +325,7 @@ def test_second_capture_observes_drift(tmp_path: Path, monkeypatch: pytest.Monke
 
 
 def test_sparse_oversized_file_blocks_without_unbounded_read(tmp_path: Path) -> None:
+    """Reject a sparse file beyond the per-file budget and accept its removal."""
     root, _ = _fixture(tmp_path)
     oversized = root / "assets" / "oversized.bin"
     with oversized.open("wb") as stream:
@@ -340,6 +358,7 @@ def test_sparse_oversized_file_blocks_without_unbounded_read(tmp_path: Path) -> 
     ],
 )
 def test_known_metadata_wrong_types_reject_and_recover(tmp_path: Path, field: str, value: object) -> None:
+    """Block wrongly typed known fields and accept the manifest after removing them."""
     root, payload = _fixture(tmp_path)
     payload[field] = value
     _manifest(root, payload)
@@ -351,6 +370,7 @@ def test_known_metadata_wrong_types_reject_and_recover(tmp_path: Path, field: st
 
 @pytest.mark.parametrize("name", ["UPPER", "unicode-é", "two--parts", "two..parts", "-edge", "edge.", ""])
 def test_invalid_names_reject_and_recover(tmp_path: Path, name: str) -> None:
+    """Reject nonportable plugin names and accept a valid name after correction."""
     root, payload = _fixture(tmp_path)
     payload["name"] = name
     _manifest(root, payload)
@@ -361,6 +381,7 @@ def test_invalid_names_reject_and_recover(tmp_path: Path, name: str) -> None:
 
 
 def test_openai_empty_inline_and_nonobject_fallback_selection(tmp_path: Path) -> None:
+    """Verify empty inline settings take precedence and nonobjects trigger validated fallback selection."""
     root, payload = _fixture(tmp_path)
     overlay = root / ".codex-plugin" / "plugin.json"
     overlay.parent.mkdir()
@@ -384,6 +405,7 @@ def test_openai_empty_inline_and_nonobject_fallback_selection(tmp_path: Path) ->
 
 
 def test_invalid_filename_rejects_and_recovers(tmp_path: Path) -> None:
+    """Reject a nonportable resource path and accept the plugin after removing it."""
     root, _ = _fixture(tmp_path)
     resource = root / "assets" / "invalid\\path"
     resource.write_bytes(b"synthetic")
@@ -398,6 +420,7 @@ def test_capture_limits_reject_and_recover(
     monkeypatch: pytest.MonkeyPatch,
     bound: str,
 ) -> None:
+    """Enforce each capture budget and accept the fixture when normal limits are restored."""
     root, _ = _fixture(tmp_path)
     monkeypatch.setattr(plugin_capture, bound, 1)
     assert validate_plugin_package(root, source_revision=REVISION).status == "blocked"
@@ -406,6 +429,7 @@ def test_capture_limits_reject_and_recover(
 
 
 def test_cli_policy_rejection_and_recovery(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Verify CLI metadata policy blockers, corrected-input success and absence of release authority."""
     root, payload = _fixture(tmp_path)
     command = ["validate-plugin", str(root), "--source-revision", REVISION, "--json", "--robot"]
     assert main(command) == 0
@@ -421,6 +445,7 @@ def test_cli_policy_rejection_and_recovery(tmp_path: Path, capsys: pytest.Captur
 
 
 def test_failed_capture_retains_valid_policy_without_coercing_forged_policy(tmp_path: Path) -> None:
+    """Retain valid policy on capture failure and reject copied policy with nonboolean values."""
     root, metadata = _fixture(tmp_path)
     policy = PluginValidationPolicy(require_version=True)
     (root / "plugin.json").write_text("{}", encoding="utf-8")
@@ -434,6 +459,7 @@ def test_failed_capture_retains_valid_policy_without_coercing_forged_policy(tmp_
 
 @pytest.mark.parametrize("flag", ["mutation_performed", "execution_authorized", "release_ready"])
 def test_authority_flags_cannot_coerce_zero(tmp_path: Path, flag: str) -> None:
+    """Reject integer zero in top-level and nested authority flags instead of coercing it to false."""
     root, _ = _fixture(tmp_path)
     value = _valid(root).model_dump(mode="json")
     value[flag] = 0

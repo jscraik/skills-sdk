@@ -32,6 +32,7 @@ from skills_sdk.validation.skill_package import (
 def _child(
     path: str, files: tuple[PluginCapturedFile, ...], payloads: dict[str, bytes], revision: str
 ) -> PluginSkillBinding:
+    """Validate one direct skill from captured bytes and bind its files to the supplied revision."""
     prefix, policy = path + "/", SkillValidationPolicy()
     captured = {name[len(prefix) :]: data for name, data in payloads.items() if name.startswith(prefix)}
     records = tuple(
@@ -60,6 +61,7 @@ def _child(
 
 
 def _component_findings(payloads: dict[str, bytes], directories: tuple[str, ...]) -> list[SkillPackageFinding]:
+    """Report invalid component kinds and warn that captured MCP bytes remain unassessed."""
     findings: list[SkillPackageFinding] = []
     if "skills" in payloads or "mcp.json" in directories:
         findings.append(_finding("plugin_component_kind_invalid", "portable component location has the wrong kind"))

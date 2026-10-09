@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 
 
 def _cli(root: Path, expected: str, evidence: Path | None = None) -> None:
+    """Run the installed plugin CLI and assert the expected status, exit code and absence of authority."""
     completed = subprocess.run(
         [
             sys.executable,
@@ -36,6 +37,7 @@ def _cli(root: Path, expected: str, evidence: Path | None = None) -> None:
 
 
 def _verify(root: Path, payload: dict[str, object]) -> None:
+    """Check installed evidence verification, role and digest forgery rejection, and recovery."""
     from skills_sdk.core.errors import ContractError
     from skills_sdk.core.schema_registry import SchemaRegistry
     from skills_sdk.validation import verify_plugin_package_validation

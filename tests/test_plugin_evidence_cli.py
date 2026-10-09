@@ -16,6 +16,7 @@ REVISION = "1" * 40
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path, str]:
+    """Create a plugin and save passing evidence outside its root, returning both paths and JSON."""
     root = tmp_path.resolve() / "plugin"
     root.mkdir()
     metadata = {
@@ -34,6 +35,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, str]:
 
 
 def _cli(root: Path, evidence: Path, capsys: pytest.CaptureFixture[str], expected: str) -> dict[str, object]:
+    """Invoke evidence verification and check its status, exit code, privacy and authority flags."""
     code = main(
         [
             "validate-plugin",
@@ -56,6 +58,7 @@ def _cli(root: Path, evidence: Path, capsys: pytest.CaptureFixture[str], expecte
 
 
 def test_cli_rejects_forged_digest_and_recovers(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Reject a forged settings digest through the CLI and accept restored evidence."""
     root, evidence, good = _fixture(tmp_path)
     _cli(root, evidence, capsys, "pass")
     forged = json.loads(good)
@@ -73,6 +76,7 @@ def test_cli_evidence_path_and_json_bounds(
     capsys: pytest.CaptureFixture[str],
     kind: str,
 ) -> None:
+    """Reject unsafe or invalid evidence inputs and accept a restored ordinary JSON file."""
     root, evidence, good = _fixture(tmp_path)
     if kind in {"missing", "symlink", "directory", "fifo"}:
         evidence.unlink()
