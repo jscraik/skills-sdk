@@ -543,6 +543,63 @@ Hidden evaluation, scorer, calibration and rubric documents are excluded from
 the generator context. Context paths and source bytes remain private inputs;
 portable receipts retain identities and digests instead of source text.
 
+### Explicit Codex profiles (unmerged candidate)
+
+`skills_sdk.providers.codex_profiles` exposes `CodexProfileSource`,
+`describe_codex_profile`, `compile_codex_profile`, `CodexProfileInvocation`,
+`CodexProfiledCompleteAdapter`, `CodexProfiledStreamingAdapter` and
+`CodexProfiledJudgeAdapter`. These are an outer, supplied-offline adapter seam;
+the portable core does not import Codex or discover host configuration.
+
+`CodexProfileSource` holds a logical name and explicit immutable bytes:
+`profile_bytes`, optional `provider_bytes`, `catalogue_bytes` and
+`defaults_bytes`. Use only `oss-local.config.toml` or `oss-cloud.config.toml` as
+the logical name. Unresolved dependencies or effective options block without
+ambient fallback. Source and invocation representations omit private byte and
+configuration bodies; callers must still keep those bodies out of public logs.
+
+Call `describe_codex_profile(source, model_revision=...)` before constructing
+the lane. The returned `ProviderIdentityV2` uses an explicit
+`provider/native-model` identity, preserving native model tags without loosening
+the frozen URI restriction. Adapter ID `codex-profile-offline-v1` and its digest
+bind the logical name, profile bytes, dependencies, supplied defaults and binding
+contract version. The model revision is a caller claim, not authenticated model
+version evidence. Changed inputs require rebinding the plan and its affected
+calibration and execution evidence.
+
+`compile_codex_profile(plan, source, role)` returns an immutable private driver
+invocation for `generator` or `judge`. Declared profile settings override selected
+catalogue defaults, which override explicit caller defaults. Every required
+option must resolve. Temperature and trial count come from the corresponding
+frozen lane role. Catalogue paths and disabled MCP launch commands are not
+forwarded; the selected model record is supplied directly and optional
+integrations remain disabled. This is the bounded SDK adapter contract, not a
+claim of complete Codex-version configuration compatibility.
+
+Supply a fresh driver for each adapter and trial. Driver `complete` and `stream`
+methods receive `(invocation, request, payload)`; driver `judge` receives
+`(invocation, inputs)`. Cleanup retains the existing lifecycle. Guards recompile
+and compare input bindings around callbacks and stream pulls, rejecting drift
+without accepting the returned output. The adapter passes compiled settings to
+the driver; separate proof is needed that a real external implementation applies
+them. These APIs do not authorise provider calls, spending or credential access.
+Closed option values and malformed provider ports reject at input admission.
+Advertised reasoning levels constrain the resolved effort when supplied;
+absent capability metadata leaves external effort support unverified.
+Permission-profile names remain symbolic driver inputs; resolving host policy
+and proving its application remain the driver's responsibility.
+
+Focused tests cover controlled driver delivery, role-specific parameters,
+streaming, rejection, recovery and public provider-call cleanup. Controlled local
+CLI tests retain fresh profile-bound calibration and ten-case execution in both
+modes. The calibration CLI rejects stale configuration, missing profile plans
+and mismatched judge settings, then accepts corrected inputs without exposing
+held-out labels to the judge. Controlled cloud CLI and installed-wheel local,
+calibration and cloud checks prove stale-profile rejection and corrected-input
+recovery. These are offline fixtures, not external model-quality evidence.
+The existing matched services still own source safety, budget, calibration,
+whole-plugin scope and local-to-cloud handoff admission.
+
 Admission requires selected-child safety plus complete
 `PluginPreExecutionSafetyEvidence`. `screen_plugin_security` applies bounded
 static signatures across captured files; `assess_plugin_pre_execution_safety`

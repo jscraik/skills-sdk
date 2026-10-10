@@ -28,6 +28,7 @@ from skills_sdk.models.observed_calibration import (
     ObservedCalibrationPlan,
     ObservedCalibrationReceipt,
 )
+from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.scorer_quality import ScorerJudgeParameters
 
 
@@ -55,8 +56,12 @@ class NumericJudge:
         self.events.append("numeric_judge_cleanup")
 
 
-def _batch(root: Path) -> tuple[ObservedCalibrationPlan, tuple[CalibrationProbeExecution, ...], list[str]]:
+def _batch(
+    root: Path, provider_identity: ProviderIdentityV2 | None = None
+) -> tuple[ObservedCalibrationPlan, tuple[CalibrationProbeExecution, ...], list[str]]:
     definition, payload, request, events = _setup(root)
+    if provider_identity is not None:
+        request = request.model_copy(update={"provider": provider_identity})
     texts = ("behavior preserved", "incorrect held-out output")
     scores = (0.9, 0.1)
     ids = ("held-out-positive", "held-out-negative")

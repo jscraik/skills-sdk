@@ -130,7 +130,7 @@ Fresh model execution remains a separate evidence lane. The matched integration 
 adds controlled callback composition without
 claiming live-model proof.
 
-The current, unmerged calibration lifetime repair adds `CalibrationTrialAdapters`
+The calibration lifetime repair accepted in PR #55 adds `CalibrationTrialAdapters`
 and the optional `CalibrationProbeExecution.trial_adapters` tuple. The existing
 one-trial call shape remains valid. Multi-trial callers must supply exactly
 `trial_count - 1` fresh pairs after the first pair. Reusing any provider or judge
@@ -145,6 +145,43 @@ cleanup already did. See the [lifecycle regressions](../tests/test_calibration_l
 and [installed proof](../tests/installed_observed_calibration_smoke.py).
 
 ## Matched evaluation integration candidate
+
+### Explicit profile adapter candidate
+
+The unmerged `skills_sdk.providers.codex_profiles` adapter accepts explicit
+bytes for the logical `oss-local.config.toml` and `oss-cloud.config.toml`
+profiles, their provider/catalogue dependencies and caller defaults. It leaves
+the frozen `ProviderIdentityV2`, matched plan and receipt schemas unchanged.
+Existing CLI inputs without `profiles` retain their shape. Profiled calibration
+additionally requires `profile_plan`; the calibration plan retains its own
+held-out labels, scorer and policy. Profile parsing never loads named paths,
+home settings, environment credentials or MCP commands.
+
+The existing adapter identity fields bind profile and dependency bytes before
+the experiment plan is frozen. Native model names are represented as
+`provider/native-model` in portable identity and remain unchanged in the private
+driver configuration. Changed bytes require a new plan and affected downstream
+evidence. Model revision remains caller-supplied provenance.
+
+Profile values override selected catalogue defaults, which override explicit
+caller defaults. Every supported setting must resolve. Approval policy,
+approval reviewer, reasoning summary and web-search mode use the adapter's
+closed supported values. Granular approval objects remain unsupported inputs.
+Reasoning effort stays an open string; when the selected catalogue supplies
+`supported_reasoning_levels`, it must contain unique `effort`/`description`
+records and the resolved effort must be advertised. Missing capability metadata
+does not verify external support. Permission-profile names are retained as
+symbols; this adapter does not resolve host permission definitions or apply them.
+Provider URLs require valid HTTP(S) endpoints and nonzero valid explicit ports.
+
+Complete, stream and judge adapters pass the compiled configuration to supplied
+drivers and retain drift checks and existing cleanup. Controlled public API and
+installed CLI tests prove rejection and corrected-input recovery, fresh trial
+ownership and local-to-cloud baseline binding. A real driver's application of
+settings, external model quality and runtime policy need separate proof. These
+APIs grant no provider, spending or publication authority.
+
+### Accepted matched contracts
 
 The additive S4 matched families were accepted in PR #53. Acceptance does not
 establish full Agent-Skills parity or a published SDK release. They preserve existing

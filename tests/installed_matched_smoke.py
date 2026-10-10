@@ -52,6 +52,120 @@ def prepare(root: Path) -> None:
     }
     for name, payload in (("local", local), ("calibration", numeric), ("cloud", cloud)):
         (root / f"{name}.json").write_text(json.dumps(payload), encoding="utf-8")
+    _prepare_profiles(root)
+
+
+def _prepare_profiles(root: Path) -> None:
+    """Bind new observations to explicit profiles, never rewrite prior receipts."""
+    from test_codex_profile_binding import _profile_plan
+    from test_codex_profile_invocation import _CONFIGURED
+    from test_matched_calibration import _dimensions
+    from test_matched_execution import _matched
+    from test_matched_offline_cli import _pairs, _variant
+    from test_matched_profile_cli_inputs import _profiles
+
+    from skills_sdk.providers.codex_profiles import describe_codex_profile
+
+    for name in ("profile-local", "profile-calibration"):
+        (root / name).mkdir()
+    identity = describe_codex_profile(_CONFIGURED, model_revision="fixture-v1")
+    plan, calibrations, batch, _ = _matched(root / "profile-local", provider_identity=identity)
+    local = {
+        "plan": plan.model_dump(mode="json"),
+        "calibrations": [item.model_dump(mode="json") for item in calibrations],
+        "executions": _pairs(batch, plan.rubric),
+        "profiles": _profiles(plan),
+    }
+    profile_plan = _profile_plan(_CONFIGURED)
+    calibration, probes, _ = _dimensions(
+        root / "profile-calibration", trials=2, provider_identity=profile_plan.lanes[0].judge
+    )
+    numeric = {
+        "plan": calibration.model_dump(mode="json"),
+        "rubric": profile_plan.rubric.model_dump(mode="json"),
+        "executions": [_variant(item, profile_plan.rubric) for item in probes],
+        "profile_plan": profile_plan.model_dump(mode="json"),
+        "profiles": _profiles(profile_plan),
+    }
+    for name, payload in (("profile-local", local), ("profile-calibration", numeric)):
+        (root / f"{name}.json").write_text(json.dumps(payload), encoding="utf-8")
+    _prepare_profile_cloud(root, local)
+
+
+def _prepare_profile_cloud(root: Path, local: dict[str, object]) -> None:
+    """Generate cloud evidence with the selected local candidate as its baseline."""
+    from test_codex_profile_input import _CLOUD
+    from test_matched_execution import _matched
+    from test_matched_offline_cli import _pairs
+    from test_matched_profile_cli_inputs import _profiles
+
+    from skills_sdk.cli.matched_offline import _batch
+    from skills_sdk.cli.matched_profiles import _profile_batch
+    from skills_sdk.providers.codex_profiles import CodexProfileSource, describe_codex_profile
+
+    local_receipt = asyncio.run(
+        evaluation.execute_matched_lane(
+            local["plan"],
+            "local",
+            tuple(local["calibrations"]),
+            _profile_batch(_batch(local["executions"]), local["plan"], local["profiles"]),
+        )
+    )
+    source = CodexProfileSource(
+        "oss-cloud.config.toml",
+        _CLOUD,
+        defaults_bytes=b"""
+approval_policy = "never"
+approvals_reviewer = "user"
+default_permissions = "read-only"
+model_reasoning_summary = "none"
+model_reasoning_effort = "low"
+web_search = "disabled"
+hide_agent_reasoning = true
+""",
+    )
+    (root / "profile-cloud").mkdir()
+    plan, calibrations, batch, _ = _matched(
+        root / "profile-cloud",
+        variants=(4.5, 5.0, "cloud"),
+        provider_identity=describe_codex_profile(source, model_revision="fixture-v1"),
+    )
+    handoff = evaluation.prepare_matched_cloud_handoff(local_receipt, plan)
+    assert handoff.status == "ready"
+    payload = {
+        "handoff": handoff.model_dump(mode="json"),
+        "calibrations": [item.model_dump(mode="json") for item in calibrations],
+        "executions": _pairs(batch, plan.rubric),
+        "profiles": _profiles(plan, source),
+    }
+    (root / "profile-cloud.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _check_profiles(root: Path) -> None:
+    """Use the wheel's executable for stale-input rejection and recovery."""
+    for name, command, schema in (
+        ("profile-local", "matched-local", "matched-execution.v1"),
+        ("profile-calibration", "matched-calibration", "matched-calibration.v1"),
+        ("profile-cloud", "matched-cloud", "matched-cloud-execution.v1"),
+    ):
+        payload = json.loads((root / f"{name}.json").read_text())
+        stale = json.loads(json.dumps(payload))
+        stale["profiles"]["judge"]["profile_toml"] += "\n"
+        rejected = _cli(root, command, stale, schema, 2)
+        assert rejected["status"] == "blocked"
+        accepted = _cli(root, command, payload, schema)
+        execution = accepted.get("execution") or accepted
+        assert execution["external_authenticity_verified"] is False
+        if command == "matched-local":
+            assert accepted["plan"] == payload["plan"]
+            assert accepted["provider_invocation_count"] == 40
+            assert len(accepted["plan"]["case_bindings"]) == 10
+        if command == "matched-cloud":
+            assert (
+                execution["plan"]["plugin_scope"]["baseline"]
+                == payload["handoff"]["cloud_plan"]["plugin_scope"]["baseline"]
+            )
+            assert execution["lane"] == "cloud" and execution["provider_invocation_count"] == 40
 
 
 @dataclass
@@ -470,6 +584,7 @@ def check(root: Path) -> None:
     local = json.loads((root / "local.json").read_text())
     numeric = json.loads((root / "calibration.json").read_text())
     cloud = json.loads((root / "cloud.json").read_text())
+    _check_profiles(root)
     _ingress(local)
     _api(local)
     _encoding_boundary(local)
