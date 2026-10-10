@@ -16,17 +16,20 @@ from skills_sdk.models.observed_calibration import ObservedCalibrationPlan
 
 
 def _close_after_use(adapter: object, method: str, events: list[str]) -> None:
+    """Wrap an adapter to reject invocation after cleanup and duplicate cleanup."""
     original = getattr(adapter, method)
     cleanup = adapter.cleanup
     closed = False
 
     async def invoke(*args: object) -> object:
+        """Record and delegate an invocation only while the capability is open."""
         if closed:
             raise ValueError("capability was already closed")
         events.append(method)
         return await original(*args)
 
     async def close() -> None:
+        """Mark the capability closed once before delegating its cleanup."""
         nonlocal closed
         assert not closed
         closed = True
@@ -38,6 +41,7 @@ def _close_after_use(adapter: object, method: str, events: list[str]) -> None:
 
 
 def _numeric(root: Path) -> tuple[object, tuple[object, ...]]:
+    """Build a two-trial numeric plan with distinct adapters for each trial."""
     plan, batch, _ = _batch(root)
     raw = plan.model_dump(mode="json")
     raw["parameters"]["trial_count"] = 2
@@ -47,6 +51,7 @@ def _numeric(root: Path) -> tuple[object, tuple[object, ...]]:
 
 @pytest.mark.parametrize("dimensional", [False, True])
 def test_fresh_stateful_trials_close_once(tmp_path: Path, dimensional: bool) -> None:
+    """Verify each fresh numeric or dimensional capability runs and closes once."""
     if dimensional:
         plan, batch, _ = _dimensions(tmp_path, trials=2)
     else:
@@ -86,6 +91,7 @@ def test_fresh_stateful_trials_close_once(tmp_path: Path, dimensional: bool) -> 
 def test_bad_schedule_rejects_without_capability_access_and_recovers(
     tmp_path: Path, dimensional: bool, problem: str
 ) -> None:
+    """Reject malformed or aliased schedules before access, then accept corrected input."""
     if dimensional:
         plan, batch, events = _dimensions(tmp_path, trials=2)
     else:
@@ -93,7 +99,10 @@ def test_bad_schedule_rejects_without_capability_access_and_recovers(
         events = batch[0].judge.events
 
     class Unreadable:
+        """Fail on any capability access to detect premature metadata inspection."""
+
         def __getattribute__(self, name: str) -> object:
+            """Raise whenever schedule admission attempts to read a capability attribute."""
             raise AssertionError(f"unexpected capability access: {name}")
 
     first, last = batch[0], batch[-1]
@@ -133,6 +142,7 @@ def test_bad_schedule_rejects_without_capability_access_and_recovers(
 @pytest.mark.parametrize("dimensional", [False, True])
 @pytest.mark.parametrize("failure", ["settings", "identity", "cancel", "cleanup"])
 def test_later_trial_failure_retains_prefix_and_recovers(tmp_path: Path, dimensional: bool, failure: str) -> None:
+    """Retain completed trials and actual call counts after failure, then recover."""
     if dimensional:
         plan, batch, _ = _dimensions(tmp_path, trials=2)
     else:
@@ -141,9 +151,11 @@ def test_later_trial_failure_retains_prefix_and_recovers(tmp_path: Path, dimensi
     original = (judge.identity, judge.parameters, judge.judge, judge.cleanup)
 
     async def cancel(inputs: object) -> object:
+        """Simulate cancellation during a later judge invocation."""
         raise asyncio.CancelledError()
 
     async def malformed_cleanup() -> object:
+        """Return an invalid cleanup result to exercise incomplete-execution handling."""
         return False
 
     if failure == "settings":

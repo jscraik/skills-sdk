@@ -51,6 +51,7 @@ class DimensionJudge:
 
 
 def _dimensions(root: Path, count: int = 6, trials: int = 1) -> tuple[object, tuple[object, ...], list[str]]:
+    """Build dimensional probes with alternating labels and fresh adapters per trial."""
     plan, batch, events = _batch(root)
     raw = plan.model_dump(mode="json")
     ids = [f"held-out-{index}" for index in range(count)]

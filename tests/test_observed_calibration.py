@@ -109,7 +109,10 @@ def test_numeric_calibration_rejects_non_none_cleanup_and_recovers(tmp_path: Pat
     plan, executions, events = _batch(tmp_path)
 
     class InvalidCleanupJudge(NumericJudge):
+        """Expose a numeric judge whose cleanup violates the adapter contract."""
+
         async def cleanup(self) -> object:
+            """Record cleanup and return a non-None result to trigger rejection."""
             self.events.append("invalid_cleanup")
             return False
 
@@ -185,6 +188,7 @@ def test_false_positive_blocks_after_actual_execution_then_recovers(tmp_path: Pa
 def _repeat_trials(
     plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]
 ) -> tuple[CalibrationProbeExecution, ...]:
+    """Align fixture judge settings and allocate distinct adapters for later trials."""
     frames = []
     for item in executions:
         item.judge.parameters = plan.parameters
@@ -200,6 +204,7 @@ def _repeat_trials(
 
 
 def test_declared_trials_execute_each_probe_and_retain_order(tmp_path: Path) -> None:
+    """Verify every declared probe trial executes and preserves probe-major ordering."""
     plan, executions, events = _batch(tmp_path)
     payload = plan.model_dump(mode="json")
     payload["parameters"]["trial_count"] = 2
@@ -369,6 +374,7 @@ class LastTrialFailureJudge(NumericJudge):
 
 
 def test_final_trial_failure_retains_complete_invocation_count(tmp_path: Path) -> None:
+    """Count the failing final invocation, retain earlier results and accept recovery."""
     plan, executions, events = _batch(tmp_path)
     raw = plan.model_dump(mode="json")
     raw["parameters"]["trial_count"] = 2

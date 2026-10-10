@@ -209,6 +209,7 @@ def _batch(raw: object) -> tuple[object, ...]:
 
 
 async def _execute(command: str, raw: object) -> object:
+    """Validate supplied fixtures and dispatch the requested matched evaluation."""
     from dataclasses import replace
 
     from skills_sdk.evaluation import (

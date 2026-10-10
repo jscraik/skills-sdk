@@ -60,6 +60,7 @@ class FixtureJudge:
     """Observe callback invocation without importing repository test helpers."""
 
     def __init__(self, data: dict[str, object], events: list[str]) -> None:
+        """Parse the numeric fixture and initialize callback and lifecycle tracking."""
         self.identity = ProviderIdentityV2.model_validate(data["identity"])
         self.parameters = ScorerJudgeParameters.model_validate(data["parameters"])
         self.verdict = CalibrationJudgeVerdict.model_validate(data["verdict"])
@@ -86,16 +87,19 @@ class ClosingProvider:
     """Fail if a closed installed provider capability is invoked twice."""
 
     def __init__(self, delegate: SuppliedTextProviderAdapter, events: list[str]) -> None:
+        """Wrap a supplied provider with shared events and an initially open state."""
         self.delegate, self.events = delegate, events
         self.descriptor = delegate.descriptor
         self.closed = False
 
     async def complete(self, request: object, payload: object) -> object:
+        """Reject calls after cleanup and record each delegated completion."""
         assert not self.closed
         self.events.append("provider")
         return await self.delegate.complete(request, payload)
 
     async def cleanup(self) -> None:
+        """Close the provider once, record the event and clean up its delegate."""
         assert not self.closed
         self.closed = True
         self.events.append("provider_closed")
@@ -106,23 +110,27 @@ class DimensionalFixtureJudge:
     """Single-use dimensional capability for installed held-out proof."""
 
     def __init__(self, raw: dict[str, object], events: list[str]) -> None:
+        """Parse a dimensional fixture and initialize its single-use lifecycle."""
         self.identity = ProviderIdentityV2.model_validate(raw["identity"])
         self.parameters = ScorerJudgeParameters.model_validate(raw["parameters"])
         self.judgment = MatchedVariantJudgment.model_validate(raw["judgment"])
         self.events, self.closed = events, False
 
     async def judge(self, inputs: object) -> object:
+        """Return the fixture judgment only while open and without held-out labels."""
         assert not self.closed and "expected_label" not in inputs.__dataclass_fields__
         self.events.append("judge")
         return self.judgment
 
     async def cleanup(self) -> None:
+        """Close the judge once and record its cleanup event."""
         assert not self.closed
         self.closed = True
         self.events.append("judge_closed")
 
 
 def _dimensional(root: Path) -> None:
+    """Verify installed dimensional trials reject missing pairs and accept fresh ones."""
     data = json.loads((root / "dimensional.json").read_text())
     plan = ObservedCalibrationPlan.model_validate(data["plan"])
     rubric = MatchedComparisonRubric.model_validate(data["rubric"])

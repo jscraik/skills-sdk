@@ -179,6 +179,7 @@ def test_offline_local_cli_whole_batch_rejection_and_recovery(
 def test_offline_dimensional_calibration_cli(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str, trials: int
 ) -> None:
+    """Verify offline dimensional CLI rejection and recovery with the declared trial count."""
     plan, batch, _ = _dimensions(tmp_path, trials=trials)
     rubric = _plan().rubric
     source = tmp_path / "calibration.json"

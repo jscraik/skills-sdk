@@ -54,6 +54,7 @@ class CalibrationProbeExecution:
 
 
 def _trial_schedule(item: CalibrationProbeExecution) -> tuple[CalibrationTrialAdapters, ...]:
+    """Return the initial adapter pair followed by the explicit later-trial pairs."""
     return (CalibrationTrialAdapters(item.provider, item.judge), *item.trial_adapters)
 
 
@@ -80,6 +81,8 @@ def _capability_schedule_problem(
 
 
 class _CalibrationJudge:
+    """Bind one judge invocation to held-out probe evidence and trial settings."""
+
     def __init__(
         self,
         delegate: SelectedCaseJudgeAdapter,
