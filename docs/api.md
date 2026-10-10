@@ -6,8 +6,9 @@ The additive `validate_plugin_package` service in `skills_sdk.validation` captur
 a root-manifest plugin without executing it or changing its source. Supply a
 `Path`, a forty-character source revision and optional `PluginValidationPolicy`
 from `skills_sdk.models`. The policy can require nonempty version and description
-metadata; neither is a mandatory base-format field. This candidate implementation
-is tracked separately from accepted main in the [task record](projects/sdk-workflow/tasks.md).
+metadata; neither is a mandatory base-format field. This inspection capability
+was accepted in PR #52 and is recorded in the
+[task record](projects/sdk-workflow/tasks.md).
 
 The `plugin-package-validation/v1` result retains a `PortablePluginManifest`
 projection, all captured file hashes/sizes/ordinary permissions, a separate mode
@@ -474,8 +475,8 @@ or completed reviewer execution.
 
 ## Matched whole-plugin evaluation candidate
 
-This S4 implementation is unmerged integration work, not accepted-main
-functionality or complete workflow parity. It adds the public evaluation APIs
+Accepted in PR #53, this bounded S4 implementation does not establish complete
+workflow parity or live-provider quality. It provides the public evaluation APIs
 `assess_matched_pair`, `execute_matched_calibration`, `execute_matched_lane`,
 `prepare_matched_cloud_handoff`, `execute_matched_cloud`,
 `execute_matched_regression` and `execute_matched_cloud_regression`.

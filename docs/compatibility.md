@@ -126,14 +126,14 @@ offline verdicts; it does not discover executables, read credentials, spend
 provider credits, or authenticate scores and labels. Controlled installed API/CLI
 tests prove acceptance, preflight rejection and corrected-input recovery without
 Agent-Skills or Foundry imports. They do not prove a real model's calibration.
-Fresh model execution remains a separate evidence lane. The unmerged matched
-integration candidate below adds controlled callback composition without
+Fresh model execution remains a separate evidence lane. The matched integration accepted in PR #53
+adds controlled callback composition without
 claiming live-model proof.
 
 ## Matched evaluation integration candidate
 
-The S4 matched families are additive unmerged integration work, not accepted
-main contracts or proof of full Agent-Skills parity. They preserve existing
+The additive S4 matched families were accepted in PR #53. Acceptance does not
+establish full Agent-Skills parity or a published SDK release. They preserve existing
 `observed-calibration-plan/v1`, `observed-calibration/v1` and read-only
 `scorer-calibration/v1` semantics. Supplied artifact checks cannot become
 executed calibration merely by declaring completed probes.
@@ -172,14 +172,13 @@ trial. `MatchedVariantExecution.additional_trials` supplies each later pair as
 `MatchedTrialAdapters`; missing, extra or reused instances block admission
 before host property access. Existing per-call cleanup and cancellation stay
 unchanged; uninvoked capabilities remain caller-owned. These private host
-capabilities are not portable receipt fields. Draft receipts produced before
-the request-binding repair must be regenerated; the matched family did not
-exist on the accepted base and is not a frozen released format yet.
-The unmerged lane specification now requires explicit `generator_mode`:
+capabilities are not portable receipt fields. Historical pre-merge draft receipts produced before the request-binding repair
+must be regenerated; they predate acceptance of this family in PR #53.
+The accepted lane specification requires explicit `generator_mode`:
 `complete` or `stream`. Both variants and all trials must use that mode. It is
 part of plan and trial commitments, so prior draft plans lacking the field and
-receipts derived from them must be regenerated; this is not a reinterpretation
-of an accepted-main family. Completed receipts already enforce exact provider
+receipts derived from them must be regenerated; those drafts predate the accepted contract. Future changes must follow the
+normal versioning rules for accepted families. Completed receipts already enforce exact provider
 and judge counts through their declared coverage ceiling and full pair count.
 The unfinished-pair allowance applies only to blocked prefixes.
 
@@ -579,7 +578,7 @@ stale, mismatched or unreadable inputs block. Raw settings remain private and
 verification grants no execution, permission or release authority. The CLI reads
 regular no-follow JSON up to 16 MiB and rejects duplicate members and malformed
 input; default inspection behaviour remains unchanged. That accepted structural
-verification does not establish the separate unmerged S4 execution route.
+verification does not establish the separate S4 execution route accepted in PR #53.
 Blocked outputs preserve validated caller policy across evidence and revision
 failures; malformed caller policy remains a typed input blocker before capture.
 Blocked children also retain path-bound candidate IDs, including the unchanged
