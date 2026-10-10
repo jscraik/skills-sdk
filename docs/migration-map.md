@@ -14,10 +14,15 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd),
+Accepted SDK baseline: [`ec8f0dae`](https://github.com/jscraik/skills-sdk/commit/ec8f0dae3b370cf9f9c8a85ce91f70e4846481f1),
 verified on 2026-10-10 and shared with the workflow and task record. Entries below
 describe that revision, not queued branches. Each row names its entrypoint or
 absence, a proof or boundary reference, its limitation, and the remaining action.
+
+PR #54 reconciled the descriptions without adding executable capabilities.
+The current calibration lifetime candidate adds fresh per-trial adapters and
+[lifecycle proof](../tests/test_calibration_lifetime.py), but is unmerged; the
+`evals` row retains its accepted-main limitation until delivery completes.
 
 Accepted PR #52 affects `package_identity`, `skill_intake`
 and `sdk_plugin_lifecycle`: `validate_plugin_package` / `validate-plugin` add

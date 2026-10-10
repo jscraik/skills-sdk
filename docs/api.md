@@ -275,6 +275,12 @@ or completed reviewer execution.
   capabilities. It composes the existing guarded selected-case executor rather
   than importing a provider transport or accepting completed probe claims.
   Every probe runs for the declared trial count, bounded to 128 invocations.
+  The first trial uses `provider` and `judge`; subsequent trials require an
+  explicit `trial_adapters` tuple of `CalibrationTrialAdapters(provider, judge)`.
+  All provider and judge objects must be distinct across the entire batch,
+  including across roles. Missing, malformed or aliased schedules block before
+  adapter metadata access. The SDK does not clone or reopen host capabilities.
+  This working-branch lifetime repair is not yet part of the accepted baseline.
   Judges return `CalibrationJudgeVerdict` with bound assertion evidence and an
   actual callback-returned numeric score. The harness retains held-out labels;
   delegates receive only ordinary `SelectedCaseJudgeInput`. Identity/settings

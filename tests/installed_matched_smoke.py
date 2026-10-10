@@ -38,7 +38,7 @@ def prepare(root: Path) -> None:
         "calibrations": [item.model_dump(mode="json") for item in calibrations],
         "executions": _pairs(batch, plan.rubric),
     }
-    calibration, probes, _ = _dimensions(root / "calibration")
+    calibration, probes, _ = _dimensions(root / "calibration", trials=2)
     numeric = {
         "plan": calibration.model_dump(mode="json"),
         "rubric": _plan().rubric.model_dump(mode="json"),
@@ -431,6 +431,8 @@ def _cli_workflow(root: Path, local: dict[str, object], numeric: object, cloud: 
     for payload, code in ((numeric, 0), (dict(numeric, extra=True), 2), (numeric, 0)):
         result = _cli(root, "matched-calibration", payload, "matched-calibration.v1", code)
         assert result["status"] == ("pass" if code == 0 else "blocked")
+        if code == 0:
+            assert result["calibration"]["judge_invocation_count"] == 12
     for command, schema, payload in (
         ("matched-local", "matched-regression.v1", local),
         ("matched-cloud", "matched-cloud-regression.v1", cloud),

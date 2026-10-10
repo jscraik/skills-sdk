@@ -5,6 +5,7 @@ from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
 
 __all__ = [
     "CalibrationProbeExecution",
+    "CalibrationTrialAdapters",
     "ContentReviewDocument",
     "ContentReviewInput",
     "DimensionalJudgeAdapter",
@@ -95,7 +96,7 @@ def __getattr__(name: str) -> object:
         from skills_sdk.evaluation.skill_context import prepare_selected_case_context
 
         return prepare_selected_case_context
-    if name in {"CalibrationProbeExecution", "execute_scorer_calibration"}:
+    if name in {"CalibrationProbeExecution", "CalibrationTrialAdapters", "execute_scorer_calibration"}:
         from skills_sdk.evaluation import observed_calibration
 
         return getattr(observed_calibration, name)

@@ -208,6 +208,10 @@ candidate-bound lanes:
   proves external authenticity or authorises promotion. See the maintained
   [installed calibration proof](../tests/installed_observed_calibration_smoke.py)
   for a complete synthetic input and accepted/rejected/recovery example.
+  In the unmerged lifetime repair, repeated trials allocate fresh controlled
+  provider/judge instances after plan validation. No extra JSON fields are
+  required; this does not clone live adapters or turn fixture scores into
+  external model evidence.
 - `eval selected-case` loads one declared case for the requested mode, runs a
   caller-supplied bounded text adapter, validates separately supplied semantic
   assertion evidence against the candidate, case, provider, and output digest,
@@ -301,6 +305,8 @@ contract and does not gain a matched-lane mode field.
   a qualified local candidate to the cloud baseline without authorising spend.
 - `matched-calibration` requires exactly `plan`, `rubric` and `executions`;
   the ordered probe callbacks return supplied dimensional judgments.
+  The unmerged lifetime repair allocates a fresh controlled pair for each
+  declared trial, with unchanged JSON input shape and receipt schemas.
 - `matched-local` requires exactly `plan`, `calibrations` and `executions`.
   `calibrations` contains both child-target bundles; `executions` contains
   exactly ten baseline/candidate pairs with explicit private plugin context

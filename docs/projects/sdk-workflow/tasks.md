@@ -96,8 +96,13 @@ validation, current PR checks/reviews, or live provider and runtime evidence.
 
 ## Proof lanes and resume point
 
-Current slice: bounded instruction-alignment documentation reconciliation from
-accepted `ed378971`. PR #53 merged on 2026-10-10. Its signed source head
+Current slice: stateful calibration capability-lifetime repair from accepted
+`ec8f0dae`, the PR #54 merge on 2026-10-10. PR #54's documentation reconciliation
+is accepted; the fresh per-trial adapter schedule, lifecycle tests and offline
+CLI changes are local, unmerged work. Installed proof, final aggregate,
+independent review and signed delivery remain required.
+
+Historical PR #53 evidence: it merged on 2026-10-10. Its signed source head
 `20eac04739ebe2706e204372b7514fe494589b14` and the squash merge have identical
 trees. That source candidate passed the canonical repository wrapper with
 3,353 tests and one skipped, plus schemas, code style, build, installed API/CLI
@@ -110,10 +115,9 @@ candidate and portable-export work parked; S4 review-export authority does not
 cover presentation. This is the single current resume point; dated assessments
 below are history.
 
-After that reconciliation, the next dependency-ready implementation is the
-stateful calibration capability-lifetime repair described below, with focused
-and installed accepted/rejected/recovery proof, before claiming stateful
-end-to-end calibration. Then integrate named profiles using the settled
+Complete this calibration repair with focused and installed
+accepted/rejected/recovery proof before claiming stateful end-to-end
+calibration. Then integrate named profiles using the settled
 capability contract; profile parsing and binding alone do not require live
 calibration execution. Applicable security evidence and the final
 scan adapter remain bounded separate work, with live operations requiring
@@ -355,7 +359,7 @@ Documenting these commands does not claim a new test run.
   separate calibration probes/repeats remain the intended scope. Intermediate
   counts without retained exact commands are omitted rather than promoted into
   reproducible validation evidence.
-- Remaining calibration ownership assessment: the accepted
+- Historical calibration ownership assessment, 2026-10-09: the accepted
   `execute_scorer_calibration` trial expansion reuses each probe's supplied
   capabilities; matched calibration composes that route. The new matched-lane
   capability schedule does not change this accepted contract. Before claiming
@@ -366,8 +370,9 @@ Documenting these commands does not claim a new test run.
   `calibration_execution_incomplete` after the first trial in both numeric and
   dimensional calibration. The one-trial neighbours pass. This diagnostic is
   not an installed-entrypoint repair, live-provider proof or six-probe scorer
-  qualification. Preserve it as an open lifecycle issue, not a failed S4
-  matched-lane repair.
+  qualification. The current unmerged repair supplies explicit fresh pairs
+  and rejects aliasing before wrapping; this issue stays open until its
+  installed proof, aggregate and delivery gates pass.
 - Presentation is a separate signed, locally validated candidate `0c6eea3`:
   2,949 tests passed, one skipped, plus installed base and optional-image checks.
   It remains unpushed while permission to export its complete diff to the

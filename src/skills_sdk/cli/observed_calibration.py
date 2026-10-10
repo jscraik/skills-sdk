@@ -6,7 +6,7 @@ import argparse
 import asyncio
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -96,7 +96,8 @@ def _execution(arguments: argparse.Namespace, raw: object) -> CalibrationProbeEx
 def run(arguments: argparse.Namespace, read_input: Callable[[Path], bytes], pairs: Callable[..., object]) -> int:
     """Read bounded no-follow JSON and invoke only controlled supplied adapters."""
     from skills_sdk.core.errors import ContractError
-    from skills_sdk.evaluation.observed_calibration import execute_scorer_calibration
+    from skills_sdk.evaluation.observed_calibration import CalibrationTrialAdapters, execute_scorer_calibration
+    from skills_sdk.models.observed_calibration import ObservedCalibrationPlan
 
     try:
         data = _object(
@@ -105,8 +106,19 @@ def run(arguments: argparse.Namespace, read_input: Callable[[Path], bytes], pair
         )
         if not isinstance(data["executions"], list) or not 2 <= len(data["executions"]) <= 64:
             raise ValueError("invalid calibration batch")
+        plan = ObservedCalibrationPlan.model_validate(data["plan"])
         executions = tuple(_execution(arguments, item) for item in data["executions"])
-        receipt = asyncio.run(execute_scorer_calibration(data["plan"], executions))
+        executions = tuple(
+            replace(
+                item,
+                trial_adapters=tuple(
+                    CalibrationTrialAdapters(replace(item.provider), replace(item.judge))
+                    for _ in range(plan.parameters.trial_count - 1)
+                ),
+            )
+            for item in executions
+        )
+        receipt = asyncio.run(execute_scorer_calibration(plan, executions))
     except (ContractError, OSError, RecursionError, TypeError, ValueError):
         receipt = asyncio.run(execute_scorer_calibration(None, ()))
     _emit(receipt, arguments.json_output)
