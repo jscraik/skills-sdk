@@ -217,6 +217,21 @@ async def execute_selected_case_with_judge(
 ) -> EvaluationReceiptV2:
     """Execute one provider call, then judge its actual output before scoring."""
 
+    return await _execute_selected_case_with_judge(
+        definition, request, input_payload, adapter, judge, _request_matches_definition
+    )
+
+
+async def _execute_selected_case_with_judge(
+    definition: SelectedCaseDefinition,
+    request: ProviderExecutionRequest,
+    input_payload: JsonValue | SelectedCaseExecutionInput,
+    adapter: TextProviderAdapter | None,
+    judge: SelectedCaseJudgeAdapter | None,
+    matches_request: Callable[[SelectedCaseDefinition, ProviderExecutionRequest, JsonValue], bool],
+) -> EvaluationReceiptV2:
+    """Share the bounded lifecycle with an explicitly selected private binding check."""
+
     safety_evidence = None
     if isinstance(input_payload, SelectedCaseExecutionInput):
         safety_evidence = input_payload.safety_evidence
@@ -249,7 +264,7 @@ async def execute_selected_case_with_judge(
     if not all(_public_text_is_redaction_safe(value) for value in provider_fields):
         raise ContractError("invalid_provider_request", "provider identity contains private values")
     payload = _canonical_input_payload(input_payload)
-    if not _request_matches_definition(definition, request, payload):
+    if not matches_request(definition, request, payload):
         return _blocked(definition, request, "selected_case_request_mismatch")
     if request.status != "prepared":
         blocker = request.blocker

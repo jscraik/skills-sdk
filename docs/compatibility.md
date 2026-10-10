@@ -126,7 +126,94 @@ offline verdicts; it does not discover executables, read credentials, spend
 provider credits, or authenticate scores and labels. Controlled installed API/CLI
 tests prove acceptance, preflight rejection and corrected-input recovery without
 Agent-Skills or Foundry imports. They do not prove a real model's calibration.
-Fresh model execution and matched local/cloud comparison remain separate work.
+Fresh model execution remains a separate evidence lane. The unmerged matched
+integration candidate below adds controlled callback composition without
+claiming live-model proof.
+
+## Matched evaluation integration candidate
+
+The S4 matched families are additive unmerged integration work, not accepted
+main contracts or proof of full Agent-Skills parity. They preserve existing
+`observed-calibration-plan/v1`, `observed-calibration/v1` and read-only
+`scorer-calibration/v1` semantics. Supplied artifact checks cannot become
+executed calibration merely by declaring completed probes.
+
+The current strict plan requires two complete passing plugin captures and mode
+digests with distinct complete candidate identities, one through nine matching child paths, exactly ten ordered active
+cases, per-child driver coverage and multi-child cross-skill coverage. Scenarios
+are child-bound singleton `ScenarioSetV2` values with `release=False`; full
+coverage uses the existing claims/mappings with no open gaps. Captured file
+identity and modes, case scope, assertions and scorer contracts remain separate
+but joined evidence. Complete child/assertion calibration bundles require at
+least six observed held-out probes per target. These probes and trial repeats
+do not create extra active cases.
+Matched reference eligibility is checked consistently at plan admission and
+runtime context preparation: hidden evaluation inputs, non-Markdown files and
+duplicates of automatically selected child `SKILL.md` entrypoints reject.
+Ordinary captured Markdown reference paths remain supported. Portable captures
+retain metadata, not source bytes or encoding proof. UTF-8 readability is
+checked during fresh source-backed context preparation before provider or
+judge access; invalid selected bytes return a typed blocker. Unselected binary
+resources need not decode as text. Path rules supplement JSON Schema through
+the registered models; schema acceptance alone is not execution clearance.
+
+Private execution context requires fresh source binding, selected-child safety
+and complete supplied plugin safety evidence with applicable checks and static
+screening. This does not authenticate review or prove runtime safety. Explicit
+callback and elapsed budgets retain first-stop observations; elapsed checks
+cannot interrupt a running callback. Requested cost budgets produce a
+zero-callback blocker rather than a claimed spend cap. Descriptive selection
+requires sufficient trials, confidence, stability and directional evidence;
+`unchanged` and `inconclusive` are not promotion signals. Summary is a derived
+API property, not an additional serialised receipt field.
+
+Matched lane capabilities use a distinct provider and judge instance for every
+trial. `MatchedVariantExecution.additional_trials` supplies each later pair as
+`MatchedTrialAdapters`; missing, extra or reused instances block admission
+before host property access. Existing per-call cleanup and cancellation stay
+unchanged; uninvoked capabilities remain caller-owned. These private host
+capabilities are not portable receipt fields. Draft receipts produced before
+the request-binding repair must be regenerated; the matched family did not
+exist on the accepted base and is not a frozen released format yet.
+The unmerged lane specification now requires explicit `generator_mode`:
+`complete` or `stream`. Both variants and all trials must use that mode. It is
+part of plan and trial commitments, so prior draft plans lacking the field and
+receipts derived from them must be regenerated; this is not a reinterpretation
+of an accepted-main family. Completed receipts already enforce exact provider
+and judge counts through their declared coverage ceiling and full pair count.
+The unfinished-pair allowance applies only to blocked prefixes.
+
+Cloud handoff preserves the qualifying local plugin as baseline and freezes
+scope, coverage and scoring objectives. Regression closure requires owned
+failures, a complete controlled ten-case rerun and unchanged fixture source.
+The full rerun uses one absolute candidate root; distinct source copies reject
+before host callbacks even when their initial captures match. This private
+host-input restriction adds no filesystem paths to portable receipts. Identical
+baseline and candidate identities reject at plan validation; sharing only a
+package identifier, revision or content digest is not itself a rejection.
+Baseline calibration commitments cannot change during regression recovery,
+even if both bundles pass. Corrected-candidate calibration can change while the
+baseline controls remain frozen. Retained regression receipts enforce the same
+rule; old draft receipts that violated it must be regenerated.
+The supplied-offline CLI observes callbacks without external authenticity,
+live-quality, spending, publication or promotion proof. Matched offline
+fixtures support descriptor-selected complete and pull-stream protocols across
+calibration, local, cloud and both regression routes. This does not widen the
+existing public `SuppliedTextProviderAdapter` complete-only contract. See
+[API families](api.md#matched-whole-plugin-evaluation-candidate) and
+[CLI commands](cli.md#matched-evaluation-candidate). The retained historical
+validation command for PR #53 candidate
+`ca1db74570a945f4843013d61d47b2e2eea77e73` was
+`PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS=-x bash scripts/validate-repository.sh`:
+`pass`, 3,182 tests passed and one skipped. Its disposable offline cache
+bindings and proof limits are recorded in the
+[task record](projects/sdk-workflow/tasks.md). This result does not validate
+the subsequent reference-context, selected-child ownership, trial-feasibility,
+trial-identity, adapter-contract, receipt-cost or safety repairs. Those require
+fresh combined validation and delivery evidence in
+[PR #53](https://github.com/jscraik/skills-sdk/pull/53); neither the historical
+result nor this candidate establishes accepted-main contracts, live quality or
+hosted clearance.
 
 ## Supplied content-review contracts
 
@@ -485,14 +572,14 @@ part of candidate file identity.
 
 Hash-only model and SchemaRegistry validation establish supplied envelope
 consistency, not derivation of metadata or selected settings from actual source.
-The unmerged repair adds `verify_plugin_package_validation` and CLI
+PR #52 accepted `verify_plugin_package_validation` and CLI
 `validate-plugin --verify-evidence FILE` to compare a normalised full envelope
 with fresh no-follow capture under the caller's revision and policy. Invalid,
 stale, mismatched or unreadable inputs block. Raw settings remain private and
 verification grants no execution, permission or release authority. The CLI reads
 regular no-follow JSON up to 16 MiB and rejects duplicate members and malformed
-input; default inspection behaviour remains unchanged. Current repair proof is
-required independently of the earlier candidate's historical validation.
+input; default inspection behaviour remains unchanged. That accepted structural
+verification does not establish the separate unmerged S4 execution route.
 Blocked outputs preserve validated caller policy across evidence and revision
 failures; malformed caller policy remains a typed input blocker before capture.
 Blocked children also retain path-bound candidate IDs, including the unchanged

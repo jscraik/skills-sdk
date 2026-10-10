@@ -6,18 +6,19 @@ workflow and its current implementation boundaries. Maintain it with each
 public route change; use [the migration map](migration-map.md) for legacy
 coverage and [the task record](projects/sdk-workflow/tasks.md) for execution state.
 
-Accepted implementation baseline: [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a),
-verified on 2026-10-08. The diagram is the intended process, not a claim that
+Accepted implementation baseline: [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842),
+verified on 2026-10-09. The diagram is the intended process, not a claim that
 every gate is executable. The table describes that accepted baseline; branch
 prototypes and local test passes do not add capabilities to it.
 
-The current portable-plugin candidate adds the bounded
+Accepted PR #52 adds the bounded
 [`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including
 fresh source comparison through `--verify-evidence` for supplied validation,
 tracked
 in the [task record](projects/sdk-workflow/tasks.md). It binds complete files and
-immediate skill subtrees, not release approval. This addition remains separate
-from the accepted-baseline status table until its PR is merged.
+immediate skill subtrees, not release approval. Presentation and matched
+plugin-evaluation candidates remain unmerged and do not extend that accepted
+capability boundary.
 
 ## Entry routes and independence
 

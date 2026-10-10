@@ -14,25 +14,25 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a),
-verified on 2026-10-08 and shared with the workflow and task record. Entries below
+Accepted SDK baseline: [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842),
+verified on 2026-10-09 and shared with the workflow and task record. Entries below
 describe that revision, not queued branches. Each row names its entrypoint or
 absence, a proof or boundary reference, its limitation, and the remaining action.
 
-Unmerged portable-plugin candidate affecting `package_identity`, `skill_intake`
+Accepted PR #52 affects `package_identity`, `skill_intake`
 and `sdk_plugin_lifecycle`: `validate_plugin_package` / `validate-plugin` add
 root-manifest inspection, whole-file/mode binding, immediate skill findings and
 OpenAI settings selection. Proof lives in
 [plugin regressions](../tests/test_plugin_package.py) and the
-[installed smoke](../tests/installed_plugin_intake_smoke.py). Its repair candidate
+[installed smoke](../tests/installed_plugin_intake_smoke.py). Its accepted repairs
 adds `verify_plugin_package_validation` / `validate-plugin --verify-evidence`
 for fresh source-backed comparison of supplied envelopes; see
 [verification proof](../tests/test_plugin_evidence.py). Schema validation alone
 cannot establish selected-settings derivation from unavailable source bytes.
 This is not
 standalone wrapping, admission, artwork approval, MCP transport validation or
-release delivery. Complete those separate gates after accepting this bounded
-slice; the table below still records accepted main, not this candidate.
+release delivery. Complete those separate gates after this bounded
+slice; the table below records accepted main, not later local candidates.
 
 The [plugin-first release decision](workflow.md#managed-release-format) changes
 the destination contract, not these accepted implementation statuses. Existing
@@ -80,9 +80,9 @@ does not describe the implemented SDK SchemaRegistry.
 | `risk_mode_taxonomy` | Partial | `CapabilitySafetyReview` and six-category checklist; [safety proof](../tests/test_pre_execution_safety.py). Not complete legacy risk-mode parity. | S3: compare remaining taxonomy semantics and explicitly replace or retain them. |
 | `package_security_signature` | Partial | `screen_package_security` inspects captured bytes; [screening tests](../tests/test_security_screening.py). Static indicators are not independent scanner or vulnerability proof. | S3: add relevant external scanner/reviewer evidence and validate its limits. |
 | `skill_ir` | Implemented | `build_skill_ir` and `read_frontmatter`; [package parsing proof](../tests/test_skill_package_validation.py). Portable representation used by validation, not authoring or execution. | Retain parsing and identity proof. |
-| `package_identity` | Implemented | `build_skill_package`; [public build/identity proof](../tests/test_skill_package_validation.py). A skill build is not whole-plugin capture or publication. | S2/S5: bind complete plugin manifests/resources before release checks and emitted archives. |
+| `package_identity` | Implemented | `build_skill_package` and `validate_plugin_package`; [plugin identity proof](../tests/test_plugin_package.py). Complete-plugin bytes and a separate mode ledger are bound; capture is not publication. | S2/S5: compose release checks and emitted archives under the captured plugin identity and modes. |
 | `install_preview` | Partial | `plan_runtime_install`; [planning proof](../tests/test_installation_planning.py). No host apply. | S5: implement selected host application and failure recovery. |
-| `skill_intake` | Partial | `intake_skill_package`; [intake proof](../tests/test_package_intake.py). Directory skill input only. | S2/S5: normalise standalone or plugin inputs to a separate root-manifest plugin candidate without rewriting source. |
+| `skill_intake` | Partial | `intake_skill_package` handles directory skills; `validate_plugin_package` inspects root-manifest plugins; [plugin proof](../tests/test_plugin_package.py). Neither silently wraps source or clears managed release. | S2/S5: explicitly normalise standalone inputs to a separate plugin candidate without rewriting source. |
 | `skill_intake_review` | Partial | Intake rights/owner checks plus `assess_content_review`; [review proof](../tests/test_content_review.py). Claims and semantic quality are not independently authenticated. | S2/S3: verify external provenance and reviewer quality for adoption. |
 | `lockfile_preview` | Partial | `RuntimeLock` and `InstallPlan`; [planning proof](../tests/test_installation_planning.py). No applied lock/runtime state. | S5: join plans to observed installation and rollback. |
 | `real_install` | Pending | No host apply service; `InstallationResult` is [supplied evidence](../tests/test_runtime_execution_evidence.py). | S5: implement a bounded install adapter with exact-version readback. |
@@ -115,7 +115,7 @@ does not describe the implemented SDK SchemaRegistry.
 | `schema_registry` | Implemented | `SchemaRegistry`; [core proof](../tests/test_core_contracts.py). Semantic validation is not live execution. | Retain unknown-family rejection and registered semantic checks. |
 | `registry` | External service | Registry identity/preparation [contracts](../tests/test_registry_contracts.py); SDK does not operate a catalogue or registry. | S5: prove initial private Tessl adapter/readback, retain independent SDK artifacts, and gate any future backend-default change on dual-destination proof. |
 | `local_plugin_readiness` | Partial | Discovery/activation [evidence contracts](../tests/test_runtime_execution_evidence.py); no observing adapter. | S5: observe complete-plugin display and direct/indirect/incomplete/unrelated activation, including overlapping skills, on the selected host. |
-| `sdk_plugin_lifecycle` | Partial | Skill intake/build [proof](../tests/test_package_intake.py); complete native plugin processing is not accepted. | S2/S5: integrate root `plugin.json` capture, direct skill discovery, extension precedence, full-resource checks and delivery. |
+| `sdk_plugin_lifecycle` | Partial | `validate-plugin` and `--verify-evidence` inspect complete root-manifest plugins and freshly compare supplied envelopes; [source verification proof](../tests/test_plugin_evidence.py). No release, installation or publication approval. | S2/S5: compose presentation, evaluation, exports and delivery under accepted capture; prove each later lane separately. |
 | `remote_marketplace` | External service | [Registry ownership boundary](workflow.md#registry-transition), not an SDK-operated marketplace or independent distribution proof. | S6: retire marketplace operation from SDK ownership; any separately authorised service consumes SDK contracts and proves its own distribution. |
 | `publish` | Pending | Registry preparation [API proof](../tests/test_registry_preparation.py); no publication adapter. | S5: prove private Tessl publication/readback, interrupted/repeated request idempotency and uncertain-outcome reconciliation before retry; do not assume arbitrary endpoint compatibility. |
 | `rollback` | Partial | Rollback [evidence contracts](../tests/test_runtime_execution_evidence.py); no executing adapter. | S5: implement restoration and verify previous lock/runtime after failed mutation. |

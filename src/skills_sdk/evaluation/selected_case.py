@@ -18,6 +18,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput, assess_pre_execution_safety
 from skills_sdk.evaluation.quality import _capture_evals, _ClosedLoader
+from skills_sdk.evaluation.selected_case_checks import _category, _check_contract_digest
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2, ScenarioObservationV2, ScenarioSetV2
 from skills_sdk.models.packaging import PackageManifestFile, PackageReceiptBlocker
@@ -70,6 +71,11 @@ class SelectedCaseDefinition:
             {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in self.semantic_assertions
         ]
         return canonical_json_sha256(payload)
+
+    @property
+    def check_contract_sha256(self) -> str:
+        """Bind semantic and deterministic checks without changing judge evidence v1."""
+        return _check_contract_digest(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,17 +235,6 @@ def _deterministic_patterns_are_bounded(
     except UnicodeError:
         return False
     return len(patterns) <= _MAX_DETERMINISTIC_PATTERNS and pattern_bytes <= _MAX_DETERMINISTIC_PATTERN_BYTES
-
-
-def _category(value: object) -> Literal["happy", "pressure", "boundary", "regression"]:
-    """Map supported package categories onto the evaluation-v2 contract."""
-    if not isinstance(value, str):
-        raise _contract_error("invalid_selected_case", "selected case category must be text")
-    if value in {"happy", "pressure", "regression"}:
-        return cast(Literal["happy", "pressure", "regression"], value)
-    if value in {"boundary", "edge", "negative"}:
-        return "boundary"
-    raise _contract_error("invalid_selected_case", "selected case category is unsupported")
 
 
 def load_selected_case(
@@ -471,14 +466,9 @@ def _request_matches_definition(
     input_payload: JsonValue,
 ) -> bool:
     """Return whether the request and payload bind exactly to the selected case."""
-    case = definition.scenario_set.cases[0]
-    return (
-        request.candidate == definition.scenario_set.candidate
-        and request.scenario_set_id == definition.scenario_set.scenario_set_id
-        and request.case_id == case.case_id
-        and input_payload == {"prompt": case.prompt}
-        and request.input_sha256 == canonical_json_sha256(input_payload)
-    )
+    from skills_sdk.evaluation.skill_context import _request_matches_context_or_prompt
+
+    return _request_matches_context_or_prompt(definition, request, input_payload)
 
 
 def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:

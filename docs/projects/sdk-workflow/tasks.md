@@ -66,14 +66,14 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 | S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Accepted in PR #44; maintain affected rows at every feature closeout. |
 | S2 | Add applicable plugin/skill policy, approved icons and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review and local stage composition exist. Plugin normalisation/composition, icon validation/approval, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
 | S3 | Bind applicable security evidence, update-permission differences and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass; expanded permissions need renewed authority. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Permission-delta interpretation, independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
-| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Locally validated candidate, unmerged. Reconcile plugin binding and budget/decision acceptance against the accepted calibration base before normal PR delivery. Local fixtures do not establish live local/cloud model lift. |
+| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Integrated candidate on accepted PR #52 base, unmerged. Focused proof covers strict plugin binding, child calibration, budgets, source/safety guards and one-to-nine-child offline routes. Final aggregate, installed proof and normal PR delivery remain separate gates. Local fixtures do not establish live local/cloud model lift. |
 | S5 | Compose plugin archive/presentation verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, private-material exclusion, versioned destination profiles, separate portable/export digests, exact checked version, uncertain-outcome readback, idempotency and observed recovery; host display/activation separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
 | S6 | Join feedback-to-regression and reconcile consumer cutover or retirement coverage. | Every scoped failure has an owner and retained regression; clean-room entrypoints run without sibling projects; all legacy rows have disposition. | Queued |
 
 ## Accepted delivery ledger
 
-Accepted SDK baseline: [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a),
-verified on 2026-10-08. The workflow and migration map describe this same
+Accepted SDK baseline: [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842),
+verified on 2026-10-09. The workflow and migration map describe this same
 revision. These merges accept the bounded capabilities below, not all acceptance
 criteria of their parent slices.
 
@@ -87,6 +87,7 @@ criteria of their parent slices.
 | [PR #49](https://github.com/jscraik/skills-sdk/pull/49) | [`40139ca`](https://github.com/jscraik/skills-sdk/commit/40139ca2e813cd6e3555cff0366cd2262fdd5972) | Bounded static screening and candidate-bound safety gates before selected-case execution. |
 | [PR #50](https://github.com/jscraik/skills-sdk/pull/50) | [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012) | Observed numeric scorer-calibration callbacks; the CLI consumes supplied-offline fixtures. |
 | [PR #51](https://github.com/jscraik/skills-sdk/pull/51) | [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a) | Reconciled accepted coverage and plugin-first release policy, mandatory icons and the separate registry start gate; no executable capability added. |
+| [PR #52](https://github.com/jscraik/skills-sdk/pull/52) | [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842) | Root-manifest plugin inspection, complete bytes and separate modes, child/settings binding and fresh source verification. No release approval or live-operation authority. |
 
 Repository tests and installed-entrypoint proof are linked in the migration map.
 The ledger records hosted acceptance; it does not replace exact candidate
@@ -113,7 +114,7 @@ Documenting these commands does not claim a new test run.
   [PR #51](https://github.com/jscraik/skills-sdk/pull/51) at `c38a769`. It records the plugin-first
   target, mandatory icon policy and strengthened acceptance without changing
   executable services or live-operation authority.
-- Current work: portable plugin inspection and binding, locally validated on
+- Accepted work: portable plugin inspection and binding, developed on
   `codex/sdk-portable-plugin-intake` with documentation from PR #51. The additive
   `validate_plugin_package` / `validate-plugin` route captures root-manifest
   candidates, complete file bytes and modes, per-skill findings and OpenAI
@@ -129,8 +130,8 @@ Documenting these commands does not claim a new test run.
   unknown-key diagnostics. It also adds source-backed full-envelope
   verification through `verify_plugin_package_validation` and
   `validate-plugin --verify-evidence FILE`; hash-only contract consistency does
-  not establish source derivation. This work remains unmerged against accepted
-  main `c38a769`; local proof and hosted delivery are separate states.
+  not establish source derivation. PR #52 merged at `1125d0e` on 2026-10-09;
+  local proof and hosted delivery remain separate evidence lanes.
 - PR #52 reconciliation follows the completed bot task at `86760d2`. The local
   candidate preserves digest-only receipts instead of retaining arbitrary raw
   settings. Canonical digest tests cover inline and fallback nested settings,
@@ -285,16 +286,68 @@ Documenting these commands does not claim a new test run.
   `git diff --check` passing. The installed plugin route proves the four
   reported rejection classes and finding-code sibling with corrected recovery.
   The earlier 2,705-test result remains historical evidence for `4738fb9`.
-- Next action: publish the validated retained-evidence follow-up, then
-  reconcile current-head hosted review and checks
-  for PR #52 before receipt-gated merge.
-  Preserve the accepted calibration service
-  and queued local-winner handoff; integrate downstream work only after the
-  complete-plugin identity seam is ready. Earlier branch-local validation does
-  not prove the new product contract.
-- Unmerged S4 evidence: the repaired candidate passed its local repository
-  wrapper (2552 passed, one skipped), plus installed rejection/recovery proof.
-  This is not accepted SDK functionality, hosted clearance, or live model proof.
+- PR #52 closeout: Jamie merged the signed repair head `4cdfefb` at accepted
+  `1125d0e`. The source and accepted trees agree. This records the hosted merge;
+  it does not recast the earlier blocked review gate as an agent-performed merge.
+- S4 delivery evidence: PR #53's signed candidate
+  `ca1db74570a945f4843013d61d47b2e2eea77e73` integrates against accepted base
+  `1125d0e4fe339a4c4c60a47a11952ae70367a842`. Its retained final command was:
+
+  ```sh
+  PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS=-x bash scripts/validate-repository.sh
+  ```
+
+  Result on 2026-10-09: `pass`, 3,182 tests passed, one skipped in 2,411.55
+  seconds; generated schemas, code style, wheel build, installed smoke checks
+  and diff checks passed. Execution used `UV_OFFLINE=1` and disposable
+  `MISE_STATE_DIR` and `UV_CACHE_DIR` bindings; private cache paths are not
+  committed. The wrapper selects this checkout's pinned environment.
+  `PYTEST_ADDOPTS=-x` stopped on first failure without excluding tests.
+  This is historical local evidence for that exact PR #53 candidate, not
+  accepted-main, hosted-check or live-provider proof.
+- Current PR #53 repairs address reference-context exclusion, selected-child
+  reference ownership, trial feasibility and identity, adapter contracts and
+  fresh per-trial capability lifetimes, schema-registry rejection proof and
+  descriptor-selected complete/stream fixtures across all five offline CLI routes,
+  receipt validation cost and safety requirements. The signed `743c389` repair binds
+  all regression candidate contexts to one absolute fixture root and rejects
+  identical complete baseline/candidate identities at plan validation. Later
+  review repairs align reference eligibility between plan and runtime, freeze
+  baseline calibration commitments during recovery and expose nested cloud
+  regression blockers in text output. Their focused and installed regression
+  checks retain rejected inputs and corrected-input recovery. These edits postdate
+  `ca1db745`; its aggregate does not validate them. Latest combined-candidate
+  validation, signed delivery and review-thread state belong to
+  [PR #53](https://github.com/jscraik/skills-sdk/pull/53); they require fresh
+  evidence and do not change the accepted-main baseline recorded above.
+  The next review identifies generator-mode drift: the repair requires one
+  explicit complete/stream mode per lane and binds all variants and trials to
+  it. Fresh source-backed UTF-8 blocking and completed invocation ceilings
+  already exist; new regressions and clarified descriptions preserve those
+  boundaries instead of adding filesystem access to portable plan models.
+  These edits postdate `2610c786`; its 3,314-test aggregate is historical proof
+  only and does not validate the new candidate.
+  Exactly ten active cases, one through nine captured children and
+  separate calibration probes/repeats remain the intended scope. Intermediate
+  counts without retained exact commands are omitted rather than promoted into
+  reproducible validation evidence.
+- Remaining calibration ownership assessment: the accepted
+  `execute_scorer_calibration` trial expansion reuses each probe's supplied
+  capabilities; matched calibration composes that route. The new matched-lane
+  capability schedule does not change this accepted contract. Before claiming
+  stateful host calibration support, reproduce closing-adapter behaviour and
+  choose a compatible fresh-capability route with focused lifecycle proof.
+- Presentation is a separate signed, locally validated candidate `0c6eea3`:
+  2,949 tests passed, one skipped, plus installed base and optional-image checks.
+  It remains unpushed while permission to export its complete diff to the
+  configured external review service is pending. S4 local integration has no
+  presentation/Pillow import dependency and need not wait for that review;
+  managed release still requires the presentation gate.
+- Historical S4 prototype evidence: the older candidate passed its local
+  repository wrapper (2552 passed, one skipped), plus installed
+  rejection/recovery proof. That result does not validate the current strict
+  plugin integration and is not accepted SDK functionality, hosted clearance
+  or live model proof.
 - Unmerged S5 evidence: archive, complete-plugin capture/hardening and supplied
   transport-byte work remain local candidates. A custom-timezone callback at
   transport ingress remains an actionable blocker; resolve it before claiming
