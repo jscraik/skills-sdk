@@ -209,6 +209,8 @@ def _batch(raw: object) -> tuple[object, ...]:
 
 
 async def _execute(command: str, raw: object) -> object:
+    from dataclasses import replace
+
     from skills_sdk.evaluation import (
         execute_matched_calibration,
         execute_matched_cloud,
@@ -216,18 +218,30 @@ async def _execute(command: str, raw: object) -> object:
         execute_matched_lane,
         execute_matched_regression,
     )
-    from skills_sdk.evaluation.observed_calibration import CalibrationProbeExecution
+    from skills_sdk.evaluation.observed_calibration import CalibrationProbeExecution, CalibrationTrialAdapters
+    from skills_sdk.models.observed_calibration import ObservedCalibrationPlan
 
     if command == "matched-calibration":
         data = _object(raw, {"plan", "rubric", "executions"})
         if not isinstance(data["executions"], list) or not 2 <= len(data["executions"]) <= 64:
             raise ValueError("offline matched calibration requires bounded probes")
+        plan = ObservedCalibrationPlan.model_validate(data["plan"])
         variants = tuple(_variant(item) for item in data["executions"])
         frames = tuple(
-            CalibrationProbeExecution(item.definition, item.request, item.inputs, item.provider, item.judge)
+            CalibrationProbeExecution(
+                item.definition,
+                item.request,
+                item.inputs,
+                item.provider,
+                item.judge,
+                tuple(
+                    CalibrationTrialAdapters(replace(item.provider), replace(item.judge))
+                    for _ in range(plan.parameters.trial_count - 1)
+                ),
+            )
             for item in variants
         )
-        return await execute_matched_calibration(data["plan"], data["rubric"], frames)
+        return await execute_matched_calibration(plan, data["rubric"], frames)
     fields = {"plan", "calibrations", "executions"}
     if command == "matched-cloud":
         fields = {"handoff", "calibrations", "executions"}

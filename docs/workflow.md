@@ -6,10 +6,14 @@ workflow and its current implementation boundaries. Maintain it with each
 public route change; use [the migration map](migration-map.md) for legacy
 coverage and [the task record](projects/sdk-workflow/tasks.md) for execution state.
 
-Accepted implementation baseline: [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd),
+Accepted implementation baseline: [`ec8f0dae`](https://github.com/jscraik/skills-sdk/commit/ec8f0dae3b370cf9f9c8a85ce91f70e4846481f1),
 verified on 2026-10-10. The diagram is the intended process, not a claim that
 every gate is executable. The table describes that accepted baseline; branch
 prototypes and local test passes do not add capabilities to it.
+
+PR #54 accepted the instruction-alignment documentation reconciliation. The
+fresh-per-trial calibration repair is current branch work, not an accepted
+capability or live-provider proof. Its delivery state is in the task record.
 
 Accepted PR #52 adds the bounded
 [`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including

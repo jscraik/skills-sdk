@@ -175,10 +175,11 @@ def test_offline_local_cli_whole_batch_rejection_and_recovery(
 
 
 @pytest.mark.parametrize("provider_mode", ["complete", "stream"])
+@pytest.mark.parametrize("trials", [1, 2])
 def test_offline_dimensional_calibration_cli(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str, trials: int
 ) -> None:
-    plan, batch, _ = _dimensions(tmp_path)
+    plan, batch, _ = _dimensions(tmp_path, trials=trials)
     rubric = _plan().rubric
     source = tmp_path / "calibration.json"
     payload = {
@@ -194,7 +195,7 @@ def test_offline_dimensional_calibration_cli(
         SchemaRegistry().validate("matched-calibration.v1", receipt)
         assert receipt["status"] == ("blocked" if expected else "pass")
         if not expected:
-            assert receipt["calibration"]["judge_invocation_count"] == 6
+            assert receipt["calibration"]["judge_invocation_count"] == 6 * trials
 
 
 def test_relative_plugin_host_paths_use_same_bound_candidate(

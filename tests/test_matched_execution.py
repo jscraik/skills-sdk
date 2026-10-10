@@ -125,6 +125,21 @@ def _calibrate_child(
         )
         for index, text in enumerate(texts)
     )
+    from skills_sdk.evaluation import CalibrationTrialAdapters
+
+    frames = tuple(
+        replace(
+            frame,
+            trial_adapters=tuple(
+                CalibrationTrialAdapters(
+                    _Provider(frame.request, events, frame.provider.text),
+                    DimensionJudge(frame.judge, frame.judge.score, events),
+                )
+                for _ in range(parameters.trial_count - 1)
+            ),
+        )
+        for frame in frames
+    )
     receipt = asyncio.run(execute_matched_calibration(calibration, rubric, frames))
     assert receipt.status == "pass"
     return receipt
