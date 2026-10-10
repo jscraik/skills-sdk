@@ -14,8 +14,8 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842),
-verified on 2026-10-09 and shared with the workflow and task record. Entries below
+Accepted SDK baseline: [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd),
+verified on 2026-10-10 and shared with the workflow and task record. Entries below
 describe that revision, not queued branches. Each row names its entrypoint or
 absence, a proof or boundary reference, its limitation, and the remaining action.
 
@@ -25,7 +25,7 @@ root-manifest inspection, whole-file/mode binding, immediate skill findings and
 OpenAI settings selection. Proof lives in
 [plugin regressions](../tests/test_plugin_package.py) and the
 [installed smoke](../tests/installed_plugin_intake_smoke.py). Its accepted repairs
-adds `verify_plugin_package_validation` / `validate-plugin --verify-evidence`
+add `verify_plugin_package_validation` / `validate-plugin --verify-evidence`
 for fresh source-backed comparison of supplied envelopes; see
 [verification proof](../tests/test_plugin_evidence.py). Schema validation alone
 cannot establish selected-settings derivation from unavailable source bytes.
@@ -94,16 +94,16 @@ does not describe the implemented SDK SchemaRegistry.
 | `review_verification` | Partial | `assess_content_review` and `assess_pre_execution_safety`; [safety proof](../tests/test_pre_execution_safety.py). Bindings/freshness do not authenticate reviewers. | S3: verify independent review provenance and scope. |
 | `determinism_audit` | Pending | No general audit route in the [API](api.md); deterministic evaluation is narrower. | S6: define a necessary audit consumer or explicitly retire the legacy facade. |
 | `trust_store` | Pending | No trust-ledger service in the [API](api.md); evidence validation is not trusted issuer selection. | S3: decide trust ownership and select an adapter or reviewed retirement. |
-| `observability_feedback` | Partial | `check_local_quality` retains blocked stages and recovery; [stop-boundary proof](../tests/test_quality_workflow_stop_boundaries.py). No automatic feedback-to-regression loop. | S6: compose failure ownership, retained regression and observed rerun. |
+| `observability_feedback` | Partial | `execute_matched_regression` and `execute_matched_cloud_regression` retain explicit correction/rerun evidence; [feedback proof](../tests/test_matched_feedback.py). Automatic regression capture is not implemented. | S6: prove external feedback, retained regressions and consumer cutover. |
 | `refs_ingestion` | Partial | `assess_content_review` inventories captured references; [review proof](../tests/test_content_review.py). No external reference retrieval or comprehensive accuracy review. | S2: decide external ingestion needs and retain explicit content-review gaps. |
-| `evals` | Partial | Deterministic/selected-case services plus `execute_scorer_calibration`; [installed calibration proof](../tests/installed_observed_calibration_smoke.py). CLI calibration uses supplied-offline fixtures, not fresh model results. | S3/S4: prove live adapter quality and matched experiments separately. |
-| `eval_profiles` | Partial | Injected provider descriptors; [provider proof](../tests/test_provider_call.py). No automatic host profile integration. | S4: bind supported profiles; use the accepted local winner as cloud baseline and compare within each model lane. |
-| `ab_rubric` | Partial | Scorer/judge contracts and numeric calibration; [calibration proof](../tests/test_observed_calibration.py). No accepted matched scorecard. | S4: validate matched rubric, weights and same-model decision rules. |
-| `ab_preview` | Pending | No matched A/B route in accepted [CLI](cli.md). | S4: integrate and prove the queued pair-preview route against accepted main. |
-| `ab_plan` | Pending | No matched plan service in accepted [API](api.md). | S4: freeze both candidates, cases, models, settings, rubric, budgets, stopping rules and regression/improvement thresholds. |
-| `ab_run` | Pending | `execute_selected_case` is [single-case proof](../tests/test_selected_case_evaluation.py), not matched orchestration. | S4: bind paired execution to plugin versions; prove per-skill and relevant cross-skill cases plus rejected-drift recovery. |
-| `ab_judge_preview` | Partial | `SelectedCaseJudgeInput`; [judge proof](../tests/test_live_selected_case.py). No matched pair preparation. | S4: prepare comparable blinded pair inputs. |
-| `ab_judge_score` | Partial | `execute_selected_case_with_judge`; [judge proof](../tests/test_live_selected_case.py). No accepted matched decision. | S4: bind pair judgments and calibrated same-model lift; disclose variability and reject unchanged/inconclusive improvement claims. |
+| `evals` | Partial | Selected-case, observed calibration and matched plugin services exist; [installed matched proof](../tests/installed_matched_smoke.py). Supplied-offline CLI results do not prove fresh model quality. | S3/S4: repair stateful calibration lifetime and prove supported live adapters separately. |
+| `eval_profiles` | Partial | Matched descriptors and `prepare_matched_cloud_handoff` bind same-lane settings and local lineage; [handoff proof](../tests/test_matched_handoff.py). Named TOML profiles are not integrated. | S4: implement explicit oss-local/oss-cloud profile selection and secret-free binding. |
+| `ab_rubric` | Partial | `MatchedComparisonPlan` and calibration bind rubric and decision limits; [comparison proof](../tests/test_matched_comparison.py). Offline conformance is not live judge quality. | S4: prove selected profile and judge quality with authorised execution. |
+| `ab_preview` | Partial | `assess_matched_pair` / `eval matched-assessment` assess supplied pair evidence; [CLI proof](../tests/test_matched_cli.py). Not a complete legacy preview-parity claim. | S4: disposition remaining legacy preview semantics and real-adapter proof. |
+| `ab_plan` | Partial | `MatchedComparisonPlan` binds plugin candidates, ten cases, model/settings, rubric and budgets; [scope proof](../tests/test_matched_plugin_scope.py). Named host profiles remain absent. | S4: bind explicit profiles and retain rejection/recovery proof. |
+| `ab_run` | Partial | `execute_matched_lane` / `eval matched-local` orchestrate plugin-bound trials; [installed proof](../tests/installed_matched_smoke.py). CLI execution uses supplied offline inputs. | S4: integrate selected model profiles and separately prove live quality. |
+| `ab_judge_preview` | Partial | Matched calibration and trial inputs bind child/assertion context; [calibration proof](../tests/test_matched_plugin_calibration.py). This does not establish all legacy blinded-preview semantics. | S4: assess remaining blinded-pair parity before replacement or retirement. |
+| `ab_judge_score` | Partial | `assess_matched_pair` and `execute_matched_lane` produce bound same-lane decisions; [execution proof](../tests/test_matched_execution.py). Unchanged/inconclusive outcomes do not promote candidates. | S4: prove real judge calibration and variability under supported profiles. |
 | `scenario_quality_gate` | Implemented | `assess_scenario_quality` / `eval scenario-quality`; [quality proof](../tests/test_scenario_quality.py). Definition quality is not executed behaviour. | Retain v1 compatibility and ten-active-case v2 proof. |
 | `package_verify` | Implemented | `validate_skill_package` / `validate`; [validation proof](../tests/test_skill_package_validation.py). Structural validation is not semantic or icon approval. | S2: retain content-review/coverage evidence; add candidate-bound icon approval, rights and destination file checks. |
 | `signing` | Pending | Native Git signing is [delivery governance](../CONTRIBUTING.md), not package signing. | S5: decide package-signature requirements and adapter or explicit retirement. |
@@ -126,6 +126,11 @@ does not describe the implemented SDK SchemaRegistry.
 | `package_hardening` | Implemented | `harden_skill_package`; [hardening proof](../tests/test_package_hardening.py). No full-plugin or live security clearance. | S5: compose the CLI and archive handoff while retaining separate security evidence. |
 
 ## Migration proof
+
+Disposition of these 52 capability ids is not a complete module, symbol or
+production-caller migration audit. [SDK-1](product-acceptance.md#acceptance-matrix)
+retains that exact-revision obligation, and SDK-8 retains released-consumer and
+legacy-retirement proof. Do not close either from this table alone.
 
 Before porting each executable behaviour, inspect its source implementation,
 accepted/rejected neighbours, actual consumer, and failure semantics. Run

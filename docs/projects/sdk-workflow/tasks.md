@@ -66,14 +66,14 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 | S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Accepted in PR #44; maintain affected rows at every feature closeout. |
 | S2 | Add applicable plugin/skill policy, approved icons and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review and local stage composition exist. Plugin normalisation/composition, icon validation/approval, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
 | S3 | Bind applicable security evidence, update-permission differences and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass; expanded permissions need renewed authority. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Permission-delta interpretation, independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
-| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Integrated candidate on accepted PR #52 base, unmerged. Focused proof covers strict plugin binding, child calibration, budgets, source/safety guards and one-to-nine-child offline routes. Final aggregate, installed proof and normal PR delivery remain separate gates. Local fixtures do not establish live local/cloud model lift. |
+| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Partial: PR #53 merged. Strict plugin binding, child calibration, budgets, source/safety guards, one-to-nine-child offline routes and feedback/rerun services have focused and installed proof. Named profiles, stateful calibration lifetime and live local/cloud quality remain open. |
 | S5 | Compose plugin archive/presentation verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, private-material exclusion, versioned destination profiles, separate portable/export digests, exact checked version, uncertain-outcome readback, idempotency and observed recovery; host display/activation separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
-| S6 | Join feedback-to-regression and reconcile consumer cutover or retirement coverage. | Every scoped failure has an owner and retained regression; clean-room entrypoints run without sibling projects; all legacy rows have disposition. | Queued |
+| S6 | Join feedback-to-regression and reconcile consumer cutover or retirement coverage. | Every scoped failure has an owner and retained regression; clean-room entrypoints run without sibling projects; all legacy rows have disposition. | Partial: PR #53 adds bounded matched feedback/rerun services; automatic capture, consumer cutover and retirement remain open. |
 
 ## Accepted delivery ledger
 
-Accepted SDK baseline: [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842),
-verified on 2026-10-09. The workflow and migration map describe this same
+Accepted SDK baseline: [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd),
+verified on 2026-10-10. The workflow and migration map describe this same
 revision. These merges accept the bounded capabilities below, not all acceptance
 criteria of their parent slices.
 
@@ -88,12 +88,36 @@ criteria of their parent slices.
 | [PR #50](https://github.com/jscraik/skills-sdk/pull/50) | [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012) | Observed numeric scorer-calibration callbacks; the CLI consumes supplied-offline fixtures. |
 | [PR #51](https://github.com/jscraik/skills-sdk/pull/51) | [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a) | Reconciled accepted coverage and plugin-first release policy, mandatory icons and the separate registry start gate; no executable capability added. |
 | [PR #52](https://github.com/jscraik/skills-sdk/pull/52) | [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842) | Root-manifest plugin inspection, complete bytes and separate modes, child/settings binding and fresh source verification. No release approval or live-operation authority. |
+| [PR #53](https://github.com/jscraik/skills-sdk/pull/53) | [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd) | Bounded matched whole-plugin evaluation, child calibration, same-lane local/cloud handoff and feedback/rerun services. Supplied-offline CLI and injected API proof are not live quality or release clearance. |
 
 Repository tests and installed-entrypoint proof are linked in the migration map.
 The ledger records hosted acceptance; it does not replace exact candidate
 validation, current PR checks/reviews, or live provider and runtime evidence.
 
 ## Proof lanes and resume point
+
+Current slice: bounded instruction-alignment documentation reconciliation from
+accepted `ed378971`. PR #53 merged on 2026-10-10. Its signed source head
+`20eac04739ebe2706e204372b7514fe494589b14` and the squash merge have identical
+trees. That source candidate passed the canonical repository wrapper with
+3,353 tests and one skipped, plus schemas, code style, build, installed API/CLI
+and diff checks. This historical result does not validate later changed bytes.
+
+Jamie merged PR #53 externally. At merge readback, the hosted validation job
+was still running and the local update receipt had not passed; merge topology
+does not retroactively establish those lanes. Keep the separate presentation
+candidate and portable-export work parked; S4 review-export authority does not
+cover presentation. This is the single current resume point; dated assessments
+below are history.
+
+After that reconciliation, the next dependency-ready implementation is the
+stateful calibration capability-lifetime repair described below, with focused
+and installed accepted/rejected/recovery proof, before claiming stateful
+end-to-end calibration. Then integrate named profiles using the settled
+capability contract; profile parsing and binding alone do not require live
+calibration execution. Applicable security evidence and the final
+scan adapter remain bounded separate work, with live operations requiring
+their own authority. Parent S2, S3, S4 and programme acceptance remain open.
 
 Use `pass`, `fail`, `blocked`, or `not_run` for each lane. Record exact command,
 candidate revision, evidence reference, what it proves, and the next check.
@@ -305,7 +329,7 @@ Documenting these commands does not claim a new test run.
   `PYTEST_ADDOPTS=-x` stopped on first failure without excluding tests.
   This is historical local evidence for that exact PR #53 candidate, not
   accepted-main, hosted-check or live-provider proof.
-- Current PR #53 repairs address reference-context exclusion, selected-child
+- Historical PR #53 repairs addressed reference-context exclusion, selected-child
   reference ownership, trial feasibility and identity, adapter contracts and
   fresh per-trial capability lifetimes, schema-registry rejection proof and
   descriptor-selected complete/stream fixtures across all five offline CLI routes,
@@ -316,17 +340,17 @@ Documenting these commands does not claim a new test run.
   baseline calibration commitments during recovery and expose nested cloud
   regression blockers in text output. Their focused and installed regression
   checks retain rejected inputs and corrected-input recovery. These edits postdate
-  `ca1db745`; its aggregate does not validate them. Latest combined-candidate
-  validation, signed delivery and review-thread state belong to
-  [PR #53](https://github.com/jscraik/skills-sdk/pull/53); they require fresh
-  evidence and do not change the accepted-main baseline recorded above.
-  The next review identifies generator-mode drift: the repair requires one
+  `ca1db745`; its aggregate does not validate them. Final source head
+  `20eac047` passed the same repository wrapper with 3,353 tests and one skipped,
+  plus generated schemas, code style, build and installed checks. Its tree equals
+  accepted merge `ed378971`; see the separate delivery lanes above.
+  A subsequent review identified generator-mode drift: the repair requires one
   explicit complete/stream mode per lane and binds all variants and trials to
   it. Fresh source-backed UTF-8 blocking and completed invocation ceilings
   already exist; new regressions and clarified descriptions preserve those
   boundaries instead of adding filesystem access to portable plan models.
   These edits postdate `2610c786`; its 3,314-test aggregate is historical proof
-  only and does not validate the new candidate.
+  only and does not validate the later repair.
   Exactly ten active cases, one through nine captured children and
   separate calibration probes/repeats remain the intended scope. Intermediate
   counts without retained exact commands are omitted rather than promoted into
@@ -335,8 +359,15 @@ Documenting these commands does not claim a new test run.
   `execute_scorer_calibration` trial expansion reuses each probe's supplied
   capabilities; matched calibration composes that route. The new matched-lane
   capability schedule does not change this accepted contract. Before claiming
-  stateful host calibration support, reproduce closing-adapter behaviour and
-  choose a compatible fresh-capability route with focused lifecycle proof.
+  stateful host calibration support, choose a compatible fresh-capability route
+  with focused lifecycle proof. A controlled public-API diagnostic on
+  2026-10-09 confirmed that a reusable two-trial fixture succeeds, while
+  permanently closing provider or judge capabilities return
+  `calibration_execution_incomplete` after the first trial in both numeric and
+  dimensional calibration. The one-trial neighbours pass. This diagnostic is
+  not an installed-entrypoint repair, live-provider proof or six-probe scorer
+  qualification. Preserve it as an open lifecycle issue, not a failed S4
+  matched-lane repair.
 - Presentation is a separate signed, locally validated candidate `0c6eea3`:
   2,949 tests passed, one skipped, plus installed base and optional-image checks.
   It remains unpushed while permission to export its complete diff to the
@@ -361,6 +392,10 @@ Documenting these commands does not claim a new test run.
 
 ### Queued-work assessment and next bounded slice
 
+Historical assessment and slice selection, 2026-10-08. The intake slice below
+was subsequently accepted in PR #52; it is not the active instruction. See the
+[current resume point](#proof-lanes-and-resume-point) for delivery order.
+
 Read-only assessment on 2026-10-08 found that queued capture, build, hardening
 and transport use `.tessl-plugin/plugin.json` as authoritative metadata. Root
 `plugin.json` and the Codex overlay are retained as ordinary files, not
@@ -376,7 +411,7 @@ within one cloud model lane. Preserve it. Callers still supply the refined
 candidate; neither candidate authoring nor live cloud quality is established.
 These are source-inspection results, not new test runs or accepted-main claims.
 
-Active slice: **canonical portable plugin intake and binding**, within the existing
+Then-selected slice: **canonical portable plugin intake and binding**, within the existing
 validation, intake, packaging, model/schema and CLI seams. No registry server,
 provider execution, publication or installation is part of this slice.
 
@@ -402,7 +437,7 @@ provider execution, publication or installation is part of this slice.
   with Agent-Skills, Foundry and registry services unavailable. Run focused
   proof and the required aggregate after relevant implementation changes.
 
-After intake binding, add a bounded icon/presentation validation slice using
+The then-planned follow-up was a bounded icon/presentation validation slice using
 existing models and services, not a new framework. Prove approval/rights binding,
 destination image limits, safe manifest references, exact packed assets, changed
 icon invalidation, and accepted/rejected/corrected inputs. Keep visual approval
@@ -411,13 +446,50 @@ validation. Inventory existing managed plugins for missing or unsuitable art
 through supplied candidates, then schedule normal versioned updates; preserve
 acceptable art and verified provider-managed exemptions.
 
-Then compose explicit standalone normalisation, plugin-bound evaluation and
+The remaining direction was explicit standalone normalisation, plugin-bound evaluation and
 archive preparation. Reconcile declared optimisation budgets and permission
 changes before dependent execution, and require adapter-version, presentation,
 interruption/retry and recovery proof before delivery. A separate bounded Tessl export adapter must retain
 unchanged skill contents, distinct artifact digests and a verified relationship,
 or block when required resources/modes cannot survive. Preserve the existing ten
 active scenarios. No current candidate authorises advancing to live operations.
+
+### Explicit integration gaps
+
+These are remaining actions within the existing slices, not new programme
+completion criteria or authority to execute providers and scanners.
+
+- **S4 model-profile adapter.** Consumer: the existing matched local/cloud
+  entrypoints. Accept caller-selected `oss-local.config.toml` and
+  `oss-cloud.config.toml` through an explicit adapter seam, independent of home
+  layout, Agent-Skills and Foundry. Bind effective model/settings and secret-free
+  profile provenance; reject missing, malformed, unsupported, wrong-lane,
+  mismatched and changed inputs before callbacks. Preserve same-model settings
+  for both variants and the accepted-local-candidate cloud baseline. Prove
+  acceptance, rejection and recovery through public API and installed CLI with
+  isolated fixtures. Generic injected callbacks do not close this requirement;
+  real-provider execution and quality need separate authority and evidence.
+- **S3 applicable security integration.** Consumer: candidate-bound safety
+  assessment and permission-change decisions before execution. Use the selected
+  Codex Security integration without importing a host plugin into the core.
+  Record applicable OWASP guidance/version, actual reviewer/scanner identity,
+  scope, exclusions, artifact provenance, findings and unresolved risks. Cover
+  relevant scripts, hooks, MCP, dependencies, secrets, file/network access and
+  installation; compare baseline permissions with the candidate. Prove valid,
+  absent, stale, wrong-candidate, contradictory and corrected supplied evidence;
+  independent execution/provenance remains separate proof. The proposed OWASP
+  references and final-scan boundary are in
+  [workflow policy](../../workflow.md#applicable-security-evidence-and-final-scan).
+- **Proposed S3/S5 final Snyk scan adapter.** If selected for managed-release
+  policy, its consumer is the prepared complete-plugin handoff. First record
+  the selected coverage, output contract and quota policy. Prove a pinned,
+  scoped, optional adapter can validate a report
+  for the exact candidate and artifact, preserve coverage gaps and findings, and
+  block stale/mismatched/incomplete output, quota exhaustion or failed analysis.
+  Retain corrected-input recovery and required rescanning after changed bytes.
+  Offline adapter proof consumes no quota. Live Agent Scan content export and
+  any MCP execution need explicit authority; the account allowance is unknown.
+  A successful scan is neither release approval nor private Tessl readback.
 
 ## Lens application
 

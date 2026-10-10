@@ -43,7 +43,7 @@ today. The portable core stays independent of those integration clients.
 | SDK-3 | Provider protocol and reference adapter | The SDK-3.1 offline executor, typed complete-or-stream adapter protocol, credential boundary, public evidence, and local conformance are implemented and verified below. No packaged reference adapter or real-provider evidence exists. | `verified_local` | Select and prove a packaged reference adapter, then separately close authorized real-provider and hosted Ubuntu evidence. |
 | SDK-4 | Runtime host protocol and transactional lifecycle | Candidate-bound planning and evidence models exist without package install, host apply, rollback, discovery, activation, uninstall, or retirement mechanisms. Existing-copy maintenance is narrower than installation. | `in_progress` | Implement SDK-owned host integration, initially Codex, and prove selected checked registry-version identity, discovery, behavior, rejection and recovery without changing provider-managed exemptions. |
 | SDK-5 | Registry adapter interfaces and selected implementations | Immutable local preparation exists without registry interaction, private-visibility readback, upload, promotion, deprecation, or revocation. | `in_progress` | Prove initial private Tessl publication/readback/install through an explicit adapter; keep canonical artifacts and evidence independent. A future registry default requires representative dual-destination proof, not catalogue visibility alone. |
-| SDK-6 | Executable CLI and composable orchestration | `intake`, `check-local`, `check-quality`, `review-content`, `validate`, `build`, `eval scenario-quality`, `eval scorer-quality`, `eval scorer-calibration`, `eval observed-calibration`, `eval selected-case`, `verify recurring-findings`, `verify pr-sweep-dirty-closeout`, `compare-copy`, and `maintain-entrypoint` execute locally; maintenance may modify an existing host file only with `--apply`. `inventory`, `package`, `project`, and `tessl` remain discovery boundaries. Static scorer checks do not execute judges; observed calibration CLI uses supplied offline verdicts. No complete plugin create/update/external-intake/check/install workflow is established. | `in_progress` | Connect the agent-facing workflow to complete-plugin orchestration and prove stable JSON, exit, failure, recovery and mutation boundaries for every implemented route. |
+| SDK-6 | Executable CLI and composable orchestration | `intake`, `check-local`, `check-quality`, `review-content`, `validate`, `validate-plugin` (including `--verify-evidence`), `build`, `eval scenario-quality`, `eval scorer-quality`, `eval scorer-calibration`, `eval observed-calibration`, `eval selected-case`, `eval matched-assessment`, `eval matched-handoff`, `eval matched-calibration`, `eval matched-local`, `eval matched-cloud`, `eval matched-regression`, `eval matched-cloud-regression`, `verify recurring-findings`, `verify pr-sweep-dirty-closeout`, `compare-copy`, and `maintain-entrypoint` execute locally; maintenance may modify an existing host file only with `--apply`. `inventory`, `package`, `project`, and `tessl` remain discovery boundaries. Static scorer checks do not execute judges; observed calibration CLI uses supplied offline verdicts; matched routes use supplied evidence or explicit supplied-offline callbacks, not discovered live model adapters. No complete plugin create/update/external-intake/check/install workflow is established. | `in_progress` | Connect the agent-facing workflow to complete-plugin orchestration and prove stable JSON, exit, failure, recovery and mutation boundaries for every implemented route. |
 | SDK-7 | Independent product operations | Pinned Python tooling, schemas, tests, CI, and reproducible local builds exist. Release, supported matrix, fuzzing, benchmarks, signed artifacts, documentation publication, and maintained examples remain incomplete. | `in_progress` | Record selected matrices and thresholds, then close release and maintenance evidence without relying on Agent-Skills. |
 | SDK-8 | Released external-consumer proof and retirement | No released SDK consumer, checked private Tessl version, selected Codex runtime installation, or completed Agent-Skills fallback retirement is proved here. | `not_verified` | Prove maintained consumers and non-exempt installed versions against a released SDK, preserve verified OpenAI exemptions, and complete parity, rollback, and retirement evidence. |
 
@@ -58,7 +58,7 @@ a second delivery tracker. Coverage below was inspected at accepted code
 `817966b378be0da45928fbaef89b2ede3708b012` on 2026-10-08. These requirements
 are product policy, not claims that the gates already execute. Use the
 [workflow policy](workflow.md#icons-and-presentation) for icon design and current
-OpenAI destination limits, and the [next slice](projects/sdk-workflow/tasks.md#queued-work-assessment-and-next-bounded-slice)
+OpenAI destination limits, and the [current resume point](projects/sdk-workflow/tasks.md#proof-lanes-and-resume-point)
 for implementation order.
 
 | Gate | Existing accepted proof and limitation | Required acceptance |
@@ -110,7 +110,11 @@ Merged source remains durable. Pull request 27 is represented by merge commit
 `6bb92d07b87896f5463c22b582394c01dcf8f0c2`. This records topology only; it does
 not retroactively alter the review gate that existed before the external merge.
 
-## Next dependency-ready unit: provider call conformance
+## Historical pilot: provider call conformance
+
+This section retains the SDK-3.1 pilot contract and its dated evidence. It is
+not the current slice instruction; use the existing
+[delivery record](projects/sdk-workflow/tasks.md#proof-lanes-and-resume-point).
 
 ### Outcome and consumer
 
@@ -283,7 +287,7 @@ its nineteenth owned path. On the frozen implementation bytes:
 
 The preserved implementation commit
 `1ceeb54ff8a1c8be0589a32b28c4a70b560dcde8` supplied the replay provenance for
-current `origin/main` at `f5ebdbde687265e58033403f8a0cfb9debc54abe`.
+then-observed `origin/main` at `f5ebdbde687265e58033403f8a0cfb9debc54abe`.
 Independent compatibility review then found that the provider adapter owned
 the scheduler intended to enforce SDK deadlines. The repaired implementation
 commit `665b035` moves scheduling to a caller-injected SDK clock and adds a

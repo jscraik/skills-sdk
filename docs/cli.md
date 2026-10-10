@@ -262,7 +262,7 @@ local adapter arguments.
 
 ## Matched evaluation candidate
 
-These S4 commands are unmerged integration work. They use supplied evidence or
+These bounded S4 commands were accepted in PR #53. They use supplied evidence or
 explicit supplied-offline callbacks, not discovered live model adapters.
 Use the [API contract](api.md#matched-whole-plugin-evaluation-candidate) for the
 full-plugin, ten-case, child calibration, safety and budget requirements.
