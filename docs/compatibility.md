@@ -130,6 +130,20 @@ Fresh model execution remains a separate evidence lane. The matched integration 
 adds controlled callback composition without
 claiming live-model proof.
 
+The current, unmerged calibration lifetime repair adds `CalibrationTrialAdapters`
+and the optional `CalibrationProbeExecution.trial_adapters` tuple. The existing
+one-trial call shape remains valid. Multi-trial callers must supply exactly
+`trial_count - 1` fresh pairs after the first pair. Reusing any provider or judge
+object, including across probes or roles, now blocks before capability access.
+Matched calibration checks original objects before wrapping judges; wrappers
+cannot conceal reuse. This deliberately replaces implicit reuse of cleaned-up
+capabilities, including reusable fixture adapters. Repeated CLI inputs retain
+their JSON shape: the offline adapter constructs separate controlled instances.
+Receipt schemas, candidate binding, held-out labels and active scenario counts
+are unchanged. A non-`None` numeric cleanup result now blocks, as dimensional
+cleanup already did. See the [lifecycle regressions](../tests/test_calibration_lifetime.py)
+and [installed proof](../tests/installed_observed_calibration_smoke.py).
+
 ## Matched evaluation integration candidate
 
 The additive S4 matched families were accepted in PR #53. Acceptance does not

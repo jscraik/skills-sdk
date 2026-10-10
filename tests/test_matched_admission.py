@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,7 +18,7 @@ from test_selected_case_evaluation import _safety_for
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.evaluation.matched_admission import _require_calibration, preflight_matched_lane
 from skills_sdk.evaluation.matched_calibration import execute_matched_calibration
-from skills_sdk.evaluation.observed_calibration import CalibrationProbeExecution
+from skills_sdk.evaluation.observed_calibration import CalibrationProbeExecution, CalibrationTrialAdapters
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 from skills_sdk.evaluation.skill_context import prepare_selected_case_context
 from skills_sdk.models.matched_comparison import MatchedComparisonPlan
@@ -69,6 +70,19 @@ def _calibrated(root: Path, count: int = 6) -> tuple[MatchedComparisonPlan, Matc
             ),
         )
         for index, text in enumerate(texts)
+    )
+    executions = tuple(
+        replace(
+            execution,
+            trial_adapters=tuple(
+                CalibrationTrialAdapters(
+                    _Provider(request, events, execution.provider.text),
+                    DimensionJudge(execution.judge, execution.judge.score, events),
+                )
+                for _ in range(calibration.parameters.trial_count - 1)
+            ),
+        )
+        for execution in executions
     )
     events.clear()
     receipt = asyncio.run(execute_matched_calibration(calibration, plan.rubric, executions))

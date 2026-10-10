@@ -17,7 +17,11 @@ from test_selected_case_evaluation import _evidence, _safety_for
 from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.evaluation.observed_calibration import CalibrationProbeExecution, execute_scorer_calibration
+from skills_sdk.evaluation.observed_calibration import (
+    CalibrationProbeExecution,
+    CalibrationTrialAdapters,
+    execute_scorer_calibration,
+)
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 from skills_sdk.models.observed_calibration import (
     CalibrationJudgeVerdict,
@@ -100,6 +104,30 @@ def _batch(root: Path) -> tuple[ObservedCalibrationPlan, tuple[CalibrationProbeE
     return plan, executions, events
 
 
+def test_numeric_calibration_rejects_non_none_cleanup_and_recovers(tmp_path: Path) -> None:
+    """A swallowed cleanup failure must not qualify held-out judgments."""
+    plan, executions, events = _batch(tmp_path)
+
+    class InvalidCleanupJudge(NumericJudge):
+        """Expose a numeric judge whose cleanup violates the adapter contract."""
+
+        async def cleanup(self) -> object:
+            """Record cleanup and return a non-None result to trigger rejection."""
+            self.events.append("invalid_cleanup")
+            return False
+
+    first = executions[0]
+    invalid = InvalidCleanupJudge(first.definition, first.request, first.judge.score, events)
+    broken = (replace(first, judge=invalid), *executions[1:])
+    rejected = asyncio.run(execute_scorer_calibration(plan, broken))
+    assert rejected.status == "blocked"
+    assert rejected.blocker.code == "calibration_execution_incomplete"
+    assert rejected.judge_invocation_count == 1
+    assert rejected.results == ()
+    recovered = asyncio.run(execute_scorer_calibration(plan, executions))
+    assert recovered.status == "pass"
+
+
 def _host_input(plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]) -> dict[str, object]:
     """Retain controlled fixture inputs for source and installed CLI proof."""
     return {
@@ -157,13 +185,31 @@ def test_false_positive_blocks_after_actual_execution_then_recovers(tmp_path: Pa
     assert asyncio.run(execute_scorer_calibration(plan, executions)).status == "pass"
 
 
+def _repeat_trials(
+    plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]
+) -> tuple[CalibrationProbeExecution, ...]:
+    """Align fixture judge settings and allocate distinct adapters for later trials."""
+    frames = []
+    for item in executions:
+        item.judge.parameters = plan.parameters
+        pairs = []
+        for _ in range(plan.parameters.trial_count - 1):
+            judge = type(item.judge)(item.definition, item.request, item.judge.score, item.judge.events)
+            judge.parameters = plan.parameters
+            pairs.append(
+                CalibrationTrialAdapters(_Provider(item.request, item.provider.events, item.provider.text), judge)
+            )
+        frames.append(replace(item, trial_adapters=tuple(pairs)))
+    return tuple(frames)
+
+
 def test_declared_trials_execute_each_probe_and_retain_order(tmp_path: Path) -> None:
+    """Verify every declared probe trial executes and preserves probe-major ordering."""
     plan, executions, events = _batch(tmp_path)
     payload = plan.model_dump(mode="json")
     payload["parameters"]["trial_count"] = 2
     plan = ObservedCalibrationPlan.model_validate(payload)
-    for item in executions:
-        item.judge.parameters = plan.parameters
+    executions = _repeat_trials(plan, executions)
     result = asyncio.run(execute_scorer_calibration(plan, executions))
     assert result.status == "pass" and len(result.results) == 4
     assert [item.trial_index for item in result.results] == [0, 1, 0, 1]
@@ -328,19 +374,19 @@ class LastTrialFailureJudge(NumericJudge):
 
 
 def test_final_trial_failure_retains_complete_invocation_count(tmp_path: Path) -> None:
+    """Count the failing final invocation, retain earlier results and accept recovery."""
     plan, executions, events = _batch(tmp_path)
     raw = plan.model_dump(mode="json")
     raw["parameters"]["trial_count"] = 2
     plan = ObservedCalibrationPlan.model_validate(raw)
     judge = LastTrialFailureJudge(executions[1].definition, executions[1].request, 0.1, events)
     changed = (executions[0], replace(executions[1], judge=judge))
-    for item in changed:
-        item.judge.parameters = plan.parameters
+    changed = _repeat_trials(plan, changed)
     blocked = asyncio.run(execute_scorer_calibration(plan, changed))
     assert blocked.status == "blocked" and blocked.judge_invocation_count == 4 and len(blocked.results) == 3
     assert ObservedCalibrationReceipt.model_validate(blocked) == blocked
     SchemaRegistry().validate("observed-calibration.v1", blocked.model_dump(mode="json"))
-    executions[1].judge.parameters = plan.parameters
+    executions = _repeat_trials(plan, executions)
     assert asyncio.run(execute_scorer_calibration(plan, executions)).status == "pass"
 
 

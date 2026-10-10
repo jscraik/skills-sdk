@@ -34,6 +34,14 @@ from skills_sdk.providers.call import TextProviderAdapter
 
 
 @dataclass(frozen=True, slots=True)
+class CalibrationTrialAdapters:
+    """One trial's independently owned provider and judge capabilities."""
+
+    provider: TextProviderAdapter
+    judge: SelectedCaseJudgeAdapter
+
+
+@dataclass(frozen=True, slots=True)
 class CalibrationProbeExecution:
     """Private adapter capabilities; none are serialised into calibration receipts."""
 
@@ -42,9 +50,39 @@ class CalibrationProbeExecution:
     inputs: SelectedCaseExecutionInput
     provider: TextProviderAdapter
     judge: SelectedCaseJudgeAdapter
+    trial_adapters: tuple[CalibrationTrialAdapters, ...] = ()
+
+
+def _trial_schedule(item: CalibrationProbeExecution) -> tuple[CalibrationTrialAdapters, ...]:
+    """Return the initial adapter pair followed by the explicit later-trial pairs."""
+    return (CalibrationTrialAdapters(item.provider, item.judge), *item.trial_adapters)
+
+
+def _capability_schedule_problem(
+    plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]
+) -> str | None:
+    """Reject missing or aliased capabilities without reading adapter properties."""
+    if type(executions) is not tuple or len(executions) != len(plan.probes):
+        return "calibration_execution_coverage"
+    seen: set[int] = set()
+    for item in executions:
+        if type(item) is not CalibrationProbeExecution:
+            return "invalid_calibration_execution"
+        if type(item.trial_adapters) is not tuple or len(item.trial_adapters) != plan.parameters.trial_count - 1:
+            return "calibration_trial_coverage"
+        if any(type(pair) is not CalibrationTrialAdapters for pair in item.trial_adapters):
+            return "invalid_calibration_execution"
+        for pair in _trial_schedule(item):
+            for capability in (pair.provider, pair.judge):
+                if capability is None or id(capability) in seen:
+                    return "calibration_capability_reuse"
+                seen.add(id(capability))
+    return None
 
 
 class _CalibrationJudge:
+    """Bind one judge invocation to held-out probe evidence and trial settings."""
+
     def __init__(
         self,
         delegate: SelectedCaseJudgeAdapter,
@@ -99,7 +137,8 @@ class _CalibrationJudge:
 
     async def cleanup(self) -> None:
         """Reuse the executor's bounded cleanup lifecycle."""
-        await self.delegate.cleanup()
+        if await self.delegate.cleanup() is not None:
+            raise ValueError("calibration judge cleanup must resolve to None")
 
 
 def _blocked(
@@ -122,8 +161,9 @@ def _blocked(
 
 def _preflight(plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]) -> str | None:
     """Validate the whole batch before accessing any host capability properties."""
-    if type(executions) is not tuple or len(executions) != len(plan.probes):
-        return "calibration_execution_coverage"
+    problem = _capability_schedule_problem(plan, executions)
+    if problem is not None:
+        return problem
     for item in executions:
         if type(item) is not CalibrationProbeExecution or type(item.inputs) is not SelectedCaseExecutionInput:
             return "invalid_calibration_execution"
@@ -166,15 +206,15 @@ async def execute_scorer_calibration(
     results: list[ObservedCalibrationProbeResult] = []
     invocation_count = 0
     expanded = [
-        (probe, item, trial)
+        (probe, item, trial, adapters)
         for probe, item in zip(parsed.probes, executions, strict=True)
-        for trial in range(parsed.parameters.trial_count)
+        for trial, adapters in enumerate(_trial_schedule(item))
     ]
-    for probe, item, trial in expanded:
-        frame = _CalibrationJudge(item.judge, parsed, probe, trial)
+    for probe, item, trial, adapters in expanded:
+        frame = _CalibrationJudge(adapters.judge, parsed, probe, trial)
         try:
             evaluation = await execute_selected_case_with_judge(
-                item.definition, item.request, item.inputs, item.provider, frame
+                item.definition, item.request, item.inputs, adapters.provider, frame
             )
         except (AttributeError, TypeError, ValueError, ContractError):
             return _blocked(

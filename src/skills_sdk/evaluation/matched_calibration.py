@@ -6,7 +6,13 @@ from dataclasses import dataclass, replace
 from typing import Protocol
 
 from skills_sdk.evaluation.live_selected_case import SelectedCaseJudgeInput
-from skills_sdk.evaluation.observed_calibration import CalibrationProbeExecution, execute_scorer_calibration
+from skills_sdk.evaluation.observed_calibration import (
+    CalibrationProbeExecution,
+    CalibrationTrialAdapters,
+    _capability_schedule_problem,
+    _trial_schedule,
+    execute_scorer_calibration,
+)
 from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt, _dimension_digest, _dimension_score
 from skills_sdk.models.matched_comparison import MatchedComparisonRubric, MatchedVariantJudgment
 from skills_sdk.models.observed_calibration import CalibrationJudgeVerdict, ObservedCalibrationPlan
@@ -89,11 +95,24 @@ async def execute_matched_calibration(
     try:
         parsed = ObservedCalibrationPlan.model_validate(plan)
         scoring = MatchedComparisonRubric.model_validate(rubric)
-        if type(executions) is not tuple or any(type(item) is not CalibrationProbeExecution for item in executions):
+        if _capability_schedule_problem(parsed, executions) is not None:
             raise ValueError("dimensional calibration requires a bounded explicit batch")
-        wrappers = tuple(_DimensionalCalibrationJudge(item.judge, scoring) for item in executions)
-        batch = tuple(replace(item, judge=wrapper) for item, wrapper in zip(executions, wrappers, strict=True))
-    except (TypeError, ValueError):
+        wrappers = tuple(
+            tuple(_DimensionalCalibrationJudge(pair.judge, scoring) for pair in _trial_schedule(item))
+            for item in executions
+        )
+        batch = tuple(
+            replace(
+                item,
+                judge=group[0],
+                trial_adapters=tuple(
+                    CalibrationTrialAdapters(pair.provider, wrapper)
+                    for pair, wrapper in zip(item.trial_adapters, group[1:], strict=True)
+                ),
+            )
+            for item, group in zip(executions, wrappers, strict=True)
+        )
+    except (AttributeError, TypeError, ValueError):
         return MatchedCalibrationReceipt(
             status="blocked",
             blocker=PackageSafetyBlocker(
@@ -101,7 +120,9 @@ async def execute_matched_calibration(
             ),
         )
     observed = await execute_scorer_calibration(parsed, batch)
-    retained = tuple(judgment for wrapper in wrappers for judgment in wrapper.judgments)[: len(observed.results)]
+    retained = tuple(judgment for group in wrappers for wrapper in group for judgment in wrapper.judgments)[
+        : len(observed.results)
+    ]
     return MatchedCalibrationReceipt(
         rubric=scoring, calibration=observed, judgments=retained, status=observed.status, blocker=observed.blocker
     )

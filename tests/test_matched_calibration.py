@@ -15,6 +15,7 @@ from test_observed_calibration import _batch
 from test_selected_case_evaluation import _evidence
 
 from skills_sdk.evaluation.matched_calibration import execute_matched_calibration
+from skills_sdk.evaluation.observed_calibration import CalibrationTrialAdapters
 from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt
 from skills_sdk.models.matched_comparison import MatchedVariantJudgment
 from skills_sdk.models.observed_calibration import ObservedCalibrationPlan
@@ -50,6 +51,7 @@ class DimensionJudge:
 
 
 def _dimensions(root: Path, count: int = 6, trials: int = 1) -> tuple[object, tuple[object, ...], list[str]]:
+    """Build dimensional probes with alternating labels and fresh adapters per trial."""
     plan, batch, events = _batch(root)
     raw = plan.model_dump(mode="json")
     ids = [f"held-out-{index}" for index in range(count)]
@@ -75,6 +77,19 @@ def _dimensions(root: Path, count: int = 6, trials: int = 1) -> tuple[object, tu
     plan = ObservedCalibrationPlan.model_validate(raw)
     for frame in frames:
         frame.judge.parameters = plan.parameters
+    frames = tuple(
+        replace(
+            frame,
+            trial_adapters=tuple(
+                CalibrationTrialAdapters(
+                    _Provider(frame.request, events, frame.provider.text),
+                    DimensionJudge(frame.judge, frame.judge.score, events),
+                )
+                for _ in range(trials - 1)
+            ),
+        )
+        for frame in frames
+    )
     return plan, frames, events
 
 
