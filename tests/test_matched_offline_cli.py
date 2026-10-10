@@ -11,7 +11,6 @@ import pytest
 from test_matched_calibration import _dimensions
 from test_matched_comparison import _plan
 from test_matched_execution import _matched
-from test_matched_feedback import _failure
 from test_matched_handoff import _journey
 from test_provider_call import _provider_request
 from test_selected_case_evaluation import _evidence
@@ -21,7 +20,7 @@ from skills_sdk.cli.matched_offline import _FixtureProvider
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import prepare_matched_cloud_handoff
-from skills_sdk.models.matched_comparison import MatchedVariantJudgment
+from skills_sdk.models.matched_comparison import MatchedComparisonPlan, MatchedVariantJudgment
 from skills_sdk.models.provider_call import TextProviderAdapterDescriptor
 from skills_sdk.providers import DEFAULT_PROVIDER_CALL_LIMITS, execute_provider_call
 
@@ -142,11 +141,21 @@ def _variant(item: object, rubric: object, provider_mode: str | None = None) -> 
     return result
 
 
+def _mode_plan(plan: MatchedComparisonPlan, provider_mode: str, lane: str) -> MatchedComparisonPlan:
+    """Declare the intended protocol before generating any callback observations."""
+    raw = plan.model_dump(mode="json")
+    for specification in raw["lanes"]:
+        if specification["lane"] == lane:
+            specification["generator_mode"] = provider_mode
+    return MatchedComparisonPlan.model_validate(raw)
+
+
 @pytest.mark.parametrize("children,provider_mode", [(1, "complete"), (2, "complete"), (9, "complete"), (2, "stream")])
 def test_offline_local_cli_whole_batch_rejection_and_recovery(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], children: int, provider_mode: str
 ) -> None:
     plan, calibrations, batch, _ = _matched(tmp_path, child_count=children)
+    plan = _mode_plan(plan, provider_mode, "local")
     pairs = _pairs(batch, plan.rubric, provider_mode)
     payload = {
         "plan": plan.model_dump(mode="json"),
@@ -258,6 +267,7 @@ def test_offline_cloud_cli_retains_handoff_and_closes_regression(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str
 ) -> None:
     local, plan, calibrations, batch, _ = _journey(tmp_path)
+    plan = _mode_plan(plan, provider_mode, "cloud")
     handoff = prepare_matched_cloud_handoff(local, plan)
     batch[0].candidate.provider.text = "behavior preserved; rm -rf"
     payload = {
@@ -286,10 +296,22 @@ def test_offline_cloud_cli_retains_handoff_and_closes_regression(
 def test_offline_local_regression_cli_retains_failure_and_rerun(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], provider_mode: str
 ) -> None:
-    initial, plan, calibrations, batch, _ = _failure(tmp_path)
+    plan, calibrations, batch, _ = _matched(tmp_path)
+    plan = _mode_plan(plan, provider_mode, "local")
+    batch[0].candidate.provider.text = "behavior preserved; rm -rf"
+    initial = _run(
+        "matched-local",
+        {
+            "plan": plan.model_dump(mode="json"),
+            "calibrations": [item.model_dump(mode="json") for item in calibrations],
+            "executions": _pairs(batch, plan.rubric, provider_mode),
+        },
+        tmp_path,
+        capsys,
+    )
     batch[0].candidate.provider.text = "behavior preserved"
     payload = {
-        "initial": initial.model_dump(mode="json"),
+        "initial": initial,
         "assignments": [{"case_id": "case-0", "owner": "SDK maintainer"}],
         "plan": plan.model_dump(mode="json"),
         "calibrations": [item.model_dump(mode="json") for item in calibrations],
@@ -297,5 +319,5 @@ def test_offline_local_regression_cli_retains_failure_and_rerun(
     }
     closed = _run("matched-regression", payload, tmp_path, capsys)
     SchemaRegistry().validate("matched-regression.v1", closed)
-    assert closed["status"] == "closed" and closed["initial"] == initial.model_dump(mode="json")
+    assert closed["status"] == "closed" and closed["initial"] == initial
     assert closed["rerun"]["provider_invocation_count"] == 40

@@ -290,6 +290,10 @@ as bounded Unicode-safe chunks followed by terminal evidence; they do not
 accept arbitrary event scripts or contact a provider. Existing provider-call
 byte, event, timeout and cleanup limits still apply. Invalid modes return a
 typed blocked receipt; corrected inputs can be retried without changing source.
+For local, cloud and regression lanes, every descriptor must match the plan's
+explicit `generator_mode`; mixing complete and stream variants cannot produce
+a completed matched comparison. Supplied calibration retains its separate
+contract and does not gain a matched-lane mode field.
 
 - `matched-assessment` requires exactly `plan`, `lane`, `baseline` and
   `candidate`; it assesses supplied paired judgments without execution.

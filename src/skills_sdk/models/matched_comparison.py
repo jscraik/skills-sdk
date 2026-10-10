@@ -82,6 +82,7 @@ class MatchedLaneSpec(_MatchedContractModel):
 
     lane: Literal["local", "cloud"]
     generator: ProviderIdentityV2
+    generator_mode: Literal["complete", "stream"]
     generator_parameters: ScorerJudgeParameters
     judge: ProviderIdentityV2
     judge_parameters: ScorerJudgeParameters

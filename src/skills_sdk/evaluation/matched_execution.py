@@ -87,8 +87,12 @@ class _MatchedProvider:
         self.guard.check()
         descriptor = TextProviderAdapterDescriptor.model_validate(_canonical_matched_input(self.delegate.descriptor))
         parameters = ScorerJudgeParameters.model_validate(_canonical_matched_input(self.delegate.parameters))
-        if descriptor.provider != self.specification.generator or parameters != self.specification.generator_parameters:
-            raise ValueError("matched generator identity or settings changed")
+        if (
+            descriptor.provider != self.specification.generator
+            or descriptor.mode != self.specification.generator_mode
+            or parameters != self.specification.generator_parameters
+        ):
+            raise ValueError("matched generator identity, mode or settings changed")
         return descriptor
 
     async def complete(self, request: object, input_payload: JsonValue) -> ProviderAdapterComplete:

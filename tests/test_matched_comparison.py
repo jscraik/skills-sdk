@@ -56,6 +56,7 @@ def _plan() -> MatchedComparisonPlan:
             {
                 "lane": lane,
                 "generator": identity,
+                "generator_mode": "complete",
                 "generator_parameters": parameters,
                 "judge": identity,
                 "judge_parameters": parameters,

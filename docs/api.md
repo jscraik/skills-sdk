@@ -494,10 +494,15 @@ mapping consistency, not the truth or completeness of supplied claims.
 
 Each case has child-bound scorers, selected skill paths and optional shared
 reference paths retained by both captures. Both plan admission and runtime
-context require eligible Markdown references and reject hidden evaluation,
+context require eligible Markdown paths and reject hidden evaluation,
 scorer, rubric, calibration and held-out paths. References cannot duplicate
 the selected children's automatically included `SKILL.md` entrypoints; ordinary
-captured files such as root `README.md` remain eligible. The ten singleton `ScenarioSetV2`
+captured files such as root `README.md` remain eligible. Captures retain hashes
+and sizes, not source text or encoding proof. Structural plan admission does
+not establish readability: source-backed context preparation requires every
+selected document to decode as UTF-8 before provider or judge access, otherwise
+execution returns a typed blocker. Unselected binary resources remain valid
+captured resources. The ten singleton `ScenarioSetV2`
 values on each side use `release=False`; together they form the managed active
 set, rather than ten independent release sets. Plugin identity properties derive
 from complete captures, not caller-supplied parent aliases.
@@ -518,7 +523,10 @@ bounded single-call cleanup; later unused capabilities remain caller-owned.
 Hosts must supply fresh capabilities again for a separate lane execution.
 Distinct instances do not prove that a host has avoided aliasing an external
 session behind different wrappers; that remains the host's responsibility.
-The provider descriptor selects complete or pull-stream mode. Streaming remains
+Each `MatchedLaneSpec` requires `generator_mode`, either `complete` or `stream`.
+Every variant and trial descriptor must match that frozen mode; mismatch blocks
+before that provider callback, without a completed comparison. The mode is part
+of the plan digest and retained trial request commitments. Streaming remains
 bounded by the provider lifecycle, with source, settings and elapsed-budget
 checks at every pull and iterator cleanup on success or rejection.
 `PluginExecutionContext` and

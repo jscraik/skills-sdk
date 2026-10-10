@@ -150,8 +150,12 @@ do not create extra active cases.
 Matched reference eligibility is checked consistently at plan admission and
 runtime context preparation: hidden evaluation inputs, non-Markdown files and
 duplicates of automatically selected child `SKILL.md` entrypoints reject.
-Ordinary captured Markdown references remain supported. These semantic rules
-supplement JSON Schema through the registered models.
+Ordinary captured Markdown reference paths remain supported. Portable captures
+retain metadata, not source bytes or encoding proof. UTF-8 readability is
+checked during fresh source-backed context preparation before provider or
+judge access; invalid selected bytes return a typed blocker. Unselected binary
+resources need not decode as text. Path rules supplement JSON Schema through
+the registered models; schema acceptance alone is not execution clearance.
 
 Private execution context requires fresh source binding, selected-child safety
 and complete supplied plugin safety evidence with applicable checks and static
@@ -171,6 +175,13 @@ unchanged; uninvoked capabilities remain caller-owned. These private host
 capabilities are not portable receipt fields. Draft receipts produced before
 the request-binding repair must be regenerated; the matched family did not
 exist on the accepted base and is not a frozen released format yet.
+The unmerged lane specification now requires explicit `generator_mode`:
+`complete` or `stream`. Both variants and all trials must use that mode. It is
+part of plan and trial commitments, so prior draft plans lacking the field and
+receipts derived from them must be regenerated; this is not a reinterpretation
+of an accepted-main family. Completed receipts already enforce exact provider
+and judge counts through their declared coverage ceiling and full pair count.
+The unfinished-pair allowance applies only to blocked prefixes.
 
 Cloud handoff preserves the qualifying local plugin as baseline and freezes
 scope, coverage and scoring objectives. Regression closure requires owned

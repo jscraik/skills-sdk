@@ -86,6 +86,24 @@ def test_single_and_multiple_child_contexts_bind_complete_plugin(tmp_path: Path)
     assert str(root) not in json.dumps(payload)
 
 
+def test_fresh_non_utf8_selected_reference_blocks_then_recaptured_input_recovers(tmp_path: Path) -> None:
+    """Fresh structural captures do not claim that selected source text is readable."""
+    root = _plugin(tmp_path)
+    target = root / "references/shared.md"
+    target.write_bytes(b"\xff\xfe")
+    (root / "binary.bin").write_bytes(b"\xff")
+    definition, context = _prepared(root, ("skills/alpha",))
+    with pytest.raises(ContractError, match="UTF-8") as rejected:
+        prepare_matched_plugin_context(definition, context)
+    assert rejected.value.code == "invalid_matched_plugin_context"
+    target.write_text("Corrected public guidance.\n", encoding="utf-8")
+    repaired_definition, repaired_context = _prepared(root, ("skills/alpha",))
+    assert repaired_context.validation.candidate != context.validation.candidate
+    payload = prepare_matched_plugin_context(repaired_definition, repaired_context)
+    assert payload["plugin_context"]["documents"][-1]["text"] == "Corrected public guidance.\n"
+    assert "binary.bin" not in [item["path"] for item in payload["plugin_context"]["documents"]]
+
+
 @pytest.mark.parametrize("reference", ["skills/beta/SKILL.md", "skills/beta/references/guide.md"])
 def test_unselected_child_references_block_and_selected_shared_recover(tmp_path: Path, reference: str) -> None:
     """Runtime context must not silently widen declared per-skill selection."""

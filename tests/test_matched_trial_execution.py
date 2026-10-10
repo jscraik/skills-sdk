@@ -23,6 +23,7 @@ from skills_sdk.evaluation import (
     MatchedVariantExecution,
     execute_matched_lane,
 )
+from skills_sdk.models.matched_comparison import MatchedComparisonPlan
 from skills_sdk.models.matched_execution import MatchedExecutionReceipt
 from skills_sdk.models.matched_trial import matched_trial_identity
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
@@ -161,6 +162,13 @@ class StreamingProvider:
         self.events.append("stream_cleanup")
 
 
+def _stream_plan(plan: MatchedComparisonPlan) -> MatchedComparisonPlan:
+    """Explicitly freeze local pull streaming without changing cloud controls."""
+    raw = plan.model_dump(mode="json")
+    raw["lanes"][0]["generator_mode"] = "stream"
+    return MatchedComparisonPlan.model_validate(raw)
+
+
 def test_public_matched_protocols_describe_required_parameters_and_dimensional_judge() -> None:
     hints = get_type_hints(MatchedVariantExecution)
     assert hints["provider"] == MatchedProviderAdapter
@@ -192,7 +200,7 @@ def test_stream_only_adapters_execute_all_trials_and_close_each_iterator(tmp_pat
         )
         for pair in batch
     )
-    receipt = asyncio.run(execute_matched_lane(plan, "local", calibrations, streaming))
+    receipt = asyncio.run(execute_matched_lane(_stream_plan(plan), "local", calibrations, streaming))
     assert receipt.status == "completed"
     assert receipt.provider_invocation_count == receipt.judge_invocation_count == 40
     assert events.count("stream_open") == events.count("stream_closed") == events.count("stream_cleanup") == 40
@@ -206,7 +214,7 @@ def test_source_mutation_during_stream_blocks_before_judge_and_recovers(tmp_path
     original = source.read_bytes()
     broken = replace(batch[0].baseline, provider=StreamingProvider(batch[0].baseline.provider, change_source=source))
     modified = (replace(batch[0], baseline=broken), *batch[1:])
-    blocked = asyncio.run(execute_matched_lane(plan, "local", calibrations, modified))
+    blocked = asyncio.run(execute_matched_lane(_stream_plan(plan), "local", calibrations, modified))
     assert blocked.status == "blocked" and blocked.blocker.code == "matched_plugin_source_changed"
     assert blocked.provider_invocation_count == 1 and blocked.judge_invocation_count == 0
     assert events == ["stream_open", "stream_pull", "stream_closed", "stream_cleanup"]
@@ -232,7 +240,7 @@ def test_stream_open_settings_drift_blocks_before_first_pull_and_recovers(tmp_pa
 
     broken = replace(batch[0].baseline, provider=DriftingStream(batch[0].baseline.provider))
     modified = (replace(batch[0], baseline=broken), *batch[1:])
-    blocked = asyncio.run(execute_matched_lane(plan, "local", calibrations, modified))
+    blocked = asyncio.run(execute_matched_lane(_stream_plan(plan), "local", calibrations, modified))
     assert blocked.status == "blocked" and blocked.blocker.code == "matched_execution_incomplete"
     assert blocked.provider_invocation_count == 1 and blocked.judge_invocation_count == 0
     assert events == ["stream_open", "stream_cleanup"]

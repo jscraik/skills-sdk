@@ -320,6 +320,13 @@ Documenting these commands does not claim a new test run.
   validation, signed delivery and review-thread state belong to
   [PR #53](https://github.com/jscraik/skills-sdk/pull/53); they require fresh
   evidence and do not change the accepted-main baseline recorded above.
+  The next review identifies generator-mode drift: the repair requires one
+  explicit complete/stream mode per lane and binds all variants and trials to
+  it. Fresh source-backed UTF-8 blocking and completed invocation ceilings
+  already exist; new regressions and clarified descriptions preserve those
+  boundaries instead of adding filesystem access to portable plan models.
+  These edits postdate `2610c786`; its 3,314-test aggregate is historical proof
+  only and does not validate the new candidate.
   Exactly ten active cases, one through nine captured children and
   separate calibration probes/repeats remain the intended scope. Intermediate
   counts without retained exact commands are omitted rather than promoted into

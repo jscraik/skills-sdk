@@ -159,6 +159,10 @@ def _api(payload: dict[str, object]) -> None:
         assert receipt.provider_invocation_count == (40 if expected == "completed" else 0)
         SchemaRegistry().validate("matched-execution.v1", receipt.model_dump(mode="json"))
         if expected == "completed":
+            for offset in (1, 2):
+                extra = receipt.model_dump(mode="json")
+                extra["provider_invocation_count"] += offset
+                _rejected(models.MatchedExecutionReceipt, extra)
             pair = receipt.comparison(0)
             assessed = evaluation.assess_matched_pair(receipt.plan, "local", pair.baseline, pair.candidate)
             assert assessed == pair and not assessed.execution_performed
@@ -240,13 +244,52 @@ def _failure(payload: dict[str, object]) -> dict[str, object]:
 
 
 def _provider_mode(payload: dict[str, object], mode: str) -> dict[str, object]:
-    """Select a protocol in fixture JSON without changing source or evidence."""
+    """Bind fixture descriptors to a newly declared lane protocol, not old observations."""
     changed = json.loads(json.dumps(payload))
+    plan = changed.get("plan") or changed["handoff"]["cloud_plan"]
+    if "lanes" in plan:
+        lane = "local" if "plan" in changed else "cloud"
+        for specification in plan["lanes"]:
+            if specification["lane"] == lane:
+                specification["generator_mode"] = mode
     for execution in changed["executions"]:
         variants = execution.values() if "baseline" in execution else (execution,)
         for variant in variants:
             variant["provider"]["descriptor"]["mode"] = mode
     return changed
+
+
+def _mixed_mode(payload: dict[str, object]) -> dict[str, object]:
+    """Keep the declared mode unchanged while changing one supplied descriptor."""
+    changed = json.loads(json.dumps(payload))
+    descriptor = changed["executions"][0]["baseline"]["provider"]["descriptor"]
+    descriptor["mode"] = "stream" if descriptor["mode"] == "complete" else "complete"
+    return changed
+
+
+def _encoding_boundary(payload: dict[str, object]) -> None:
+    """Installed source-backed context rejects freshly captured unreadable text."""
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.validation import validate_plugin_package
+
+    item = _variant(payload["executions"][0]["baseline"])
+    context = item.plugin_context
+    target = context.root / context.reference_paths[0]
+    original = target.read_bytes()
+    try:
+        target.write_bytes(b"\xff\xfe")
+        capture = validate_plugin_package(context.root, source_revision=context.validation.candidate.source_revision)
+        assert capture.status == "pass"
+        try:
+            evaluation.prepare_matched_plugin_context(item.definition, replace(context, validation=capture))
+        except ContractError as error:
+            assert error.code == "invalid_matched_plugin_context" and "UTF-8" in error.message
+        else:
+            raise AssertionError("Fresh invalid UTF-8 reached provider context")
+    finally:
+        target.write_bytes(original)
+    recovered = evaluation.prepare_matched_plugin_context(item.definition, context)
+    assert recovered == item.inputs.payload
 
 
 def _identical_variants(payload: dict[str, object]) -> dict[str, object]:
@@ -377,6 +420,7 @@ def _cli_workflow(root: Path, local: dict[str, object], numeric: object, cloud: 
         (local, 0),
         (dict(local, executions=local["executions"][:-1]), 2),
         (_provider_mode(local, "unsupported"), 2),
+        (_mixed_mode(local), 2),
         (_identical_variants(local), 2),
         (_invalid_reference(local, "SKILL.md"), 2),
         (_invalid_reference(local, "references/evals.yaml"), 2),
@@ -426,6 +470,7 @@ def check(root: Path) -> None:
     cloud = json.loads((root / "cloud.json").read_text())
     _ingress(local)
     _api(local)
+    _encoding_boundary(local)
     _cloud_blocker_text(root)
     for mode in ("complete", "stream"):
         _cli_workflow(root, _provider_mode(local, mode), _provider_mode(numeric, mode), _provider_mode(cloud, mode))

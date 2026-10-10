@@ -45,6 +45,25 @@ def _rejected(raw: dict[str, object], good: MatchedExecutionReceipt, form: str) 
 
 
 @pytest.mark.parametrize("form", ["raw", "json", "copy", "construct"])
+@pytest.mark.parametrize("extra_provider,extra_judge", [(1, 0), (2, 0), (2, 1)])
+def test_completed_counts_cannot_exceed_represented_pairs(
+    completed: MatchedExecutionReceipt, form: str, extra_provider: int, extra_judge: int
+) -> None:
+    """The declared coverage ceiling already rejects extra unpaired invocations."""
+    raw = completed.model_dump(mode="json")
+    raw["provider_invocation_count"] += extra_provider
+    raw["judge_invocation_count"] += extra_judge
+    _rejected(raw, completed, form)
+
+
+def test_completed_observations_cannot_relabel_the_frozen_generator_mode(completed: MatchedExecutionReceipt) -> None:
+    """Changing the mode invalidates the retained trial request commitments."""
+    raw = completed.model_dump(mode="json")
+    raw["plan"]["lanes"][0]["generator_mode"] = "stream"
+    _rejected(raw, completed, "raw")
+
+
+@pytest.mark.parametrize("form", ["raw", "json", "copy", "construct"])
 @pytest.mark.parametrize("offset", [0.0, 1.0])
 def test_completed_receipt_cannot_reach_elapsed_deadline(
     completed: MatchedExecutionReceipt, form: str, offset: float

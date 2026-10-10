@@ -319,6 +319,14 @@
         "generator": {
           "$ref": "#/$defs/ProviderIdentityV2"
         },
+        "generator_mode": {
+          "enum": [
+            "complete",
+            "stream"
+          ],
+          "title": "Generator Mode",
+          "type": "string"
+        },
         "generator_parameters": {
           "$ref": "#/$defs/ScorerJudgeParameters"
         },
@@ -340,6 +348,7 @@
       "required": [
         "lane",
         "generator",
+        "generator_mode",
         "generator_parameters",
         "judge",
         "judge_parameters",
