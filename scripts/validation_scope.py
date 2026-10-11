@@ -21,14 +21,17 @@ def git_environment() -> dict[str, str]:
 
 
 def _git(root: Path, *arguments: str) -> bytes:
+    """Run a Git query in the checkout with inherited Git settings removed."""
     return subprocess.run(["git", *arguments], cwd=root, env=git_environment(), check=True, capture_output=True).stdout
 
 
 def _paths(output: bytes) -> set[str]:
+    """Decode nonempty paths from NUL-delimited Git output into a set."""
     return {path.decode("utf-8") for path in output.split(b"\0") if path}
 
 
 def _ordinary_prose(root: Path, path: str, revisions: tuple[str, str]) -> bool:
+    """Check the prose allowlist and reject unsafe revision, index, or filesystem modes."""
     relative = Path(path)
     if relative.name == "AGENTS.md" or path == "docs/standards.md":
         return False
@@ -79,6 +82,7 @@ def validation_scope(root: Path, base: str, head: str) -> str:
 
 
 def main() -> int:
+    """Print the validation scope, exiting with status 2 when identity checks fail."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", required=True)
     parser.add_argument("--head", required=True)

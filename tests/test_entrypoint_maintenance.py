@@ -120,6 +120,7 @@ def test_live_advisory_lock_blocks_maintenance(tmp_path: Path) -> None:
 
 
 def test_non_regular_lock_is_rejected_without_blocking(tmp_path: Path) -> None:
+    """Verify a FIFO lock path is rejected without waiting for a writer."""
     if not hasattr(os, "mkfifo"):
         pytest.skip("FIFO creation is unavailable")
     _source, target, _backup, args = _fixture(tmp_path)
