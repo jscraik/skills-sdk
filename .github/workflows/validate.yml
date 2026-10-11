@@ -76,6 +76,9 @@ jobs:
       - run: uv sync --frozen
       - name: Quality and schema checks
         run: bash scripts/validate-repository.sh quality
+      - name: Documentation-dependent contract tests
+        if: github.event_name == 'pull_request' && steps.pr_contract.outputs.scope == 'docs'
+        run: bash scripts/validate-repository.sh docs-tests
       - name: Full tests (two isolated workers and slow-test report)
         if: github.event_name != 'pull_request' || steps.pr_contract.outputs.scope != 'docs'
         run: bash scripts/validate-repository.sh tests

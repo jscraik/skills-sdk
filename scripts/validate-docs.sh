@@ -11,4 +11,5 @@ if [[ "$scope" != docs ]]; then
   exit 2
 fi
 bash scripts/validate-repository.sh quality
+bash scripts/validate-repository.sh docs-tests
 bash scripts/validate-repository.sh diff

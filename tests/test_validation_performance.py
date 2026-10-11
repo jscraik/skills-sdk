@@ -250,8 +250,11 @@ def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> N
     assert "github.event_name != 'pull_request' || steps.pr_contract.outputs.scope != 'docs'" in workflow
     for phase in ("quality", "tests", "build", "installed", "diff"):
         assert f"bash scripts/validate-repository.sh {phase}" in workflow
+    assert "github.event_name == 'pull_request' && steps.pr_contract.outputs.scope == 'docs'" in workflow
+    assert "bash scripts/validate-repository.sh docs-tests" in workflow
     wrapper = (ROOT / "scripts/validate-repository.sh").read_text()
     assert 'phase="${1:-all}"' in wrapper and "pytest -n 2 --dist load --durations=25" in wrapper
+    assert "tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py" in wrapper
 
 
 def test_docs_wrapper_runs_real_quality_rejects_source_and_recovers(tmp_path: Path) -> None:
@@ -270,6 +273,7 @@ def test_docs_wrapper_runs_real_quality_rejects_source_and_recovers(tmp_path: Pa
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / relative, destination)
     base = _repository(tmp_path)
+    shutil.copyfile(ROOT / "README.md", tmp_path / "README.md")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "-m", "fixture tooling")
     base = _git(tmp_path, "rev-parse", "HEAD")
@@ -304,3 +308,13 @@ def test_docs_wrapper_runs_real_quality_rejects_source_and_recovers(tmp_path: Pa
         assert "validation: start tests" not in result.stdout and "validation: start installed" not in result.stdout
         if not executable:
             assert "validation: finish codestyle status=0" in result.stdout
+            assert "validation: finish docs-tests status=0" in result.stdout
+    valid_prose = prose.read_text()
+    prose.write_text(valid_prose.replace("From the checkout root:", "At the checkout root:"))
+    broken = subprocess.run(command, cwd=tmp_path, env=environment, capture_output=True, text=True, check=False)
+    assert broken.returncode != 0, "documentation route concealed a failed README contract"
+    assert "validation: finish docs-tests status=1" in broken.stdout
+    assert "validation: start diff" not in broken.stdout
+    prose.write_text(valid_prose)
+    recovered = subprocess.run(command, cwd=tmp_path, env=environment, capture_output=True, text=True, check=False)
+    assert recovered.returncode == 0, recovered.stdout + recovered.stderr

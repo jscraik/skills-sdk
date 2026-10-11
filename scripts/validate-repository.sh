@@ -7,8 +7,8 @@ export MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"
 export MISE_CEILING_PATHS="$repo_root/.."
 
 phase="${1:-all}"
-if [[ $# -gt 1 || ! "$phase" =~ ^(all|quality|tests|build|installed|diff)$ ]]; then
-  echo "usage: bash scripts/validate-repository.sh [all|quality|tests|build|installed|diff]" >&2
+if [[ $# -gt 1 || ! "$phase" =~ ^(all|quality|docs-tests|tests|build|installed|diff)$ ]]; then
+  echo "usage: bash scripts/validate-repository.sh [all|quality|docs-tests|tests|build|installed|diff]" >&2
   exit 2
 fi
 
@@ -24,6 +24,10 @@ run_timed() {
 if [[ "$phase" == all || "$phase" == quality ]]; then
   run_timed schemas mise exec -- uv run --frozen python scripts/generate_schemas.py --check
   run_timed codestyle bash scripts/validate-codestyle.sh
+fi
+if [[ "$phase" == docs-tests ]]; then
+  run_timed docs-tests mise exec -- uv run --frozen pytest \
+    tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py --durations=10
 fi
 if [[ "$phase" == all || "$phase" == tests ]]; then
   run_timed tests mise exec -- uv run --frozen pytest -n 2 --dist load --durations=25 --durations-min=0.1

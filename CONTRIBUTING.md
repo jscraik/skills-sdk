@@ -76,6 +76,8 @@ For ordinary documentation-only changes, run
 The classifier verifies Git identity, all committed changes, dirty tracked
 paths and untracked non-ignored paths. It accepts only regular non-executable
 prose in the documented allowlist. Other changes require the full wrapper.
+The reduced route retains the existing documentation-dependent contract tests;
+prose classification does not waive tests that consume those documents.
 Hosted PR classification uses the trusted base implementation; a base without
 that implementation defaults to full validation. Pushes to main remain full.
 See [validation scope and phases](docs/standards.md#validation-scope-and-phases).

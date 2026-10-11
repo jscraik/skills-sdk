@@ -26,7 +26,7 @@ The default aggregate runs every phase and stops at the first failure. Each
 phase prints its start, exit status and elapsed seconds. The hosted `validate`
 job exposes quality, tests, build, installed-entrypoint proof and diff hygiene
 as separate steps; its successful result still requires every applicable step.
-The same wrapper accepts `quality`, `tests`, `build`, `installed` or `diff`
+The same wrapper accepts `quality`, `docs-tests`, `tests`, `build`, `installed` or `diff`
 for those steps. Running one phase does not establish aggregate completion.
 
 The test phase uses pinned pytest-xdist with two independent worker processes,
@@ -37,7 +37,8 @@ drift, failure and recovery checks are not cached or removed for speed.
 
 The documentation-only route is
 `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`.
-It runs schema drift, all codestyle/structural/link/prose checks and diff hygiene
+It runs schema drift, all codestyle/structural/link/prose checks, documentation-dependent
+contract tests and diff hygiene
 only after an exact-change classifier accepts ordinary prose. The allowlist is
 `docs/` prose with Markdown, MDX, AsciiDoc or reStructuredText suffixes, plus
 root `README.md`, `ARCHITECTURE.md`, `UBIQUITOUS.md`, `CHANGELOG.md` and
@@ -57,8 +58,13 @@ the otherwise valid PR.
 
 Hosted PR scope comes from the trusted base classifier, never from an unreviewed
 candidate classifier. A base without that classifier uses full validation.
+The `docs-tests` phase runs `test_public_repository_boundary.py` and
+`test_skill_validation_architecture.py`, retaining their repository-document,
+portable-boundary and documented-command checks. Keep this bounded set aligned
+with tests that read allowed prose. Those tests also run once within the full
+suite; the full aggregate does not repeat the separate documentation phase.
 All accepted-main push runs remain full. Documentation proof does not establish
-behavioural regression, build or installed-entrypoint proof, and must be reported
+full behavioural regression, build or installed-entrypoint proof, and must be reported
 as documentation-only rather than as a full aggregate result.
 
 The standards program scans all Python source and tests for public annotations,
