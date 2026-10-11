@@ -16,7 +16,9 @@ from pydantic_core import PydanticSerializationError
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
+from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput, assess_pre_execution_safety
 from skills_sdk.evaluation.quality import _capture_evals, _ClosedLoader
+from skills_sdk.evaluation.selected_case_checks import _category, _check_contract_digest
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2, ScenarioObservationV2, ScenarioSetV2
 from skills_sdk.models.packaging import PackageManifestFile, PackageReceiptBlocker
@@ -69,6 +71,11 @@ class SelectedCaseDefinition:
             {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in self.semantic_assertions
         ]
         return canonical_json_sha256(payload)
+
+    @property
+    def check_contract_sha256(self) -> str:
+        """Bind semantic and deterministic checks without changing judge evidence v1."""
+        return _check_contract_digest(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,17 +235,6 @@ def _deterministic_patterns_are_bounded(
     except UnicodeError:
         return False
     return len(patterns) <= _MAX_DETERMINISTIC_PATTERNS and pattern_bytes <= _MAX_DETERMINISTIC_PATTERN_BYTES
-
-
-def _category(value: object) -> Literal["happy", "pressure", "boundary", "regression"]:
-    """Map supported package categories onto the evaluation-v2 contract."""
-    if not isinstance(value, str):
-        raise _contract_error("invalid_selected_case", "selected case category must be text")
-    if value in {"happy", "pressure", "regression"}:
-        return cast(Literal["happy", "pressure", "regression"], value)
-    if value in {"boundary", "edge", "negative"}:
-        return "boundary"
-    raise _contract_error("invalid_selected_case", "selected case category is unsupported")
 
 
 def load_selected_case(
@@ -470,14 +466,9 @@ def _request_matches_definition(
     input_payload: JsonValue,
 ) -> bool:
     """Return whether the request and payload bind exactly to the selected case."""
-    case = definition.scenario_set.cases[0]
-    return (
-        request.candidate == definition.scenario_set.candidate
-        and request.scenario_set_id == definition.scenario_set.scenario_set_id
-        and request.case_id == case.case_id
-        and input_payload == {"prompt": case.prompt}
-        and request.input_sha256 == canonical_json_sha256(input_payload)
-    )
+    from skills_sdk.evaluation.skill_context import _request_matches_context_or_prompt
+
+    return _request_matches_context_or_prompt(definition, request, input_payload)
 
 
 def _canonical_input_payload(input_payload: JsonValue) -> JsonValue:
@@ -652,16 +643,8 @@ def _missing_judge_ref_receipt(
     return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
 
 
-async def execute_selected_case(
-    definition: SelectedCaseDefinition,
-    request: ProviderExecutionRequest,
-    input_payload: JsonValue,
-    adapter: TextProviderAdapter | None,
-    assertion_evidence: object,
-) -> EvaluationReceiptV2:
-    """Execute one injected provider call and evaluate bound assertion evidence."""
-
-    definition = _revalidate_definition(definition)
+def _validated_selected_request(request: ProviderExecutionRequest) -> ProviderExecutionRequest:
+    """Revalidate public request identity before observing execution adapters."""
     try:
         request = ProviderExecutionRequest.model_validate(request)
     except ValidationError:
@@ -677,6 +660,24 @@ async def execute_selected_case(
         )
     ):
         raise _contract_error("invalid_provider_request", "provider identity contains private values")
+    return request
+
+
+async def execute_selected_case(
+    definition: SelectedCaseDefinition,
+    request: ProviderExecutionRequest,
+    input_payload: JsonValue | SelectedCaseExecutionInput,
+    adapter: TextProviderAdapter | None,
+    assertion_evidence: object,
+) -> EvaluationReceiptV2:
+    """Execute one injected provider call and evaluate bound assertion evidence."""
+
+    safety_evidence = None
+    if isinstance(input_payload, SelectedCaseExecutionInput):
+        safety_evidence = input_payload.safety_evidence
+        input_payload = input_payload.payload
+    definition = _revalidate_definition(definition)
+    request = _validated_selected_request(request)
     normalized_payload = _canonical_input_payload(input_payload)
     if not _request_matches_definition(definition, request, normalized_payload):
         observation = _blocked_observation(
@@ -695,6 +696,12 @@ async def execute_selected_case(
             blocker.code if blocker is not None else "provider_request_blocked",
             "provider request was blocked before execution",
             blocker.evidence_refs if blocker is not None else request.evidence_refs,
+        )
+        return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
+    safety_blocker = assess_pre_execution_safety(request, safety_evidence, package_root=definition._package_root)
+    if safety_blocker is not None:
+        observation = _blocked_observation(
+            definition, request, safety_blocker.code, safety_blocker.message, safety_blocker.evidence_refs
         )
         return evaluate_scenario_set_v2(definition.scenario_set, (observation,), scorer=definition.scorer)
     if adapter is None or assertion_evidence is None:

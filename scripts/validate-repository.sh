@@ -21,4 +21,16 @@ fi
 mise exec -- uv venv --python 3.12 "$smoke_venv_dir"
 mise exec -- uv pip install --python "$smoke_venv_dir/bin/python" "${sdk_built_wheels[0]}"
 "$smoke_venv_dir/bin/python" tests/installed_pr_sweep_smoke.py
+"$smoke_venv_dir/bin/python" tests/installed_package_quality_smoke.py
+"$smoke_venv_dir/bin/python" tests/installed_plugin_intake_smoke.py
+"$smoke_venv_dir/bin/python" tests/installed_scenario_coverage_smoke.py
+"$smoke_venv_dir/bin/python" tests/installed_content_review_smoke.py
+mise exec -- uv run --frozen python tests/installed_quality_workflow_smoke.py --prepare "$smoke_venv_dir/quality-inputs"
+"$smoke_venv_dir/bin/python" tests/installed_quality_workflow_smoke.py --check "$smoke_venv_dir/quality-inputs"
+mise exec -- uv run --frozen python tests/installed_pre_execution_smoke.py --prepare "$smoke_venv_dir/safety-inputs"
+"$smoke_venv_dir/bin/python" tests/installed_pre_execution_smoke.py --check "$smoke_venv_dir/safety-inputs"
+mise exec -- uv run --frozen python tests/installed_observed_calibration_smoke.py --prepare "$smoke_venv_dir/calibration-inputs"
+"$smoke_venv_dir/bin/python" tests/installed_observed_calibration_smoke.py --check "$smoke_venv_dir/calibration-inputs"
+mise exec -- uv run --frozen python tests/installed_matched_smoke.py --prepare "$smoke_venv_dir/matched-inputs"
+"$smoke_venv_dir/bin/python" tests/installed_matched_smoke.py --check "$smoke_venv_dir/matched-inputs"
 git diff --check

@@ -9,9 +9,11 @@ from typing import cast
 
 import pytest
 from test_live_selected_case import _Judge, _Provider, _setup
+from test_selected_case_evaluation import _safety_for
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation import execute_selected_case_with_judge
+from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 from skills_sdk.models.evaluation_v2 import ScenarioSetV2
 from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.providers import ProviderAdapterComplete
@@ -22,7 +24,11 @@ def test_judge_failure_names_bound_judge_runner(tmp_path: Path) -> None:
     judge_identity = request.provider.model_copy(update={"adapter_id": "different-judge"})
     receipt = asyncio.run(
         execute_selected_case_with_judge(
-            definition, request, payload, _Provider(request, events), _Judge(judge_identity, events, failure=True)
+            definition,
+            request,
+            SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+            _Provider(request, events),
+            _Judge(judge_identity, events, failure=True),
         )
     )
     assert receipt.status == "blocked"
@@ -42,7 +48,11 @@ def test_provider_valid_internal_request_mutation_cannot_pass(tmp_path: Path) ->
 
     receipt = asyncio.run(
         execute_selected_case_with_judge(
-            definition, request, payload, _ValidMutatingProvider(request, events), _Judge(request.provider, events)
+            definition,
+            request,
+            SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+            _ValidMutatingProvider(request, events),
+            _Judge(request.provider, events),
         )
     )
     assert receipt.status == "blocked"
@@ -63,7 +73,11 @@ def test_definition_serializer_failure_is_typed_before_dispatch(tmp_path: Path) 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
         asyncio.run(
             execute_selected_case_with_judge(
-                forged_definition, request, payload, _Provider(request, events), _Judge(request.provider, events)
+                forged_definition,
+                request,
+                SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+                _Provider(request, events),
+                _Judge(request.provider, events),
             )
         )
     assert events == []
@@ -81,7 +95,11 @@ def test_host_contract_error_code_is_normalized_after_cleanup(tmp_path: Path, ma
 
     receipt = asyncio.run(
         execute_selected_case_with_judge(
-            definition, request, payload, _MalformedErrorProvider(request, events), _Judge(request.provider, events)
+            definition,
+            request,
+            SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+            _MalformedErrorProvider(request, events),
+            _Judge(request.provider, events),
         )
     )
     assert receipt.status == "blocked"

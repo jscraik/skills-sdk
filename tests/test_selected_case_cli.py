@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
-from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepared_request, _skill
+from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepared_request, _safety_for, _skill
 
 from skills_sdk.cli.main import main
 from skills_sdk.evaluation import load_selected_case
@@ -26,6 +26,7 @@ def test_cli_runs_controlled_supplied_adapter_without_agent_skills(
         json.dumps(
             {
                 "request": request.model_dump(mode="json"),
+                "safety_evidence": _safety_for(definition, request).model_dump(mode="json"),
                 "input_payload": input_payload,
                 "adapter": {
                     "descriptor": _adapter(request, output).descriptor.model_dump(mode="json"),
@@ -116,7 +117,14 @@ def test_cli_human_output_shows_case_blocker(tmp_path: Path, capsys: pytest.Capt
     request = _prepared_request(definition, input_payload)
     host_input = tmp_path / "missing-adapter.json"
     host_input.write_text(
-        json.dumps({"request": request.model_dump(mode="json"), "input_payload": input_payload}), encoding="utf-8"
+        json.dumps(
+            {
+                "request": request.model_dump(mode="json"),
+                "input_payload": input_payload,
+                "safety_evidence": _safety_for(definition, request).model_dump(mode="json"),
+            }
+        ),
+        encoding="utf-8",
     )
 
     exit_code = main(
@@ -160,6 +168,7 @@ def test_cli_human_output_shows_failed_case_detail(tmp_path: Path, capsys: pytes
                     "evidence_refs": ["evidence/provider-output.json"],
                 },
                 "assertion_evidence": _evidence(definition, request, output_text).model_dump(mode="json"),
+                "safety_evidence": _safety_for(definition, request).model_dump(mode="json"),
             }
         ),
         encoding="utf-8",

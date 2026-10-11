@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 from enum import StrEnum
 from typing import Annotated, Literal
 
@@ -19,6 +21,14 @@ from skills_sdk.models.inventory import (
 
 PackageName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
 PluginName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")]
+
+
+def _candidate_package_id(directory_name: str, content_sha256: str) -> str:
+    """Preserve the standalone candidate ID, including its invalid-name fallback."""
+    if re.fullmatch(r"[a-z0-9]+(?:[._-][a-z0-9]+)*", directory_name):
+        return directory_name
+    root_digest = hashlib.sha256(directory_name.encode("utf-8", errors="surrogateescape")).hexdigest()[:6]
+    return f"invalid-package-{root_digest}-{content_sha256[:12]}"
 
 
 class PackageSourceKind(StrEnum):

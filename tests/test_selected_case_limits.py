@@ -8,9 +8,10 @@ from pathlib import Path
 
 import pytest
 import yaml
-from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepared_request, _skill
+from test_selected_case_evaluation import REVISION, _adapter, _evidence, _prepared_request, _safety_for, _skill
 
 from skills_sdk.core.errors import ContractError
+from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 from skills_sdk.evaluation.selected_case import execute_selected_case, load_selected_case
 
 
@@ -46,7 +47,11 @@ def test_forged_selected_case_cannot_exceed_deterministic_pattern_bytes(tmp_path
     )
 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
-        asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
+        asyncio.run(
+            execute_selected_case(
+                forged, request, SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)), None, None
+            )
+        )
 
 
 def test_selected_case_rejects_unencodable_prompt_during_loading(tmp_path: Path) -> None:
@@ -95,7 +100,7 @@ def test_selected_case_evaluates_large_semantic_signal_set(tmp_path: Path) -> No
         execute_selected_case(
             definition,
             request,
-            input_payload,
+            SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
             _adapter(request, "reviewed"),
             _evidence(definition, request, "reviewed"),
         )

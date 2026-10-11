@@ -1,5 +1,18 @@
 """Typed package and plugin inventory contracts."""
 
+from skills_sdk.models.content_review import (
+    ContentReviewAssessment,
+    ContentReviewExecutionResult,
+    ContentReviewItem,
+    ContentReviewResult,
+)
+from skills_sdk.models.coverage import (
+    ClaimCoverage,
+    CoverageClaim,
+    CoverageGap,
+    ScenarioCoveragePlan,
+    ScenarioCoverageResult,
+)
 from skills_sdk.models.evaluation import (
     EvaluationReceipt,
     ScenarioCase,
@@ -41,6 +54,39 @@ from skills_sdk.models.maintenance import (
     EntrypointMaintenanceResult,
     RuntimeCopyComparison,
 )
+from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt
+from skills_sdk.models.matched_comparison import (
+    MatchedCaseBinding,
+    MatchedComparisonPlan,
+    MatchedComparisonRubric,
+    MatchedDimensionJudgment,
+    MatchedLaneSpec,
+    MatchedPairAssessment,
+    MatchedRubricDimension,
+    MatchedVariantJudgment,
+)
+from skills_sdk.models.matched_execution import MatchedExecutedPair, MatchedExecutionReceipt
+from skills_sdk.models.matched_feedback import (
+    MatchedCloudRegressionReceipt,
+    MatchedRegressionAssignment,
+    MatchedRegressionReceipt,
+)
+from skills_sdk.models.matched_handoff import MatchedCloudExecutionReceipt, MatchedCloudHandoff
+from skills_sdk.models.matched_plugin_calibration import MatchedCalibrationTarget, MatchedVariantCalibrationBundle
+from skills_sdk.models.matched_plugin_scope import MatchedPluginCaseScope, MatchedPluginScope
+from skills_sdk.models.matched_policy import (
+    MatchedCaseSummary,
+    MatchedLaneSummary,
+    MatchedRunBudget,
+    MatchedSelectionPolicy,
+)
+from skills_sdk.models.observed_calibration import (
+    CalibrationJudgeVerdict,
+    HeldOutCalibrationProbe,
+    ObservedCalibrationPlan,
+    ObservedCalibrationProbeResult,
+    ObservedCalibrationReceipt,
+)
 from skills_sdk.models.package import (
     IntakeChecks,
     IntakeDecision,
@@ -69,7 +115,16 @@ from skills_sdk.models.packaging import (
     PackageReceiptBlocker,
     PackageReceiptV2,
 )
+from skills_sdk.models.plugin import (
+    PluginCapturedFile,
+    PluginPackageValidation,
+    PluginSkillBinding,
+    PluginValidationPolicy,
+    PortablePluginManifest,
+)
+from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
+from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
 from skills_sdk.models.provider import ProviderIdentity, ProviderIdentityV2
 from skills_sdk.models.provider_call import (
     ProviderCallPublicResult,
@@ -82,6 +137,12 @@ from skills_sdk.models.provider_execution import (
     ProviderExecutionRequest,
     ProviderExecutionResult,
     ProviderUsageMetadata,
+)
+from skills_sdk.models.quality_workflow import (
+    LocalCheckRequestV2,
+    LocalCheckResultV2,
+    LocalQualityPolicy,
+    LocalQualityStage,
 )
 from skills_sdk.models.registry import (
     RegistryIdentity,
@@ -130,22 +191,63 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 
 __all__ = [
     "ActivationObservation",
+    "CalibrationJudgeVerdict",
+    "CapabilitySafetyReview",
+    "ClaimCoverage",
+    "ContentReviewAssessment",
+    "ContentReviewExecutionResult",
+    "ContentReviewItem",
+    "ContentReviewResult",
+    "CoverageClaim",
+    "CoverageGap",
     "DiscoveryObservation",
     "EntrypointMaintenanceBlocker",
     "EntrypointMaintenanceResult",
     "EvaluationReceipt",
     "EvaluationReceiptV2",
     "FormatChecks",
+    "HeldOutCalibrationProbe",
     "InstallPlan",
     "InstallationResult",
     "IntakeChecks",
     "IntakeDecision",
     "IntakeDecisionStatus",
+    "LocalCheckRequestV2",
+    "LocalCheckResultV2",
+    "LocalQualityPolicy",
+    "LocalQualityStage",
     "MantraAssessment",
     "MantraPrinciple",
     "MantraStatus",
+    "MatchedCalibrationReceipt",
+    "MatchedCalibrationTarget",
+    "MatchedCaseBinding",
+    "MatchedCaseSummary",
+    "MatchedCloudExecutionReceipt",
+    "MatchedCloudHandoff",
+    "MatchedCloudRegressionReceipt",
+    "MatchedComparisonPlan",
+    "MatchedComparisonRubric",
+    "MatchedDimensionJudgment",
+    "MatchedExecutedPair",
+    "MatchedExecutionReceipt",
+    "MatchedLaneSpec",
+    "MatchedLaneSummary",
+    "MatchedPairAssessment",
+    "MatchedPluginCaseScope",
+    "MatchedPluginScope",
+    "MatchedRegressionAssignment",
+    "MatchedRegressionReceipt",
+    "MatchedRubricDimension",
+    "MatchedRunBudget",
+    "MatchedSelectionPolicy",
+    "MatchedVariantCalibrationBundle",
+    "MatchedVariantJudgment",
     "MutationRaceEvidence",
     "NormalizedPackage",
+    "ObservedCalibrationPlan",
+    "ObservedCalibrationProbeResult",
+    "ObservedCalibrationReceipt",
     "OwnershipState",
     "PackageArchiveVerificationPolicy",
     "PackageArchiveVerificationReceipt",
@@ -175,10 +277,17 @@ __all__ = [
     "PackageSource",
     "PackageSourceKind",
     "PackageType",
+    "PluginCapturedFile",
     "PluginIdentity",
+    "PluginPackageValidation",
+    "PluginPreExecutionSafetyEvidence",
+    "PluginSkillBinding",
+    "PluginValidationPolicy",
+    "PortablePluginManifest",
     "PrSweepDirtyState",
     "PrSweepFinding",
     "PrSweepValidationResult",
+    "PreExecutionSafetyEvidence",
     "ProviderCallPublicResult",
     "ProviderCostObservation",
     "ProviderExecutionBlocker",
@@ -214,6 +323,8 @@ __all__ = [
     "ScenarioCaseResult",
     "ScenarioCaseResultV2",
     "ScenarioCaseV2",
+    "ScenarioCoveragePlan",
+    "ScenarioCoverageResult",
     "ScenarioObservation",
     "ScenarioObservationV2",
     "ScenarioQualityAppliedPolicy",

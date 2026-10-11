@@ -10,24 +10,97 @@ offline orchestration through an injected adapter, prepares
 local private-registry receipts, and plans intended runtime-lock transitions.
 Real-provider transports and credentials, host apply or rollback, registry
 interaction, and publication remain outside the portable core. Supported
-integration adapters and their end-to-end orchestration are SDK-owned future
-work, not responsibilities left to Agent-Skills or Foundry.
+real-provider, registry and host integrations and the complete workflow remain
+SDK-owned work, not responsibilities left to Agent-Skills or Foundry. Explicit
+profile adapters already bind supplied inputs and deliver compiled settings to
+controlled offline drivers; they do not establish those external integrations.
+
+## brAInwav product family
+
+The owner-approved product structure has two separate repositories, not a
+combined runtime or a new SDK dependency:
+
+| Repository | Responsibilities |
+| --- | --- |
+| `skills-sdk` | Portable library, CLI and contracts; validation and evaluation; package preparation; registry and host adapters. |
+| `skills-registry` (future) | Website/API and search; publisher accounts; package/version catalogue; artifact storage and access; job scheduling and operations. Keep UI, API, administration and workers in this one registry repository initially. |
+
+Registry workers use an installed, pinned SDK package version for validation,
+evaluation and preparation through public APIs and versioned schemas. Production
+must not use neighbouring checkouts, editable installations, private SDK imports
+or duplicated validation rules. Record the package version with job evidence.
+The service owns worker scheduling and isolation; the SDK owns the reusable
+operation and its contracts. Shared repository custody does not grant untrusted
+evaluation workers the website's publishing credentials. Separate processes and
+permissions need not become separate repositories.
+
+SDK registry adapters may call supported APIs but must not import registry server
+code. Offline validation, preparation and applicable local evaluation require no
+registry account, database or running website. Neither project depends on
+Agent-Skills or Foundry at runtime. Prove both sides: isolated SDK operation and
+registry consumer tests against the installed SDK package actually deployed.
+Separate repositories alone do not prove independence or security.
+
+The SDK determines what candidate-bound evidence establishes; registry policy
+decides publication, storage, presentation and distribution. The target SDK icon
+gate validates approved artwork and binds packaged bytes; the registry displays
+that exact version's artwork and attributed evidence, never silently replaces
+released assets. Coordinate a boundary change through an SDK release or explicit
+candidate package and a tested registry dependency update, not shared source.
+Reconsider repository consolidation only if repeated cross-repository
+coordination becomes a demonstrated problem and Jamie approves that change.
+
+This is a responsibility boundary, not permission to create `skills-registry`
+now. The [registry start gate](docs/workflow.md#registry-transition) still
+requires completed SDK acceptance and verified private Tessl publication first.
 
 ## Product ownership and migration
+
+Use [the canonical workflow](docs/workflow.md) for the owner-approved gate
+sequence and correction loops. The [migration map](docs/migration-map.md)
+records source capability disposition; the [task record](docs/projects/sdk-workflow/tasks.md)
+tracks bounded implementation and acceptance proof.
 
 Skills SDK owns the agent-facing `SKILL.md`, references, evaluation workflow,
 and executable tooling to create, update, check, and admit external skills and
 plugins, then orchestrate installation of selected checked versions through
-supported Tessl and Codex adapters. This is target ownership, not a claim that
+supported registry and host adapters, initially Tessl and Codex. This is target ownership, not a claim that
 all routes currently execute. Skills Foundry holds candidates awaiting SDK
 processing, including blocked candidates; its custody does not grant approval,
 distribution, or installation and need not be permanent after processing.
 Agent-Skills is only a migration source; new SDK lifecycle behavior must not
 be added there.
 
-The target managed path is candidate holding/intake, SDK checking, private
-Tessl `jscraik` registry version, and selected Codex runtime copy. Only Jamie
-decides public release. Verify origin before exempting OpenAI-provided plugins
+The [managed release format](docs/workflow.md#managed-release-format) selects
+Agent Plugins as the release unit even for one skill, with root `plugin.json`
+canonical and client-specific settings behind extension/adapter boundaries.
+Whole-plugin identity precedes release-bound quality, security and evaluation
+evidence. Standalone skills remain intake and validation inputs, not a second
+managed release format. Accepted plugin inspection and bounded matched
+evaluation do not replace the remaining normalisation, presentation and release
+preparation work or change the standalone skill-level contracts below.
+
+The [mandatory icon policy](docs/workflow.md#icons-and-presentation) belongs to
+SDK release readiness. Bind approved artwork, its rights evidence and referenced
+presentation assets to the whole-plugin candidate. Portable capture belongs to
+the reusable core; destination image rules and observed display belong to the
+selected adapters. Asset generation, normalisation and repair are explicit
+preparation operations; validation and build remain read-only. Generic asset
+hashing is not image validation, approval or host-display proof.
+
+The target managed path is optional candidate holding/intake, whole-plugin
+SDK checking, a verified registry version and selected host installation.
+Tessl `jscraik` is the initial private distribution backend, not a permanent
+SDK dependency. Do not start or create the separate registry, even a catalogue
+or prototype, before completing the SDK workflow and verifying correct private
+Tessl publication. A separately operated registry becomes primary only after
+publication, readback, download and installation proof; see the
+[registry transition](docs/workflow.md#registry-transition). The SDK remains
+usable and testable while either registry service is unavailable. Registry
+services own storage, search, access control, presentation and distribution;
+they consume SDK validation/evaluation rather than duplicate it. Tessl-specific
+manifests are import/export adapter outputs over one canonical content source.
+Only Jamie decides public release. Verify origin before exempting OpenAI-provided plugins
 or OpenAI system skills; keep their provider-managed loading paths intact.
 None of these registry, installation, or exemption outcomes is proved by the
 current local SDK contracts.
@@ -173,7 +246,11 @@ Local candidate-bound contracts
 ```
 
 The CLI is an outer adapter over the implemented local services. `intake`,
-`validate`, and `build` execute the package-processing paths above. `eval
+`validate`, and `build` execute the package-processing paths above.
+`check-local` composes read-only intake, validation, scenario quality, scorer
+quality and supplied-artifact calibration. `eval scorer-quality` and
+`eval scorer-calibration` also expose their separate static assessment services;
+none of these commands proves a live judge ran. `eval
 scenario-quality` lazily invokes the separate read-only
 `evaluation/quality.py` service, prints its versioned assessment, and exits 0
 for a passing assessment or 2 for a blocked assessment. `eval selected-case`
@@ -187,10 +264,16 @@ host credentials, adapter discovery, or judge-result storage. `compare-copy`
 performs two read-only validations and compares captured files.
 `maintain-entrypoint` checks an existing host entrypoint and permits a
 digest-bound replacement only with explicit `--apply`. The other lifecycle
-names are parseable discovery boundaries and do not perform provider,
+names `inventory`, `package`, `project`, and `tessl` are parseable discovery
+boundaries and do not perform provider,
 installation, runtime, or publication work. See
 [Runtime copy integration](docs/runtime-copy-integration.md) for maintenance
 authority, backup, platform, and concurrency limitations.
+
+`verify recurring-findings` and `verify pr-sweep-dirty-closeout` execute local
+repository-evidence validators. Their proof remains separate from hosted PR
+readiness, provider execution and runtime installation. Use
+[CLI status](docs/cli.md) for the maintained command surface.
 
 ## Code map
 
@@ -202,16 +285,16 @@ docstrings and the linked API or CLI guides.
 | --- | --- | --- |
 | `src/skills_sdk/core/` | Shared typed errors, portable paths, generic receipt parsing, and packaged schema lookup/validation. | `ContractError`, `require_portable_relative_path`, `Receipt`, `SchemaRegistry` |
 | `src/skills_sdk/models/` | Frozen Pydantic contract families for identity, inventory, intake, evaluation, risk, security, validation, manifests, and receipts. | `PackageCandidateIdentity`, `SkillPackageValidation`, `PackageManifest`, `PackageReceipt` |
-| `src/skills_sdk/validation/` | Read-only standalone-skill capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. | `SkillIR`, `read_frontmatter`, `validate_skill_package` |
+| `src/skills_sdk/validation/` | Read-only skill and portable-plugin capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. Plugin validation composes captured child bytes without changing standalone contracts. | `SkillIR`, `read_frontmatter`, `validate_skill_package`, `validate_plugin_package` |
 | `src/skills_sdk/intake/` | Composition of structural validation with caller-supplied source, ownership, rights, and admission evidence into a candidate-bound normalized package; no copying or Foundry admission. | `intake_skill_package` in `normalization.py` |
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
-| `src/skills_sdk/evaluation/` | Deterministic scoring over external observations, package-local definition checks, and one selected-case orchestration route over an injected adapter and bound judge evidence; no provider discovery, credentials, or live-model authority. | `evaluate_scenario_set` in `deterministic.py`, `assess_scenario_quality` in `quality.py`, `execute_selected_case` in `selected_case.py` |
+| `src/skills_sdk/evaluation/` | Definition/scorer checks, selected-case execution, observed calibration and bounded matched whole-plugin local/cloud evaluation with feedback/rerun over injected adapters; no provider discovery, credentials, or live-model authority. | `evaluate_scenario_set`, `assess_scenario_quality`, `execute_selected_case`, `execute_scorer_calibration`, `execute_matched_lane`, `prepare_matched_cloud_handoff` |
 | `src/skills_sdk/evaluation/quality.py` | Read-only, candidate-bound assessment of package-local scenario definitions; no scenario or provider execution. | `assess_scenario_quality` |
 | `src/skills_sdk/lifecycle/` | Pure planning of candidate-bound intended runtime-lock transitions; no installation, host inspection, rollback execution, or runtime mutation. | `plan_runtime_install` in `planning.py` |
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
 | `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
-| `src/skills_sdk/providers/` | Bounded offline complete and pull-stream orchestration through an injected adapter; no discovery, credentials, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter` |
+| `src/skills_sdk/providers/` | Bounded offline complete and pull-stream orchestration; explicit profile capture/compilation in the outer `codex_profiles` adapter delivers bound settings to caller-supplied drivers. No home discovery, credential resolution, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter`, `describe_codex_profile`, `compile_codex_profile`; [profile contract](docs/api.md#explicit-codex-profiles) |
 | `src/skills_sdk/models/runtime_evidence.py` | Candidate-bound adapter observations for installation, rollback, discovery, activation, and runtime outcome; no host path resolution, filesystem mutation, activation, or runtime invocation. | `InstallationResult`, `RuntimeOutcomeReceipt` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/host/` | Explicit, digest-bound maintenance of an existing entrypoint with retained backups; no package installation or workflow execution. | `EntrypointRequest`, `check_entrypoint`, `repair_entrypoint` |

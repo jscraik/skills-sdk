@@ -1,5 +1,100 @@
 # Python API
 
+## Portable plugin validation
+
+The additive `validate_plugin_package` service in `skills_sdk.validation` captures
+a root-manifest plugin without executing it or changing its source. Supply a
+`Path`, a forty-character source revision and optional `PluginValidationPolicy`
+from `skills_sdk.models`. The policy can require nonempty version and description
+metadata; neither is a mandatory base-format field. This inspection capability
+was accepted in PR #52 and is recorded in the
+[task record](projects/sdk-workflow/tasks.md).
+
+The `plugin-package-validation/v1` result retains a `PortablePluginManifest`
+projection, all captured file hashes/sizes/ordinary permissions, a separate mode
+digest, and each immediate `skills/<name>/SKILL.md` subtree's existing
+`SkillPackageValidation`. Invalid child findings remain visible and block the
+plugin; deeper nested skills are resources, not automatically discovered skills.
+Discovery requires the literal filename `SKILL.md`; lookalikes such as
+`SKILL-md` and `SKILLXmd` do not create children or duplicate a discovered child.
+An exact entrypoint that is a directory blocks. Retained child file roles must
+match their captured relative paths, preserving the standalone role semantics.
+Existing standalone APIs do not auto-detect or wrap plugins.
+
+Root `plugin.json` supplies the canonical name and declares
+`https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`. Names need not match
+the source directory. To preserve the frozen SDK identifier grammar, every
+plugin candidate uses `plugin-` followed by the SHA-256 of its exact UTF-8
+manifest name as `package_id`. The original name is retained separately.
+Byte-content identity covers sorted paths and hashes, including unused overlays,
+shared assets and integration files. Permission changes affect
+`mode_manifest_sha256`, not the historical content digest; compare both evidence
+lanes when consuming a capture.
+
+Unknown root fields and non-object `extensions` produce warning findings and
+are ignored. The unknown-field diagnostic lists all unknown keys in sorted,
+JSON-escaped form, including misspellings, without their values. It uses one
+aggregated warning within the existing metadata parsing budget rather than one
+finding per key. Other known fields with wrong types block. The result records which
+OpenAI settings object is selected and its canonical JSON digest: an inline
+`extensions.com.openai` object replaces the complete compatibility overlay;
+otherwise `.codex-plugin/plugin.json`, if present, supplies the object. It never
+overrides root identity or component discovery. Settings values are not echoed
+or interpreted as permission, artwork or host-compatibility approval.
+
+Capture rejects symbolic links, unsafe resources and special files. It permits
+at most 1,024 files, 2,048 total entries, 64 nested directories, 16 MiB per file
+and 64 MiB total file bytes; metadata JSON is limited to one MiB, 32 nested
+containers and 65,536 inspected values. At most 128 direct skills are assessed.
+Parsing uses captured bytes; a second whole capture rejects observed content,
+permission or directory changes. These are bounded observations, not a promise
+of a filesystem-wide atomic snapshot or protection after validation returns.
+
+`pass` establishes this structural capture only. MCP configuration bytes are
+bound but transport validity is explicitly unassessed. Icon decoding/approval,
+rights/admission, security, evaluation, wrapping, archive emission, export,
+publication and installation remain separate gates. `mutation_performed`,
+`execution_authorized` and `release_ready` remain false. Validate the envelope
+through `SchemaRegistry().validate("plugin-package-validation.v1", payload)`;
+semantic binding checks supplement JSON Schema. This is not a generic receipt
+accepted by `parse_receipt`.
+The hash-only envelope model and SchemaRegistry check supplied consistency;
+they do not prove that selected-settings digests or projected metadata were
+derived from actual source bytes. They cannot authenticate source provenance or
+reconstruct unavailable bytes. Raw settings are never echoed.
+
+The accepted portable-plugin route includes
+`verify_plugin_package_validation(plugin_root, validation, *, source_revision, policy=None)`
+in `skills_sdk.validation`. It normalises the supplied full envelope and compares
+it with fresh no-follow `validate_plugin_package` capture using the caller's
+revision and policy. Invalid, mismatched, stale or unreadable source/evidence
+returns a typed blocked result; corrected evidence can recover. Neither a
+match nor verification grants execution, permissions or release authority.
+Keep any serialised evidence file outside the plugin root; including it changes
+the captured candidate. Supply the original capture's explicit policy.
+Blocked results retain a valid caller policy even when evidence or the revision
+is invalid. Invalid caller policies return `plugin_input_invalid` before source
+capture; they cannot override policy through the supplied envelope.
+Child candidate IDs remain bound to their directory names even when malformed
+skill metadata blocks identity discovery. Invalid directory names retain the
+standalone validator's deterministic fallback ID; supplied IDs cannot replace it.
+Nested child file sizes must be integers without string or boolean coercion;
+this plugin-envelope boundary does not change standalone manifest parsing.
+Retained paths must preserve component-kind blockers they prove: a root `skills`
+file or descendants beneath file-only `mcp.json` or skill-entrypoint locations.
+Empty directory kinds are not retained and still require fresh source assessment.
+Raw and copied envelope identities, child names, file hashes and finding codes reject padding
+before shared models can trim it. Already-normalised shared objects expose only
+their canonical values, not their original input history. Versions and descriptions
+retain their existing whitespace semantics. A captured settings overlay must be
+selected or superseded by inline settings. Retained MCP files require the explicit
+unassessed warning; blocked children and missing required version or description
+metadata retain their specific blocker findings even when other blockers exist.
+Capture rejects known non-regular files from no-follow metadata before opening
+them. Post-open checks remain necessary for races; capture is not an atomic snapshot.
+This verifier was accepted in PR #52. Its structural source comparison does not
+establish the separate matched evaluation or release gates described below.
+
 The public API is the typed contract layer under `skills_sdk`. The top-level
 package exports the inventory, risk, evaluation, and provider execution
 contracts listed in its `__all__`. Import family-specific contracts such as
@@ -8,7 +103,102 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 `PackageHardeningReceipt` from
 `skills_sdk.models` (or their submodules), as shown below.
 
+The [plugin-first, registry-independent target](workflow.md#managed-release-format)
+does not change the implemented APIs below. Standalone-skill validation remains
+supported; its evidence is not automatically whole-plugin clearance. Registry
+preparation remains local contract composition, not a Tessl transport or a
+generic registry client. New plugin and import/export boundaries require the
+[explicit compatibility proof](compatibility.md#plugin-first-and-registry-independent-migration-target)
+before they are documented as available here.
+
 ## Contract families
+
+**Supplied content review:** `assess_content_review` from `skills_sdk.validation`
+checks a `ContentReviewAssessment` against the safely captured current package.
+Import that model and `ContentReviewResult` from `skills_sdk.models`. The supplied
+review covers description and progressive disclosure in `SKILL.md`, plus every
+actual file under `references/`. Each disposition is `clear`, `finding`, or an
+owned `gap`. Completed dispositions require declared, digest-bound source
+evidence for their own path; evidence for another file cannot satisfy that
+disposition. Missing coverage, stale candidate identity, wrong source digests,
+malformed assessment, findings and gaps block. Binary references are included
+in the review inventory without being interpreted as text.
+
+This service verifies supplied reviewer metadata and source binding. It does
+not independently establish accuracy, relevance, freshness, or an exhaustive
+gap inventory; `semantic_review_executed` and `promotion_authorized` remain
+false. It performs no reviewer or provider call. Source evidence digests are
+not proof that an external reviewer actually assessed those bytes. Actual
+review adapter execution uses the separate `execute_content_review` API from
+`skills_sdk.evaluation`. Supply a trusted caller-owned `OfflineContentReviewAdapter`
+with a secret-free local reviewer identity and an asynchronous `review` method.
+The adapter receives a `ContentReviewInput` containing candidate identity and
+private immutable source bytes. Treat those bytes as untrusted data, not host
+instructions. The SDK verifies the returned assessment and detects candidate
+drift, invalid results, reviewer mismatch and callback failure. The callback has
+a thirty-second deadline enforced by the parent outside the callback's event
+loop. A separate thirty-second startup deadline covers child imports and
+adapter metadata. An eight-MiB source limit applies after safe capture and
+before invocation. Caller cancellation stops the SDK-owned worker and propagates
+cancellation to the caller. Cleanup allows at most 250 milliseconds of process
+joins before returning; it does not wait for cooperative callback cancellation.
+
+`ContentReviewExecutionResult` records the observed callback invocation and
+returned assessment digest. It does not establish general semantic accuracy,
+authenticate an external reviewer, or grant promotion. The host owns adapter
+trust, sandboxing and side effects. Execution uses Python's `spawn` context,
+not `fork`: supply an importable, safely pickleable adapter and protect script
+entrypoints with `if __name__ == "__main__"`. Adapter transfer occurs before
+the startup timer and is trusted caller code, not a bounded untrusted ingress
+operation. Daemon process contexts cannot spawn this worker. Unsupported
+transfer or daemon contexts return `unsupported_content_review_isolation`
+without invoking the callback. Adapter state changes remain in the child, not
+the caller's object. Worker termination does not undo filesystem or other
+external side effects and does not guarantee callback `finally` blocks run.
+This is deadline isolation, not a security sandbox. The input limit is not a
+preallocation memory budget. The SDK
+does not load arbitrary plugins, retrieve credentials, or select a paid
+provider. The `review-content` CLI only checks supplied evidence; it does not
+dynamically invoke this adapter.
+
+**Declared scenario coverage:** `assess_scenario_coverage` from
+`skills_sdk.evaluation` audits a `ScenarioCoveragePlan` against the package's
+checked ten-case active set. Import the plan and `ScenarioCoverageResult` from
+`skills_sdk.models`. A plan binds the exact candidate and scenario-set id,
+declares `claims` with `id` and `statement`, maps each claim exactly once to
+`case_ids` or `gap_ids`, and declares each gap's `id`, `reason` and `owner`.
+Unknown cases, unmapped claims, duplicate ids, stale candidates, or unowned gaps
+block. An audit may pass with named gaps while `coverage_complete` remains false.
+Neither result authorises promotion or proves that a mapped case actually tests
+its claim. This checks the supplied inventory; it does not discover every claim,
+review semantic quality, execute cases, or calibrate a judge.
+
+`SkillValidationPolicy` from `skills_sdk.validation` selects optional package
+requirements. `required_files=("references/README.md",)` requires those exact
+portable relative paths to be readable regular files in the captured manifest.
+`check_reference_content=True` checks UTF-8 and nonempty content for Markdown,
+text, JSON and YAML references, plus JSON/YAML syntax. Binary references remain
+valid resources. These checks reuse the bytes that bind the candidate; they
+do not follow symlinks or reread files outside the package. Recognized Markdown
+suffixes are `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, `.mdtxt` and
+`.mdtext`; suffix matching is case-insensitive. A leading UTF-8 BOM is ignored
+when checking textual content. Each textual reference is limited to eight MiB
+before decoding or parsing; larger inputs return `reference_content_limit`.
+This bounds the syntax parser input, not the earlier package byte capture or
+total host memory usage.
+JSON rejects non-standard constants such as `NaN` and `Infinity`. YAML syntax
+validation accepts application-defined tags and multiple documents without
+constructing tagged objects; it does not establish application validity or safety.
+Incremental YAML parsing stops above 128 nested collections or 100,000 parser
+events and returns `reference_content_limit`. These work budgets are not a
+wall-clock deadline or a total host memory guarantee.
+
+Apply the policy to `validate_skill_package`, `build_skill_package`, or
+`intake_skill_package`. Defaults are unchanged. Invalid applicable-file policy
+returns `invalid_validation_policy`; missing required files and invalid textual
+references return finding-specific blockers. These are deterministic checks,
+not proof of accuracy, relevance, link freshness, semantic description quality,
+or completed reviewer execution.
 
 - **Archive verification:** import `verify_package_archive` from
   `skills_sdk.packaging`, and `PackageArchiveVerificationPolicy` and
@@ -80,6 +270,28 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   declared judge parameters when supplied.
   Neither service runs a judge, turns declared probe IDs into execution evidence, or
   expands the active scenario set.
+- **Observed calibration:** `execute_scorer_calibration(plan, executions)` accepts
+  an `ObservedCalibrationPlan` and ordered `CalibrationProbeExecution` host
+  capabilities. It composes the existing guarded selected-case executor rather
+  than importing a provider transport or accepting completed probe claims.
+  Every probe runs for the declared trial count, bounded to 128 invocations.
+  The first trial uses `provider` and `judge`; subsequent trials require an
+  explicit `trial_adapters` tuple of `CalibrationTrialAdapters(provider, judge)`.
+  All provider and judge objects must be distinct across the entire batch,
+  including across roles. Missing, malformed or aliased schedules block before
+  adapter metadata access. The SDK does not clone or reopen host capabilities.
+  PR #55 accepted this lifetime repair; controlled proof is not live calibration quality.
+  Judges return `CalibrationJudgeVerdict` with bound assertion evidence and an
+  actual callback-returned numeric score. The harness retains held-out labels;
+  delegates receive only ordinary `SelectedCaseJudgeInput`. Identity/settings
+  are checked around the callback; full-batch request and safety preflight
+  precedes dispatch. `ObservedCalibrationReceipt` retains a first-stop ordered
+  result prefix, invocation count, confusion-policy outcome and typed blockers.
+  Callbacks may be controlled offline fixtures: `evidence_scope` is
+  `observed_adapter_callbacks`, while `external_authenticity_verified`,
+  `mutation_performed` and `promotion_authorized` remain literal `false`.
+  Adapter invocation is not proof of externally generated scores or trusted
+  ground-truth labels. Calibration probes do not enlarge the ten active cases.
 - **Risk and security:** `RiskClassification`, `RiskSensor`,
   `SecurityScreeningResult`, and redacted `SecurityFinding` metadata.
 - **Registry preparation:** `RegistryIdentity`, `RegistryPreparationRequest`,
@@ -125,6 +337,33 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   to require matching receipt ID, candidate, and canonical manifest digest.
   A raw upstream mapping is first validated through the `package-receipt/v2`
   JSON boundary before that binding is applied.
+- **Pre-execution safety:** `PreExecutionSafetyEvidence` and
+  `CapabilitySafetyReview` retain actual upstream, review, screening and checklist
+  artifacts. `skills_sdk.validation.screen_package_security` uses the existing
+  safe package capture to inspect manifested bytes without running the package,
+  scanner subprocesses, network requests or credentials. Indicators select
+  relevant reviews; they are not proof of exploitability. The canonical
+  `sdk-capability-checklist/v1` covers content/injection, secrets/privacy,
+  filesystem/subprocess, network/external writes, dependencies/binaries and
+  tools/privileges. Content and privacy always require review. Script presence
+  cannot downgrade filesystem and dependency review to non-applicable; other
+  observed capabilities select their corresponding checks. Every non-applicable
+  entry still needs a rationale and retained review evidence.
+  `skills_sdk.evaluation.assess_pre_execution_safety` assesses bindings and
+  freshness; supplying `package_root` also requires actual recapture agreement.
+  Its `None` result means that these checks passed, not general security
+  approval. Host clocks and freshness budgets are not supplied artifact fields.
+  The default maximum review age is one hour, and an explicit host budget must
+  be an integer between one second and one day. Reviews cannot predate their
+  upstream build or be in the future.
+  Both selected-case execution APIs require `SelectedCaseExecutionInput`, which
+  wraps the provider input payload and safety evidence without sending safety
+  metadata to the provider. Bare payloads block before adapter access. Both APIs
+  enforce recapture before provider/judge properties, calls or cleanup. Omitting
+  it returns a candidate-bound evaluation blocker. The low-level provider-call
+  primitive is transport orchestration, not skill-workflow admission. Supplied
+  reviewer claims, external scanner execution, general semantic accuracy and
+  complete plugin-bundle security remain separate evidence lanes.
 - **Provider execution envelopes:** `ProviderExecutionRequest` records a
   candidate-, scenario-, provider-, safety-receipt-, and input-digest-bound
   request prepared for an external adapter. `ProviderExecutionResult` records
@@ -240,6 +479,181 @@ contracts listed in its `__all__`. Import family-specific contracts such as
   2020-12 enforces the operation-to-mutation rule, while equality between lock
   digest fields remains a semantic check.
 
+## Matched whole-plugin evaluation
+
+Accepted in PR #53, this bounded S4 implementation does not establish complete
+workflow parity or live-provider quality. It provides the public evaluation APIs
+`assess_matched_pair`, `execute_matched_calibration`, `execute_matched_lane`,
+`prepare_matched_cloud_handoff`, `execute_matched_cloud`,
+`execute_matched_regression` and `execute_matched_cloud_regression`.
+
+`MatchedComparisonPlan` requires a `MatchedPluginScope` containing two passing
+complete `PluginPackageValidation` captures, including file-mode digests.
+Their complete candidate identities must differ; an identical baseline and
+candidate is not an improvement comparison. A shared package identifier with
+a different revision or content digest remains admissible.
+The bounded slice supports one through nine child skills with the same logical
+child paths in both variants. It requires exactly ten ordered unique active
+cases, per-skill driver coverage for every child, and a cross-skill case when
+there is more than one child. Existing `ScenarioCoveragePlan` claims and
+mappings must preserve the same objective without open gaps. This verifies
+mapping consistency, not the truth or completeness of supplied claims.
+
+Each case has child-bound scorers, selected skill paths and optional shared
+reference paths retained by both captures. Both plan admission and runtime
+context require eligible Markdown paths and reject hidden evaluation,
+scorer, rubric, calibration and held-out paths. References cannot duplicate
+the selected children's automatically included `SKILL.md` entrypoints; ordinary
+captured files such as root `README.md` remain eligible. Captures retain hashes
+and sizes, not source text or encoding proof. Structural plan admission does
+not establish readability: source-backed context preparation requires every
+selected document to decode as UTF-8 before provider or judge access, otherwise
+execution returns a typed blocker. Unselected binary resources remain valid
+captured resources. The ten singleton `ScenarioSetV2`
+values on each side use `release=False`; together they form the managed active
+set, rather than ten independent release sets. Plugin identity properties derive
+from complete captures, not caller-supplied parent aliases.
+`MatchedVariantCalibrationBundle` binds the plugin candidate and modes to exact
+child/assertion/scorer targets. Every target retains observed dimensional
+calibration with at least six held-out probes and the shared judge, settings
+and rubric. Probes and repeated trials do not enlarge the ten active cases.
+
+Host adapters remain private `MatchedCaseExecution` / `MatchedVariantExecution`
+capabilities. Providers implement `MatchedCompleteProviderAdapter` or
+`MatchedStreamingProviderAdapter`, including frozen `parameters`; judges
+implement `DimensionalJudgeAdapter`, including their own frozen `parameters`.
+The first trial uses the variant's provider and judge; `additional_trials`
+contains exactly one fresh `MatchedTrialAdapters(provider, judge)` pair for
+each later trial. Admission rejects reused adapter instances anywhere in the
+lane before host property access. Each invoked adapter receives the existing
+bounded single-call cleanup; later unused capabilities remain caller-owned.
+Hosts must supply fresh capabilities again for a separate lane execution.
+Distinct instances do not prove that a host has avoided aliasing an external
+session behind different wrappers; that remains the host's responsibility.
+Each `MatchedLaneSpec` requires `generator_mode`, either `complete` or `stream`.
+Every variant and trial descriptor must match that frozen mode; mismatch blocks
+before that provider callback, without a completed comparison. The mode is part
+of the plan digest and retained trial request commitments. Streaming remains
+bounded by the provider lifecycle, with source, settings and elapsed-budget
+checks at every pull and iterator cleanup on success or rejection.
+`PluginExecutionContext` and
+`prepare_matched_plugin_context(definition, context)` bind the selected driver,
+selected child documents and permitted references to fresh whole-plugin source.
+Hidden evaluation, scorer, calibration and rubric documents are excluded from
+the generator context. Context paths and source bytes remain private inputs;
+portable receipts retain identities and digests instead of source text.
+
+### Explicit Codex profiles
+
+`skills_sdk.providers.codex_profiles` exposes `CodexProfileSource`,
+`describe_codex_profile`, `compile_codex_profile`, `CodexProfileInvocation`,
+`CodexProfiledCompleteAdapter`, `CodexProfiledStreamingAdapter` and
+`CodexProfiledJudgeAdapter`. These are an outer, supplied-offline adapter seam;
+the portable core does not import Codex or discover host configuration.
+PR #56 accepted this seam, not live-provider execution or real-provider settings application.
+
+`CodexProfileSource` holds a logical name and explicit immutable bytes:
+`profile_bytes`, optional `provider_bytes`, `catalogue_bytes` and
+`defaults_bytes`. Use only `oss-local.config.toml` or `oss-cloud.config.toml` as
+the logical name. Unresolved dependencies or effective options block without
+ambient fallback. Source and invocation representations omit private byte and
+configuration bodies; callers must still keep those bodies out of public logs.
+
+Call `describe_codex_profile(source, model_revision=...)` before constructing
+the lane. The returned `ProviderIdentityV2` uses an explicit
+`provider/native-model` identity, preserving native model tags without loosening
+the frozen URI restriction. Adapter ID `codex-profile-offline-v1` and its digest
+bind the logical name, profile bytes, dependencies, supplied defaults and binding
+contract version. The model revision is a caller claim, not authenticated model
+version evidence. Changed inputs require rebinding the plan and its affected
+calibration and execution evidence.
+
+`compile_codex_profile(plan, source, role)` returns an immutable private driver
+invocation for `generator` or `judge`. Declared profile settings override selected
+catalogue defaults, which override explicit caller defaults. Every required
+option must resolve. Temperature and trial count come from the corresponding
+frozen lane role. Catalogue paths and disabled MCP launch commands are not
+forwarded; the selected model record is supplied directly and optional
+integrations remain disabled. This is the bounded SDK adapter contract, not a
+claim of complete Codex-version configuration compatibility.
+
+Supply a fresh driver for each adapter and trial. Driver `complete` and `stream`
+methods receive `(invocation, request, payload)`; driver `judge` receives
+`(invocation, inputs)`. Cleanup retains the existing lifecycle. The adapter
+compiles once, then compares immutable source, plan, lane, role and invocation
+snapshots around callbacks and stream pulls, rejecting drift without accepting
+the returned output. It does not reparse or rehash profile dependencies on each
+pull. The adapter passes compiled settings to
+the driver; separate proof is needed that a real external implementation applies
+them. These APIs do not authorise provider calls, spending or credential access.
+Closed option values and malformed provider ports reject at input admission.
+Advertised reasoning levels constrain the resolved effort when supplied;
+absent capability metadata leaves external effort support unverified.
+Permission-profile names remain symbolic driver inputs; resolving host policy
+and proving its application remain the driver's responsibility.
+
+Focused tests cover controlled driver delivery, role-specific parameters,
+streaming, rejection, recovery and public provider-call cleanup. Controlled local
+CLI tests retain fresh profile-bound calibration and ten-case execution in both
+modes. The calibration CLI rejects stale configuration, missing profile plans
+and mismatched judge settings, then accepts corrected inputs without exposing
+held-out labels to the judge. Controlled cloud CLI and installed-wheel local,
+calibration and cloud checks prove stale-profile rejection and corrected-input
+recovery. These are offline fixtures, not external model-quality evidence.
+The existing matched services still own source safety, budget, calibration,
+whole-plugin scope and local-to-cloud handoff admission.
+
+Admission requires selected-child safety plus complete
+`PluginPreExecutionSafetyEvidence`. `screen_plugin_security` applies bounded
+static signatures across captured files; `assess_plugin_pre_execution_safety`
+joins fresh source, screening, applicable supplied checklist evidence and
+freshness. These are supplied assessments and static screening, not authenticated
+independent security review or proof that executable resources are harmless.
+
+Each lane requires explicit `MatchedRunBudget` and `MatchedSelectionPolicy`.
+Provider and judge allowances are at most 128 each; elapsed time is checked
+before and after callbacks. Expiry stops later admission but cannot cancel a
+running callback. A requested reported-cost bound blocks before callbacks
+because adapters provide no cost observations; it is not an enforced spend cap.
+`MatchedExecutionReceipt.summary` recomputes equal-case-weight descriptive
+selection from a completed lane. Minimum repeated-trial coverage, qualifying
+confidence, trial-range stability, directional case count and mean threshold
+control `candidate`, `baseline`, `unchanged` or `inconclusive`. The summary is a
+derived API property, not a serialised receipt field or a statistical guarantee.
+Plans whose lane trial count cannot meet the selection policy are rejected
+before callbacks. Each case, variant and trial gets a distinct request and
+idempotency identity derived from the frozen plan digest and lane. Execution
+receipts retain those actual requests and reject swapped or reused trial
+identities. Repeating the identical frozen experiment reproduces those identities;
+this separates trials within one experiment but does not bypass transport-side
+caching or establish authentication across separate runs.
+
+A cloud handoff requires a qualifying local candidate and no unresolved
+regressions. Its complete capture becomes the cloud baseline while case scope,
+coverage, assertions, input commitments, rubric and selection policy remain
+bound. Failed cases require explicit owners and a full ten-case controlled
+rerun; closure requires retained passing rerun evidence and unchanged captured
+fixture source. All rerun candidate contexts must name the same absolute plugin
+root, so the retained before/after capture covers every executed candidate case.
+Different source copies block before provider or judge access even when their
+initial captures agree; equivalent relative and absolute paths remain accepted.
+Baseline calibration commitments also remain frozen across recovery. Corrected
+candidate calibration may be rebound, but substituting another passing baseline
+bundle changes the experiment controls and blocks both execution and retained
+receipt validation. Declaring an owner alone cannot close a regression.
+
+The additive wire families are `matched-comparison-plan/v1`,
+`matched-pair-assessment/v1`, `matched-calibration/v1`,
+`matched-variant-calibration/v1`, `matched-execution/v1`,
+`matched-cloud-handoff/v1`, `matched-cloud-execution/v1`,
+`matched-regression/v1`, `matched-cloud-regression/v1` and
+`plugin-pre-execution-safety-evidence/v1`. Their corresponding dotted resource
+names are available through `SchemaRegistry`; semantic checks supplement JSON
+Schema. Callback observations may be supplied offline. They prove neither
+external authenticity, live-model quality, promotion authority nor provider
+spending. See [CLI input boundaries](cli.md#matched-evaluation) and
+[compatibility limits](compatibility.md#matched-evaluation-integration).
+
 ## Read-only intake
 
 `source_repository` accepts a credential-free `owner/repository` slug, not a
@@ -326,6 +740,18 @@ serialized intake receipts with
 structural and model-level bindings. The context schema is registered as
 `skill-package-intake-context.v1`; neither family is supported by the generic
 `parse_receipt` function.
+
+The additive `skills_sdk.evaluation.check_local_quality` async service accepts
+a package path and a `LocalCheckRequestV2` or closed raw request. Keyword inputs
+are `baseline_root`, `assessment` and an explicit trusted offline `adapter`.
+It returns `LocalCheckResultV2` (`local-check/v2`) with ordered original service
+receipts and final source captures. Import request, policy, stage and result
+models from `skills_sdk.models`; validate serialized inputs and outputs through
+`SchemaRegistry` using `local-check-request.v2` and `local-check.v2`.
+Supplied and observed content evidence cannot be substituted for each other.
+Declared intake context and coverage plan must match their stage receipts.
+This composition does not execute scenario/judge evaluation or authorise
+promotion. Callback invocation is recorded only in its separate observed lane.
 
 The agent-facing `skills-sdk check-local` CLI emits the registry-only
 `local-check/v1` envelope. Use

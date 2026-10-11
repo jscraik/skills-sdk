@@ -10,23 +10,19 @@ from pathlib import Path
 from typing import Any, cast
 
 from skills_sdk import __version__
+from skills_sdk.cli import COMMAND_HELP
+from skills_sdk.cli.plugin import add_plugin_parser, run_plugin_validation
+from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 
-COMMAND_HELP = {
-    "inventory": "inspect a read-only source inventory",
-    "intake": "run read-only package intake and normalization",
-    "check-local": "run read-only intake and candidate-bound local checks",
-    "validate": "run package contract validation",
-    "build": "build an immutable package candidate",
-    "eval": "run candidate-bound evaluation lanes",
-    "package": "prepare a distributable package",
-    "project": "project a candidate into a selected runtime surface",
-    "verify": "verify candidate-bound evidence",
-}
 _MAX_INTAKE_CONTEXT_BYTES = 1_048_576
 
 
 class _UnsupportedContextRead(OSError):
     """Safe context traversal is unavailable on this host."""
+
+
+class _ContextReadLimitExceeded(ValueError):
+    """The supplied regular file exceeds this command's read budget."""
 
 
 def _reject_duplicate_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -46,7 +42,8 @@ def _open_intake_context(path: Path) -> int:
     nonblock = getattr(os, "O_NONBLOCK", None)
     if (
         any(not isinstance(flag, int) or flag == 0 for flag in (directory, nofollow, nonblock))
-        or os.open not in os.supports_dir_fd
+        or not {os.open, os.stat}.issubset(os.supports_dir_fd)
+        or os.stat not in os.supports_follow_symlinks
     ):
         raise _UnsupportedContextRead("safe descriptor-relative context reads are unavailable")
     if ".." in path.parts:
@@ -58,29 +55,36 @@ def _open_intake_context(path: Path) -> int:
             child = os.open(component, os.O_RDONLY | directory | nofollow, dir_fd=parent)
             os.close(parent)
             parent = child
+        leaf = os.stat(absolute.name, dir_fd=parent, follow_symlinks=False)
+        if not stat.S_ISREG(leaf.st_mode):
+            raise ValueError("invalid intake context file")
         return os.open(absolute.name, os.O_RDONLY | nonblock | nofollow, dir_fd=parent)
     finally:
         os.close(parent)
 
 
-def _read_intake_context(path: Path) -> bytes:
+def _read_intake_context(path: Path, *, max_bytes: int = _MAX_INTAKE_CONTEXT_BYTES) -> bytes:
     """Read one bounded, regular, no-follow intake context file."""
     descriptor = _open_intake_context(path)
     try:
         before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode) or before.st_size > _MAX_INTAKE_CONTEXT_BYTES:
+        if not stat.S_ISREG(before.st_mode):
             raise ValueError("invalid intake context file")
+        if before.st_size > max_bytes:
+            raise _ContextReadLimitExceeded("context file exceeds the command read budget")
         chunks: list[bytes] = []
         captured = 0
-        while captured <= _MAX_INTAKE_CONTEXT_BYTES:
-            chunk = os.read(descriptor, min(65_536, _MAX_INTAKE_CONTEXT_BYTES + 1 - captured))
+        while captured <= max_bytes:
+            chunk = os.read(descriptor, min(65_536, max_bytes + 1 - captured))
             if not chunk:
                 break
             chunks.append(chunk)
             captured += len(chunk)
         payload = b"".join(chunks)
         after = os.fstat(descriptor)
-        if len(payload) > _MAX_INTAKE_CONTEXT_BYTES or (
+        if len(payload) > max_bytes:
+            raise _ContextReadLimitExceeded("context file exceeds the command read budget")
+        if (
             before.st_size,
             before.st_mtime_ns,
             before.st_ino,
@@ -91,6 +95,52 @@ def _read_intake_context(path: Path) -> bytes:
         os.close(descriptor)
 
 
+def _add_coverage_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    coverage = commands.add_parser("scenario-coverage", help="audit declared claims against active cases and gaps")
+    coverage.add_argument("package_root", type=Path)
+    coverage.add_argument("--source-revision", required=True)
+    coverage.add_argument("--scenario-set", required=True)
+    coverage.add_argument("--coverage-plan", type=Path, required=True)
+    coverage.add_argument("--json", action="store_true", dest="json_output")
+    coverage.add_argument("--robot", action="store_true")
+
+
+def _add_content_review_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    review = commands.add_parser("review-content", help="bind supplied content review to the current package")
+    review.add_argument("package_root", type=Path)
+    review.add_argument("--source-revision", required=True)
+    review.add_argument("--assessment", type=Path, required=True)
+    review.add_argument("--json", action="store_true", dest="json_output")
+    review.add_argument("--robot", action="store_true")
+
+
+def _add_quality_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    """Register the v2 quality command and its request, baseline, and assessment inputs."""
+    quality = commands.add_parser("check-quality", help="run explicit v2 intent, policy and content quality checks")
+    quality.add_argument("package_root", type=Path)
+    quality.add_argument("--request", type=Path, required=True)
+    quality.add_argument("--baseline-root", type=Path)
+    quality.add_argument("--assessment", type=Path)
+    quality.add_argument("--json", action="store_true", dest="json_output")
+    quality.add_argument("--robot", action="store_true")
+
+
+def _add_scorer_parsers(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    """Register read-only assessments and the explicitly offline execution route."""
+    from skills_sdk.cli.matched import add_parsers as add_evidence_parsers
+
+    add_evidence_parsers(commands)
+    for name, help_text in (
+        ("scorer-quality", "assess candidate scorer declarations without executing a judge"),
+        ("scorer-calibration", "assess candidate-bound held-out scorer artifacts"),
+    ):
+        scorer = commands.add_parser(name, help=help_text)
+        scorer.add_argument("package_root", type=Path)
+        scorer.add_argument("--source-revision", required=True)
+        scorer.add_argument("--json", action="store_true", dest="json_output")
+        scorer.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
@@ -99,6 +149,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands")
+    _add_content_review_parser(commands)
+    _add_quality_parser(commands)
+    add_plugin_parser(commands)
     for name, help_text in COMMAND_HELP.items():
         if name in {"intake", "check-local", "validate", "build", "eval", "verify"}:
             continue
@@ -127,6 +180,12 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--source-revision")
         command.add_argument("--max-entrypoint-lines", type=int)
         command.add_argument("--max-reference-depth", type=int)
+        command.add_argument(
+            "--require-file", action="append", default=[], help="require an applicable package-local file"
+        )
+        command.add_argument(
+            "--check-reference-content", action="store_true", help="check textual reference bytes and syntax"
+        )
         command.add_argument("--json", action="store_true", dest="json_output")
         command.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     intake = commands.add_parser("intake", help=COMMAND_HELP["intake"], description=COMMAND_HELP["intake"])
@@ -136,6 +195,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     intake.add_argument("--max-entrypoint-lines", type=int)
     intake.add_argument("--max-reference-depth", type=int)
+    intake.add_argument("--require-file", action="append", default=[], help="require an applicable package-local file")
+    intake.add_argument(
+        "--check-reference-content", action="store_true", help="check textual reference bytes and syntax"
+    )
     intake.add_argument("--json", action="store_true", dest="json_output")
     intake.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
     local_check = commands.add_parser("check-local", help=COMMAND_HELP["check-local"])
@@ -153,15 +216,8 @@ def build_parser() -> argparse.ArgumentParser:
     quality.add_argument("--contract-version", choices=("v1", "v2"), default="v1")
     quality.add_argument("--json", action="store_true", dest="json_output")
     quality.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
-    for name, help_text in (
-        ("scorer-quality", "assess candidate scorer declarations without executing a judge"),
-        ("scorer-calibration", "assess candidate-bound held-out scorer artifacts"),
-    ):
-        scorer = evaluation_commands.add_parser(name, help=help_text)
-        scorer.add_argument("package_root", type=Path)
-        scorer.add_argument("--source-revision", required=True)
-        scorer.add_argument("--json", action="store_true", dest="json_output")
-        scorer.add_argument("--robot", action="store_true", help="reserve the prompt-free automation contract")
+    _add_coverage_parser(evaluation_commands)
+    _add_scorer_parsers(evaluation_commands)
     selected = evaluation_commands.add_parser(
         "selected-case",
         help="evaluate one package-local case through caller-supplied provider evidence",
@@ -202,7 +258,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _human_findings(command: str, result: Any) -> tuple[Any, ...]:
     """Return findings suitable for the human-readable command output."""
-    if command in {"validate", "scenario-quality", "scorer-quality", "scorer-calibration"}:
+    if command in {
+        "validate",
+        "review-content",
+        "scenario-quality",
+        "scenario-coverage",
+        "scorer-quality",
+        "scorer-calibration",
+    }:
         return tuple(result.findings)
     return (result.blocker,) if result.blocker is not None else ()
 
@@ -279,7 +342,62 @@ def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int
     return 2
 
 
-def _selected_case_host_input(path: Path) -> tuple[object, object, object | None, object | None]:
+def _content_review(arguments: argparse.Namespace) -> int:
+    from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES
+    from skills_sdk.validation import assess_content_review
+
+    try:
+        assessment = json.loads(
+            _read_intake_context(arguments.assessment, max_bytes=CONTENT_REVIEW_ASSESSMENT_MAX_BYTES).decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_members,
+        )
+    except (_UnsupportedContextRead, _ContextReadLimitExceeded) as error:
+        from skills_sdk.models.packaging import PackageReceiptBlocker
+
+        blocker = PackageReceiptBlocker(
+            code="unsupported_context_read"
+            if isinstance(error, _UnsupportedContextRead)
+            else "content_review_input_limit",
+            message="safe descriptor-relative assessment reads are unavailable"
+            if isinstance(error, _UnsupportedContextRead)
+            else "assessment JSON exceeds the eight MiB read budget",
+            evidence_refs=("docs/compatibility.md",),
+        )
+        if arguments.json_output:
+            print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
+        else:
+            print(f"review-content: blocked\n  {blocker.code}: {blocker.message}")
+        return 2
+    except (OSError, ValueError, RecursionError):
+        assessment = None
+    result = assess_content_review(
+        arguments.package_root, source_revision=arguments.source_revision, assessment=assessment
+    )
+    _print_result("review-content", result, json_output=arguments.json_output)
+    return 0 if result.status == "pass" else 2
+
+
+def _scenario_coverage(arguments: argparse.Namespace) -> int:
+    from skills_sdk.evaluation import assess_scenario_coverage
+
+    try:
+        plan = json.loads(
+            _read_intake_context(arguments.coverage_plan).decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_members,
+        )
+    except (OSError, ValueError, RecursionError):
+        plan = None
+    result = assess_scenario_coverage(
+        arguments.package_root,
+        source_revision=arguments.source_revision,
+        scenario_set_id=arguments.scenario_set,
+        coverage_plan=plan,
+    )
+    _print_result("scenario-coverage", result, json_output=arguments.json_output)
+    return 0 if result.status == "pass" else 2
+
+
+def _selected_case_host_input(path: Path) -> tuple[object, object, object | None, object | None, object | None]:
     """Load the bounded host-supplied inputs for one selected-case run."""
     payload = json.loads(
         _read_intake_context(path).decode("utf-8"),
@@ -290,6 +408,7 @@ def _selected_case_host_input(path: Path) -> tuple[object, object, object | None
         "assertion_evidence",
         "input_payload",
         "request",
+        "safety_evidence",
     }:
         raise ValueError("invalid selected-case host input")
     return (
@@ -297,6 +416,7 @@ def _selected_case_host_input(path: Path) -> tuple[object, object, object | None
         payload.get("input_payload"),
         payload.get("adapter"),
         payload.get("assertion_evidence"),
+        payload.get("safety_evidence"),
     )
 
 
@@ -337,14 +457,20 @@ def _selected_case_eval(arguments: argparse.Namespace) -> int:
             case_id=arguments.case_id,
             mode=arguments.mode,
         )
-        request_payload, input_payload, adapter_payload, evidence_payload = _selected_case_host_input(
+        request_payload, input_payload, adapter_payload, evidence_payload, safety_payload = _selected_case_host_input(
             arguments.host_input
         )
         request = ProviderExecutionRequest.model_validate(request_payload)
         adapter = cast(TextProviderAdapter | None, _supplied_adapter(adapter_payload))
         evidence = None if evidence_payload is None else SelectedCaseJudgeEvidence.model_validate(evidence_payload)
         receipt = asyncio.run(
-            execute_selected_case(definition, request, cast(JsonValue, input_payload), adapter, evidence)
+            execute_selected_case(
+                definition,
+                request,
+                SelectedCaseExecutionInput(cast(JsonValue, input_payload), safety_payload),
+                adapter,
+                evidence,
+            )
         )
     except ContractError as exc:
         return _selected_case_blocker(exc.code, exc.message, json_output=arguments.json_output)
@@ -471,14 +597,117 @@ def _local_check(arguments: argparse.Namespace, parser: argparse.ArgumentParser)
     return _emit_local_check(stages, blocked_stage=None, json_output=arguments.json_output)
 
 
+def _quality_check(arguments: argparse.Namespace) -> int:
+    """Read bounded no-follow inputs and return the v2 envelope even on rejection."""
+    from skills_sdk.evaluation import check_local_quality
+    from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES
+    from skills_sdk.models.packaging import PackageReceiptBlocker
+    from skills_sdk.models.quality_workflow import LocalCheckResultV2
+
+    try:
+        request = json.loads(
+            _read_intake_context(arguments.request).decode("utf-8"), object_pairs_hook=_reject_duplicate_members
+        )
+        assessment = None
+        if arguments.assessment is not None:
+            assessment = json.loads(
+                _read_intake_context(arguments.assessment, max_bytes=CONTENT_REVIEW_ASSESSMENT_MAX_BYTES).decode(
+                    "utf-8"
+                ),
+                object_pairs_hook=_reject_duplicate_members,
+            )
+    except (OSError, ValueError, RecursionError):
+        result = LocalCheckResultV2(
+            status="blocked",
+            request=None,
+            blocked_stage="request",
+            blocker=PackageReceiptBlocker(
+                code="invalid_quality_input", message="Quality inputs require bounded no-follow JSON files."
+            ),
+        )
+    else:
+        result = asyncio.run(
+            check_local_quality(
+                arguments.package_root,
+                request,
+                baseline_root=arguments.baseline_root,
+                assessment=assessment,
+            )
+        )
+    if arguments.json_output:
+        print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+    else:
+        print(f"check-quality: {result.status}")
+        if result.blocker is not None:
+            print(f"  {result.blocked_stage}: {result.blocker.code}: {result.blocker.message}")
+        if (
+            result.stages
+            and result.blocked_stage not in {None, "candidate_changed", "final-capture"}
+            and result.stages[-1].name == result.blocked_stage
+        ):
+            receipt = result.stages[-1].receipt
+            decision = getattr(receipt, "decision", None)
+            if decision is not None:
+                print(f"  decision: {decision.decision.value}")
+                for code in decision.blocker_codes:
+                    print(f"  decision_blocker: {code}")
+            validation = getattr(receipt, "validation", None)
+            findings = getattr(receipt, "findings", None) or getattr(validation, "findings", ())
+            for finding in findings:
+                print(f"  {finding.code}: {finding.message}")
+            receipt_blocker = getattr(receipt, "blocker", None)
+            if receipt_blocker is not None:
+                print(f"  {receipt_blocker.code}: {receipt_blocker.message}")
+    return 0 if result.status == "local_checks_passed" else 2
+
+
+def _evaluation_command(arguments: argparse.Namespace) -> int:
+    """Dispatch evaluation lanes without changing their distinct evidence claims."""
+    if arguments.eval_command == "scenario-coverage":
+        return _scenario_coverage(arguments)
+    if arguments.eval_command == "scenario-quality":
+        from skills_sdk.evaluation import assess_scenario_quality
+
+        quality_result = assess_scenario_quality(
+            arguments.package_root,
+            source_revision=arguments.source_revision or "",
+            scenario_set_id=arguments.scenario_set,
+            contract_version=arguments.contract_version,
+        )
+        _print_result("scenario-quality", quality_result, json_output=arguments.json_output)
+        return 0 if quality_result.status == "pass" else 2
+    if arguments.eval_command == "selected-case":
+        return _selected_case_eval(arguments)
+    if arguments.eval_command == "observed-calibration" or arguments.eval_command.startswith("matched-"):
+        from skills_sdk.cli.matched import run_evidence
+
+        return run_evidence(arguments, _read_intake_context, _reject_duplicate_members)
+    from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
+
+    assessor = assess_scorer_quality if arguments.eval_command == "scorer-quality" else assess_scorer_calibration
+    receipt = assessor(arguments.package_root, source_revision=arguments.source_revision)
+    _print_result(arguments.eval_command, receipt, json_output=arguments.json_output)
+    return 0 if receipt.status == "pass" else 2
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and preserve parse-only future boundaries."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.command == "check-quality":
+        return _quality_check(arguments)
+    if arguments.command == "review-content":
+        return _content_review(arguments)
     if arguments.command == "check-local":
         return _local_check(arguments, parser)
     if arguments.command == "verify":
         return _verify(arguments)
+    if arguments.command == "validate-plugin":
+        return run_plugin_validation(
+            arguments,
+            lambda path: _read_intake_context(path, max_bytes=16 * 1024 * 1024),
+            _reject_duplicate_members,
+        )
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)
     if arguments.command == "compare-copy":
@@ -495,26 +724,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         for path in comparison.different_paths:
             print(f"  different: {path}")
         return 0 if comparison.status == "pass" else 2
-    if arguments.command == "eval" and arguments.eval_command == "scenario-quality":
-        from skills_sdk.evaluation import assess_scenario_quality
-
-        quality_result = assess_scenario_quality(
-            arguments.package_root,
-            source_revision=arguments.source_revision or "",
-            scenario_set_id=arguments.scenario_set,
-            contract_version=arguments.contract_version,
-        )
-        _print_result("scenario-quality", quality_result, json_output=arguments.json_output)
-        return 0 if quality_result.status == "pass" else 2
-    if arguments.command == "eval" and arguments.eval_command == "selected-case":
-        return _selected_case_eval(arguments)
-    if arguments.command == "eval" and arguments.eval_command in {"scorer-quality", "scorer-calibration"}:
-        from skills_sdk.evaluation import assess_scorer_calibration, assess_scorer_quality
-
-        assessor = assess_scorer_quality if arguments.eval_command == "scorer-quality" else assess_scorer_calibration
-        receipt = assessor(arguments.package_root, source_revision=arguments.source_revision)
-        _print_result(arguments.eval_command, receipt, json_output=arguments.json_output)
-        return 0 if receipt.status == "pass" else 2
+    if arguments.command == "eval":
+        return _evaluation_command(arguments)
     if arguments.command not in {"intake", "validate", "build"}:
         return 0
     from skills_sdk.validation import SkillValidationPolicy
@@ -522,6 +733,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     policy = SkillValidationPolicy(
         max_entrypoint_lines=arguments.max_entrypoint_lines,
         max_reference_depth=arguments.max_reference_depth,
+        required_files=tuple(arguments.require_file),
+        check_reference_content=arguments.check_reference_content,
     )
     if arguments.command == "intake":
         from pydantic import ValidationError

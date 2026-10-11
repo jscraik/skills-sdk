@@ -34,6 +34,7 @@ SCHEMA_NAMES = frozenset(
         "package-receipt.v1",
         "package-receipt.v2",
         "package-safety-evidence.v1",
+        "pre-execution-safety-evidence.v1",
         "receipt-base.v1",
         "risk-classification.v1",
         "security-screening.v1",
@@ -68,10 +69,30 @@ SCHEMA_NAMES = frozenset(
         "scenario-quality.v2",
         "scorer-quality.v1",
         "scorer-calibration.v1",
+        "observed-calibration-plan.v1",
+        "observed-calibration.v1",
+        "matched-comparison-plan.v1",
+        "matched-pair-assessment.v1",
+        "matched-calibration.v1",
+        "matched-variant-calibration.v1",
+        "plugin-pre-execution-safety-evidence.v1",
+        "matched-execution.v1",
+        "matched-cloud-handoff.v1",
+        "matched-cloud-execution.v1",
+        "matched-regression.v1",
+        "matched-cloud-regression.v1",
         "local-check.v1",
+        "local-check-request.v2",
+        "local-check.v2",
+        "scenario-coverage-plan.v1",
+        "scenario-coverage.v1",
+        "content-review-assessment.v1",
+        "content-review.v1",
+        "content-review-execution.v1",
         "selected-case-judge-evidence.v1",
         "scorer-profile.v1",
         "skill-package-validation.v1",
+        "plugin-package-validation.v1",
         "skill-package-intake.v1",
         "skill-package-intake-context.v1",
     }
@@ -362,6 +383,14 @@ class SchemaRegistry:
             from skills_sdk.models.runtime_evidence import RuntimeOutcomeReceipt
 
             model = RuntimeOutcomeReceipt
+        elif name == "pre-execution-safety-evidence.v1":
+            from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
+
+            model = PreExecutionSafetyEvidence
+        elif name == "plugin-pre-execution-safety-evidence.v1":
+            from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
+
+            model = PluginPreExecutionSafetyEvidence
         elif name == "package-safety-evidence.v1":
             from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 
@@ -390,10 +419,67 @@ class SchemaRegistry:
             from skills_sdk.models.scorer_quality import ScorerCalibrationReceipt
 
             model = ScorerCalibrationReceipt
+        elif name in {
+            "matched-comparison-plan.v1",
+            "matched-pair-assessment.v1",
+            "matched-calibration.v1",
+            "matched-variant-calibration.v1",
+            "matched-execution.v1",
+            "matched-cloud-handoff.v1",
+            "matched-cloud-execution.v1",
+            "matched-regression.v1",
+            "matched-cloud-regression.v1",
+        }:
+            from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt
+            from skills_sdk.models.matched_comparison import MatchedComparisonPlan, MatchedPairAssessment
+            from skills_sdk.models.matched_execution import MatchedExecutionReceipt
+            from skills_sdk.models.matched_feedback import MatchedCloudRegressionReceipt, MatchedRegressionReceipt
+            from skills_sdk.models.matched_handoff import MatchedCloudExecutionReceipt, MatchedCloudHandoff
+            from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrationBundle
+
+            model = {
+                "matched-comparison-plan.v1": MatchedComparisonPlan,
+                "matched-pair-assessment.v1": MatchedPairAssessment,
+                "matched-calibration.v1": MatchedCalibrationReceipt,
+                "matched-variant-calibration.v1": MatchedVariantCalibrationBundle,
+                "matched-execution.v1": MatchedExecutionReceipt,
+                "matched-cloud-handoff.v1": MatchedCloudHandoff,
+                "matched-cloud-execution.v1": MatchedCloudExecutionReceipt,
+                "matched-regression.v1": MatchedRegressionReceipt,
+                "matched-cloud-regression.v1": MatchedCloudRegressionReceipt,
+            }[name]
+        elif name in {"observed-calibration-plan.v1", "observed-calibration.v1"}:
+            from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
+
+            model = ObservedCalibrationPlan if name == "observed-calibration-plan.v1" else ObservedCalibrationReceipt
+        elif name in {"scenario-coverage-plan.v1", "scenario-coverage.v1"}:
+            from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
+
+            model = ScenarioCoveragePlan if name == "scenario-coverage-plan.v1" else ScenarioCoverageResult
+        elif name in {"content-review-assessment.v1", "content-review.v1", "content-review-execution.v1"}:
+            from skills_sdk.models.content_review import (
+                ContentReviewAssessment,
+                ContentReviewExecutionResult,
+                ContentReviewResult,
+            )
+
+            model = {
+                "content-review-assessment.v1": ContentReviewAssessment,
+                "content-review.v1": ContentReviewResult,
+                "content-review-execution.v1": ContentReviewExecutionResult,
+            }[name]
         elif name == "local-check.v1":
             from skills_sdk.models.local_check import LocalCheckResult
 
             model = LocalCheckResult
+        elif name == "local-check-request.v2":
+            from skills_sdk.models.quality_workflow import LocalCheckRequestV2
+
+            model = LocalCheckRequestV2
+        elif name == "local-check.v2":
+            from skills_sdk.models.quality_workflow import LocalCheckResultV2
+
+            model = LocalCheckResultV2
         elif name == "selected-case-judge-evidence.v1":
             from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 
@@ -430,6 +516,10 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
 
             model = EvaluationReceiptV2
+        elif name == "plugin-package-validation.v1":
+            from skills_sdk.models.plugin import PluginPackageValidation
+
+            model = PluginPackageValidation
         elif name == "skill-package-validation.v1":
             from skills_sdk.models.validation import SkillPackageValidation
 

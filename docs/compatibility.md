@@ -1,5 +1,319 @@
 # Compatibility
 
+## Plugin-first and registry-independent migration target
+
+The [managed release policy](workflow.md#managed-release-format) selects root
+`plugin.json` and direct `skills/<skill-name>/SKILL.md` discovery for SDK-managed
+releases, including single-skill plugins. Current standalone-skill APIs and
+receipt schemas remain supported; migration needs explicit schema, behaviour
+and compatibility proof rather than retroactive reinterpretation or removal.
+Establish complete-plugin identity before release-bound evidence. A standalone
+skill's passing receipt is not clearance for a newly assembled plugin.
+
+Keep canonical skill contents in one source. A Tessl import/export adapter may
+emit a distinct artifact with a distinct digest, but must prove required bytes,
+paths and executable modes are preserved or block unsupported content. Keep
+SDK and Tessl evaluation provenance, score meaning and not-evaluated/blocked/
+stale states separate. No shared filename or passing lint substitutes for an
+archive round-trip or selected-host test.
+
+The [registry transition](workflow.md#registry-transition) makes Tessl the
+initial backend, not a permanent SDK dependency. Existing registry preparation
+contracts do not implement replacement-registry transport or establish a Tessl
+endpoint override. Recheck the chosen backend and host independently; a
+catalogue is not distribution, and runtime hooks may retain a CLI dependency
+after registry storage changes. This section records a target, not new APIs.
+
+## Selected-case safety admission
+
+The additive `pre-execution-safety-evidence/v1` input retains actual artifacts
+and explicit capability-review outcomes. Frozen package-safety, provider-request
+and security-screening v1 payloads remain parseable without reinterpretation.
+Parsing those contracts does not grant execution admission. Selected-case API
+and CLI dispatch now requires the actual safety input and fresh source recapture;
+ID-only requests return a typed blocked evaluation instead of invoking adapters.
+This is deliberate execution hardening, not a claim of authenticated review or
+external scanner execution. Supplied manual-review fixtures prove guard behavior,
+not comprehensive security accuracy or completed plugin processing.
+
+Typed safety inputs use canonical SDK model classes, including nested models.
+Custom subclasses are rejected before their serializers run. Copied members
+are audited for unknown fields, byte strings, cycles and mutation constants,
+then revalidated; ordinary typed timestamps and closed raw JSON remain supported.
+Pipe-to-shell indicators require both filesystem/subprocess and network review,
+including commands written in non-script instructions or references.
+
+The packaged Draft 2020-12 schema enforces exactly six ordered checklist IDs,
+unique checklist evidence IDs and nonblank, public-safe rationale text. The
+model and `SchemaRegistry` additionally enforce digest and cross-object joins,
+supported screening, evidence references and applicable capability outcomes.
+The resource labels these remaining semantic checks; standalone structural
+acceptance does not establish safety admission or source freshness.
+
+Content-review worker packets use a separate bounded wire budget: the public
+eight-MiB normalized assessment limit plus 64 KiB for the envelope. Compact
+UTF-8 serialization avoids ASCII escaping that expands Unicode assessments.
+The sender and receiver enforce the same per-packet bound; the public model
+limit and CLI wire-file limit remain unchanged. A valid exact-limit assessment
+can complete offline review; one byte beyond the model limit remains invalid.
+
+The content-review startup deadline is anchored immediately after the spawned
+process launch returns, outside the trusted adapter-transfer operation. Delayed
+parent observation does not restart it. Child invocation and failed-metadata
+completion timestamps preserve timeout classification even when packets are
+already queued. Timely startup and short callbacks remain valid.
+
+## Local quality composition v2
+
+`local-check-request/v2` and `local-check/v2` are additive closed contracts;
+the five-stage `local-check/v1` command remains unchanged. The v2 service and
+`check-quality` CLI bind explicit intent, applicable policy and complete claim
+coverage before content assessment. Updates observe the supplied baseline path
+and recheck it after the journey. Source paths are host inputs, not persisted
+contract fields. The result retains the selected request and upstream receipts,
+but is not an authenticated attestation of execution or semantic truth.
+Once intake runs, `applied_policy` retains the policy supplied to validation and
+must equal the selected request policy. Earlier blockers keep it null; missing
+or contradictory applied-policy evidence cannot support a passing result.
+
+Packaged JSON Schema enforces structural types and update-baseline presence.
+Models and `SchemaRegistry` additionally enforce candidate/lineage equality,
+ordered first-stop evidence, selected intake/coverage context, content lane and
+final capture relationships. Captures with a candidate bind their manifest
+digest even when blocked, and their file paths must retain canonical sorted
+order before hashing. Recovery blocker codes must match the reported failure.
+Passing calibration matches the selected scorer's
+identity, threshold and declared parameters; passing content review matches
+captured file digests and actual reference coverage. A last-stage receipt from
+a changed candidate remains a typed blocker, not a cross-candidate evidence join.
+Only the service observes source bytes and applies
+the selected policy. Generic schema validation cannot prove these observations.
+Both families remain outside the generic receipt parser. No earlier receipt
+family is reinterpreted as permission to execute, promote or publish.
+
+This is an SDK-owned composition of accepted intake, validation, scenario,
+scorer and content services, not a claim of complete Agent-Skills extraction.
+Static held-out artifact assessment is not fresh calibration execution. The
+API accepts explicit trusted callbacks; the CLI only accepts supplied review
+evidence and blocks an observed request without that callback. Tests and
+calibration probes do not enlarge the exactly ten active managed scenarios.
+
+## Observed calibration contracts
+
+`observed-calibration-plan/v1` and `observed-calibration/v1` are additive
+contracts. They do not reinterpret read-only `scorer-calibration/v1`, change
+caller-supplied completion IDs into proof, or grant evaluation promotion.
+Raw, typed and copied inputs are revalidated at the model and service boundaries;
+`SchemaRegistry` adds semantic bindings beyond structural JSON Schema.
+Typed calibration inputs require canonical SDK model classes throughout the
+nested payload. Raw inputs require canonical dictionaries, lists and tuples with
+JSON scalars or canonical typed request timestamps; mapping views, custom
+containers, sets and iterators are rejected before coercion or iteration.
+Wrap validation audits raw members before the handler can
+discard subclass identity; copied unknown fields and byte strings are rejected
+before coercion. Normalisation reads raw members without calling model serializers,
+while preserving strict numeric values and canonical typed request timestamps.
+Receipts bind ordered held-out probes and trials to the candidate, output digest,
+assertion contract, scorer, judge and settings. Passing results require every
+declared invocation and the frozen confusion-matrix policy. Blocked partial
+results cannot claim multiple unrecorded invocations after the first stop.
+Policy-failure blockers require complete results that actually fail the policy;
+preflight blockers require zero execution, and execution blockers require an
+unfinished result prefix. Blocker codes cannot relabel complete passing evidence.
+
+The API observes injected numeric callbacks. The CLI invokes explicitly supplied
+offline verdicts; it does not discover executables, read credentials, spend
+provider credits, or authenticate scores and labels. Controlled installed API/CLI
+tests prove acceptance, preflight rejection and corrected-input recovery without
+Agent-Skills or Foundry imports. They do not prove a real model's calibration.
+Fresh model execution remains a separate evidence lane. The matched integration accepted in PR #53
+adds controlled callback composition without
+claiming live-model proof.
+
+The calibration lifetime repair accepted in PR #55 adds `CalibrationTrialAdapters`
+and the optional `CalibrationProbeExecution.trial_adapters` tuple. The existing
+one-trial call shape remains valid. Multi-trial callers must supply exactly
+`trial_count - 1` fresh pairs after the first pair. Reusing any provider or judge
+object, including across probes or roles, now blocks before capability access.
+Matched calibration checks original objects before wrapping judges; wrappers
+cannot conceal reuse. This deliberately replaces implicit reuse of cleaned-up
+capabilities, including reusable fixture adapters. Repeated CLI inputs retain
+their JSON shape: the offline adapter constructs separate controlled instances.
+Receipt schemas, candidate binding, held-out labels and active scenario counts
+are unchanged. A non-`None` numeric cleanup result now blocks, as dimensional
+cleanup already did. See the [lifecycle regressions](../tests/test_calibration_lifetime.py)
+and [installed proof](../tests/installed_observed_calibration_smoke.py).
+
+## Matched evaluation integration
+
+### Explicit profile adapter
+
+The PR #56 accepted `skills_sdk.providers.codex_profiles` adapter accepts explicit
+bytes for the logical `oss-local.config.toml` and `oss-cloud.config.toml`
+profiles, their provider/catalogue dependencies and caller defaults. It leaves
+the frozen `ProviderIdentityV2`, matched plan and receipt schemas unchanged.
+Existing CLI inputs without `profiles` retain their shape. Profiled calibration
+additionally requires `profile_plan`; the calibration plan retains its own
+held-out labels, scorer and policy. Profile parsing never loads named paths,
+home settings, environment credentials or MCP commands.
+
+The existing adapter identity fields bind profile and dependency bytes before
+the experiment plan is frozen. Native model names are represented as
+`provider/native-model` in portable identity and remain unchanged in the private
+driver configuration. Changed bytes require a new plan and affected downstream
+evidence. Model revision remains caller-supplied provenance.
+
+Profile values override selected catalogue defaults, which override explicit
+caller defaults. Every supported setting must resolve. Approval policy,
+approval reviewer, reasoning summary and web-search mode use the adapter's
+closed supported values. Granular approval objects remain unsupported inputs.
+Reasoning effort stays an open string; when the selected catalogue supplies
+`supported_reasoning_levels`, it must contain unique `effort`/`description`
+records and the resolved effort must be advertised. Missing capability metadata
+does not verify external support. Permission-profile names are retained as
+symbols; this adapter does not resolve host permission definitions or apply them.
+Provider URLs require valid HTTP(S) endpoints and nonzero valid explicit ports.
+Empty explicit ports and malformed hostname authorities block at input capture;
+validation does not resolve DNS or establish endpoint availability.
+Catalogue input accepts the native `ModelsResponse` envelope with `models`,
+without requiring a synthetic `client_version` member. A supplied optional
+`client_version` remains validated and byte-bound. Supported nullable model
+metadata is preserved, not rewritten; unknown fields and malformed types block.
+
+Complete, stream and judge adapters pass the compiled configuration to supplied
+drivers and retain drift checks and existing cleanup. Streaming reuses the
+validated immutable invocation and checks explicit source and plan snapshots;
+it does not reparse the catalogue for every event. Controlled public API and
+installed CLI tests prove rejection and corrected-input recovery, fresh trial
+ownership and local-to-cloud baseline binding. A real driver's application of
+settings, external model quality and runtime policy need separate proof. These
+APIs grant no provider, spending or publication authority.
+
+### Accepted matched contracts
+
+The additive S4 matched families were accepted in PR #53. Acceptance does not
+establish full Agent-Skills parity or a published SDK release. They preserve existing
+`observed-calibration-plan/v1`, `observed-calibration/v1` and read-only
+`scorer-calibration/v1` semantics. Supplied artifact checks cannot become
+executed calibration merely by declaring completed probes.
+
+The current strict plan requires two complete passing plugin captures and mode
+digests with distinct complete candidate identities, one through nine matching child paths, exactly ten ordered active
+cases, per-child driver coverage and multi-child cross-skill coverage. Scenarios
+are child-bound singleton `ScenarioSetV2` values with `release=False`; full
+coverage uses the existing claims/mappings with no open gaps. Captured file
+identity and modes, case scope, assertions and scorer contracts remain separate
+but joined evidence. Complete child/assertion calibration bundles require at
+least six observed held-out probes per target. These probes and trial repeats
+do not create extra active cases.
+Matched reference eligibility is checked consistently at plan admission and
+runtime context preparation: hidden evaluation inputs, non-Markdown files and
+duplicates of automatically selected child `SKILL.md` entrypoints reject.
+Ordinary captured Markdown reference paths remain supported. Portable captures
+retain metadata, not source bytes or encoding proof. UTF-8 readability is
+checked during fresh source-backed context preparation before provider or
+judge access; invalid selected bytes return a typed blocker. Unselected binary
+resources need not decode as text. Path rules supplement JSON Schema through
+the registered models; schema acceptance alone is not execution clearance.
+
+Private execution context requires fresh source binding, selected-child safety
+and complete supplied plugin safety evidence with applicable checks and static
+screening. This does not authenticate review or prove runtime safety. Explicit
+callback and elapsed budgets retain first-stop observations; elapsed checks
+cannot interrupt a running callback. Requested cost budgets produce a
+zero-callback blocker rather than a claimed spend cap. Descriptive selection
+requires sufficient trials, confidence, stability and directional evidence;
+`unchanged` and `inconclusive` are not promotion signals. Summary is a derived
+API property, not an additional serialised receipt field.
+
+Matched lane capabilities use a distinct provider and judge instance for every
+trial. `MatchedVariantExecution.additional_trials` supplies each later pair as
+`MatchedTrialAdapters`; missing, extra or reused instances block admission
+before host property access. Existing per-call cleanup and cancellation stay
+unchanged; uninvoked capabilities remain caller-owned. These private host
+capabilities are not portable receipt fields. Historical pre-merge draft receipts produced before the request-binding repair
+must be regenerated; they predate acceptance of this family in PR #53.
+The accepted lane specification requires explicit `generator_mode`:
+`complete` or `stream`. Both variants and all trials must use that mode. It is
+part of plan and trial commitments, so prior draft plans lacking the field and
+receipts derived from them must be regenerated; those drafts predate the accepted contract. Future changes must follow the
+normal versioning rules for accepted families. Completed receipts already enforce exact provider
+and judge counts through their declared coverage ceiling and full pair count.
+The unfinished-pair allowance applies only to blocked prefixes.
+
+Cloud handoff preserves the qualifying local plugin as baseline and freezes
+scope, coverage and scoring objectives. Regression closure requires owned
+failures, a complete controlled ten-case rerun and unchanged fixture source.
+The full rerun uses one absolute candidate root; distinct source copies reject
+before host callbacks even when their initial captures match. This private
+host-input restriction adds no filesystem paths to portable receipts. Identical
+baseline and candidate identities reject at plan validation; sharing only a
+package identifier, revision or content digest is not itself a rejection.
+Baseline calibration commitments cannot change during regression recovery,
+even if both bundles pass. Corrected-candidate calibration can change while the
+baseline controls remain frozen. Retained regression receipts enforce the same
+rule; old draft receipts that violated it must be regenerated.
+The supplied-offline CLI observes callbacks without external authenticity,
+live-quality, spending, publication or promotion proof. Matched offline
+fixtures support descriptor-selected complete and pull-stream protocols across
+calibration, local, cloud and both regression routes. This does not widen the
+existing public `SuppliedTextProviderAdapter` complete-only contract. See
+[API families](api.md#matched-whole-plugin-evaluation) and
+[CLI commands](cli.md#matched-evaluation). The retained historical
+validation command for PR #53 candidate
+`ca1db74570a945f4843013d61d47b2e2eea77e73` was
+`PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS=-x bash scripts/validate-repository.sh`:
+`pass`, 3,182 tests passed and one skipped. Its disposable offline cache
+bindings and proof limits are recorded in the
+[task record](projects/sdk-workflow/tasks.md). This result does not validate
+the subsequent reference-context, selected-child ownership, trial-feasibility,
+trial-identity, adapter-contract, receipt-cost or safety repairs. Final source
+validation and accepted delivery for merged
+[PR #53](https://github.com/jscraik/skills-sdk/pull/53) are recorded separately in
+the task record. Accepted bounded contracts do not establish live quality,
+release clearance or validation of later changed bytes.
+
+## Supplied content-review contracts
+
+Typed assessment inputs and callback results use the canonical
+`ContentReviewAssessment` model. Custom subclasses return an
+`invalid_content_review` blocker before their serializers run. Raw closed
+assessment data and canonical typed models remain supported.
+
+The same canonical-only rule applies to nested review contract models before
+their serializers run. Assessments have an eight-MiB normalized UTF-8 JSON
+budget, enforced by the direct model, services and `SchemaRegistry`.
+Packaged schemas annotate this semantic budget as
+`x-max-normalized-json-bytes`; generic JSON Schema validators do not enforce
+serialized byte length. The review CLI separately bounds the supplied JSON
+file at eight MiB, including whitespace, and reports `content_review_input_limit`
+for oversized files. Other intake-context readers keep their one-MiB budget.
+
+`content-review-assessment/v1`, `content-review/v1` and
+`content-review-execution/v1` are additive closed
+families. They do not reinterpret package validation or scenario-quality
+receipts. `SchemaRegistry` checks packaged structure and semantic model
+invariants, including same-path evidence for every completed disposition; owned
+gaps can remain incomplete and block. The public service additionally compares
+candidate, actual reference inventory and source-evidence digests with the captured package. A standalone
+schema cannot prove those filesystem relations or reviewer truth. These
+families remain outside the generic receipt parser and do not authorise
+execution, promotion, installation or publication.
+
+Review collections accept materialized lists or tuples, not streaming iterators.
+Blocked review results require a blocker-severity finding; warning-only findings
+cannot justify a blocked result. Returned review evidence requires observed
+adapter invocation. These semantic invariants are enforced by models and
+`SchemaRegistry`, not by standalone JSON Schema alone.
+
+The offline callback service runs a caller-selected, importable and safely
+pickleable adapter in a spawned process. It never falls back to in-process
+execution or unsafe `fork`. Script callers need a guarded main entrypoint.
+Child-local state changes do not update the original adapter object. Unsupported
+transfer is a typed blocker; supplied-review validation remains read-only and
+does not require process execution. See [API](api.md) for the separate startup,
+callback, trusted-transfer and cleanup boundaries.
+
 Skills SDK keeps portable contracts independent of Agent-Skills, Skills
 Foundry, Codex, Tessl, and any local runtime filesystem. Host adapters and
 providers consume the contracts through explicit boundaries; they are not
@@ -278,6 +592,139 @@ rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
 
+### Portable plugin capture increment
+
+The additive `plugin-package-validation/v1` family does not reinterpret
+`PluginIdentity`, `SkillIdentity`, standalone validation, intake, build or their
+existing schemas. Only `validate-plugin` selects this new route. The canonical
+source is root `plugin.json` under Agent Plugins 1.0.0, assessed against the
+[normative specification](https://agent-plugins.org/specification) and
+[OpenAI packaging semantics](https://developers.openai.com/plugins/build/plugins)
+on 2026-10-08. This is a new portable contract, not executed Agent-Skills parity.
+
+Source inspection of the queued Tessl-format implementation at revision
+`02a43847f926a0ba7f9b4c29d763237d2805c939` supplied the bounded no-follow capture,
+child/subtree binding and second-capture mechanisms. The consumer is subsequent
+SDK whole-plugin preparation and evaluation, not the future registry service.
+Deliberate differences: root manifest replaces Tessl metadata authority; no
+required workspace/private field or directory-name match; base optional metadata
+stays optional; unknown root fields and malformed `extensions` warn and are
+ignored. Unknown diagnostics retain all sorted JSON-escaped key names, not
+values, in an aggregated warning bounded by the metadata input budget.
+Immediate child discovery replaces selectors and requires literal `SKILL.md`,
+not lookalike filenames. Child file-role checks join retained roles to captured
+relative paths without changing frozen standalone roles. OpenAI inline objects
+replace, never merge, fallback settings. An ignored fallback is captured but
+not parsed. Selected malformed fallback JSON blocks with typed invalid input.
+
+The SDK rejects all symlinks and imposes documented capture/parsing budgets,
+stricter than the portable standard's containment rules. Child assessment keeps
+the existing SDK standalone semantics; an invalid child blocks this SDK result
+while retaining sibling findings. A plugin with no discovered skills may be
+structurally valid; that is not proof
+of a useful managed release. MCP bytes and selected settings are bound without
+claiming transport, destination, permissions or artwork validation. Ordinary
+file modes have their own digest; the frozen candidate content formula is
+unchanged. Empty directories are observed for capture stability but are not
+part of candidate file identity.
+
+Hash-only model and SchemaRegistry validation establish supplied envelope
+consistency, not derivation of metadata or selected settings from actual source.
+PR #52 accepted `verify_plugin_package_validation` and CLI
+`validate-plugin --verify-evidence FILE` to compare a normalised full envelope
+with fresh no-follow capture under the caller's revision and policy. Invalid,
+stale, mismatched or unreadable inputs block. Raw settings remain private and
+verification grants no execution, permission or release authority. The CLI reads
+regular no-follow JSON up to 16 MiB and rejects duplicate members and malformed
+input; default inspection behaviour remains unchanged. That accepted structural
+verification does not establish the separate S4 execution route accepted in PR #53.
+Blocked outputs preserve validated caller policy across evidence and revision
+failures; malformed caller policy remains a typed input blocker before capture.
+Blocked children also retain path-bound candidate IDs, including the unchanged
+standalone fallback formula for invalid directory names. Model and registered
+schema validation reject replaced IDs even when child identity is absent.
+Plugin evidence also rejects coercible nested file sizes before parsing the
+unchanged standalone manifest model. File paths retain component-kind blockers
+they directly prove, including nonempty descendants of file-only locations;
+empty directories still require source verification. The shared CLI context
+reader rejects known special leaves before opening, while preserving no-follow,
+post-open type, read-budget and drift checks for its existing callers.
+The plugin-only ingress also rejects padded candidate identities, child identity
+names, file hashes and finding codes before shared models can trim them. Frozen standalone
+normalisation is unchanged; already-normalised objects cannot reveal their input
+history. Descriptive whitespace remains valid. Captured fallback presence excludes
+the `none` settings selection, while inline settings may still supersede malformed
+unused fallback bytes. Retained MCP files require their unassessed warning, and
+blocked children or missing required metadata retain their specific blocker codes
+and severities. These checks apply to bound envelopes, not empty input blockers;
+they do not establish source authenticity or MCP execution safety.
+
+Synthetic accepted/rejected/recovery cases are in
+[`test_plugin_package.py`](../tests/test_plugin_package.py) and
+[`test_plugin_envelope_review.py`](../tests/test_plugin_envelope_review.py), with
+safe synthetic pre-open cases in
+[`test_plugin_context_preopen.py`](../tests/test_plugin_context_preopen.py) and
+[`installed_plugin_intake_smoke.py`](../tests/installed_plugin_intake_smoke.py).
+The latter uses the installed wheel's public API, packaged schema and CLI with
+no sibling project, provider, registry or editable SDK import. See the task
+record for validation/delivery state; test presence alone is not passing proof.
+
+### Existing migration increments
+
+The additive `scenario-coverage-plan/v1` and `scenario-coverage/v1` families
+audit caller-declared claim-to-case-or-gap mappings against the package's
+ten active scenarios. Existing scenario-quality v1/v2 receipts, local-check v1,
+and their policies do not change. Calibration probes and historical cases
+cannot satisfy an active-case mapping. Named gaps preserve incomplete coverage,
+even when the mapping audit passes. Model and `SchemaRegistry` validation
+enforce cross-field semantics beyond structural JSON Schema. Neither family
+enters generic `parse_receipt` dispatch; use its model or registry. The source
+skill's Evals Router audit shape guides this implementation; no executed
+Agent-Skills parity or semantic reviewer execution is claimed.
+
+Coverage mappings and active-case identifiers preserve surrounding whitespace
+exactly, matching the scenario-quality inventory rather than normalising it.
+Whitespace-only and non-text identifiers remain invalid. Distinct identifiers
+such as `case-0` and ` case-0 ` remain distinct and can be mapped separately.
+
+Direct plan models and `SchemaRegistry` reject duplicate declaration or mapping
+identifiers, unknown claim or gap references, mapping entries without case or
+gap references, repeated references, and unused gaps. A declaration may omit a claim's mapping so
+the audit can report `unmapped_claim`; contract validation alone does not
+establish complete coverage. Active-case membership requires the package
+inventory and is checked by the audit, not standalone plan validation.
+
+The applicable package-quality policy is an additive increment, not full
+reference-review parity. Legacy `reference_quality_contract` checks nonempty
+reference content and structured syntax, but also applies filename/title
+heuristics and contract-specific fields. The SDK ports the deterministic byte
+and syntax checks behind explicit `check_reference_content`; semantic title,
+description, coverage and source-accuracy review remain separate work.
+Binary references are deliberately excluded from text checks, rather than
+requiring every resource to decode as UTF-8. JSON rejects non-standard numeric
+constants and validates large integer tokens without numeric conversion.
+Markdown suffixes listed in the API contract receive the same checks as `.md`;
+leading UTF-8 BOMs are not content. The opt-in text check has an eight-MiB
+per-reference parsing budget with a typed `reference_content_limit` blocker.
+This does not bound the preceding package capture or waive source safety.
+YAML uses syntax events, not object construction, so custom tags and
+multiple documents remain valid reference formats. This deliberately differs
+from the source's single-document constructor; syntax acceptance is not safety
+clearance. Incremental YAML parsing stops above 128 nested collections or
+100,000 events with `reference_content_limit`; excessive but syntactically
+valid documents are deliberately blocked. This does not promise a wall-clock
+deadline. Required files are explicit policy,
+not a global OpenAI or repository layout requirement. Defaults and versioned
+validation/build/intake envelopes remain unchanged. Corrected source produces
+a new candidate digest; validation never changes the source.
+The existing result envelope does not record the effective validation policy.
+Retain the selected policy and exact command with evidence; an unspecified
+passing v1 validation result does not prove these opt-in checks ran.
+
+Retained proof includes `tests/test_package_quality_policy.py` and the installed
+API/CLI smoke in `tests/installed_package_quality_smoke.py`. Source semantics
+were inspected; live Agent-Skills execution is not claimed by these SDK tests.
+
 Before porting a workflow, identify the source revision, production consumer,
 supported input forms, policy declarations, and failure semantics. Use the
 source implementation and representative accepted and rejected cases to
@@ -379,6 +826,11 @@ must bind the same candidate identity and report their own evidence.
 
 ## Tessl to Codex native-plugin compatibility question
 
+The following CLI 0.111.0 experiment concerns the older Codex compatibility
+layout. Retain it as historical evidence, not a claim about today's CLI or the
+new canonical root-manifest format. The next adapter proof must cover the
+portable plugin target and any explicitly selected compatibility import.
+
 The SDK does not yet claim that a Tessl plugin archive can carry a complete
 Codex-native plugin. Tessl's documented plugin manifest selects skills, rules,
 commands, MCP metadata, and hooks; OpenAI's native plugin also requires its
@@ -407,8 +859,8 @@ not a claim that the existing Tessl-format wrapper for skill evaluation is
 absent or unusable.
 
 Compatibility question for Tessl: what documented manifest field or package
-layout includes *all* referenced native-plugin resources, including
-`.codex-plugin/plugin.json`, assets, and scripts outside skill directories, in
+layout includes *all* required plugin resources, including canonical root
+`plugin.json`, any selected compatibility manifest, assets and scripts outside skill directories, in
 the versioned archive without changing their contents, relative paths, or
 executable modes? If that is supported, which Codex integration installs the
 complete archive as one plugin rather than only materializing its skills, MCP

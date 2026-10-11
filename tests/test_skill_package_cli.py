@@ -122,7 +122,7 @@ def test_missing_source_revision_returns_structured_blocker(tmp_path: Path, comm
     assert payload["candidate"] is None
 
 
-@pytest.mark.parametrize("arguments", [["--help"], ["inventory"]])
+@pytest.mark.parametrize("arguments", [["--help"], ["inventory"], ["validate-plugin", "--help"]])
 def test_reserved_routes_do_not_import_validation_dependencies(tmp_path: Path, arguments: list[str]) -> None:
     (tmp_path / "yaml.py").write_text("raise RuntimeError('validation dependency imported')\n", encoding="utf-8")
     environment = os.environ.copy()

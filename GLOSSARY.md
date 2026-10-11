@@ -17,6 +17,12 @@ A collection of skill instructions and supporting content prepared for portable
 use by agents. The source package alone does not establish installation or activation.
 _Avoid_: runtime installation, plugin cache
 
+**SDK-managed release**:
+A checked, versioned Agent Plugins package, including releases containing only
+one skill. Standalone skill evidence does not establish clearance for the
+complete plugin.
+_Avoid_: bare-skill receipt, source custody, installed runtime
+
 **Candidate identity**:
 The combination of package identity, source revision, and content digest that
 identifies the exact source state under consideration.
@@ -49,7 +55,8 @@ _Avoid_: skill instance, runtime handle
 
 **Plugin identity**:
 The package identity, name, and version of a plugin, distinct from a standalone
-skill or an installed copy.
+skill or an installed copy. A managed release binds the complete plugin;
+wrapping a skill does not transfer its clearance to that plugin.
 _Avoid_: skill identity, installed plugin
 
 ### Lifecycle and evidence
@@ -134,6 +141,12 @@ workflows, and tooling for creating, updating, checking, admitting, and orchestr
 installation of packages. This ownership does not establish that every intended
 operation is implemented or that an external operation has occurred.
 _Avoid_: candidate holding location, registry service, completed migration
+
+**Registry service**:
+An independently operated backend for package storage, discovery, access
+control, and distribution that consumes SDK contracts. A catalogue linking to
+another registry's installation route does not establish independent distribution.
+_Avoid_: SDK validation engine, candidate holding, portable package format
 
 **Skills Foundry**:
 The holding location for skill and plugin candidates awaiting SDK processing,

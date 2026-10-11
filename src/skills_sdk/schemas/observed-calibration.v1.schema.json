@@ -1,0 +1,566 @@
+{
+  "$defs": {
+    "HeldOutCalibrationProbe": {
+      "additionalProperties": false,
+      "description": "A host-retained label bound to the exact held-out provider output.",
+      "properties": {
+        "expected_label": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Expected Label",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "probe_id": {
+          "minLength": 1,
+          "title": "Probe Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "probe_id",
+        "output_sha256",
+        "expected_label"
+      ],
+      "title": "HeldOutCalibrationProbe",
+      "type": "object"
+    },
+    "ObservedCalibrationPlan": {
+      "additionalProperties": false,
+      "description": "Freeze candidate, judge, parameters, scorer, held-out outputs and policy.",
+      "properties": {
+        "assertion_contract_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Assertion Contract Sha256",
+          "type": "string"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "judge": {
+          "$ref": "#/$defs/ProviderIdentityV2"
+        },
+        "parameters": {
+          "$ref": "#/$defs/ScorerJudgeParameters"
+        },
+        "policy": {
+          "$ref": "#/$defs/ScorerCalibrationAppliedPolicy"
+        },
+        "probes": {
+          "items": {
+            "$ref": "#/$defs/HeldOutCalibrationProbe"
+          },
+          "maxItems": 64,
+          "minItems": 2,
+          "title": "Probes",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "observed-calibration-plan/v1",
+          "default": "observed-calibration-plan/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scorer": {
+          "$ref": "#/$defs/ScorerProfile"
+        }
+      },
+      "required": [
+        "candidate",
+        "scorer",
+        "judge",
+        "parameters",
+        "policy",
+        "assertion_contract_sha256",
+        "probes"
+      ],
+      "title": "ObservedCalibrationPlan",
+      "type": "object"
+    },
+    "ObservedCalibrationProbeResult": {
+      "additionalProperties": false,
+      "description": "Redacted per-output execution result; raw outputs never enter the receipt.",
+      "properties": {
+        "expected_label": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Expected Label",
+          "type": "string"
+        },
+        "judge_result_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Judge Result Sha256",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "predicted_label": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Predicted Label",
+          "type": "string"
+        },
+        "probe_id": {
+          "minLength": 1,
+          "title": "Probe Id",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        },
+        "trial_index": {
+          "minimum": 0,
+          "title": "Trial Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "probe_id",
+        "trial_index",
+        "output_sha256",
+        "expected_label",
+        "predicted_label",
+        "score",
+        "judge_result_sha256"
+      ],
+      "title": "ObservedCalibrationProbeResult",
+      "type": "object"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageSafetyBlocker": {
+      "additionalProperties": false,
+      "description": "Typed reason that a safety-review state cannot establish no issue.",
+      "properties": {
+        "code": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+                }
+              },
+              {
+                "not": {
+                  "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+                }
+              }
+            ],
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[^A-Za-z0-9/])/(?!/)|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            },
+            {
+              "pattern": "\\S"
+            }
+          ],
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageSafetyBlocker",
+      "type": "object"
+    },
+    "ProviderIdentityV2": {
+      "additionalProperties": false,
+      "description": "Hardened provider identity for provider-bearing v2 contracts.",
+      "properties": {
+        "adapter_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "adapter_version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Adapter Version Or Digest",
+          "type": "string"
+        },
+        "model_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+              }
+            }
+          ],
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*(?:/[A-Za-z0-9][A-Za-z0-9._:+-]*)*$",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "provider_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_kind": {
+          "enum": [
+            "llm",
+            "agent",
+            "external"
+          ],
+          "title": "Provider Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "provider-identity/v2",
+          "default": "provider-identity/v2",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Version Or Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "provider_kind",
+        "model_id",
+        "version_or_digest",
+        "adapter_id",
+        "adapter_version_or_digest"
+      ],
+      "title": "ProviderIdentityV2",
+      "type": "object"
+    },
+    "ScorerCalibrationAppliedPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "max_false_negatives": {
+          "minimum": 0,
+          "title": "Max False Negatives",
+          "type": "integer"
+        },
+        "max_false_positives": {
+          "minimum": 0,
+          "title": "Max False Positives",
+          "type": "integer"
+        },
+        "minimum_examples": {
+          "minimum": 1,
+          "title": "Minimum Examples",
+          "type": "integer"
+        },
+        "minimum_true_negatives": {
+          "minimum": 1,
+          "title": "Minimum True Negatives",
+          "type": "integer"
+        },
+        "minimum_true_positives": {
+          "minimum": 1,
+          "title": "Minimum True Positives",
+          "type": "integer"
+        },
+        "threshold": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold",
+        "minimum_examples",
+        "minimum_true_positives",
+        "minimum_true_negatives",
+        "max_false_positives",
+        "max_false_negatives"
+      ],
+      "title": "ScorerCalibrationAppliedPolicy",
+      "type": "object"
+    },
+    "ScorerJudgeParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "temperature": {
+          "title": "Temperature",
+          "type": "number"
+        },
+        "trial_count": {
+          "minimum": 1,
+          "title": "Trial Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "temperature",
+        "trial_count"
+      ],
+      "title": "ScorerJudgeParameters",
+      "type": "object"
+    },
+    "ScorerProfile": {
+      "additionalProperties": false,
+      "description": "Versioned scorer identity and calibration requirements.",
+      "properties": {
+        "calibration_probe_ids": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Calibration Probe Ids",
+          "type": "array"
+        },
+        "calibration_required": {
+          "title": "Calibration Required",
+          "type": "boolean"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "deterministic_checks_first": {
+          "title": "Deterministic Checks First",
+          "type": "boolean"
+        },
+        "pass_threshold": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Pass Threshold",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "scorer-profile/v1",
+          "default": "scorer-profile/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scorer_id": {
+          "minLength": 1,
+          "title": "Scorer Id",
+          "type": "string"
+        },
+        "scorer_type": {
+          "enum": [
+            "deterministic",
+            "llm_judge",
+            "hybrid",
+            "external"
+          ],
+          "title": "Scorer Type",
+          "type": "string"
+        },
+        "version_or_digest": {
+          "minLength": 1,
+          "title": "Version Or Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "scorer_id",
+        "scorer_type",
+        "version_or_digest",
+        "pass_threshold",
+        "deterministic_checks_first",
+        "calibration_required"
+      ],
+      "title": "ScorerProfile",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/observed-calibration.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Observed callback proof, not authenticated external judge or promotion proof.",
+  "properties": {
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageSafetyBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence_scope": {
+      "const": "observed_adapter_callbacks",
+      "default": "observed_adapter_callbacks",
+      "title": "Evidence Scope",
+      "type": "string"
+    },
+    "external_authenticity_verified": {
+      "const": false,
+      "default": false,
+      "title": "External Authenticity Verified",
+      "type": "boolean"
+    },
+    "judge_execution_performed": {
+      "title": "Judge Execution Performed",
+      "type": "boolean"
+    },
+    "judge_invocation_count": {
+      "maximum": 128,
+      "minimum": 0,
+      "title": "Judge Invocation Count",
+      "type": "integer"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "plan": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ObservedCalibrationPlan"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "promotion_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Promotion Authorized",
+      "type": "boolean"
+    },
+    "results": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ObservedCalibrationProbeResult"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "observed-calibration/v1",
+      "default": "observed-calibration/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "judge_invocation_count",
+    "judge_execution_performed"
+  ],
+  "title": "ObservedCalibrationReceipt",
+  "type": "object"
+}

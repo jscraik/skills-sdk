@@ -1,0 +1,580 @@
+# Skills SDK workflow delivery
+
+Owner: Skills SDK maintainers. This task record tracks the owner-approved
+workflow in [workflow.md](../../workflow.md). The capability inventory in
+[migration-map.md](../../migration-map.md) replaces conversation-only migration
+status. This record owns delivery state and accepted revisions; the workflow
+owns the intended process and accepted capability boundaries, while the map
+owns legacy dispositions, proof, limitations, and remaining actions. Update
+these existing documents together at feature closeout; archive this record
+only after all scoped acceptance criteria pass.
+
+## Goal and constraints
+
+Deliver an independent, agent-accessible create/update/external-check workflow,
+then applicable security, matched local/cloud evaluation, registry delivery,
+selected installation, and regression feedback. Reuse existing SDK services,
+models, schemas, and tests. Keep one writer per branch and one bounded slice
+per reviewable change.
+
+Owner decision, 2026-10-08: use the
+[plugin-first managed release format](../../workflow.md#managed-release-format).
+Every SDK-managed skill release is an Agent Plugins package, including one-skill
+releases; root `plugin.json` is canonical. Keep standalone-skill intake and
+validation, preserve source during normalisation, and bind release evidence to
+the completed plugin rather than wrapping a cleared skill afterwards. Existing
+accepted services are not retroactively complete-plugin implementations.
+The same decision makes distribution registry-independent: Tessl is the initial
+backend to prove; a separately operated registry becomes primary only after
+the [transition gates](../../workflow.md#registry-transition). Do not start or
+create that registry, including a catalogue or prototype, until the Skills SDK
+workflow meets its agreed acceptance criteria and publication to Jamie's private
+Tessl workspace is verified by exact-version and private-visibility readback.
+Record that proof here before separately authorised registry work begins.
+A catalogue may then precede independent distribution; neither service building
+nor live publication is authorised by this record. Preserve one canonical content source and bind
+distinct portable/export artifact digests through an explicit adapter.
+
+The [brAInwav product-family boundary](../../../ARCHITECTURE.md#brainwav-product-family)
+keeps `skills-sdk` and future `skills-registry` in separate repositories.
+Registry UI, API and workers stay together initially. Workers consume an
+installed, pinned SDK package through public APIs and versioned schemas;
+website, accounts, catalogue, artifact storage/access and job operations belong
+to the registry. Production editable/checkout imports and duplicated SDK rules
+are excluded. Prove the packaged consumer boundary and credential isolation when
+that work is authorised. This is future ownership, not a new implementation
+slice or registry-start authority.
+
+The same owner direction requires an approved professional icon for every
+Jamie-owned managed plugin, including one-skill releases. Apply the
+[icon policy](../../workflow.md#icons-and-presentation) and
+[strengthened acceptance gates](../../product-acceptance.md#managed-release-gates)
+through existing slices. Preserve valid third-party branding and rights. Artwork
+creation is an explicit preparation operation, not a validator side effect or
+permission to spend; no installed-copy bulk rewrite is authorised.
+
+Preserve unrelated source edits and generated run state. No provider spending,
+credential use, registry mutation, public publication, or home runtime mutation
+is authorised by this task record. Implement portable boundaries and controlled
+adapter proof first; live operations require their applicable authority.
+Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
+
+## Ordered checklist
+
+| Slice | Work | Completion proof | State |
+| --- | --- | --- | --- |
+| S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Accepted in PR #44; maintain affected rows at every feature closeout. |
+| S2 | Add applicable plugin/skill policy, approved icons and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 and #52 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review, local stage composition and canonical plugin inspection exist. Plugin normalisation, joined release preparation, icon validation/approval, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
+| S3 | Bind applicable security evidence, update-permission differences and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass; expanded permissions need renewed authority. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Permission-delta interpretation, independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
+| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Partial: PRs #53, #55 and #56 merged. Strict plugin binding, child calibration, budgets, source/safety guards, fresh per-trial capabilities, one-to-nine-child offline routes, feedback/rerun and explicit named-profile binding exist. Real-driver settings application and live local/cloud quality remain open. |
+| S5 | Compose plugin archive/presentation verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, private-material exclusion, versioned destination profiles, separate portable/export digests, exact checked version, uncertain-outcome readback, idempotency and observed recovery; host display/activation separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
+| S6 | Join feedback-to-regression and reconcile consumer cutover or retirement coverage. | Every scoped failure has an owner and retained regression; clean-room entrypoints run without sibling projects; all legacy rows have disposition. | Partial: PR #53 adds bounded matched feedback/rerun services; automatic capture, consumer cutover and retirement remain open. |
+
+## Accepted delivery ledger
+
+Accepted SDK baseline: [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d),
+verified on 2026-10-11. The workflow and migration map describe this same
+revision. These merges accept the bounded capabilities below, not all acceptance
+criteria of their parent slices.
+
+| Delivery | Accepted revision | Bounded capability |
+| --- | --- | --- |
+| [PR #44](https://github.com/jscraik/skills-sdk/pull/44) | [`77640af`](https://github.com/jscraik/skills-sdk/commit/77640af82642f5b02ae2624337a1f0c170199f3e) | Target workflow, source inventory and command discovery. |
+| [PR #45](https://github.com/jscraik/skills-sdk/pull/45) | [`812e10c`](https://github.com/jscraik/skills-sdk/commit/812e10cd149b2e07131078eb25d4354b02299d14) | Applicable package-quality policy. |
+| [PR #46](https://github.com/jscraik/skills-sdk/pull/46) | [`a07b332`](https://github.com/jscraik/skills-sdk/commit/a07b3324f5eb89d42bc6a0387b842ef4678fd3fa) | Candidate-bound declared scenario-claim coverage. |
+| [PR #47](https://github.com/jscraik/skills-sdk/pull/47) | [`6ce9924`](https://github.com/jscraik/skills-sdk/commit/6ce99240ebd349eee7d91e896153509b13e680ec) | Candidate-bound content assessment and bounded offline reviewer execution. |
+| [PR #48](https://github.com/jscraik/skills-sdk/pull/48) | [`b208b1d`](https://github.com/jscraik/skills-sdk/commit/b208b1d20f1ff948013b4594336c4d7f260164d1) | Ordered local quality workflow with typed stop and recovery boundaries. |
+| [PR #49](https://github.com/jscraik/skills-sdk/pull/49) | [`40139ca`](https://github.com/jscraik/skills-sdk/commit/40139ca2e813cd6e3555cff0366cd2262fdd5972) | Bounded static screening and candidate-bound safety gates before selected-case execution. |
+| [PR #50](https://github.com/jscraik/skills-sdk/pull/50) | [`817966b`](https://github.com/jscraik/skills-sdk/commit/817966b378be0da45928fbaef89b2ede3708b012) | Observed numeric scorer-calibration callbacks; the CLI consumes supplied-offline fixtures. |
+| [PR #51](https://github.com/jscraik/skills-sdk/pull/51) | [`c38a769`](https://github.com/jscraik/skills-sdk/commit/c38a7696ebc8e283cd69a1914f8abb543b459f2a) | Reconciled accepted coverage and plugin-first release policy, mandatory icons and the separate registry start gate; no executable capability added. |
+| [PR #52](https://github.com/jscraik/skills-sdk/pull/52) | [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842) | Root-manifest plugin inspection, complete bytes and separate modes, child/settings binding and fresh source verification. No release approval or live-operation authority. |
+| [PR #53](https://github.com/jscraik/skills-sdk/pull/53) | [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd) | Bounded matched whole-plugin evaluation, child calibration, same-lane local/cloud handoff and feedback/rerun services. Supplied-offline CLI and injected API proof are not live quality or release clearance. |
+| [PR #56](https://github.com/jscraik/skills-sdk/pull/56) | [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d) | Explicit local/cloud profile inputs, dependency/settings binding, controlled driver invocation, drift rejection and corrected-input recovery. Not real-provider settings application or quality proof. |
+
+PR #54 accepted instruction-alignment documentation at
+[`ec8f0dae`](https://github.com/jscraik/skills-sdk/commit/ec8f0dae3b370cf9f9c8a85ce91f70e4846481f1).
+PR #55 accepted fresh per-trial calibration capabilities at
+[`e13ac5da`](https://github.com/jscraik/skills-sdk/commit/e13ac5da0236a4fead407bd3c8a5e9e71e61ae47).
+Jamie merged PR #55; its source head `4d2983a` and accepted merge have identical
+file trees. Hosted merge does not retroactively prove a passing local readiness
+receipt or completion of previously pending independent review and CI gates.
+
+Repository tests and installed-entrypoint proof are linked in the migration map.
+The ledger records hosted acceptance; it does not replace exact candidate
+validation, current PR checks/reviews, or live provider and runtime evidence.
+
+## Proof lanes and resume point
+
+Current bounded slice, 2026-10-11: documentation-only instruction alignment
+from accepted PR #56 revision `047260b`. Reconcile accepted capabilities,
+Jamie's security selections and dependency order in existing records. Closeout
+requires the final changed documents' repository validation, signed delivery,
+current-head independent review/checks and applicable receipts. This follow-up
+is not yet accepted and adds no executable service or external-operation authority.
+
+PR #56 merged externally on 2026-10-11 at 12:57:35 UTC. Its final signed source
+head `337f8dce04cb11efd002fa5a41c867840448d41e` and accepted squash merge have
+identical trees. That source passed `bash scripts/validate-repository.sh`:
+3,519 tests passed and one skipped, plus schema, code-style, build and installed
+API/CLI checks. Source and installed-wheel local/calibration/cloud tests cover
+profile binding, stale-input rejection and recovery with controlled fixtures.
+The source signature was verified and pushed non-force. The
+[hosted validation run](https://github.com/jscraik/skills-sdk/actions/runs/38097902762)
+completed successfully; all five reported source-head checks passed and all four
+threads were resolved at merge readback. The local update receipt had remained
+blocked by unsupported review verdict formats. External merge does not make
+that receipt pass retrospectively or establish real-provider settings application,
+live quality or release readiness. No new aggregate was run on the identical
+squash tree.
+
+Historical PR #56 original-candidate evidence: `0429ac5f85b2996b11e72ba2ad4edbc879012b75`
+passed `bash scripts/validate-repository.sh` with 3,498 tests and one skipped,
+plus build and installed-entrypoint checks. Its signature was verified and it
+was pushed non-force. This result validates only those original bytes, not the
+subsequent repairs or this documentation follow-up.
+
+Historical PR #53 evidence: it merged on 2026-10-10. Its signed source head
+`20eac04739ebe2706e204372b7514fe494589b14` and the squash merge have identical
+trees. That source candidate passed the canonical repository wrapper with
+3,353 tests and one skipped, plus schemas, code style, build, installed API/CLI
+and diff checks. This historical result does not validate later changed bytes.
+
+Jamie merged PR #53 externally. At merge readback, the hosted validation job
+was still running and the local update receipt had not passed; merge topology
+does not retroactively establish those lanes. This is historical merge evidence,
+not an active instruction to repeat PR #53 work.
+
+Parked work remains root-owned, with no ownership transfer: presentation branch
+`codex/sdk-plugin-presentation-integration` at signed `0c6eea3` has historical
+local validation but no accepted delivery; portable-export branch
+`codex/sdk-portable-export` has local uncommitted work based on `1125d0e`, focused
+proof only and no aggregate or delivery. Preserve both and unrelated primary
+edits. The earlier S4 review-export approval does not cover presentation.
+
+One next dependency-ready slice after this reconciliation: resume the existing
+S2 presentation/preparation candidate against accepted `047260b`, without
+rebasing or overwriting parked bytes. Use one representative canonical complete
+plugin to prove candidate-bound metadata, artwork-file and supplied rights/approval
+checks through public APIs and installed CLI, with rejected inputs and corrected
+recovery. Review any destination conversion separately. Explicit standalone
+normalisation remains an input-route obligation; it must preserve the original
+source and cannot silently turn bare-skill evidence into plugin clearance.
+
+That representative plugin still cannot traverse the complete workflow. Retain
+these dependent gates, in workflow order, rather than choosing later evaluation
+work because its components are available:
+
+1. S2 explicit preparation/normalisation, presentation and whole-plugin quality
+   composition; comprehensive semantic/reference accuracy and scenario/scorer
+   gaps need applicable evidence. Captured asset bytes are not visual approval.
+2. S3 baseline-to-candidate permission interpretation and selected Codex Security /
+   OWASP applicability with independent provenance and unresolved-risk blockers,
+   before untrusted execution. Static screening alone cannot close this gate.
+3. S4 supported real-driver settings application, held-out calibration and
+   same-lane local/cloud quality, within separate provider authority. Exactly ten
+   active scenarios remain distinct from probes/tests; unchanged, rejected and
+   inconclusive outcomes do not force a winner.
+4. S5 complete portable/archive/export proof and the applicable final Snyk check,
+   then authorised private Tessl exact-version/private-visibility readback.
+   Installation, artwork display, activation and rollback each need separate proof.
+5. Supported environments, release evidence, maintained released consumers and
+   legacy module/symbol/production-caller retirement under
+   [product acceptance](../../product-acceptance.md#acceptance-matrix).
+
+Retain failures and regression cases throughout. Changed candidates rebind and
+invalidate affected downstream evidence; rerun the failed gate and its
+dependents. Profile or A/B success does not close earlier permission/security,
+preparation or release gates, and installation does not close product acceptance.
+Parent S2, S3, S4 and programme acceptance remain open. Live providers, scanner
+exports, publication and runtime changes require their own authority.
+
+Use `pass`, `fail`, `blocked`, or `not_run` for each lane. Record exact command,
+candidate revision, evidence reference, what it proves, and the next check.
+Do not turn a successful local gate into hosted, provider, registry, or runtime
+clearance. Required proof blocks completion of its dependent slice only.
+
+Name delivery state separately: proposed, implemented locally, validated locally,
+under review, merged, published, or verified in a host. Record exact revision and
+proof for each applicable lane; these are not interchangeable completion labels.
+
+The focused commands below are historical runs in the pinned Python 3.12
+environment. Their repository command text is retained; transient local cache
+and tool-state environment overrides are omitted from this portable record.
+Documenting these commands does not claim a new test run.
+
+- Source assessment base: Agent-Skills `532962c65ef0549d16168c0e899c9cb8dc032188`.
+- Documentation reconciliation merged in
+  [PR #51](https://github.com/jscraik/skills-sdk/pull/51) at `c38a769`. It records the plugin-first
+  target, mandatory icon policy and strengthened acceptance without changing
+  executable services or live-operation authority.
+- Accepted work: portable plugin inspection and binding, developed on
+  `codex/sdk-portable-plugin-intake` with documentation from PR #51. The additive
+  `validate_plugin_package` / `validate-plugin` route captures root-manifest
+  candidates, complete file bytes and modes, per-skill findings and OpenAI
+  settings precedence. Focused and installed proof live in
+  [plugin tests](../../../tests/test_plugin_package.py) and
+  [installed smoke](../../../tests/installed_plugin_intake_smoke.py).
+  Historical proof for `41c2dfcf373f4c345ec0fc03ba38633bb0484d58`:
+  `bash scripts/validate-repository.sh` passed on 2026-10-08 with 2,566 tests
+  passed, one skipped, wheel build and all installed-entrypoint checks passing.
+  The pre-reconciliation repair passed that command on 2026-10-08 with 2,629 tests
+  passed, one skipped, wheel build and all installed-entrypoint checks passing.
+  It repairs child-role binding, literal entrypoint discovery and named
+  unknown-key diagnostics. It also adds source-backed full-envelope
+  verification through `verify_plugin_package_validation` and
+  `validate-plugin --verify-evidence FILE`; hash-only contract consistency does
+  not establish source derivation. PR #52 merged at `1125d0e` on 2026-10-09;
+  local proof and hosted delivery remain separate evidence lanes.
+- PR #52 reconciliation follows the completed bot task at `86760d2`. The local
+  candidate preserves digest-only receipts instead of retaining arbitrary raw
+  settings. Canonical digest tests cover inline and fallback nested settings,
+  private-value non-disclosure, tamper rejection and corrected-input recovery.
+  Focused plugin, evidence, CLI and public-boundary checks on 2026-10-08:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_review_regressions.py tests/test_plugin_package.py tests/test_public_repository_boundary.py -q
+  ```
+
+  Result: `pass` — 133 tests passed. After restoring the no-settings
+  orphan-digest regression:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py -q
+  ```
+
+  Result: `pass` — 12 tests passed. The reconciled candidate then passed
+  `bash scripts/validate-repository.sh` on 2026-10-08: 2,632 tests passed, one
+  skipped, with schema, code style, build, installed-entrypoint and diff checks
+  passing. Earlier aggregate proof remains historical; signed delivery and
+  current-head hosted evidence are separate closeout requirements.
+- Signed repair `49fd6fc367dca04e97cd0319913b8c5f4aaaed10` was pushed to
+  [PR #52](https://github.com/jscraik/skills-sdk/pull/52) on 2026-10-09. Its five
+  hosted review threads were resolved by their reviewers or the owner. A local
+  base review then found a blocked-output policy-retention defect. The follow-up
+  repair preserves valid caller policy across malformed or mismatched evidence,
+  CLI read and JSON failures, and invalid source revisions. Invalid policy
+  fails before source capture. Focused policy, evidence and plugin checks on
+  2026-10-09:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_package.py -q
+  ```
+
+  Result: `pass` — 103 tests passed. The earlier 2,632-test aggregate result applies to
+  the previous repair; the final follow-up result is recorded below.
+  Hosted review `5466755715` then identified missing candidate-ID binding for
+  blocked children. The same follow-up repairs that boundary, including invalid
+  directory-name fallback IDs. Its manifest-allowlist allegation was refuted by
+  the committed allowlist and passing typed-model roundtrip tests. The expanded
+  focused plugin, standalone, core and receipt suite ran on 2026-10-09:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_child_binding.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_package.py tests/test_plugin_review_regressions.py tests/test_skill_package_validation.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q
+  ```
+
+  Result: `pass` — 352 tests passed, one skipped. Independent delta reviews
+  found no actionable issues.
+  Review `5466988582` added a pre-open special-file finding and repeated the
+  policy-mismatch finding already covered by the repair. The follow-up also
+  rejects known non-regular files before opening them, including the standalone
+  reader found by the bounded sibling check. Post-open race checks remain.
+  The in-progress aggregate was interrupted to include this final correction;
+  partial test output is not a passing aggregate result.
+  After correcting the new test's message assertion to the existing sanitised
+  public diagnostic, the pre-open regression command was:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_capture_preopen.py -q
+  ```
+
+  Result: `pass` — 13 tests passed on 2026-10-09. The final candidate
+  passed `bash scripts/validate-repository.sh` on 2026-10-09: 2,674 tests passed,
+  one skipped, with generated schemas, code style, build, all installed-entrypoint
+  acceptance/rejection/recovery checks and `git diff --check` passing.
+- Signed input and evidence repair
+  [`ed488df`](https://github.com/jscraik/skills-sdk/commit/ed488dfcfdb665143d9a0551c48be08acc0fbfe8)
+  was published in PR #52 through signed reconciliation commit
+  [`3629e329`](https://github.com/jscraik/skills-sdk/commit/3629e3293facfa2da9425be62b2c9dd4b4439801)
+  on 2026-10-09. The reconciliation tree is identical to the validated repair
+  tree. Review `5467338707` requested the exact focused commands recorded above;
+  this documentation correction does not change implementation or test inputs.
+- Review `5467422704` added three input-boundary findings on `3629e329`:
+  coercible nested child sizes, erased component-kind blockers, and known
+  special evidence files opened before rejection. The follow-up rejects those
+  inputs, preserves standalone size parsing and shared CLI success semantics,
+  and retains post-open checks. A bounded sibling check also covers component
+  directories proved by captured descendants; empty directories are not inferred.
+  The new regression command reproduced 27 failures with one passing race check
+  before repair, then passed all 28 cases after repair:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py -q
+  ```
+
+  Result: `pass` on 2026-10-09 for that initial repaired test set. The expanded
+  neighbouring-input, unsupported-host, shared-caller and contract suite ran:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_child_binding.py tests/test_plugin_capture_preopen.py tests/test_intake_cli.py tests/test_content_review.py tests/test_local_check_cli.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q
+  ```
+
+  Result: `pass` — 402 tests passed on 2026-10-09. The first aggregate stopped
+  at the 800-line module limit before pytest. Combining the equivalent
+  descriptor-support conditions repaired that failure without changing the limit.
+  The reader regression command then passed all nine cases:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_context_preopen.py -q
+  ```
+
+  Result: `pass` on 2026-10-09. The final
+  `bash scripts/validate-repository.sh` result was `pass`: 2,705 tests passed,
+  one skipped, generated schemas, code style, wheel build, every installed
+  API/CLI acceptance/rejection/recovery check and `git diff --check` passed.
+  The earlier 2,674-test aggregate remains historical. Synthetic device metadata
+  and temporary FIFO fixtures do not establish atomic capture or live host proof.
+- The input-boundary follow-up was published as signed revision
+  [`4738fb9`](https://github.com/jscraik/skills-sdk/commit/4738fb9309bfcc861ced95ae0a8f9354b025b7f2).
+  Review `5467831856` then identified padded candidate fields, erased fallback
+  selection, an erased MCP warning and a suppressed required-version blocker.
+  The next repair keeps canonical identity strings exact and retains observable
+  findings for blocked and passing envelopes. Its bounded sibling check includes
+  child hashes and names, required descriptions and the blocked-child finding;
+  frozen standalone parsing and descriptive whitespace remain unchanged.
+  The initial regression command reproduced 85 failures with 22 passing tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -q
+  ```
+
+  Result: `fail` before repair on 2026-10-09. After repair and added neighbouring
+  cases, this command passed 112 tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -q --tb=short
+  ```
+
+  Result: `pass` on 2026-10-09. The combined plugin, evidence and frozen-contract
+  regression command then passed 448 tests:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py tests/test_plugin_context_preopen.py tests/test_plugin_evidence.py tests/test_plugin_evidence_cli.py tests/test_plugin_child_binding.py tests/test_plugin_capture_preopen.py tests/test_plugin_package.py tests/test_plugin_review_regressions.py tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py -q --tb=short
+  ```
+
+  Result: `pass` on 2026-10-09. Two read-only repair reviews found no actionable
+  defect within the identity and retained-finding changes. A final bounded check
+  of regex-constrained strings found the same padding issue in finding codes.
+  The aggregate was deliberately stopped after 141 passing tests, not recorded
+  as a pass. This additional regression command reproduced six failures:
+
+  ```sh
+  mise exec -- uv run --frozen pytest -p no:cacheprovider -o addopts='' tests/test_plugin_envelope_review.py -k padded_finding_codes -q --tb=short
+  ```
+
+  Result: `fail` before adding finding codes to the plugin-only ingress rule.
+  The same command then returned `pass`: six tests passed, 112 deselected on
+  2026-10-09. The final `bash scripts/validate-repository.sh` result was `pass`:
+  2,801 tests passed, one skipped, with generated schemas, code style, wheel
+  build, every installed API/CLI acceptance/rejection/recovery check and
+  `git diff --check` passing. The installed plugin route proves the four
+  reported rejection classes and finding-code sibling with corrected recovery.
+  The earlier 2,705-test result remains historical evidence for `4738fb9`.
+- PR #52 closeout: Jamie merged the signed repair head `4cdfefb` at accepted
+  `1125d0e`. The source and accepted trees agree. This records the hosted merge;
+  it does not recast the earlier blocked review gate as an agent-performed merge.
+- S4 delivery evidence: PR #53's signed candidate
+  `ca1db74570a945f4843013d61d47b2e2eea77e73` integrates against accepted base
+  `1125d0e4fe339a4c4c60a47a11952ae70367a842`. Its retained final command was:
+
+  ```sh
+  PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS=-x bash scripts/validate-repository.sh
+  ```
+
+  Result on 2026-10-09: `pass`, 3,182 tests passed, one skipped in 2,411.55
+  seconds; generated schemas, code style, wheel build, installed smoke checks
+  and diff checks passed. Execution used `UV_OFFLINE=1` and disposable
+  `MISE_STATE_DIR` and `UV_CACHE_DIR` bindings; private cache paths are not
+  committed. The wrapper selects this checkout's pinned environment.
+  `PYTEST_ADDOPTS=-x` stopped on first failure without excluding tests.
+  This is historical local evidence for that exact PR #53 candidate, not
+  accepted-main, hosted-check or live-provider proof.
+- Historical PR #53 repairs addressed reference-context exclusion, selected-child
+  reference ownership, trial feasibility and identity, adapter contracts and
+  fresh per-trial capability lifetimes, schema-registry rejection proof and
+  descriptor-selected complete/stream fixtures across all five offline CLI routes,
+  receipt validation cost and safety requirements. The signed `743c389` repair binds
+  all regression candidate contexts to one absolute fixture root and rejects
+  identical complete baseline/candidate identities at plan validation. Later
+  review repairs align reference eligibility between plan and runtime, freeze
+  baseline calibration commitments during recovery and expose nested cloud
+  regression blockers in text output. Their focused and installed regression
+  checks retain rejected inputs and corrected-input recovery. These edits postdate
+  `ca1db745`; its aggregate does not validate them. Final source head
+  `20eac047` passed the same repository wrapper with 3,353 tests and one skipped,
+  plus generated schemas, code style, build and installed checks. Its tree equals
+  accepted merge `ed378971`; see the separate delivery lanes above.
+  A subsequent review identified generator-mode drift: the repair requires one
+  explicit complete/stream mode per lane and binds all variants and trials to
+  it. Fresh source-backed UTF-8 blocking and completed invocation ceilings
+  already exist; new regressions and clarified descriptions preserve those
+  boundaries instead of adding filesystem access to portable plan models.
+  These edits postdate `2610c786`; its 3,314-test aggregate is historical proof
+  only and does not validate the later repair.
+  Exactly ten active cases, one through nine captured children and
+  separate calibration probes/repeats remain the intended scope. Intermediate
+  counts without retained exact commands are omitted rather than promoted into
+  reproducible validation evidence.
+- Historical calibration ownership assessment, 2026-10-09: the accepted
+  `execute_scorer_calibration` trial expansion reuses each probe's supplied
+  capabilities; matched calibration composes that route. The new matched-lane
+  capability schedule does not change this accepted contract. Before claiming
+  stateful host calibration support, choose a compatible fresh-capability route
+  with focused lifecycle proof. A controlled public-API diagnostic on
+  2026-10-09 confirmed that a reusable two-trial fixture succeeds, while
+  permanently closing provider or judge capabilities return
+  `calibration_execution_incomplete` after the first trial in both numeric and
+  dimensional calibration. The one-trial neighbours pass. This diagnostic is
+  not an installed-entrypoint repair, live-provider proof or six-probe scorer
+  qualification. PR #55 subsequently accepted explicit fresh pairs and
+  rejection of aliasing before wrapping. Its controlled lifecycle and installed
+  fixtures cover the repair; real-provider calibration quality remains separate.
+- Presentation is a separate signed, locally validated candidate `0c6eea3`:
+  2,949 tests passed, one skipped, plus installed base and optional-image checks.
+  It remains unpushed while permission to export its complete diff to the
+  configured external review service is pending. S4 local integration has no
+  presentation/Pillow import dependency and need not wait for that review;
+  managed release still requires the presentation gate.
+- Historical S4 prototype evidence: the older candidate passed its local
+  repository wrapper (2552 passed, one skipped), plus installed
+  rejection/recovery proof. That result does not validate the current strict
+  plugin integration and is not accepted SDK functionality, hosted clearance
+  or live model proof.
+- Unmerged S5 evidence: archive, complete-plugin capture/hardening and supplied
+  transport-byte work remain local candidates. A custom-timezone callback at
+  transport ingress remains an actionable blocker; resolve it before claiming
+  final transport review clearance or starting its full validation.
+- Provider, registry, and home runtime execution: `not_run` for these delivery
+  slices. Controlled callbacks and installed offline fixtures do not establish
+  external scanner quality, model lift, publication, or selected installation.
+- S2/S3 and programme acceptance remain open. Keep supplied mapping, semantic
+  review, scenario execution, calibration, promotion and external-state proof
+  separate; use the map's remaining actions before selecting further work.
+
+### Queued-work assessment and next bounded slice
+
+Historical assessment and slice selection, 2026-10-08. The intake slice below
+was subsequently accepted in PR #52; it is not the active instruction. See the
+[current resume point](#proof-lanes-and-resume-point) for delivery order.
+
+Read-only assessment on 2026-10-08 found that queued capture, build, hardening
+and transport use `.tessl-plugin/plugin.json` as authoritative metadata. Root
+`plugin.json` and the Codex overlay are retained as ordinary files, not
+interpreted as a canonical portable contract. Immediate-child skill discovery,
+full-file recapture, per-skill findings and a separate mode ledger are reusable.
+Byte-content identity must not be described as including modes when the current
+contract binds modes separately. Current ZIP/TGZ verification proves supplied
+representations of that bundle, not a portable-to-Tessl export relationship.
+
+The queued matched handoff already requires the qualifying local candidate as
+the cloud baseline, preserves frozen controls, and compares both cloud variants
+within one cloud model lane. Preserve it. Callers still supply the refined
+candidate; neither candidate authoring nor live cloud quality is established.
+These are source-inspection results, not new test runs or accepted-main claims.
+
+Then-selected slice: **canonical portable plugin intake and binding**, within the existing
+validation, intake, packaging, model/schema and CLI seams. No registry server,
+provider execution, publication or installation is part of this slice.
+
+- Accept root-only single- and multi-skill Agent Plugins candidates using the
+  selected specification and direct skill discovery, with Tessl unavailable.
+- Establish whole-plugin identity before downstream evidence; retain complete
+  resources, modes and per-skill findings. Prove changed shared bytes or modes
+  invalidate their affected evidence, and bare-skill receipts cannot clear a
+  newly assembled plugin.
+- Capture referenced artwork bytes as resources in this slice, without claiming
+  decoding, visual approval or observed host display. Preserve the required
+  release-policy gate for the following presentation slice.
+- Implement OpenAI extension precedence without merging an ignored overlay.
+  Separate standard conformance from stricter SDK policy, including unknown
+  fields and metadata conflicts; never label an SDK-only rejection a standard
+  requirement. Keep supported compatibility imports explicit, not competing
+  canonical metadata sources.
+- Preserve standalone-skill public contracts and original source. Keep wrapping
+  into a new candidate as an explicit later normalisation step, not a silent
+  change to existing skill identity.
+- Prove valid, malformed/type-invalid, unsafe-path/resource, stale-evidence and
+  corrected-input cases through public models, schemas, API and installed CLI
+  with Agent-Skills, Foundry and registry services unavailable. Run focused
+  proof and the required aggregate after relevant implementation changes.
+
+The then-planned follow-up was a bounded icon/presentation validation slice using
+existing models and services, not a new framework. Prove approval/rights binding,
+destination image limits, safe manifest references, exact packed assets, changed
+icon invalidation, and accepted/rejected/corrected inputs. Keep visual approval
+distinct from decoding and authorised host-display proof distinct from offline
+validation. Inventory existing managed plugins for missing or unsuitable art
+through supplied candidates, then schedule normal versioned updates; preserve
+acceptable art and verified provider-managed exemptions.
+
+The remaining direction was explicit standalone normalisation, plugin-bound evaluation and
+archive preparation. Reconcile declared optimisation budgets and permission
+changes before dependent execution, and require adapter-version, presentation,
+interruption/retry and recovery proof before delivery. A separate bounded Tessl export adapter must retain
+unchanged skill contents, distinct artifact digests and a verified relationship,
+or block when required resources/modes cannot survive. Preserve the existing ten
+active scenarios. No current candidate authorises advancing to live operations.
+
+### Explicit integration gaps
+
+These are remaining actions within the existing slices, not new programme
+completion criteria or authority to execute providers and scanners.
+
+- **S4 accepted model-profile binding; remaining real-provider proof.** PR #56
+  accepted caller-selected `oss-local.config.toml` / `oss-cloud.config.toml`
+  contents through the public outer adapter and installed matched CLI. Profile,
+  dependency and effective-settings binding, same-lane controls, stale-input
+  rejection and corrected recovery have controlled offline proof. No home
+  layout, Agent-Skills or Foundry dependency is introduced. The remaining
+  consumer is a supported real driver: prove actual settings application,
+  provider identity/support, calibration and live quality within separate
+  authority. Generic callbacks and compiled-settings delivery do not close that
+  external proof requirement.
+- **S3 applicable security integration.** Consumer: candidate-bound safety
+  assessment and permission-change decisions before execution. Use the selected
+  Codex Security integration without importing a host plugin into the core.
+  Record applicable OWASP guidance/version, actual reviewer/scanner identity,
+  scope, exclusions, artifact provenance, findings and unresolved risks. Cover
+  relevant scripts, hooks, MCP, dependencies, secrets, file/network access and
+  installation; compare baseline permissions with the candidate. Prove valid,
+  absent, stale, wrong-candidate, contradictory and corrected supplied evidence;
+  independent execution/provenance remains separate proof. Jamie selected OWASP
+  Top 10 for Agentic Applications 2026 as primary guidance, with the MCP Security
+  Cheat Sheet where MCP applies. Record the actual reference revision/date and
+  reviewer/scanner version; neither is inferred from selection. Those decisions
+  and the final-scan boundary are in
+  [workflow policy](../../workflow.md#applicable-security-evidence-and-final-scan).
+- **S3/S5 required applicable final Snyk scan; adapter unimplemented.** Its
+  consumer is the frozen prepared complete-plugin handoff. Record justified
+  non-applicability without silently waiving required coverage. First bind the
+  actual coverage, output contract and quota policy. Prove a pinned,
+  scoped, optional adapter can validate a report
+  for the exact candidate and artifact, preserve coverage gaps and findings, and
+  block stale/mismatched/incomplete output, quota exhaustion or failed analysis.
+  Retain corrected-input recovery and required rescanning after changed bytes.
+  Offline adapter proof consumes no quota. Live Agent Scan content export and
+  any MCP execution need explicit authority; the account allowance is unknown.
+  A successful scan is neither release approval nor private Tessl readback.
+
+## Lens application
+
+Architecture guidance selects existing seams and caller-visible proof.
+Agent-native guidance requires discoverable commands and usable recovery.
+Testing requires proportionate accepted/rejected behaviour evidence.
+Evals Router binds claims, cases, scorer, candidate, and execution authority.
+Scenario Generator keeps realistic tasks, hidden criteria, drift review, and
+failure ownership. Simplify reviews each completed patch and may record
+`no_justified_edit`; it does not remove safeguards without behaviour proof.
+
+The skills' historical Agent-Skills commands are assessment references.
+Destination validation uses SDK-owned commands. The existing v1 scenario policy
+remains compatible; the managed v2 path retains ten active cases.

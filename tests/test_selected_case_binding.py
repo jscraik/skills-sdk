@@ -10,11 +10,12 @@ from pathlib import Path
 import pytest
 import yaml
 from jsonschema import Draft202012Validator
-from test_selected_case_evaluation import REVISION, _adapter, _case, _evidence, _prepared_request, _skill
+from test_selected_case_evaluation import REVISION, _adapter, _case, _evidence, _prepared_request, _safety_for, _skill
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 from skills_sdk.evaluation.selected_case import _canonical_input_payload, execute_selected_case, load_selected_case
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 
@@ -76,7 +77,11 @@ def test_mutually_consistent_weakened_definition_cannot_replace_loaded_case(tmp_
     )
 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
-        asyncio.run(execute_selected_case(forged, request, input_payload, None, None))
+        asyncio.run(
+            execute_selected_case(
+                forged, request, SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)), None, None
+            )
+        )
 
 
 def test_loader_rejects_private_composed_scenario_set_id(tmp_path: Path) -> None:
@@ -107,7 +112,13 @@ def test_nested_string_subclass_cannot_spoof_selected_prompt(tmp_path: Path) -> 
     request = request.model_copy(update={"input_sha256": canonical_json_sha256({"prompt": "different"})})
 
     receipt = asyncio.run(
-        execute_selected_case(definition, request, {"prompt": DeceptiveText("different")}, None, None)
+        execute_selected_case(
+            definition,
+            request,
+            SelectedCaseExecutionInput({"prompt": DeceptiveText("different")}, _safety_for(definition, request)),
+            None,
+            None,
+        )
     )
 
     assert receipt.status == "blocked"
@@ -147,7 +158,11 @@ def test_adapter_string_subclass_cannot_spoof_deterministic_signal(tmp_path: Pat
 
     receipt = asyncio.run(
         execute_selected_case(
-            definition, request, input_payload, _adapter(request, output), _evidence(definition, request, output)
+            definition,
+            request,
+            SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
+            _adapter(request, output),
+            _evidence(definition, request, output),
         )
     )
 
@@ -165,7 +180,15 @@ def test_loaded_definition_rechecks_package_source_at_execution(tmp_path: Path) 
     evals.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ContractError, match="invalid_selected_case_definition"):
-        asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+        asyncio.run(
+            execute_selected_case(
+                definition,
+                request,
+                SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
+                None,
+                None,
+            )
+        )
 
 
 def test_mode_string_subclass_cannot_select_release_only_case_as_smoke(tmp_path: Path) -> None:
@@ -208,7 +231,13 @@ def test_raw_judge_mapping_is_validated_at_execution(tmp_path: Path) -> None:
     artifact = _evidence(definition, request, output).model_dump(mode="json")
 
     receipt = asyncio.run(
-        execute_selected_case(definition, request, input_payload, _adapter(request, output), artifact)
+        execute_selected_case(
+            definition,
+            request,
+            SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
+            _adapter(request, output),
+            artifact,
+        )
     )
 
     assert receipt.status == "pass"
@@ -223,7 +252,13 @@ def test_malformed_judge_artifacts_return_typed_blocker(tmp_path: Path, invalid:
     request = _prepared_request(definition, input_payload)
 
     receipt = asyncio.run(
-        execute_selected_case(definition, request, input_payload, _adapter(request, "reviewed"), invalid)
+        execute_selected_case(
+            definition,
+            request,
+            SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
+            _adapter(request, "reviewed"),
+            invalid,
+        )
     )
 
     assert receipt.status == "blocked"
@@ -253,7 +288,15 @@ def test_judge_result_path_is_not_invented_for_host_evidence(tmp_path: Path) -> 
             return None
 
     adapter = TrackedAdapter()
-    receipt = asyncio.run(execute_selected_case(definition, request, input_payload, adapter, evidence))
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition,
+            request,
+            SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
+            adapter,
+            evidence,
+        )
+    )
 
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
@@ -274,9 +317,25 @@ def test_selected_case_bounds_host_input_before_canonicalization(
 
     if too_large:
         with pytest.raises(ContractError, match="provider_input_too_large"):
-            asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+            asyncio.run(
+                execute_selected_case(
+                    definition,
+                    request,
+                    SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
+                    None,
+                    None,
+                )
+            )
     else:
-        receipt = asyncio.run(execute_selected_case(definition, request, input_payload, None, None))
+        receipt = asyncio.run(
+            execute_selected_case(
+                definition,
+                request,
+                SelectedCaseExecutionInput(input_payload, _safety_for(definition, request)),
+                None,
+                None,
+            )
+        )
         assert receipt.status == "blocked"
         assert receipt.case_results[0].blocker is not None
         assert receipt.case_results[0].blocker.code == "selected_case_request_mismatch"
@@ -298,7 +357,11 @@ def test_malformed_input_does_not_traverse_large_sibling(tmp_path: Path) -> None
     malformed = {"z": large, "a": object()}
 
     with pytest.raises(ContractError, match="invalid_provider_input"):
-        asyncio.run(execute_selected_case(definition, request, malformed, None, None))
+        asyncio.run(
+            execute_selected_case(
+                definition, request, SelectedCaseExecutionInput(malformed, _safety_for(definition, request)), None, None
+            )
+        )
     assert large.traversed is False
 
 
@@ -315,7 +378,11 @@ def test_deeply_nested_host_input_returns_typed_depth_error(tmp_path: Path) -> N
         cursor = child
 
     with pytest.raises(ContractError, match="provider_input_depth_exceeded"):
-        asyncio.run(execute_selected_case(definition, request, nested, None, None))
+        asyncio.run(
+            execute_selected_case(
+                definition, request, SelectedCaseExecutionInput(nested, _safety_for(definition, request)), None, None
+            )
+        )
 
 
 def test_mapping_subclass_cannot_expand_input_during_normalization(tmp_path: Path) -> None:
@@ -329,7 +396,11 @@ def test_mapping_subclass_cannot_expand_input_during_normalization(tmp_path: Pat
     payload = ExpandingMapping({"prompt": definition.scenario_set.cases[0].prompt})
     request = _prepared_request(definition, {"prompt": definition.scenario_set.cases[0].prompt})
 
-    receipt = asyncio.run(execute_selected_case(definition, request, payload, None, None))
+    receipt = asyncio.run(
+        execute_selected_case(
+            definition, request, SelectedCaseExecutionInput(payload, _safety_for(definition, request)), None, None
+        )
+    )
     assert receipt.status == "blocked"
     assert receipt.case_results[0].blocker is not None
     assert receipt.case_results[0].blocker.code == "provider_adapter_required"
@@ -345,7 +416,11 @@ def test_oversized_provider_output_returns_blocked_receipt(tmp_path: Path) -> No
 
     receipt = asyncio.run(
         execute_selected_case(
-            definition, request, payload, _adapter(request, output), _evidence(definition, request, output)
+            definition,
+            request,
+            SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+            _adapter(request, output),
+            _evidence(definition, request, output),
         )
     )
     assert receipt.status == "blocked"

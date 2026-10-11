@@ -15,13 +15,23 @@ release, provider, runtime, registry, distribution, or consumer truth.
 
 The target owner is the SDK agent-facing `SKILL.md`, references, and evaluation
 workflow for complete skill and plugin creation, updates, checks, external
-intake, and selected installation through SDK-owned Tessl and Codex adapters.
+intake, and selected installation through SDK-owned registry and host adapters,
+initially Tessl and Codex. Use the [workflow](workflow.md) for current accepted
+capabilities and the [delivery record](projects/sdk-workflow/tasks.md) for merged
+revisions; the historical evidence blocks below do not override those states.
 Foundry holds candidates awaiting SDK processing, including rejected or
 blocked candidates retained with reasons; holding does not clear or distribute
 them. The existing `admit_to_foundry` inventory disposition retains its
 evidence-gated intended meaning and is not a holding-state synonym.
-Checked versions must be verified private in Tessl `jscraik` before becoming
-managed installation sources, and only Jamie can choose public release.
+Managed releases are complete root-manifest plugins, including one-skill
+releases. Checked versions need verified publication/readback through the
+selected registry before managed installation; private Tessl `jscraik` is the
+initial route, not a permanent requirement. Do not start or create the future
+registry, including a catalogue or prototype, until the SDK workflow meets its
+agreed acceptance criteria and correct private Tessl publication is verified.
+An independent registry becomes
+primary only after the [transition gates](workflow.md#registry-transition);
+only Jamie can choose public release.
 Origin-verified OpenAI-provided plugins and system skills remain provider-managed
 and exempt. These are acceptance targets, not claims that the operations exist
 today. The portable core stays independent of those integration clients.
@@ -29,17 +39,74 @@ today. The portable core stays independent of those integration clients.
 | ID | Required outcome | Current evidence | Status | Next closure condition |
 | --- | --- | --- | --- | --- |
 | SDK-1 | Exact-revision disposition of the full Agent-Skills SDK surface | No durable module, symbol, and production-caller matrix is stored here. | `not_verified` | Import the independently reviewed classification as an exact-revision SDK record and resolve every entry to one allowed owner. |
-| SDK-2 | Executable portable lifecycle engines | Intake, validation, package construction, deterministic scoring, safety evidence contracts, registry preparation, and runtime planning exist. Whole-report orchestration and other temporary candidates are missing and cannot be counted. | `in_progress` | Close every named engine with durable implementation, public interface, conformance, and recovery proof. |
-| SDK-3 | Provider protocol and reference adapter | The SDK-3.1 offline executor, typed complete-or-stream adapter protocol, credential boundary, public evidence, and local conformance are implemented and verified below. No packaged reference adapter or real-provider evidence exists. | `verified_local` | Select and prove a packaged reference adapter, then separately close authorized real-provider and hosted Ubuntu evidence. |
-| SDK-4 | Runtime host protocol and transactional lifecycle | Candidate-bound planning and evidence models exist without package install, host apply, rollback, discovery, activation, uninstall, or retirement mechanisms. Existing-copy maintenance is narrower than installation. | `in_progress` | Implement SDK-owned Codex host integration and prove selected Tessl-version identity, discovery, behavior, rejection, and recovery without changing provider-managed exemptions. |
-| SDK-5 | Registry adapter interfaces and selected implementations | Immutable local preparation exists without Tessl registry interaction, private-visibility readback, upload, promotion, deprecation, or revocation. | `in_progress` | Implement SDK-owned Tessl integration; prove exact checked version and private `jscraik` readback before installation, with public release only by Jamie's decision. |
-| SDK-6 | Executable CLI and composable orchestration | `intake`, `validate`, `build`, `eval scenario-quality`, `eval selected-case`, `compare-copy`, and `maintain-entrypoint` execute locally; the last route may modify an existing host file only with `--apply`. Other advertised lifecycle routes remain parse-only. No complete create/update/external-intake/check/install workflow is established. | `in_progress` | Connect the agent-facing `SKILL.md`, references, and evaluation route to executable SDK orchestration and prove stable JSON, exit, failure, recovery, mutation boundaries, and complete-package behavior for every implemented route. |
+| SDK-2 | Executable portable lifecycle engines | Intake, validation, package construction, deterministic scoring, safety gates, observed calibration, bounded whole-plugin matched evaluation/feedback, registry preparation, and runtime planning exist. Complete joined lifecycle orchestration and unmerged preparation candidates are not established. | `in_progress` | Close every named engine with durable implementation, public interface, conformance, and recovery proof. |
+| SDK-3 | Provider protocol and reference adapter | The SDK-3.1 offline executor, typed complete-or-stream adapter protocol, credential boundary, public evidence, and local conformance are implemented and verified below. PR #56 adds packaged explicit-profile adapters delivering compiled settings to controlled drivers, not a real-provider transport or authenticated model/settings proof. | `verified_local` | Select and prove a packaged real-provider reference driver, then separately close authorized real-provider and hosted Ubuntu evidence. |
+| SDK-4 | Runtime host protocol and transactional lifecycle | Candidate-bound planning and evidence models exist without package install, host apply, rollback, discovery, activation, uninstall, or retirement mechanisms. Existing-copy maintenance is narrower than installation. | `in_progress` | Implement SDK-owned host integration, initially Codex, and prove selected checked registry-version identity, discovery, behavior, rejection and recovery without changing provider-managed exemptions. |
+| SDK-5 | Registry adapter interfaces and selected implementations | Immutable local preparation exists without registry interaction, private-visibility readback, upload, promotion, deprecation, or revocation. | `in_progress` | Prove initial private Tessl publication/readback/install through an explicit adapter; keep canonical artifacts and evidence independent. A future registry default requires representative dual-destination proof, not catalogue visibility alone. |
+| SDK-6 | Executable CLI and composable orchestration | `intake`, `check-local`, `check-quality`, `review-content`, `validate`, `validate-plugin` (including `--verify-evidence`), `build`, `eval scenario-quality`, `eval scorer-quality`, `eval scorer-calibration`, `eval observed-calibration`, `eval selected-case`, `eval matched-assessment`, `eval matched-handoff`, `eval matched-calibration`, `eval matched-local`, `eval matched-cloud`, `eval matched-regression`, `eval matched-cloud-regression`, `verify recurring-findings`, `verify pr-sweep-dirty-closeout`, `compare-copy`, and `maintain-entrypoint` execute locally; maintenance may modify an existing host file only with `--apply`. `inventory`, `package`, `project`, and `tessl` remain discovery boundaries. Static scorer checks do not execute judges; observed calibration CLI uses supplied offline verdicts; matched routes use supplied evidence or explicit supplied-offline callbacks, not discovered live model adapters. No complete plugin create/update/external-intake/check/install workflow is established. | `in_progress` | Connect the agent-facing workflow to complete-plugin orchestration and prove stable JSON, exit, failure, recovery and mutation boundaries for every implemented route. |
 | SDK-7 | Independent product operations | Pinned Python tooling, schemas, tests, CI, and reproducible local builds exist. Release, supported matrix, fuzzing, benchmarks, signed artifacts, documentation publication, and maintained examples remain incomplete. | `in_progress` | Record selected matrices and thresholds, then close release and maintenance evidence without relying on Agent-Skills. |
 | SDK-8 | Released external-consumer proof and retirement | No released SDK consumer, checked private Tessl version, selected Codex runtime installation, or completed Agent-Skills fallback retirement is proved here. | `not_verified` | Prove maintained consumers and non-exempt installed versions against a released SDK, preserve verified OpenAI exemptions, and complete parity, rollback, and retirement evidence. |
 
 None of these rows is complete. The matrix is not a completion percentage and
 does not change Foundry source custody, package rights, host policy, provider
 credentials, registry identity, or distribution authority.
+
+## Managed release gates
+
+The following strengthen existing SDK-2 through SDK-8 acceptance; they are not
+a second delivery tracker. Coverage below was inspected at accepted code
+`047260b1c1d051f1b3c54bf6327881987305e52d` on 2026-10-11. These requirements
+are product policy, not claims that the gates already execute. Use the
+[workflow policy](workflow.md#icons-and-presentation) for icon design and current
+OpenAI destination limits, and the [current resume point](projects/sdk-workflow/tasks.md#proof-lanes-and-resume-point)
+for implementation order.
+
+| Gate | Existing accepted proof and limitation | Required acceptance |
+| --- | --- | --- |
+| Icons and presentation | [Plugin inspection](cli.md#portable-plugin-inspection), [skill capture](../tests/test_skill_package_validation.py) and [ZIP verification](../tests/test_package_archive_verification.py) bind generic asset bytes. [Intake](../tests/test_package_intake.py) checks supplied package rights; neither proves image rights, approval, decoding or host display. | Every Jamie-owned managed plugin has approved professional artwork. Bind approval and rights, decoded file validation, safe manifest closure, exact archive presence and candidate identity. Reject missing, malformed, oversized, non-square, escaping, stale or unapproved artwork; corrected inputs recover without source mutation. Preserve licensed third-party branding. Verify names, descriptions and starter prompts against actual capability, with screenshots/onboarding only when applicable. An authorised host observation must separately show the correct icon. |
+| Destination compatibility | Canonical portable-plugin inspection exists, not conversion or destination presentation profiles. Existing skill/archive contracts do not establish destination behaviour. | Pin specification and adapter versions; prove representative portable and destination packages preserve required content and behaviour. Unsupported components return explicit blockers, never silent loss. Distinguish declared, structurally checked and observed compatibility. |
+| Discovery and activation | [Runtime evidence contracts](../tests/test_runtime_execution_evidence.py) validate supplied observations; the SDK does not observe or activate a plugin. | An authorised observing adapter proves direct, indirect, incomplete and unrelated requests, including overlapping skills. Expected activation, negative activation and clarification/routing all need evidence for the exact installed candidate. |
+| Update permissions | [Safety evidence](../tests/test_pre_execution_safety.py) and [static screening](../tests/test_security_screening.py) support candidate-bound checks, not baseline-to-candidate permission interpretation. | Compare hooks, MCP servers, destinations, dependencies and access. Unchanged or reduced permissions have valid neighbouring cases; expansion is visible and blocks dependent operations without renewed authority. Corrected input or applicable approval recovers without inheriting baseline authority. |
+| Bounded optimisation | [Matched comparison](../tests/test_matched_comparison.py), [execution](../tests/test_matched_execution.py) and [handoff](../tests/test_matched_handoff.py) enforce bound plans, budgets, same-lane outcomes and accepted-local lineage. [Explicit-profile binding](../tests/test_codex_profile_binding.py) and [installed proof](../tests/installed_matched_smoke.py) are controlled offline evidence, not real-provider settings application, lift or live quality. | Freeze budgets, stop rules, minimum meaningful improvement and regression limits before execution. Prove same-lane comparability, variability reporting, budget exhaustion and rejected promotion for unchanged/inconclusive results. Cloud baseline is the accepted local winner; changed candidates need fresh affected safety and evaluation evidence. |
+| Artifact completeness | [Archive verification](../tests/test_package_archive_verification.py) checks supplied ZIP content against the manifest; it is not archive emission or complete-plugin/mode preservation. | Inspect emitted and converted archives, not just directories. Required resources, artwork and executable modes survive; missing files, unsafe paths and incompatible representations block. Exclude secrets, private review/provider evidence and held-out answers. Public attribution remains available where required. |
+| Recovery and retries | [Provider calls](../tests/test_provider_call.py) classify retryable failures but perform zero automatic retries. [Runtime evidence](../tests/test_runtime_execution_evidence.py) models recovery without executing publication, install or rollback. | Prove interruption, repeated requests, idempotency and conflict handling. Read back uncertain publication before any retry; unavailable readback blocks dependent mutation. Failed installation preserves or restores the previous working version, with observed lock/runtime recovery and a typed blocker when recovery cannot be verified. |
+
+Applicable security review retains the selected Codex Security integration and
+OWASP Top 10 for Agentic Applications 2026, supplemented by the MCP Security
+Cheat Sheet where MCP applies. The final scoped Snyk Agent Scan is required where
+applicable before registry handoff; record justified exclusions, exact candidate
+and prepared-artifact binding, actual coverage, reviewer/scanner provenance,
+guidance revision and unresolved-risk blockers. See the
+[selected security policy](workflow.md#applicable-security-evidence-and-final-scan).
+Its adapter and authorised executed proof remain open. Validating supplied
+artifacts is not executed scanning or independent review; quota exhaustion,
+unknown output and missing required coverage cannot pass the gate. This policy
+does not grant export, component execution, quota use or spending authority.
+
+For the future [registry consumer boundary](../ARCHITECTURE.md#brainwav-product-family),
+prove isolated SDK operation without registry accounts, databases or server
+imports, and consumer tests against the installed pinned SDK package actually
+deployed. Reject production dependence on editable/neighbouring checkouts or
+private SDK modules. Registry workers use public APIs/versioned schemas without
+duplicating lifecycle logic or inheriting website publishing credentials.
+Registry display must retain the exact version's artwork and attributed
+evidence. These are future consumer acceptance criteria, not authority to start
+the registry before the existing gate or claims of deployed proof.
+
+Image and approval checks must distinguish file validity from visual quality;
+passing a decoder is not professional-design approval. An icon-only change
+requires a new candidate and affected proof, followed by normal versioned
+delivery. Inventory and schedule existing managed plugins; do not bulk-rewrite
+installed copies or alter verified provider-managed packages.
+
+Keep exactly ten active managed scenarios. Implementation, compatibility,
+security, calibration and held-out tests are not capped at ten. Validators and
+build remain read-only; generation, normalisation and repair are explicit
+preparation operations. Prove accepted, rejected and corrected inputs through
+supported public API and installed CLI routes without sibling projects. Use
+controlled adapters for offline proof and obtain separate authority for external
+state checks. No row above authorises provider spending, credentials, uploads,
+publication, installation or registry creation.
 
 ## Evidence invalidated by temporary-worktree loss
 
@@ -55,7 +122,11 @@ Merged source remains durable. Pull request 27 is represented by merge commit
 `6bb92d07b87896f5463c22b582394c01dcf8f0c2`. This records topology only; it does
 not retroactively alter the review gate that existed before the external merge.
 
-## Next dependency-ready unit: provider call conformance
+## Historical pilot: provider call conformance
+
+This section retains the SDK-3.1 pilot contract and its dated evidence. It is
+not the current slice instruction; use the existing
+[delivery record](projects/sdk-workflow/tasks.md#proof-lanes-and-resume-point).
 
 ### Outcome and consumer
 
@@ -228,7 +299,7 @@ its nineteenth owned path. On the frozen implementation bytes:
 
 The preserved implementation commit
 `1ceeb54ff8a1c8be0589a32b28c4a70b560dcde8` supplied the replay provenance for
-current `origin/main` at `f5ebdbde687265e58033403f8a0cfb9debc54abe`.
+then-observed `origin/main` at `f5ebdbde687265e58033403f8a0cfb9debc54abe`.
 Independent compatibility review then found that the provider adapter owned
 the scheduler intended to enforce SDK deadlines. The repaired implementation
 commit `665b035` moves scheduling to a caller-injected SDK clock and adds a

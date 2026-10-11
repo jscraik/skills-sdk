@@ -22,6 +22,7 @@ from skills_sdk.models.scenario_quality import (
 )
 from skills_sdk.models.validation import SkillPackageValidation
 from skills_sdk.validation import validate_skill_package
+from skills_sdk.validation.safe_yaml import _ClosedLoader
 
 _EVALS_PATH = "references/evals.yaml"
 _MAX_EVALS_BYTES = 1_048_576
@@ -103,46 +104,6 @@ class ScenarioQualityPolicy:
             self.minimum_negative_or_edge,
         ) != (5, 8, 10, 1, 1):
             raise ValueError("scenario-quality/v1 uses the fixed portable 5/8/10 and 1/1 release policy")
-
-
-class _ClosedLoader(yaml.SafeLoader):
-    def compose_node(self, parent: yaml.Node | None, index: int) -> yaml.Node:
-        if self.check_event(yaml.AliasEvent):
-            raise yaml.constructor.ConstructorError(
-                None, None, "YAML aliases are not supported", self.peek_event().start_mark
-            )
-        self._node_count = getattr(self, "_node_count", 0) + 1
-        if self._node_count > _MAX_YAML_NODES:
-            raise yaml.constructor.ConstructorError(
-                None, None, "YAML node limit exceeded", self.peek_event().start_mark
-            )
-        depth = getattr(self, "_node_depth", 0) + 1
-        if depth > _MAX_YAML_DEPTH:
-            raise yaml.constructor.ConstructorError(
-                None, None, "YAML nesting limit exceeded", self.peek_event().start_mark
-            )
-        self._node_depth = depth
-        try:
-            return cast(yaml.Node, super().compose_node(parent, index))
-        finally:
-            self._node_depth = depth - 1
-
-
-def _mapping(loader: _ClosedLoader, node: yaml.MappingNode, deep: bool = False) -> dict[object, object]:
-    result: dict[object, object] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        if not isinstance(key, str):
-            raise yaml.constructor.ConstructorError(
-                None, None, "YAML mapping keys must be strings", key_node.start_mark
-            )
-        if key in result:
-            raise yaml.constructor.ConstructorError(None, None, f"duplicate YAML key: {key}", key_node.start_mark)
-        result[key] = loader.construct_object(value_node, deep=deep)
-    return result
-
-
-_ClosedLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _mapping)
 
 
 def _capture_evals(root: Path, expected_sha256: str) -> bytes:
