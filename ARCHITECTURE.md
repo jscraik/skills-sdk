@@ -116,7 +116,7 @@ operational contracts.
   evidence through an explicit Codex adapter.
 - Changing command behavior: start at `main` and `build_parser` in
   `src/skills_sdk/cli/main.py`, then read `docs/cli.md`.
-- Changing vocabulary or agent routing: read [UBIQUITOUS.md](UBIQUITOUS.md)
+- Changing vocabulary or agent routing: read [GLOSSARY.md](GLOSSARY.md)
   and [AGENTS.md](AGENTS.md) before editing prose or instructions.
 
 ## Bird's-eye view
@@ -320,7 +320,7 @@ single module:
 
 ### Vocabulary and reader routing
 
-Use [UBIQUITOUS.md](UBIQUITOUS.md) for terms that change the action, especially
+Use [GLOSSARY.md](GLOSSARY.md) for terms that change the action, especially
 “build”, “validate”, “verify”, “install”, “publish”, “candidate”, and “receipt”.
 The active agent rules live in [AGENTS.md](AGENTS.md); implementation style and
 contribution workflow remain in `CODESTYLE.md` and `CONTRIBUTING.md`.
@@ -406,7 +406,7 @@ They describe that earlier candidate and do not establish current readiness.
 
 - [README.md](README.md) — reader-facing overview and first local commands.
 - [AGENTS.md](AGENTS.md) — active task routing, boundaries, and validation rules.
-- [UBIQUITOUS.md](UBIQUITOUS.md) — canonical project vocabulary and prompt translations.
+- [GLOSSARY.md](GLOSSARY.md) — canonical project vocabulary.
 - `docs/agent-entrypoint.md` — minimal cold-agent route.
 - `docs/api.md` — contract families and schema validation.
 - `docs/cli.md` — command behavior and exit codes.

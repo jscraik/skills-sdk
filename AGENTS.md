@@ -47,7 +47,7 @@ operate the Tessl registry, or claim an installed runtime from local receipts.
 
 ## Working language and discovery
 
-- Use [`UBIQUITOUS.md`](UBIQUITOUS.md) as the canonical project vocabulary.
+- Use [`GLOSSARY.md`](GLOSSARY.md) as the canonical project vocabulary.
   Consult it when ambiguous public-contract terms such as “build”, “publish”,
   “install”, “candidate”, or “receipt” affect the requested action or meaning.
 - Use [`ARCHITECTURE.md`](ARCHITECTURE.md) for the bird's-eye code map,

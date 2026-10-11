@@ -91,10 +91,10 @@ def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
     """Require pull-request guidance to scope mise to the checkout."""
     template = (REPOSITORY_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-    ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
+    cli = (REPOSITORY_ROOT / "docs/cli.md").read_text(encoding="utf-8")
     assert "From the checkout root:" in readme
     assert "Run commands from the repository checkout root" in template
-    assert "Run the checkout-scoped commands below from the repository checkout root" in ubiquitous
+    assert "Run the checkout-scoped commands below from the repository checkout root" in cli
     assert (
         'MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen '
         "pytest tests/test_repository_standards.py -q"
@@ -104,9 +104,10 @@ def test_pull_request_template_scopes_mise_to_the_checkout() -> None:
 def test_checkout_scoped_documented_commands_use_the_trusted_config_and_execute() -> None:
     """Require documented commands to trust the checkout and execute."""
     readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
-    ubiquitous = (REPOSITORY_ROOT / "UBIQUITOUS.md").read_text(encoding="utf-8")
+    cli = (REPOSITORY_ROOT / "docs/cli.md").read_text(encoding="utf-8")
     readme_commands = _quick_start_commands(readme)
-    prompt_commands = [command for command in ubiquitous.split("`")[1::2] if "mise exec" in command]
+    translations = cli.split("## Prompt translations", 1)[1]
+    prompt_commands = [command for command in translations.split("`")[1::2] if "mise exec" in command]
 
     _assert_checkout_trust_prefixes(readme)
     assert prompt_commands
@@ -156,7 +157,7 @@ def test_documented_mise_commands_stop_parent_config_discovery() -> None:
         "CONTRIBUTING.md",
         "README.md",
         "SUPPORT.md",
-        "UBIQUITOUS.md",
+        "GLOSSARY.md",
         "docs/agent-entrypoint.md",
         "docs/api.md",
         "docs/cli.md",
@@ -169,7 +170,7 @@ def test_documented_mise_commands_stop_parent_config_discovery() -> None:
 
 def test_documented_cli_placeholders_are_shell_safe() -> None:
     placeholder = re.compile(r"(?<![\"'])<[a-z0-9-]+>(?![\"'])")
-    for relative in ("README.md", "UBIQUITOUS.md", "docs/cli.md", "docs/scenario-quality.md"):
+    for relative in ("README.md", "GLOSSARY.md", "docs/cli.md", "docs/scenario-quality.md"):
         for line in (REPOSITORY_ROOT / relative).read_text(encoding="utf-8").splitlines():
             if "skills-sdk" in line or "--source-revision" in line:
                 assert placeholder.search(line) is None, f"{relative}: unquoted shell placeholder: {line}"
