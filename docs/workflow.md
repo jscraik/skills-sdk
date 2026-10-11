@@ -6,16 +6,17 @@ workflow and its current implementation boundaries. Maintain it with each
 public route change; use [the migration map](migration-map.md) for legacy
 coverage and [the task record](projects/sdk-workflow/tasks.md) for execution state.
 
-Accepted implementation baseline: [`e13ac5da`](https://github.com/jscraik/skills-sdk/commit/e13ac5da0236a4fead407bd3c8a5e9e71e61ae47),
-verified on 2026-10-10. The diagram is the intended process, not a claim that
+Accepted implementation baseline: [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d),
+verified on 2026-10-11. The diagram is the intended process, not a claim that
 every gate is executable. The table describes that accepted baseline; branch
 prototypes and local test passes do not add capabilities to it.
 
 PR #54 accepted the instruction-alignment documentation reconciliation.
 PR #55 accepted fresh per-trial calibration adapters, schedule admission and
-cleanup regression coverage. Controlled adapter proof is not live-provider
-quality evidence. Named-profile integration remains separate current work;
-its delivery state is in the task record.
+cleanup regression coverage. PR #56 accepted explicit local/cloud profile
+capture, compiled settings delivery to controlled drivers, drift rejection and
+corrected-input recovery. Controlled adapter proof is not real-provider settings
+application or live quality evidence; remaining delivery state is in the task record.
 
 Accepted PR #52 adds the bounded
 [`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including
@@ -267,8 +268,8 @@ retain separate provenance and score interpretation.
 | Icons and presentation | Approved icon, rights evidence, accurate metadata, safe references and packed resources; selected destination and host proof remain distinct. | Generic asset capture and ZIP verification exist. Icon decoding, dimensions, approval, destination metadata validation and observed display are not implemented at this baseline. |
 | Scenarios and scorer | Realistic cases linked to claims, hidden criteria, gap inventory, scorer quality, and held-out calibration. | Scenario quality, declared claim coverage, supplied scorer checks and observed calibration callbacks exist. The calibration CLI uses supplied-offline fixtures; fresh model quality and matched experiments are separate. |
 | Security | Capability-specific checks, reviewer evidence and update-permission differences; unresolved risks block execution and expanded authority needs renewed approval. | `screen_package_security` runs bounded static screening. Guarded selected-case execution requires fresh candidate-bound review/checklist evidence and recapture. Permission-delta interpretation, external scanners, independent review and comprehensive security remain separate gaps. |
-| Local comparison | Baseline and candidate plugin versions run on the same oss-local model, frozen cases, settings, and rubric; include relevant cross-skill behaviour. | PR #53 adds bounded matched whole-plugin orchestration with ten active cases and per-trial capabilities; installed offline proof exists. Named oss-local profile integration and real-provider lift remain open. |
-| Cloud refinement | Freeze the accepted local winner as baseline; compare it with a refined candidate on the same oss-cloud model and frozen cases/rubric/settings. | PR #53 enforces accepted-local-candidate lineage and same-lane cloud comparison. Named oss-cloud profile integration, refinement authoring and live cloud proof remain incomplete. |
+| Local comparison | Baseline and candidate plugin versions run on the same oss-local model, frozen cases, settings, and rubric; include relevant cross-skill behaviour. | PR #53 adds bounded matched whole-plugin orchestration with ten active cases and per-trial capabilities; PR #56 binds explicitly supplied oss-local profile inputs. Installed offline proof exists, not real-provider settings application or lift. |
+| Cloud refinement | Freeze the accepted local winner as baseline; compare it with a refined candidate on the same oss-cloud model and frozen cases/rubric/settings. | PR #53 enforces accepted-local-candidate lineage and same-lane cloud comparison; PR #56 binds explicitly supplied oss-cloud profile inputs. Refinement authoring, real-provider settings application and live cloud proof remain incomplete. |
 | Registry preparation | Complete plugin archive verified against candidate manifest and required resources; passing preparation evidence binds candidate, registry name, version, build and hardening before publication. | Skill build, hardening, archive verification and registry-preparation/v1 APIs exist; plugin-bound composition and archive emission are not accepted yet. |
 | Publication and installation | Authorised private publication, exact version readback, selected install, discovery, activation, and runtime behaviour. | Portable planning/evidence contracts exist; executing adapters are planned. |
 | Feedback | Failure owner, retained internal regression, correction, and rerun before another live evaluation. | Local quality stages retain typed blockers. PR #53 adds explicit matched regression/rerun services; automatic regression capture, external feedback and consumer cutover remain incomplete. |
@@ -343,11 +344,17 @@ mismatched or changed profile inputs must block affected execution before
 provider calls, with corrected-input recovery. Retain credentials outside
 portable evidence and never copy arbitrary configuration values into receipts.
 
-Injected descriptors and same-lane checks do not implement these named profile
-inputs. Profile selection, redacted provenance and supported settings need a
-separate bounded adapter slice with public API and installed CLI proof. Offline
-fixtures can establish binding and rejection, not real-provider identity,
-quality, availability or permission to spend.
+Accepted PR #56 implements this bounded input seam through
+[`describe_codex_profile` and `compile_codex_profile`](api.md#explicit-codex-profiles)
+and the [CLI `profiles` inputs](cli.md#explicit-profile-inputs). Callers select
+logical profile names and supply contents and required dependencies explicitly,
+not paths for the SDK to discover. The adapter binds profile provenance and
+effective settings before the plan is frozen, delivers compiled settings to
+controlled drivers and rejects input drift. Public API and installed CLI proof
+cover accepted, rejected and corrected inputs, including calibration and cloud
+handoff. These offline fixtures do not authenticate a model revision or prove
+that a real driver applies the settings, model quality, availability or
+permission to spend. Those remain separately authorised integration proof.
 
 ### Applicable security evidence and final scan
 
@@ -358,24 +365,26 @@ candidate, evidence provenance, applicable threats, justified exclusions,
 findings and unresolved-risk disposition through supported adapters or supplied
 evidence. The core must not import a host security plugin.
 
-Select and record the applicable OWASP edition before claiming coverage. The
-reference candidates are [Agentic Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/),
-[LLM Top 10 2026](https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/)
-and the [MCP Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html)
-where MCP applies. These are guidance candidates, not an approved conformance
-claim or evidence that a scanner covers every category. Include scripts, hooks,
-MCP configuration, file/network access, dependencies, secrets and installation
+Jamie selected [OWASP Top 10 for Agentic Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)
+as primary guidance, supplemented by the
+[MCP Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/MCP_Security_Cheat_Sheet.html)
+where MCP applies. Record the actual guidance revision or observation date with
+each assessment; no cheat-sheet edition or scanner version is inferred here.
+Selection is not conformance or evidence that a scanner covers every category.
+Include scripts, hooks, MCP configuration, file/network access, dependencies,
+secrets and installation
 where relevant; do not require irrelevant categories for every plugin.
 Supplied artifacts, executed checks and independent review remain distinct.
 
-The proposed **Snyk Agent Scan** integration is the final automated security
-check before registry handoff, after cheaper local checks, evaluation and final
-artifact preparation. It does not replace earlier pre-execution safety gates,
+The selected **Snyk Agent Scan** requirement is the final scoped automated
+security check, where applicable, before registry handoff, after cheaper local
+checks, evaluation and final artifact preparation. It does not replace earlier pre-execution safety gates,
 Codex Security review or the final release-readiness decision. Bind its report
 to the exact complete candidate and prepared portable/export payload, actual
 coverage, scanner/API version, settings, findings and freshness. Unsupported or
 unscanned plugin components remain explicit coverage gaps, not whole-plugin
-clearance. Candidate changes require affected checks and rescanning.
+clearance. Record justified non-applicability separately; do not silently waive
+required coverage. Candidate changes require affected checks and rescanning.
 
 Use an optional adapter with explicit candidate-only paths and isolated bounded
 execution, not automatic home discovery. [Agent Scan](https://github.com/snyk/agent-scan)
@@ -388,7 +397,7 @@ require separate authority; no scan is authorised by this document.
 The account's Agent Scan allowance is not established here. Conserve runs for
 the frozen release candidate and a correction rerun; quota exhaustion, failed
 analysis, unknown output formats and incomplete required coverage block the
-dependent handoff when this scan is selected as a required release gate. Never
+dependent handoff where the selected scan requirement applies. Never
 treat them as a pass, retry without bounds or upgrade
 a paid plan automatically. Pin and validate the experimental output contract.
 No Snyk dependency or account is required for independent SDK core operation.
