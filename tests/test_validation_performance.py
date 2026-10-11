@@ -133,6 +133,45 @@ def test_staged_source_changes_cannot_hide_in_docs_or_worktree(change: str, tmp_
     assert validation_scope(tmp_path, base, base) == "full"
 
 
+@pytest.mark.parametrize(
+    "flags", [("--assume-unchanged",), ("--skip-worktree",), ("--assume-unchanged", "--skip-worktree")]
+)
+def test_hidden_index_flags_require_full_proof_without_mutating_index(tmp_path: Path, flags: tuple[str, ...]) -> None:
+    _repository(tmp_path)
+    source = tmp_path / "runtime.py"
+    source.write_text("value = 1\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "-m", "fixture code")
+    head = _git(tmp_path, "rev-parse", "HEAD")
+    _git(tmp_path, "update-ref", "refs/remotes/origin/main", head)
+    (tmp_path / "README.md").write_text("new guidance\n")
+    command = [sys.executable, str(ROOT / "scripts/validation_scope.py"), "--base", head, "--head", head]
+    assert validation_scope(tmp_path, head, head) == "docs"
+    for flag in flags:
+        _git(tmp_path, "update-index", flag, "runtime.py")
+    source.write_text("value = 2\n")
+    index = tmp_path / ".git/index"
+    before = index.read_bytes()
+    assert validation_scope(tmp_path, head, head) == "full"
+    result = subprocess.run(command, cwd=tmp_path, check=False, capture_output=True, text=True)
+    assert result.returncode == 0 and result.stdout.strip() == "full"
+    assert index.read_bytes() == before
+    invalid = subprocess.run([*command[:-1], "missing-head"], cwd=tmp_path, check=False, capture_output=True, text=True)
+    assert invalid.returncode == 2 and "validation scope blocked" in invalid.stderr
+    for flag in flags:
+        _git(tmp_path, "update-index", flag.replace("--", "--no-", 1), "runtime.py")
+    assert validation_scope(tmp_path, head, head) == "full"
+    source.write_text("value = 1\n")
+    assert validation_scope(tmp_path, head, head) == "docs"
+    for flag in flags:
+        _git(tmp_path, "update-index", flag, "runtime.py")
+    assert validation_scope(tmp_path, head, head) == "full"
+    for flag in flags:
+        _git(tmp_path, "update-index", flag.replace("--", "--no-", 1), "runtime.py")
+    recovered = subprocess.run(command, cwd=tmp_path, check=False, capture_output=True, text=True)
+    assert recovered.returncode == 0 and recovered.stdout.strip() == "docs"
+
+
 def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path) -> None:
     base = _repository(tmp_path)
     (tmp_path / "README.md").write_text("branch guidance\n")

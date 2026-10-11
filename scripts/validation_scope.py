@@ -65,6 +65,10 @@ def validation_scope(root: Path, base: str, head: str) -> str:
         if error.returncode != 1:
             raise
         return "full"
+    # Index flags can hide modified tracked files from every diff query.
+    indexed = _git(root, "ls-files", "-v", "-z")
+    if any(entry and not entry.startswith(b"H ") for entry in indexed.split(b"\0")):
+        return "full"
     paths = _paths(_git(root, "diff", "--no-renames", "--name-only", "-z", baseline, resolved, "--"))
     paths |= _paths(_git(root, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD", "--"))
     paths |= _paths(_git(root, "diff", "--no-renames", "--name-only", "-z", "--"))

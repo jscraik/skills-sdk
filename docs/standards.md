@@ -50,7 +50,9 @@ and non-prose dirty paths cannot select documentation-only proof.
 The base must be an ancestor of the locally fetched `origin/main`; refresh that
 ref before selecting an accepted baseline. An unmerged candidate cannot serve
 as its own accepted base to hide earlier executable changes. Index and working
-tree modes are checked separately.
+tree modes are checked separately. Assume-unchanged, skip-worktree and other
+non-ordinary index flags select full validation, even when tracked bytes appear
+unchanged. The classifier does not clear these flags or modify the index.
 Inherited Git directory, worktree, index and configuration selectors are removed
 from classifier subprocesses. If accepted main advanced after a branch was
 created, the non-ancestor comparison selects full validation instead of blocking
