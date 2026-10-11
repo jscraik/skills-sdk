@@ -10,8 +10,10 @@ offline orchestration through an injected adapter, prepares
 local private-registry receipts, and plans intended runtime-lock transitions.
 Real-provider transports and credentials, host apply or rollback, registry
 interaction, and publication remain outside the portable core. Supported
-integration adapters and their end-to-end orchestration are SDK-owned future
-work, not responsibilities left to Agent-Skills or Foundry.
+real-provider, registry and host integrations and the complete workflow remain
+SDK-owned work, not responsibilities left to Agent-Skills or Foundry. Explicit
+profile adapters already bind supplied inputs and deliver compiled settings to
+controlled offline drivers; they do not establish those external integrations.
 
 ## brAInwav product family
 
@@ -74,8 +76,9 @@ Agent Plugins as the release unit even for one skill, with root `plugin.json`
 canonical and client-specific settings behind extension/adapter boundaries.
 Whole-plugin identity precedes release-bound quality, security and evaluation
 evidence. Standalone skills remain intake and validation inputs, not a second
-managed release format. This target does not change the implemented skill-level
-services below or claim that the queued plugin implementation is accepted.
+managed release format. Accepted plugin inspection and bounded matched
+evaluation do not replace the remaining normalisation, presentation and release
+preparation work or change the standalone skill-level contracts below.
 
 The [mandatory icon policy](docs/workflow.md#icons-and-presentation) belongs to
 SDK release readiness. Bind approved artwork, its rights evidence and referenced
@@ -285,13 +288,13 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/validation/` | Read-only skill and portable-plugin capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. Plugin validation composes captured child bytes without changing standalone contracts. | `SkillIR`, `read_frontmatter`, `validate_skill_package`, `validate_plugin_package` |
 | `src/skills_sdk/intake/` | Composition of structural validation with caller-supplied source, ownership, rights, and admission evidence into a candidate-bound normalized package; no copying or Foundry admission. | `intake_skill_package` in `normalization.py` |
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
-| `src/skills_sdk/evaluation/` | Deterministic scoring over external observations, package-local definition checks, and one selected-case orchestration route over an injected adapter and bound judge evidence; no provider discovery, credentials, or live-model authority. | `evaluate_scenario_set` in `deterministic.py`, `assess_scenario_quality` in `quality.py`, `execute_selected_case` in `selected_case.py` |
+| `src/skills_sdk/evaluation/` | Definition/scorer checks, selected-case execution, observed calibration and bounded matched whole-plugin local/cloud evaluation with feedback/rerun over injected adapters; no provider discovery, credentials, or live-model authority. | `evaluate_scenario_set`, `assess_scenario_quality`, `execute_selected_case`, `execute_scorer_calibration`, `execute_matched_lane`, `prepare_matched_cloud_handoff` |
 | `src/skills_sdk/evaluation/quality.py` | Read-only, candidate-bound assessment of package-local scenario definitions; no scenario or provider execution. | `assess_scenario_quality` |
 | `src/skills_sdk/lifecycle/` | Pure planning of candidate-bound intended runtime-lock transitions; no installation, host inspection, rollback execution, or runtime mutation. | `plan_runtime_install` in `planning.py` |
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
 | `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
-| `src/skills_sdk/providers/` | Bounded offline complete and pull-stream orchestration through an injected adapter; no discovery, credentials, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter` |
+| `src/skills_sdk/providers/` | Bounded offline complete and pull-stream orchestration; explicit profile capture/compilation in the outer `codex_profiles` adapter delivers bound settings to caller-supplied drivers. No home discovery, credential resolution, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter`, `describe_codex_profile`, `compile_codex_profile`; [profile contract](docs/api.md#explicit-codex-profiles) |
 | `src/skills_sdk/models/runtime_evidence.py` | Candidate-bound adapter observations for installation, rollback, discovery, activation, and runtime outcome; no host path resolution, filesystem mutation, activation, or runtime invocation. | `InstallationResult`, `RuntimeOutcomeReceipt` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/host/` | Explicit, digest-bound maintenance of an existing entrypoint with retained backups; no package installation or workflow execution. | `EntrypointRequest`, `check_entrypoint`, `repair_entrypoint` |

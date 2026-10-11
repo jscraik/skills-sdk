@@ -14,15 +14,17 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`e13ac5da`](https://github.com/jscraik/skills-sdk/commit/e13ac5da0236a4fead407bd3c8a5e9e71e61ae47),
-verified on 2026-10-10 and shared with the workflow and task record. Entries below
+Accepted SDK baseline: [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d),
+verified on 2026-10-11 and shared with the workflow and task record. Entries below
 describe that revision, not queued branches. Each row names its entrypoint or
 absence, a proof or boundary reference, its limitation, and the remaining action.
 
 PR #54 reconciled the descriptions without adding executable capabilities.
 PR #55 accepted fresh per-trial adapters and
-[lifecycle proof](../tests/test_calibration_lifetime.py). Named-profile binding
-and real-provider quality remain separate gaps in the `evals` row.
+[lifecycle proof](../tests/test_calibration_lifetime.py). PR #56 accepted
+explicit local/cloud profile binding and controlled settings delivery through
+the [public adapter seam](api.md#explicit-codex-profiles). Real-provider settings
+application and quality remain separate gaps in the evaluation rows.
 
 Accepted PR #52 affects `package_identity`, `skill_intake`
 and `sdk_plugin_lifecycle`: `validate_plugin_package` / `validate-plugin` add
@@ -101,12 +103,12 @@ does not describe the implemented SDK SchemaRegistry.
 | `trust_store` | Pending | No trust-ledger service in the [API](api.md); evidence validation is not trusted issuer selection. | S3: decide trust ownership and select an adapter or reviewed retirement. |
 | `observability_feedback` | Partial | `execute_matched_regression` and `execute_matched_cloud_regression` retain explicit correction/rerun evidence; [feedback proof](../tests/test_matched_feedback.py). Automatic regression capture is not implemented. | S6: prove external feedback, retained regressions and consumer cutover. |
 | `refs_ingestion` | Partial | `assess_content_review` inventories captured references; [review proof](../tests/test_content_review.py). No external reference retrieval or comprehensive accuracy review. | S2: decide external ingestion needs and retain explicit content-review gaps. |
-| `evals` | Partial | Selected-case, observed calibration and matched plugin services exist; [installed matched proof](../tests/installed_matched_smoke.py). Fresh per-trial adapters have [lifecycle proof](../tests/test_calibration_lifetime.py). Supplied-offline CLI results do not prove fresh model quality. | S3/S4: bind explicitly selected model profiles and prove supported live adapters separately. |
-| `eval_profiles` | Partial | Matched descriptors and `prepare_matched_cloud_handoff` bind same-lane settings and local lineage; [handoff proof](../tests/test_matched_handoff.py). Named TOML profiles are not integrated. | S4: implement explicit oss-local/oss-cloud profile selection and secret-free binding. |
-| `ab_rubric` | Partial | `MatchedComparisonPlan` and calibration bind rubric and decision limits; [comparison proof](../tests/test_matched_comparison.py). Offline conformance is not live judge quality. | S4: prove selected profile and judge quality with authorised execution. |
+| `evals` | Partial | Selected-case, observed calibration, matched plugin and explicit-profile routes exist; [installed matched proof](../tests/installed_matched_smoke.py). Fresh per-trial adapters have [lifecycle proof](../tests/test_calibration_lifetime.py). Supplied-offline results do not prove fresh model quality. | S3/S4: prove supported real-driver settings application, calibration and quality separately. |
+| `eval_profiles` | Partial | `describe_codex_profile` and `compile_codex_profile` bind explicit oss-local/oss-cloud inputs, dependencies and settings; profiled adapters deliver them to controlled drivers. [Binding proof](../tests/test_codex_profile_binding.py), [invocation proof](../tests/test_codex_profile_invocation.py) and [CLI inputs](cli.md#explicit-profile-inputs) remain supplied-offline, not authenticated provider execution. | S4: prove a supported real driver applies the selected settings; retain secret isolation, source-drift rejection and local-to-cloud lineage. |
+| `ab_rubric` | Partial | `MatchedComparisonPlan` and calibration bind rubric and decision limits; [comparison proof](../tests/test_matched_comparison.py). Offline conformance is not live judge quality. | S4: prove judge calibration and quality under the selected profile with authorised execution. |
 | `ab_preview` | Partial | `assess_matched_pair` / `eval matched-assessment` assess supplied pair evidence; [CLI proof](../tests/test_matched_cli.py). Not a complete legacy preview-parity claim. | S4: disposition remaining legacy preview semantics and real-adapter proof. |
-| `ab_plan` | Partial | `MatchedComparisonPlan` binds plugin candidates, ten cases, model/settings, rubric and budgets; [scope proof](../tests/test_matched_plugin_scope.py). Named host profiles remain absent. | S4: bind explicit profiles and retain rejection/recovery proof. |
-| `ab_run` | Partial | `execute_matched_lane` / `eval matched-local` orchestrate plugin-bound trials; [installed proof](../tests/installed_matched_smoke.py). CLI execution uses supplied offline inputs. | S4: integrate selected model profiles and separately prove live quality. |
+| `ab_plan` | Partial | `MatchedComparisonPlan` binds plugin candidates, ten cases, model/settings, rubric and budgets; [scope proof](../tests/test_matched_plugin_scope.py). Explicit profile bytes are bound before plan freezing; [profile input proof](../tests/test_matched_profile_cli_inputs.py). Model revision remains supplied provenance. | S4: retain profile rejection/recovery and separately verify real-provider identity and settings support. |
+| `ab_run` | Partial | `execute_matched_lane` / `eval matched-local` orchestrate plugin-bound trials, with optional explicit profile inputs; [installed proof](../tests/installed_matched_smoke.py). CLI execution still uses supplied offline outputs. | S4: separately prove live quality and real-driver settings application within authority. |
 | `ab_judge_preview` | Partial | Matched calibration and trial inputs bind child/assertion context; [calibration proof](../tests/test_matched_plugin_calibration.py). This does not establish all legacy blinded-preview semantics. | S4: assess remaining blinded-pair parity before replacement or retirement. |
 | `ab_judge_score` | Partial | `assess_matched_pair` and `execute_matched_lane` produce bound same-lane decisions; [execution proof](../tests/test_matched_execution.py). Unchanged/inconclusive outcomes do not promote candidates. | S4: prove real judge calibration and variability under supported profiles. |
 | `scenario_quality_gate` | Implemented | `assess_scenario_quality` / `eval scenario-quality`; [quality proof](../tests/test_scenario_quality.py). Definition quality is not executed behaviour. | Retain v1 compatibility and ten-active-case v2 proof. |

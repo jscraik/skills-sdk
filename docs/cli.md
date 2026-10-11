@@ -264,11 +264,11 @@ schema, lint, test, build, and diff checks. Do not pass credentials or machine
 paths through portable receipt contracts; host paths belong only in explicit
 local adapter arguments.
 
-## Matched evaluation candidate
+## Matched evaluation
 
 These bounded S4 commands were accepted in PR #53. They use supplied evidence or
 explicit supplied-offline callbacks, not discovered live model adapters.
-Use the [API contract](api.md#matched-whole-plugin-evaluation-candidate) for the
+Use the [API contract](api.md#matched-whole-plugin-evaluation) for the
 full-plugin, ten-case, child calibration, safety and budget requirements.
 
 ```bash
@@ -322,7 +322,10 @@ contract and does not gain a matched-lane mode field.
   rebound after a correction. A different passing baseline bundle still blocks
   recovery because it changes the retained experiment controls.
 
-### Explicit profile inputs (unmerged candidate)
+### Explicit profile inputs
+
+PR #56 accepted these supplied-offline inputs. They do not discover a live
+provider or establish external settings application, model quality or authority.
 
 The local, cloud and regression execution inputs may additionally contain
 `profiles`, with exactly `generator` and `judge`. Both select the same logical
