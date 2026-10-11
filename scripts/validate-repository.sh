@@ -12,6 +12,7 @@ if [[ $# -gt 1 || ! "$phase" =~ ^(all|quality|docs-tests|tests|build|installed|d
   exit 2
 fi
 
+# Run the labeled command, report elapsed seconds, and return its exit status.
 run_timed() {
   local label="$1" started="$SECONDS" result=0
   shift

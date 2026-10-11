@@ -491,6 +491,7 @@ def _tooling_suppression_findings(pyproject: dict[str, Any]) -> list[Finding]:
 
 
 def _tool_pin_findings(pyproject: dict[str, Any], mise: dict[str, Any], lock: dict[str, Any]) -> list[Finding]:
+    """Report Python and tool version mismatches across project, mise, and lock configuration."""
     findings: list[Finding] = []
     dev_dependencies = pyproject["dependency-groups"]["dev"]
     build_requirements = pyproject["build-system"]["requires"]

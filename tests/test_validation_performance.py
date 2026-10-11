@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _git(root: Path, *arguments: str) -> str:
+    """Run an isolated fixture Git command and return its stripped text output."""
     environment = git_environment()
     return subprocess.run(
         ["git", *arguments], cwd=root, env=environment, check=True, capture_output=True, text=True
@@ -23,6 +24,7 @@ def _git(root: Path, *arguments: str) -> str:
 
 
 def _repository(root: Path) -> str:
+    """Initialize a prose fixture and return its commit registered as accepted main."""
     _git(root, "init")
     _git(root, "config", "user.name", "Validation fixture")
     _git(root, "config", "user.email", "fixture@example.invalid")
@@ -36,6 +38,7 @@ def _repository(root: Path) -> str:
 
 @pytest.mark.parametrize("relative", ["README.md", "docs/guide.md", "docs/nested/guide.rst"])
 def test_prose_change_selects_docs_and_source_change_restores_full(tmp_path: Path, relative: str) -> None:
+    """Verify dirty and committed prose select docs until executable source is added."""
     base = _repository(tmp_path)
     prose = tmp_path / relative
     prose.parent.mkdir(parents=True, exist_ok=True)
@@ -62,6 +65,7 @@ def test_prose_change_selects_docs_and_source_change_restores_full(tmp_path: Pat
     ],
 )
 def test_policy_or_executable_changes_require_full_validation(tmp_path: Path, relative: str) -> None:
+    """Verify policy files and executable source cannot select the prose route."""
     base = _repository(tmp_path)
     source = tmp_path / relative
     source.parent.mkdir(parents=True, exist_ok=True)
@@ -70,6 +74,7 @@ def test_policy_or_executable_changes_require_full_validation(tmp_path: Path, re
 
 
 def test_empty_stale_head_symlink_and_mode_changes_do_not_select_docs(tmp_path: Path) -> None:
+    """Reject stale heads and keep empty, executable-mode, or symlink changes on full proof."""
     base = _repository(tmp_path)
     assert validation_scope(tmp_path, base, base) == "full"
     prose = tmp_path / "README.md"
@@ -88,6 +93,7 @@ def test_empty_stale_head_symlink_and_mode_changes_do_not_select_docs(tmp_path: 
 
 
 def test_missing_base_is_blocked_and_corrected_identity_recovers(tmp_path: Path) -> None:
+    """Verify an unknown base blocks classification and a valid base restores docs scope."""
     base = _repository(tmp_path)
     (tmp_path / "README.md").write_text("changed\n")
     with pytest.raises(subprocess.CalledProcessError):
@@ -96,6 +102,7 @@ def test_missing_base_is_blocked_and_corrected_identity_recovers(tmp_path: Path)
 
 
 def test_unaccepted_base_and_staged_mode_cannot_hide_executable_changes(tmp_path: Path) -> None:
+    """Reject unaccepted bases and require full proof for staged executable modes."""
     base = _repository(tmp_path)
     (tmp_path / "runtime.py").write_text("value = 1\n")
     _git(tmp_path, "add", ".")
@@ -115,6 +122,7 @@ def test_unaccepted_base_and_staged_mode_cannot_hide_executable_changes(tmp_path
 
 @pytest.mark.parametrize("change", ["rename", "canceled_worktree"])
 def test_staged_source_changes_cannot_hide_in_docs_or_worktree(change: str, tmp_path: Path) -> None:
+    """Keep staged source edits visible despite prose renames or canceled worktree edits."""
     _repository(tmp_path)
     source = tmp_path / "runtime.py"
     source.write_text("value = 1\n")
@@ -137,6 +145,7 @@ def test_staged_source_changes_cannot_hide_in_docs_or_worktree(change: str, tmp_
     "flags", [("--assume-unchanged",), ("--skip-worktree",), ("--assume-unchanged", "--skip-worktree")]
 )
 def test_hidden_index_flags_require_full_proof_without_mutating_index(tmp_path: Path, flags: tuple[str, ...]) -> None:
+    """Verify hidden index flags force full proof and clearing them permits recovery."""
     _repository(tmp_path)
     source = tmp_path / "runtime.py"
     source.write_text("value = 1\n")
@@ -173,6 +182,7 @@ def test_hidden_index_flags_require_full_proof_without_mutating_index(tmp_path: 
 
 
 def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path) -> None:
+    """Require full proof when accepted main has advanced outside the candidate ancestry."""
     base = _repository(tmp_path)
     (tmp_path / "README.md").write_text("branch guidance\n")
     _git(tmp_path, "add", ".")
@@ -191,6 +201,7 @@ def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path) 
 def test_inherited_git_selectors_do_not_mutate_or_classify_the_caller(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Verify inherited Git selectors cannot redirect fixture writes or classification."""
     caller, fixture = tmp_path / "caller", tmp_path / "fixture"
     caller.mkdir()
     fixture.mkdir()
@@ -216,6 +227,7 @@ def test_inherited_git_selectors_do_not_mutate_or_classify_the_caller(
 
 
 def test_phase_reports_failure_without_running_later_phases(tmp_path: Path) -> None:
+    """Verify a failed phase reports its status and prevents later phases from running."""
     tools = tmp_path / "bin"
     tools.mkdir()
     mise = tools / "mise"
@@ -235,6 +247,7 @@ def test_phase_reports_failure_without_running_later_phases(tmp_path: Path) -> N
 
 
 def test_classifier_cli_accepts_rejects_and_recovers(tmp_path: Path) -> None:
+    """Exercise CLI scope transitions and the error exit for an unknown head."""
     head = _repository(tmp_path)
     prose = tmp_path / "README.md"
     prose.write_text("new guidance\n")
@@ -254,6 +267,7 @@ def test_classifier_cli_accepts_rejects_and_recovers(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("argument", ["unknown", "--skip-tests"])
 def test_unknown_phase_is_rejected(argument: str) -> None:
+    """Verify unsupported phase arguments exit with a usage error."""
     result = subprocess.run(
         ["bash", "scripts/validate-repository.sh", argument], cwd=ROOT, capture_output=True, check=False
     )
@@ -261,6 +275,7 @@ def test_unknown_phase_is_rejected(argument: str) -> None:
 
 
 def test_parallel_workers_preserve_isolation_and_propagate_failure(tmp_path: Path) -> None:
+    """Verify two workers isolate paths and environment changes and propagate test failure."""
     source = tmp_path / "test_isolation.py"
     source.write_text(
         "import os\nimport pytest\n"
@@ -283,6 +298,7 @@ def test_parallel_workers_preserve_isolation_and_propagate_failure(tmp_path: Pat
 
 
 def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> None:
+    """Check trusted-base workflow routing and preservation of the full validation phases."""
     workflow = (ROOT / ".github/workflows/validate.yml").read_text()
     assert "cp trusted-base/scripts/validation_scope.py" in workflow
     assert "scope=full" in workflow

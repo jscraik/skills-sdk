@@ -235,6 +235,7 @@ def _matched(
     child_count: int = 1,
     provider_identity: ProviderIdentityV2 | None = None,
 ) -> tuple[object, tuple[object, object], tuple[object, ...], list[str]]:
+    """Build a matched plan, calibration receipts, paired executions, and a shared event log."""
     template = _plan()
     rubric = template.rubric
     events: list[str] = []
