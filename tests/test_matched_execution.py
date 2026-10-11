@@ -33,6 +33,7 @@ from skills_sdk.models.matched_execution import MatchedExecutionReceipt
 from skills_sdk.models.matched_plugin_calibration import MatchedCalibrationTarget, MatchedVariantCalibrationBundle
 from skills_sdk.models.observed_calibration import ObservedCalibrationPlan
 from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI
+from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.scorer_quality import ScorerJudgeParameters
 from skills_sdk.validation import validate_plugin_package
 
@@ -227,11 +228,20 @@ def _variant(
 
 
 def _matched(
-    root: Path, trials: int = 2, variants: tuple[float, float, str] = (2.5, 4.5, "local"), child_count: int = 1
+    root: Path,
+    trials: int = 2,
+    variants: tuple[float, float, str] = (2.5, 4.5, "local"),
+    child_count: int = 1,
+    provider_identity: ProviderIdentityV2 | None = None,
 ) -> tuple[object, tuple[object, object], tuple[object, ...], list[str]]:
     rubric = _plan().rubric
     events: list[str] = []
-    settings = (trials, None if variants[2] == "local" else _plan().lanes[1].generator, child_count)
+    selected = (
+        provider_identity
+        if provider_identity is not None
+        else (None if variants[2] == "local" else _plan().lanes[1].generator)
+    )
+    settings = (trials, selected, child_count)
     left_scorers, left_receipt, left = _variant(root / "baseline", variants[0], rubric, events, settings)
     right_scorers, right_receipt, right = _variant(root / "candidate", variants[1], rubric, events, settings)
     raw = _plan().model_dump(mode="json")

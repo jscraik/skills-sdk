@@ -223,7 +223,10 @@ async def _execute(command: str, raw: object) -> object:
     from skills_sdk.models.observed_calibration import ObservedCalibrationPlan
 
     if command == "matched-calibration":
-        data = _object(raw, {"plan", "rubric", "executions"})
+        fields = {"plan", "rubric", "executions"}
+        if type(raw) is dict and "profiles" in raw:
+            fields |= {"profiles", "profile_plan"}
+        data = _object(raw, fields)
         if not isinstance(data["executions"], list) or not 2 <= len(data["executions"]) <= 64:
             raise ValueError("offline matched calibration requires bounded probes")
         plan = ObservedCalibrationPlan.model_validate(data["plan"])
@@ -242,17 +245,33 @@ async def _execute(command: str, raw: object) -> object:
             )
             for item in variants
         )
+        if "profiles" in data:
+            from skills_sdk.cli.matched_profiles import _profile_calibration
+
+            frames = _profile_calibration(frames, data["profile_plan"], data["profiles"])
         return await execute_matched_calibration(plan, data["rubric"], frames)
     fields = {"plan", "calibrations", "executions"}
     if command == "matched-cloud":
         fields = {"handoff", "calibrations", "executions"}
     elif command in {"matched-regression", "matched-cloud-regression"}:
         fields |= {"initial", "assignments"}
+    if type(raw) is dict and "profiles" in raw:
+        fields |= {"profiles"}
     data = _object(raw, fields)
     if not isinstance(data["calibrations"], list) or len(data["calibrations"]) != 2:
         raise ValueError("both offline calibration receipts are required")
     calibrations = tuple(data["calibrations"])
     batch = _batch(data["executions"])
+    if "profiles" in data:
+        from skills_sdk.cli.matched_profiles import _profile_batch
+        from skills_sdk.models.matched_handoff import MatchedCloudHandoff
+
+        profile_plan = (
+            MatchedCloudHandoff.model_validate(data["handoff"]).cloud_plan
+            if command == "matched-cloud"
+            else data["plan"]
+        )
+        batch = _profile_batch(batch, profile_plan, data["profiles"])
     if command == "matched-cloud":
         return await execute_matched_cloud(data["handoff"], calibrations, batch)
     if command in {"matched-regression", "matched-cloud-regression"}:

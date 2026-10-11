@@ -19,6 +19,7 @@ from skills_sdk.evaluation.observed_calibration import CalibrationTrialAdapters
 from skills_sdk.models.matched_calibration import MatchedCalibrationReceipt
 from skills_sdk.models.matched_comparison import MatchedVariantJudgment
 from skills_sdk.models.observed_calibration import ObservedCalibrationPlan
+from skills_sdk.models.provider import ProviderIdentityV2
 
 
 class DimensionJudge:
@@ -50,9 +51,11 @@ class DimensionJudge:
         self.events.append("dimensional_cleanup")
 
 
-def _dimensions(root: Path, count: int = 6, trials: int = 1) -> tuple[object, tuple[object, ...], list[str]]:
+def _dimensions(
+    root: Path, count: int = 6, trials: int = 1, provider_identity: ProviderIdentityV2 | None = None
+) -> tuple[object, tuple[object, ...], list[str]]:
     """Build dimensional probes with alternating labels and fresh adapters per trial."""
-    plan, batch, events = _batch(root)
+    plan, batch, events = _batch(root, provider_identity)
     raw = plan.model_dump(mode="json")
     ids = [f"held-out-{index}" for index in range(count)]
     texts = [f"observed held-out output {index}" for index in range(count)]

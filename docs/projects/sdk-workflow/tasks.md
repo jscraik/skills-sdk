@@ -66,13 +66,13 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 | S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Accepted in PR #44; maintain affected rows at every feature closeout. |
 | S2 | Add applicable plugin/skill policy, approved icons and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review and local stage composition exist. Plugin normalisation/composition, icon validation/approval, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
 | S3 | Bind applicable security evidence, update-permission differences and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass; expanded permissions need renewed authority. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Permission-delta interpretation, independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
-| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Partial: PR #53 merged. Strict plugin binding, child calibration, budgets, source/safety guards, one-to-nine-child offline routes and feedback/rerun services have focused and installed proof. Named profiles, stateful calibration lifetime and live local/cloud quality remain open. |
+| S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Partial: PRs #53 and #55 merged. Strict plugin binding, child calibration, budgets, source/safety guards, fresh per-trial capabilities, one-to-nine-child offline routes and feedback/rerun services exist. Named profiles and live local/cloud quality remain open. |
 | S5 | Compose plugin archive/presentation verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, private-material exclusion, versioned destination profiles, separate portable/export digests, exact checked version, uncertain-outcome readback, idempotency and observed recovery; host display/activation separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
 | S6 | Join feedback-to-regression and reconcile consumer cutover or retirement coverage. | Every scoped failure has an owner and retained regression; clean-room entrypoints run without sibling projects; all legacy rows have disposition. | Partial: PR #53 adds bounded matched feedback/rerun services; automatic capture, consumer cutover and retirement remain open. |
 
 ## Accepted delivery ledger
 
-Accepted SDK baseline: [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd),
+Accepted SDK baseline: [`e13ac5da`](https://github.com/jscraik/skills-sdk/commit/e13ac5da0236a4fead407bd3c8a5e9e71e61ae47),
 verified on 2026-10-10. The workflow and migration map describe this same
 revision. These merges accept the bounded capabilities below, not all acceptance
 criteria of their parent slices.
@@ -90,17 +90,35 @@ criteria of their parent slices.
 | [PR #52](https://github.com/jscraik/skills-sdk/pull/52) | [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842) | Root-manifest plugin inspection, complete bytes and separate modes, child/settings binding and fresh source verification. No release approval or live-operation authority. |
 | [PR #53](https://github.com/jscraik/skills-sdk/pull/53) | [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd) | Bounded matched whole-plugin evaluation, child calibration, same-lane local/cloud handoff and feedback/rerun services. Supplied-offline CLI and injected API proof are not live quality or release clearance. |
 
+PR #54 accepted instruction-alignment documentation at
+[`ec8f0dae`](https://github.com/jscraik/skills-sdk/commit/ec8f0dae3b370cf9f9c8a85ce91f70e4846481f1).
+PR #55 accepted fresh per-trial calibration capabilities at
+[`e13ac5da`](https://github.com/jscraik/skills-sdk/commit/e13ac5da0236a4fead407bd3c8a5e9e71e61ae47).
+Jamie merged PR #55; its source head `4d2983a` and accepted merge have identical
+file trees. Hosted merge does not retroactively prove a passing local readiness
+receipt or completion of previously pending independent review and CI gates.
+
 Repository tests and installed-entrypoint proof are linked in the migration map.
 The ledger records hosted acceptance; it does not replace exact candidate
 validation, current PR checks/reviews, or live provider and runtime evidence.
 
 ## Proof lanes and resume point
 
-Current slice: stateful calibration capability-lifetime repair from accepted
-`ec8f0dae`, the PR #54 merge on 2026-10-10. PR #54's documentation reconciliation
-is accepted; the fresh per-trial adapter schedule, lifecycle tests and offline
-CLI changes are local, unmerged work. Installed proof, final aggregate,
-independent review and signed delivery remain required.
+Current slice: explicit local/cloud model-profile binding from accepted
+`e13ac5da`, the PR #55 merge on 2026-10-10. PR #54's documentation reconciliation
+and PR #55's fresh per-trial calibration schedule are accepted. The unmerged
+candidate implements explicit profile capture, compiled settings delivery to
+controlled drivers, and input-drift guards. Source CLI local complete/stream,
+calibration and cloud handoff checks pass; installed-wheel local, calibration
+and cloud checks prove stale-input rejection and recovery. The unchanged
+candidate committed as `0429ac5f85b2996b11e72ba2ad4edbc879012b75` passed
+`bash scripts/validate-repository.sh`: 3,498 tests passed and one skipped,
+with build and installed-entrypoint checks passing. This is historical proof
+for those exact bytes, not validation of subsequent repairs. Its signature was
+verified and it was pushed non-force to PR #56. Any changed final candidate
+requires its own repository validation; current-head hosted checks, independent
+review, readiness receipts and merge remain separate closeout gates. This does
+not establish external-provider settings application or live model quality.
 
 Historical PR #53 evidence: it merged on 2026-10-10. Its signed source head
 `20eac04739ebe2706e204372b7514fe494589b14` and the squash merge have identical
@@ -115,11 +133,10 @@ candidate and portable-export work parked; S4 review-export authority does not
 cover presentation. This is the single current resume point; dated assessments
 below are history.
 
-Complete this calibration repair with focused and installed
-accepted/rejected/recovery proof before claiming stateful end-to-end
-calibration. Then integrate named profiles using the settled
-capability contract; profile parsing and binding alone do not require live
-calibration execution. Applicable security evidence and the final
+Integrate named profiles using the accepted calibration capability contract.
+Require explicit catalogue and provider dependencies rather than discovering
+home configuration or assuming defaults. Profile parsing and binding alone
+do not establish live calibration execution. Applicable security evidence and the final
 scan adapter remain bounded separate work, with live operations requiring
 their own authority. Parent S2, S3, S4 and programme acceptance remain open.
 
@@ -370,9 +387,9 @@ Documenting these commands does not claim a new test run.
   `calibration_execution_incomplete` after the first trial in both numeric and
   dimensional calibration. The one-trial neighbours pass. This diagnostic is
   not an installed-entrypoint repair, live-provider proof or six-probe scorer
-  qualification. The current unmerged repair supplies explicit fresh pairs
-  and rejects aliasing before wrapping; this issue stays open until its
-  installed proof, aggregate and delivery gates pass.
+  qualification. PR #55 subsequently accepted explicit fresh pairs and
+  rejection of aliasing before wrapping. Its controlled lifecycle and installed
+  fixtures cover the repair; real-provider calibration quality remains separate.
 - Presentation is a separate signed, locally validated candidate `0c6eea3`:
   2,949 tests passed, one skipped, plus installed base and optional-image checks.
   It remains unpushed while permission to export its complete diff to the

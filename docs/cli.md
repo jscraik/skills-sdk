@@ -305,7 +305,7 @@ contract and does not gain a matched-lane mode field.
   a qualified local candidate to the cloud baseline without authorising spend.
 - `matched-calibration` requires exactly `plan`, `rubric` and `executions`;
   the ordered probe callbacks return supplied dimensional judgments.
-  The unmerged lifetime repair allocates a fresh controlled pair for each
+  The PR #55 lifetime repair allocates a fresh controlled pair for each
   declared trial, with unchanged JSON input shape and receipt schemas.
 - `matched-local` requires exactly `plan`, `calibrations` and `executions`.
   `calibrations` contains both child-target bundles; `executions` contains
@@ -321,6 +321,41 @@ contract and does not gain a matched-lane mode field.
   Baseline calibration commitments remain frozen; candidate calibration can be
   rebound after a correction. A different passing baseline bundle still blocks
   recovery because it changes the retained experiment controls.
+
+### Explicit profile inputs (unmerged candidate)
+
+The local, cloud and regression execution inputs may additionally contain
+`profiles`, with exactly `generator` and `judge`. Both select the same logical
+lane name: `oss-local.config.toml` or `oss-cloud.config.toml`. Without this
+member, the field sets above remain unchanged. `matched-calibration` accepts
+`profiles` together with `profile_plan`, the matched plan defining the selected
+lane's identities and settings. Its separate `plan` still owns held-out probes
+and calibration policy. Profile wrapping preserves fresh capabilities for every
+probe and trial; reused capabilities and mismatched fixture settings block.
+
+Each role contains exactly `name`, `profile_toml`, `provider_toml`,
+`catalogue_json`, `defaults_toml` and `configuration_sha256`. These are explicit
+text contents, not file paths. `profile_toml` is required; the three dependency
+texts may be `null` only when no unresolved input needs them. The adapter does
+not read a profile's catalogue path, resolve credential environment variables,
+discover home settings or execute disabled MCP commands.
+
+Build the model identity with `describe_codex_profile` before freezing the
+matched plan. Use `compile_codex_profile(plan, source, role)` from
+`skills_sdk.providers.codex_profiles` to obtain the expected configuration
+digest. The CLI rejects a fixture digest mismatch before allocating callbacks.
+Profile provenance is part of the plan's adapter identity, so changing supplied
+bytes requires a new plan and affected downstream evidence, not merely a new
+fixture digest. The accepted-local-candidate cloud baseline remains governed by
+the existing handoff checks.
+
+Controlled local CLI tests cover complete and stream modes: a wrong expected
+configuration blocks with zero callbacks, then corrected inputs complete ten
+cases with profile-bound evidence. Controlled cloud refinement preserves the
+accepted local candidate as its baseline. Installed-wheel local, calibration
+and cloud commands reject stale profiles and accept corrected inputs.
+Supplied output text and judge results remain controlled fixtures, not evidence
+that Codex or an external model used these settings.
 
 Matched plans require distinct complete baseline and candidate identities.
 An identical A/A input returns a typed blocker; corrected distinct inputs can

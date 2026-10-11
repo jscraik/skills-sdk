@@ -14,15 +14,15 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`ec8f0dae`](https://github.com/jscraik/skills-sdk/commit/ec8f0dae3b370cf9f9c8a85ce91f70e4846481f1),
+Accepted SDK baseline: [`e13ac5da`](https://github.com/jscraik/skills-sdk/commit/e13ac5da0236a4fead407bd3c8a5e9e71e61ae47),
 verified on 2026-10-10 and shared with the workflow and task record. Entries below
 describe that revision, not queued branches. Each row names its entrypoint or
 absence, a proof or boundary reference, its limitation, and the remaining action.
 
 PR #54 reconciled the descriptions without adding executable capabilities.
-The current calibration lifetime candidate adds fresh per-trial adapters and
-[lifecycle proof](../tests/test_calibration_lifetime.py), but is unmerged; the
-`evals` row retains its accepted-main limitation until delivery completes.
+PR #55 accepted fresh per-trial adapters and
+[lifecycle proof](../tests/test_calibration_lifetime.py). Named-profile binding
+and real-provider quality remain separate gaps in the `evals` row.
 
 Accepted PR #52 affects `package_identity`, `skill_intake`
 and `sdk_plugin_lifecycle`: `validate_plugin_package` / `validate-plugin` add
@@ -101,7 +101,7 @@ does not describe the implemented SDK SchemaRegistry.
 | `trust_store` | Pending | No trust-ledger service in the [API](api.md); evidence validation is not trusted issuer selection. | S3: decide trust ownership and select an adapter or reviewed retirement. |
 | `observability_feedback` | Partial | `execute_matched_regression` and `execute_matched_cloud_regression` retain explicit correction/rerun evidence; [feedback proof](../tests/test_matched_feedback.py). Automatic regression capture is not implemented. | S6: prove external feedback, retained regressions and consumer cutover. |
 | `refs_ingestion` | Partial | `assess_content_review` inventories captured references; [review proof](../tests/test_content_review.py). No external reference retrieval or comprehensive accuracy review. | S2: decide external ingestion needs and retain explicit content-review gaps. |
-| `evals` | Partial | Selected-case, observed calibration and matched plugin services exist; [installed matched proof](../tests/installed_matched_smoke.py). Supplied-offline CLI results do not prove fresh model quality. | S3/S4: repair stateful calibration lifetime and prove supported live adapters separately. |
+| `evals` | Partial | Selected-case, observed calibration and matched plugin services exist; [installed matched proof](../tests/installed_matched_smoke.py). Fresh per-trial adapters have [lifecycle proof](../tests/test_calibration_lifetime.py). Supplied-offline CLI results do not prove fresh model quality. | S3/S4: bind explicitly selected model profiles and prove supported live adapters separately. |
 | `eval_profiles` | Partial | Matched descriptors and `prepare_matched_cloud_handoff` bind same-lane settings and local lineage; [handoff proof](../tests/test_matched_handoff.py). Named TOML profiles are not integrated. | S4: implement explicit oss-local/oss-cloud profile selection and secret-free binding. |
 | `ab_rubric` | Partial | `MatchedComparisonPlan` and calibration bind rubric and decision limits; [comparison proof](../tests/test_matched_comparison.py). Offline conformance is not live judge quality. | S4: prove selected profile and judge quality with authorised execution. |
 | `ab_preview` | Partial | `assess_matched_pair` / `eval matched-assessment` assess supplied pair evidence; [CLI proof](../tests/test_matched_cli.py). Not a complete legacy preview-parity claim. | S4: disposition remaining legacy preview semantics and real-adapter proof. |
