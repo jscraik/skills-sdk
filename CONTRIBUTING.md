@@ -65,6 +65,21 @@ The codestyle wrapper runs the pinned Vale release with the SDK-owned prose
 rules. Repair prose findings in the owning document; do not add inline
 suppression comments or exclusions.
 
+The full wrapper reports elapsed seconds and failure status for schemas,
+codestyle, tests, build, installed proof and diff hygiene. Tests run in two
+isolated pytest-xdist workers with no test-selection exclusions and a slow-test
+report. Use serial focused pytest when investigating a worker-sensitive failure;
+do not relabel that narrower result as full proof.
+
+For ordinary documentation-only changes, run
+`bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`.
+The classifier verifies Git identity, all committed changes, dirty tracked
+paths and untracked non-ignored paths. It accepts only regular non-executable
+prose in the documented allowlist. Other changes require the full wrapper.
+Hosted PR classification uses the trusted base implementation; a base without
+that implementation defaults to full validation. Pushes to main remain full.
+See [validation scope and phases](docs/standards.md#validation-scope-and-phases).
+
 Commits use Conventional Commit subjects and native Git signing through the
 configured signer. Do not bypass hooks or use an unsigned fallback. Pull
 requests must follow the repository template; local checks do not establish
