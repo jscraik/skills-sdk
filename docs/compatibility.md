@@ -144,11 +144,11 @@ are unchanged. A non-`None` numeric cleanup result now blocks, as dimensional
 cleanup already did. See the [lifecycle regressions](../tests/test_calibration_lifetime.py)
 and [installed proof](../tests/installed_observed_calibration_smoke.py).
 
-## Matched evaluation integration candidate
+## Matched evaluation integration
 
-### Explicit profile adapter candidate
+### Explicit profile adapter
 
-The unmerged `skills_sdk.providers.codex_profiles` adapter accepts explicit
+The PR #56 accepted `skills_sdk.providers.codex_profiles` adapter accepts explicit
 bytes for the logical `oss-local.config.toml` and `oss-cloud.config.toml`
 profiles, their provider/catalogue dependencies and caller defaults. It leaves
 the frozen `ProviderIdentityV2`, matched plan and receipt schemas unchanged.
@@ -258,8 +258,8 @@ live-quality, spending, publication or promotion proof. Matched offline
 fixtures support descriptor-selected complete and pull-stream protocols across
 calibration, local, cloud and both regression routes. This does not widen the
 existing public `SuppliedTextProviderAdapter` complete-only contract. See
-[API families](api.md#matched-whole-plugin-evaluation-candidate) and
-[CLI commands](cli.md#matched-evaluation-candidate). The retained historical
+[API families](api.md#matched-whole-plugin-evaluation) and
+[CLI commands](cli.md#matched-evaluation). The retained historical
 validation command for PR #53 candidate
 `ca1db74570a945f4843013d61d47b2e2eea77e73` was
 `PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS=-x bash scripts/validate-repository.sh`:
@@ -267,11 +267,11 @@ validation command for PR #53 candidate
 bindings and proof limits are recorded in the
 [task record](projects/sdk-workflow/tasks.md). This result does not validate
 the subsequent reference-context, selected-child ownership, trial-feasibility,
-trial-identity, adapter-contract, receipt-cost or safety repairs. Those require
-fresh combined validation and delivery evidence in
-[PR #53](https://github.com/jscraik/skills-sdk/pull/53); neither the historical
-result nor this candidate establishes accepted-main contracts, live quality or
-hosted clearance.
+trial-identity, adapter-contract, receipt-cost or safety repairs. Final source
+validation and accepted delivery for merged
+[PR #53](https://github.com/jscraik/skills-sdk/pull/53) are recorded separately in
+the task record. Accepted bounded contracts do not establish live quality,
+release clearance or validation of later changed bytes.
 
 ## Supplied content-review contracts
 

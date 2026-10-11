@@ -280,7 +280,7 @@ or completed reviewer execution.
   All provider and judge objects must be distinct across the entire batch,
   including across roles. Missing, malformed or aliased schedules block before
   adapter metadata access. The SDK does not clone or reopen host capabilities.
-  This working-branch lifetime repair is not yet part of the accepted baseline.
+  PR #55 accepted this lifetime repair; controlled proof is not live calibration quality.
   Judges return `CalibrationJudgeVerdict` with bound assertion evidence and an
   actual callback-returned numeric score. The harness retains held-out labels;
   delegates receive only ordinary `SelectedCaseJudgeInput`. Identity/settings
@@ -479,7 +479,7 @@ or completed reviewer execution.
   2020-12 enforces the operation-to-mutation rule, while equality between lock
   digest fields remains a semantic check.
 
-## Matched whole-plugin evaluation candidate
+## Matched whole-plugin evaluation
 
 Accepted in PR #53, this bounded S4 implementation does not establish complete
 workflow parity or live-provider quality. It provides the public evaluation APIs
@@ -543,13 +543,14 @@ Hidden evaluation, scorer, calibration and rubric documents are excluded from
 the generator context. Context paths and source bytes remain private inputs;
 portable receipts retain identities and digests instead of source text.
 
-### Explicit Codex profiles (unmerged candidate)
+### Explicit Codex profiles
 
 `skills_sdk.providers.codex_profiles` exposes `CodexProfileSource`,
 `describe_codex_profile`, `compile_codex_profile`, `CodexProfileInvocation`,
 `CodexProfiledCompleteAdapter`, `CodexProfiledStreamingAdapter` and
 `CodexProfiledJudgeAdapter`. These are an outer, supplied-offline adapter seam;
 the portable core does not import Codex or discover host configuration.
+PR #56 accepted this seam, not live-provider execution or real-provider settings application.
 
 `CodexProfileSource` holds a logical name and explicit immutable bytes:
 `profile_bytes`, optional `provider_bytes`, `catalogue_bytes` and
@@ -578,9 +579,11 @@ claim of complete Codex-version configuration compatibility.
 
 Supply a fresh driver for each adapter and trial. Driver `complete` and `stream`
 methods receive `(invocation, request, payload)`; driver `judge` receives
-`(invocation, inputs)`. Cleanup retains the existing lifecycle. Guards recompile
-and compare input bindings around callbacks and stream pulls, rejecting drift
-without accepting the returned output. The adapter passes compiled settings to
+`(invocation, inputs)`. Cleanup retains the existing lifecycle. The adapter
+compiles once, then compares immutable source, plan, lane, role and invocation
+snapshots around callbacks and stream pulls, rejecting drift without accepting
+the returned output. It does not reparse or rehash profile dependencies on each
+pull. The adapter passes compiled settings to
 the driver; separate proof is needed that a real external implementation applies
 them. These APIs do not authorise provider calls, spending or credential access.
 Closed option values and malformed provider ports reject at input admission.
@@ -648,8 +651,8 @@ The additive wire families are `matched-comparison-plan/v1`,
 names are available through `SchemaRegistry`; semantic checks supplement JSON
 Schema. Callback observations may be supplied offline. They prove neither
 external authenticity, live-model quality, promotion authority nor provider
-spending. See [CLI input boundaries](cli.md#matched-evaluation-candidate) and
-[compatibility limits](compatibility.md#matched-evaluation-integration-candidate).
+spending. See [CLI input boundaries](cli.md#matched-evaluation) and
+[compatibility limits](compatibility.md#matched-evaluation-integration).
 
 ## Read-only intake
 
