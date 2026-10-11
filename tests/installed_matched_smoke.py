@@ -153,6 +153,15 @@ def _check_profiles(root: Path) -> None:
         stale["profiles"]["judge"]["profile_toml"] += "\n"
         rejected = _cli(root, command, stale, schema, 2)
         assert rejected["status"] == "blocked"
+        malformed = json.loads(json.dumps(payload))
+        profile = malformed["profiles"]["generator"]
+        field = "provider_toml" if profile["provider_toml"] is not None else "profile_toml"
+        original = profile[field]
+        profile[field] = original.replace("localhost:9999", "localhost:").replace(
+            "https://example.invalid/v1", "https://example.invalid:/v1"
+        )
+        assert profile[field] != original
+        assert _cli(root, command, malformed, schema, 2)["status"] == "blocked"
         accepted = _cli(root, command, payload, schema)
         execution = accepted.get("execution") or accepted
         assert execution["external_authenticity_verified"] is False

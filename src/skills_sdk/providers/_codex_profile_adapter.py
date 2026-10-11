@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from typing import Literal, Protocol
 
 from skills_sdk.core.errors import ContractError
@@ -52,20 +53,47 @@ class _CodexProfiledAdapterBase:
         self.source, self.driver = source, driver
         self._invocation = _compile_codex_profile(self.plan, source, self._role)
         self._lane = self.plan.lanes[0 if source.name == "oss-local.config.toml" else 1]
+        self._source_snapshot = self._source_values()
+        self._plan_snapshot = self.plan.model_dump_json()
+        self._lane_snapshot = self._lane.model_dump_json()
+        self._role_snapshot = self._role
+        self._invocation_snapshot = replace(self._invocation, binding=replace(self._invocation.binding))
         self._stream_iterator: AsyncIterator[ProviderAdapterStreamItem] | None = None
         if self._role == "generator" and self._lane.generator_mode != self._mode:
             raise ContractError("model_profile_mode_unsupported", "adapter mode must match the frozen lane")
 
     def _check(self) -> _CodexProfileInvocation:
-        try:
-            current = _compile_codex_profile(self.plan, self.source, self._role)
-        except ContractError:
-            raise ContractError(
-                "model_profile_binding_changed", "rebind changed profile inputs before execution"
-            ) from None
-        if current != self._invocation:
+        # Immutable bytes compare by identity in the unchanged case. No catalogue
+        # parsing, hashing or configuration serialisation belongs in stream pulls.
+        if (
+            self._source_values() != self._source_snapshot
+            or type(self.plan) is not MatchedComparisonPlan
+            or self.plan.model_dump_json() != self._plan_snapshot
+            or self._lane.model_dump_json() != self._lane_snapshot
+            or self._role != self._role_snapshot
+            or self._invocation != self._invocation_snapshot
+        ):
             raise ContractError("model_profile_binding_changed", "rebind changed profile inputs before execution")
-        return current
+        return self._invocation
+
+    def _source_values(self) -> tuple[object, ...]:
+        if (
+            type(self.source) is not _CodexProfileSource
+            or type(self.source.name) is not str
+            or type(self.source.profile_bytes) is not bytes
+            or any(
+                item is not None and type(item) is not bytes
+                for item in (self.source.provider_bytes, self.source.catalogue_bytes, self.source.defaults_bytes)
+            )
+        ):
+            raise ContractError("model_profile_binding_changed", "rebind changed profile inputs before execution")
+        return (
+            self.source.name,
+            self.source.profile_bytes,
+            self.source.provider_bytes,
+            self.source.catalogue_bytes,
+            self.source.defaults_bytes,
+        )
 
     @property
     def descriptor(self) -> TextProviderAdapterDescriptor:

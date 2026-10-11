@@ -19,7 +19,6 @@ wire_api = "responses"
 """
 _CATALOGUE = json.dumps(
     {
-        "client_version": "fixture-v1",
         "models": [{"slug": "example-model:small", "base_instructions": "Controlled fixture instructions."}],
     }
 ).encode()
@@ -70,13 +69,29 @@ def test_inline_cloud_transport_needs_no_ambient_provider() -> None:
             _resolve_profile_dependencies(parsed, _CLOUD, provider, catalogue)
 
 
-@pytest.mark.parametrize("port", ["not-a-port", "99999", "0", "-1"])
+@pytest.mark.parametrize("port", ["not-a-port", "99999", "0", "-1", ""])
 def test_inherited_provider_ports_reject_and_recover(port: str) -> None:
     parsed = _parse_codex_profile(_LOCAL, "local")
     invalid = _PROVIDER.replace(b"localhost:9999", f"localhost:{port}".encode())
     with pytest.raises(ContractError):
         _resolve_profile_dependencies(parsed, _LOCAL, invalid, _CATALOGUE)
     assert _resolve_profile_dependencies(parsed, _LOCAL, _PROVIDER, _CATALOGUE).provider_sha256
+
+
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "[::1]", "example.invalid.", "xn--bcher-kva.invalid"])
+def test_valid_provider_authority_neighbours_are_accepted(host: str) -> None:
+    parsed = _parse_codex_profile(_LOCAL, "local")
+    provider = _PROVIDER.replace(b"localhost:9999", f"{host}:443".encode())
+    assert _resolve_profile_dependencies(parsed, _LOCAL, provider, _CATALOGUE).provider_sha256
+
+
+@pytest.mark.parametrize("root", [{"unknown": True}, {"client_version": None}, {"client_version": ""}])
+def test_native_catalogue_keeps_closed_root_validation_and_recovery(root: dict) -> None:
+    parsed = _parse_codex_profile(_LOCAL, "local")
+    data = json.loads(_CATALOGUE) | root
+    with pytest.raises(ContractError, match="model_profile_dependency_invalid"):
+        _resolve_profile_dependencies(parsed, _LOCAL, _PROVIDER, json.dumps(data).encode())
+    assert _resolve_profile_dependencies(parsed, _LOCAL, _PROVIDER, _CATALOGUE).catalogue_sha256
 
 
 @pytest.mark.parametrize(

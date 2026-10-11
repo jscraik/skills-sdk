@@ -43,6 +43,26 @@ _CATALOGUE_FIELDS = {
     "availability_nux",
     "use_responses_lite",
     "supports_search_tool",
+    "minimal_client_version",
+    "guardian",
+    "default_service_tier",
+    "available_access_programs",
+    "include_skills_usage_instructions",
+    "include_plugin_usage_instructions",
+    "include_apps_usage_instructions",
+    "supports_reasoning_summary_parameter",
+    "auto_compact_token_limit",
+    "comp_hash",
+    "effective_context_window_percent",
+    "supports_experimental_context",
+    "supports_reasoning_effort_updates",
+    "node_repl_auto_review_required",
+    "node_repl_disabled",
+    "auto_review_model_override",
+    "model_specialty",
+    "tool_mode",
+    "multi_agent_version",
+    "multi_agent_reasoning_effort",
 }
 
 _CATALOGUE_BOOLEANS = {
@@ -53,17 +73,49 @@ _CATALOGUE_BOOLEANS = {
     "supports_image_detail_original",
     "use_responses_lite",
     "supports_search_tool",
+    "include_skills_usage_instructions",
+    "include_plugin_usage_instructions",
+    "include_apps_usage_instructions",
+    "supports_reasoning_summary_parameter",
+    "supports_experimental_context",
+    "supports_reasoning_effort_updates",
+    "node_repl_auto_review_required",
+    "node_repl_disabled",
 }
-_CATALOGUE_NUMBERS = {"priority", "context_window", "max_context_window"}
+_CATALOGUE_NUMBERS = {
+    "priority",
+    "context_window",
+    "max_context_window",
+    "auto_compact_token_limit",
+    "effective_context_window_percent",
+}
 _CATALOGUE_ARRAYS = {
     "supported_reasoning_levels",
     "experimental_supported_tools",
     "input_modalities",
     "service_tiers",
     "additional_speed_tiers",
+    "minimal_client_version",
 }
 _CATALOGUE_OBJECTS = {"model_messages", "truncation_policy"}
-_CATALOGUE_OPTIONAL = {"availability_nux", "upgrade"}
+_CATALOGUE_OPTIONAL = {"availability_nux", "upgrade", "guardian", "available_access_programs"}
+_CATALOGUE_NULLABLE = _CATALOGUE_OPTIONAL | {
+    "description",
+    "default_reasoning_level",
+    "default_verbosity",
+    "apply_patch_tool_type",
+    "model_messages",
+    "context_window",
+    "max_context_window",
+    "auto_compact_token_limit",
+    "comp_hash",
+    "default_service_tier",
+    "auto_review_model_override",
+    "model_specialty",
+    "tool_mode",
+    "multi_agent_version",
+    "multi_agent_reasoning_effort",
+}
 
 
 def _json_values_are_bounded(value: object) -> None:
@@ -93,6 +145,8 @@ def _validate_catalogue_entry(entry: object) -> None:
     if type(entry) is not dict or set(entry) - _CATALOGUE_FIELDS:
         raise _dependency_error()
     for key, value in entry.items():
+        if value is None and key in _CATALOGUE_NULLABLE:
+            continue
         if key in _CATALOGUE_BOOLEANS:
             valid = type(value) is bool
         elif key in _CATALOGUE_NUMBERS:
@@ -167,9 +221,9 @@ def _catalogue(payload: object, model: str) -> tuple[str, str]:
     blob = _bounded(payload)
     data = json.loads(blob.decode("utf-8"), object_pairs_hook=_unique, parse_constant=_reject_constant)
     _json_values_are_bounded(data)
-    if type(data) is not dict or set(data) != {"client_version", "models"}:
+    if type(data) is not dict or "models" not in data or set(data) - {"client_version", "models"}:
         raise _dependency_error()
-    if type(data["client_version"]) is not str or not data["client_version"].strip():
+    if "client_version" in data and (type(data["client_version"]) is not str or not data["client_version"].strip()):
         raise _dependency_error()
     models = data["models"]
     if type(models) is not list or not 1 <= len(models) <= 256:

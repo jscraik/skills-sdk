@@ -73,6 +73,12 @@ def test_profile_capture_retains_unresolved_dependencies_without_loading_them(mo
         _CLOUD.replace(b"https://example.invalid/v1", b"https://user:private@example.invalid/v1"),
         _CLOUD.replace(b"https://example.invalid/v1", b"https://example.invalid/v1?key=private"),
         _CLOUD.replace(b"https://example.invalid/v1", b"file:///invalid/model"),
+        _CLOUD.replace(b"https://example.invalid/v1", b"https://example.invalid:/v1"),
+        _CLOUD.replace(b"https://example.invalid/v1", b"https://example .invalid:443/v1"),
+        _CLOUD.replace(b"https://example.invalid/v1", b"https://-example.invalid/v1"),
+        _CLOUD.replace(b"https://example.invalid/v1", b"https://example..invalid/v1"),
+        _CLOUD.replace(b"https://example.invalid/v1", b"https://256.1.1.1/v1"),
+        _CLOUD.replace(b"https://example.invalid/v1", b"https://[::1]extra/v1"),
         _CLOUD + b'api_key = "synthetic-private-value"\n',
     ],
 )
@@ -89,6 +95,15 @@ def test_changed_settings_change_profile_digest() -> None:
     original = _parse_codex_profile(_LOCAL, "local")
     changed = _parse_codex_profile(_LOCAL.replace(b'"none"', b'"concise"'), "local")
     assert original.profile_sha256 != changed.profile_sha256
+
+
+@pytest.mark.parametrize("authority", ["[ABCD::1]:443", "[AbCd::1]:443"])
+def test_ipv6_authority_case_accepts_after_malformed_input(authority: str) -> None:
+    invalid = _CLOUD.replace(b"https://example.invalid/v1", b"https://[ABCD::1]extra/v1")
+    with pytest.raises(ContractError, match="invalid_model_profile"):
+        _parse_codex_profile(invalid, "cloud")
+    valid = _CLOUD.replace(b"https://example.invalid/v1", f"https://{authority}/v1".encode())
+    assert _parse_codex_profile(valid, "cloud").declares_provider
 
 
 @pytest.mark.parametrize("key", ["approval_policy", "approvals_reviewer", "web_search", "model_reasoning_summary"])

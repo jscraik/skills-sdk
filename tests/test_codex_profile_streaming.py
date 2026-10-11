@@ -1,6 +1,7 @@
 """Exercise profile drift during streaming through the public provider call."""
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from dataclasses import replace
 
@@ -82,3 +83,71 @@ def test_wrong_mode_blocks_before_stream_driver_access() -> None:
     with pytest.raises(ContractError, match="model_profile_mode_unsupported"):
         _CodexProfiledStreamingAdapter(_profile_plan(_CONFIGURED), _CONFIGURED, driver)
     assert driver.opens == 0
+
+
+def test_equal_mutable_source_bytes_do_not_bypass_cached_validation() -> None:
+    source = replace(_CONFIGURED)
+    driver = _StreamDriver()
+    adapter = _CodexProfiledStreamingAdapter(_stream_plan(source), source, driver)
+    request = _request_for(adapter)
+    object.__setattr__(source, "catalogue_bytes", bytearray(source.catalogue_bytes))
+    with pytest.raises(ContractError, match="model_profile_binding_changed"):
+        adapter._check()
+    # The public call translates unreadable adapter properties at admission.
+    with pytest.raises(ContractError, match="invalid_provider_adapter"):
+        asyncio.run(execute_provider_call(request, None, adapter))
+    assert driver.opens == 0
+    corrected = _CodexProfiledStreamingAdapter(_stream_plan(), _CONFIGURED, _StreamDriver())
+    assert (
+        asyncio.run(execute_provider_call(_request_for(corrected), None, corrected)).public_result.status == "completed"
+    )
+
+
+def test_large_catalogue_stream_compiles_once_and_preserves_public_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
+    import skills_sdk.providers._codex_profile_adapter as module
+
+    catalogue = json.loads(_CONFIGURED.catalogue_bytes)
+    catalogue["models"] += [{"slug": f"other-{index}", "base_instructions": "x" * 3500} for index in range(255)]
+    source = replace(_CONFIGURED, catalogue_bytes=json.dumps(catalogue).encode())
+    original = module._compile_codex_profile
+    compilations = []
+
+    def compile_once(*args: object) -> object:
+        compilations.append(True)
+        return original(*args)
+
+    monkeypatch.setattr(module, "_compile_codex_profile", compile_once)
+
+    class Driver(_StreamDriver):
+        async def stream(
+            self, invocation: object, request: object, payload: object
+        ) -> AsyncIterator[ProviderAdapterStreamItem]:
+            async def values() -> AsyncIterator[ProviderAdapterStreamItem]:
+                try:
+                    for _ in range(4095):
+                        yield ProviderAdapterChunk("x")
+                    yield ProviderAdapterTerminal(("evidence/profile-stream.json",))
+                finally:
+                    self.closes += 1
+
+            return values()
+
+    driver = Driver()
+    adapter = _CodexProfiledStreamingAdapter(_stream_plan(source), source, driver)
+    outcome = asyncio.run(execute_provider_call(_request_for(adapter), None, adapter))
+    assert outcome.public_result.status == "completed" and outcome.complete_text == "x" * 4095
+    assert len(compilations) == 1
+    assert driver.cleanups == driver.closes == 1
+
+
+def test_nested_plan_mutation_mid_stream_blocks_and_recovers() -> None:
+    driver = _StreamDriver()
+    adapter = _CodexProfiledStreamingAdapter(_stream_plan(), _CONFIGURED, driver)
+    driver.mutate = lambda: object.__setattr__(adapter.plan.lanes[0].generator_parameters, "temperature", 0.5)
+    with pytest.raises(ContractError, match="model_profile_binding_changed"):
+        asyncio.run(execute_provider_call(_request_for(adapter), None, adapter))
+    assert driver.cleanups == driver.closes == 1
+    corrected = _CodexProfiledStreamingAdapter(_stream_plan(), _CONFIGURED, _StreamDriver())
+    assert (
+        asyncio.run(execute_provider_call(_request_for(corrected), None, corrected)).public_result.status == "completed"
+    )

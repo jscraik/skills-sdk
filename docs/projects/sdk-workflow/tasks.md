@@ -110,8 +110,14 @@ and PR #55's fresh per-trial calibration schedule are accepted. The unmerged
 candidate implements explicit profile capture, compiled settings delivery to
 controlled drivers, and input-drift guards. Source CLI local complete/stream,
 calibration and cloud handoff checks pass; installed-wheel local, calibration
-and cloud checks prove stale-input rejection and recovery. Final repository
-validation, independent review and signed delivery remain required. This does
+and cloud checks prove stale-input rejection and recovery. The unchanged
+candidate committed as `0429ac5f85b2996b11e72ba2ad4edbc879012b75` passed
+`bash scripts/validate-repository.sh`: 3,498 tests passed and one skipped,
+with build and installed-entrypoint checks passing. This is historical proof
+for those exact bytes, not validation of subsequent repairs. Its signature was
+verified and it was pushed non-force to PR #56. Any changed final candidate
+requires its own repository validation; current-head hosted checks, independent
+review, readiness receipts and merge remain separate closeout gates. This does
 not establish external-provider settings application or live model quality.
 
 Historical PR #53 evidence: it merged on 2026-10-10. Its signed source head

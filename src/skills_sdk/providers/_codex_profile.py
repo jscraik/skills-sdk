@@ -7,6 +7,7 @@ effective execution settings and matched-candidate binding belong to admission.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import re
 import tomllib
 from dataclasses import dataclass
@@ -122,6 +123,7 @@ def _providers(value: object, selected: str) -> bool:
         if entry.get("wire_api") not in {"responses", "chat"} or not entry.get("base_url"):
             raise _invalid()
         endpoint = urlsplit(entry["base_url"])
+        _validate_authority(endpoint.netloc, endpoint.hostname)
         # Accessing .port rejects non-numeric ports and values above 65535.
         port = endpoint.port
         if (
@@ -137,6 +139,26 @@ def _providers(value: object, selected: str) -> bool:
         if "env_key" in entry and not re.fullmatch(r"[A-Z_][A-Z0-9_]{0,127}", entry["env_key"]):
             raise _invalid()
     return selected in value
+
+
+def _validate_authority(authority: str, hostname: str | None) -> None:
+    """Reject malformed endpoints without resolving DNS or contacting a provider."""
+    if not hostname or authority.endswith(":") or any(character.isspace() for character in authority):
+        raise _invalid()
+    if ":" in hostname:
+        if "%" in hostname or not re.fullmatch(
+            r"\[" + re.escape(hostname) + r"\](?::[0-9]+)?", authority, flags=re.IGNORECASE
+        ):
+            raise _invalid()
+        ipaddress.IPv6Address(hostname)
+        return
+    name = hostname.encode("idna").decode("ascii").removesuffix(".")
+    if len(name) > 253 or not all(
+        re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label) for label in name.split(".")
+    ):
+        raise _invalid()
+    if all(character in "0123456789." for character in name) and "." in name:
+        ipaddress.IPv4Address(name)
 
 
 def _validate_profile(data: dict[str, object]) -> None:

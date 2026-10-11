@@ -173,9 +173,17 @@ records and the resolved effort must be advertised. Missing capability metadata
 does not verify external support. Permission-profile names are retained as
 symbols; this adapter does not resolve host permission definitions or apply them.
 Provider URLs require valid HTTP(S) endpoints and nonzero valid explicit ports.
+Empty explicit ports and malformed hostname authorities block at input capture;
+validation does not resolve DNS or establish endpoint availability.
+Catalogue input accepts the native `ModelsResponse` envelope with `models`,
+without requiring a synthetic `client_version` member. A supplied optional
+`client_version` remains validated and byte-bound. Supported nullable model
+metadata is preserved, not rewritten; unknown fields and malformed types block.
 
 Complete, stream and judge adapters pass the compiled configuration to supplied
-drivers and retain drift checks and existing cleanup. Controlled public API and
+drivers and retain drift checks and existing cleanup. Streaming reuses the
+validated immutable invocation and checks explicit source and plan snapshots;
+it does not reparse the catalogue for every event. Controlled public API and
 installed CLI tests prove rejection and corrected-input recovery, fresh trial
 ownership and local-to-cloud baseline binding. A real driver's application of
 settings, external model quality and runtime policy need separate proof. These

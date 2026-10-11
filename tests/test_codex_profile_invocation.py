@@ -29,6 +29,46 @@ def test_compile_applies_selected_settings_and_never_forwards_host_paths() -> No
     assert "localhost" not in repr(invocation)
 
 
+def test_native_models_response_preserves_null_metadata_through_public_adapter() -> None:
+    from skills_sdk.providers.codex_profiles import CodexProfiledCompleteAdapter, compile_codex_profile
+
+    model = {
+        "slug": "example-model:small",
+        "display_name": "Controlled native model",
+        "description": None,
+        "default_reasoning_level": None,
+        "supported_reasoning_levels": [{"effort": "low", "description": "Controlled effort"}],
+        "shell_type": "unified_exec",
+        "visibility": "list",
+        "supported_in_api": True,
+        "priority": 1,
+        "upgrade": None,
+        "availability_nux": None,
+        "model_messages": None,
+        "support_verbosity": False,
+        "default_verbosity": None,
+        "apply_patch_tool_type": None,
+        "web_search_tool_type": "text",
+        "truncation_policy": {"mode": "bytes", "limit": 10000},
+        "context_window": None,
+        "max_context_window": None,
+        "effective_context_window_percent": 95,
+        "experimental_supported_tools": [],
+        "input_modalities": ["text", "image"],
+        "include_skills_usage_instructions": False,
+        "include_plugin_usage_instructions": False,
+        "include_apps_usage_instructions": False,
+        "default_reasoning_summary": "none",
+    }
+    source = replace(_CONFIGURED, catalogue_bytes=json.dumps({"models": [model]}).encode())
+    plan = _profile_plan(source)
+    invocation = compile_codex_profile(plan, source)
+    assert json.loads(invocation.configuration_json)["catalogue_model"] == model
+    assert json.loads(invocation.configuration_json)["options"]["model_reasoning_effort"] == "low"
+    adapter = CodexProfiledCompleteAdapter(plan, source, _Driver())
+    assert asyncio.run(execute_provider_call(_request_for(adapter), None, adapter)).public_result.status == "completed"
+
+
 def test_missing_defaults_block_and_explicit_correction_recovers() -> None:
     with pytest.raises(ContractError, match="model_profile_settings_missing"):
         _compile_codex_profile(_profile_plan(), _SOURCE)

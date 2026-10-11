@@ -30,7 +30,7 @@ def _configuration_options(source: _CodexProfileSource, data: dict[str, object],
         ("model_reasoning_effort", "default_reasoning_level"),
         ("model_reasoning_summary", "default_reasoning_summary"),
     ):
-        if key in model:
+        if model.get(key) is not None:
             options[target] = model[key]
     options.update({key: value for key, value in data.items() if key in _SETTING_FIELDS})
     if set(options) != _SETTING_FIELDS:
