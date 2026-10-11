@@ -17,7 +17,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Checkout trusted PR template contract
         if: github.event_name == 'pull_request'
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -57,7 +56,10 @@ jobs:
               fi
               rm -rf -- trusted-base
               if [[ -f "$classifier" ]]; then
-                scope="$(python3 "$classifier" --base "$BASE_SHA" --head "$HEAD_SHA")"
+                head_checkout="$(mktemp -d "$RUNNER_TEMP/sdk-pr-head.XXXXXX")"
+                git worktree add --quiet --detach "$head_checkout" "$HEAD_SHA"
+                scope="$(cd "$head_checkout" && python3 "$classifier" --base "$BASE_SHA" --head "$HEAD_SHA")"
+                git worktree remove "$head_checkout"
               fi
               echo "scope=$scope" >> "$GITHUB_OUTPUT"
               exit 0

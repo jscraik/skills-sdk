@@ -60,6 +60,12 @@ the otherwise valid PR.
 
 Hosted PR scope comes from the trusted base classifier, never from an unreviewed
 candidate classifier. A base without that classifier uses full validation.
+Validation retains GitHub's default PR merge-result checkout so tests, builds
+and installed proof include the base changes. Classification alone runs in a
+temporary detached worktree at the exact PR head; it does not move or rewrite
+the validation checkout. An advanced base requires full merge-tree proof, not
+head-only tests. Invalid head identity blocks classification; corrected inputs
+recover. The temporary head worktree is removed after successful classification.
 The `docs-tests` phase runs `test_public_repository_boundary.py` and
 `test_skill_validation_architecture.py`, retaining their repository-document,
 portable-boundary and documented-command checks. Keep this bounded set aligned

@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts.validation_scope import git_environment, validation_scope
 
@@ -310,6 +311,84 @@ def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> N
     wrapper = (ROOT / "scripts/validate-repository.sh").read_text()
     assert 'phase="${1:-all}"' in wrapper and "pytest -n 2 --dist load --durations=25" in wrapper
     assert "tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py" in wrapper
+
+
+def _hosted_classification(root: Path, runner: Path, base: str, head: str) -> subprocess.CompletedProcess[str]:
+    """Execute the real hosted classification fragment without changing the validation tree."""
+    workflow = yaml.safe_load((ROOT / ".github/workflows/validate.yml").read_text())
+    steps = workflow["jobs"]["validate"]["steps"]
+    assert "ref" not in steps[0]["with"], "validation must retain the default merge-result checkout"
+    command = next(step["run"] for step in steps if step.get("id") == "pr_contract")
+    fragment = command[command.index('if [[ -f "$classifier" ]]; then') : command.index('echo "scope=$scope"')]
+    runner.mkdir()
+    classifier = runner / "trusted-classifier.py"
+    shutil.copyfile(ROOT / "scripts/validation_scope.py", classifier)
+    return subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", fragment + 'printf "%s\\n" "$scope"'],
+        cwd=root,
+        env={
+            **git_environment(),
+            "RUNNER_TEMP": str(runner),
+            "classifier": str(classifier),
+            "BASE_SHA": base,
+            "HEAD_SHA": head,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_hosted_merge_validation_rejects_semantic_base_drift_and_recovers(tmp_path: Path) -> None:
+    """Prove head-only success cannot hide a semantic failure in the default merge checkout."""
+    root, runner = tmp_path / "checkout", tmp_path / "runner"
+    root.mkdir()
+    _repository(root)
+    (root / "runtime.py").write_text("VALUE = 1\n")
+    _git(root, "add", ".")
+    _git(root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture runtime")
+    _git(root, "checkout", "-b", "fixture-base")
+    _git(root, "checkout", "-b", "fixture-head")
+    test = root / "test_runtime.py"
+    test.write_text("from runtime import VALUE\ndef test_value():\n    assert VALUE == 1\n")
+    _git(root, "add", ".")
+    _git(root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture head")
+    head = _git(root, "rev-parse", "HEAD")
+    command = [sys.executable, "-m", "pytest", "-q", "test_runtime.py"]
+    assert subprocess.run(command, cwd=root, capture_output=True, check=False).returncode == 0
+    _git(root, "checkout", "fixture-base")
+    (root / "runtime.py").write_text("VALUE = 22\n")
+    _git(root, "add", ".")
+    _git(root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture advanced base")
+    base = _git(root, "rev-parse", "HEAD")
+    _git(root, "update-ref", "refs/remotes/origin/main", base)
+    _git(root, "-c", "commit.gpgsign=false", "merge", "--no-edit", "fixture-head")
+    merge = _git(root, "rev-parse", "HEAD")
+    classified = _hosted_classification(root, runner, base, head)
+    assert classified.returncode == 0 and classified.stdout.strip() == "full", classified.stderr
+    assert _git(root, "rev-parse", "HEAD") == merge
+    assert sum(line.startswith("worktree ") for line in _git(root, "worktree", "list", "--porcelain").splitlines()) == 1
+    assert subprocess.run(command, cwd=root, capture_output=True, check=False).returncode == 1
+    test.write_text("from runtime import VALUE\ndef test_value():\n    assert VALUE == 22\n")
+    assert subprocess.run(command, cwd=root, capture_output=True, check=False).returncode == 0
+
+
+def test_hosted_head_classification_keeps_docs_route_and_blocks_wrong_identity(tmp_path: Path) -> None:
+    """Keep eligible head prose reduced while unknown identity blocks without moving validation HEAD."""
+    root = tmp_path / "checkout"
+    root.mkdir()
+    base = _repository(root)
+    (root / "README.md").write_text("# Updated prose\n")
+    _git(root, "add", ".")
+    _git(root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture prose")
+    head = _git(root, "rev-parse", "HEAD")
+    accepted = _hosted_classification(root, tmp_path / "accepted", base, head)
+    assert accepted.returncode == 0 and accepted.stdout.strip() == "docs", accepted.stderr
+    blocked = _hosted_classification(root, tmp_path / "blocked", base, "missing-head")
+    assert blocked.returncode != 0 and not blocked.stdout.strip()
+    recovered = _hosted_classification(root, tmp_path / "recovered", base, head)
+    assert recovered.returncode == 0 and recovered.stdout.strip() == "docs", recovered.stderr
+    assert _git(root, "rev-parse", "HEAD") == head
 
 
 def test_docs_wrapper_runs_real_quality_rejects_source_and_recovers(tmp_path: Path) -> None:
