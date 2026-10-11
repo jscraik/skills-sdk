@@ -48,7 +48,10 @@ Any nested `AGENTS.md` and this validation-policy document are excluded.
 Symlink and executable-mode changes, empty comparisons, stale or unknown heads
 and non-prose dirty paths cannot select documentation-only proof.
 The base must be an ancestor of the locally fetched `origin/main`; refresh that
-ref before selecting an accepted baseline. An unmerged candidate cannot serve
+ref before selecting an accepted baseline. The current accepted ref must also
+be an ancestor of the exact head. A historical caller-supplied base cannot hide
+accepted changes missing from a stale branch; that case selects full validation.
+An unmerged candidate cannot serve
 as its own accepted base to hide earlier executable changes. Index and working
 tree modes are checked separately. Assume-unchanged, skip-worktree and other
 non-ordinary index flags select full validation, even when tracked bytes appear

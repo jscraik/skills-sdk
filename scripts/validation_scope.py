@@ -60,10 +60,11 @@ def validation_scope(root: Path, base: str, head: str) -> str:
     baseline = _git(root, "rev-parse", "--verify", f"{base}^{{commit}}").decode().strip()
     if actual != resolved:
         raise ValueError("head must identify the current checkout")
+    accepted = _git(root, "rev-parse", "--verify", "refs/remotes/origin/main^{commit}").decode().strip()
     # An unmerged head cannot be declared as its own accepted base to hide code.
-    _git(root, "merge-base", "--is-ancestor", baseline, "refs/remotes/origin/main")
+    _git(root, "merge-base", "--is-ancestor", baseline, accepted)
     try:
-        _git(root, "merge-base", "--is-ancestor", baseline, resolved)
+        _git(root, "merge-base", "--is-ancestor", accepted, resolved)
     except subprocess.CalledProcessError as error:
         if error.returncode != 1:
             raise

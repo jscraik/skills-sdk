@@ -182,7 +182,8 @@ def test_hidden_index_flags_require_full_proof_without_mutating_index(tmp_path: 
     assert recovered.returncode == 0 and recovered.stdout.strip() == "docs"
 
 
-def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path) -> None:
+@pytest.mark.parametrize("baseline_choice", ["current", "historical"])
+def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path, baseline_choice: str) -> None:
     """Require full proof when accepted main has advanced outside the candidate ancestry."""
     base = _repository(tmp_path)
     (tmp_path / "README.md").write_text("branch guidance\n")
@@ -196,7 +197,21 @@ def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path) 
     advanced = _git(tmp_path, "rev-parse", "HEAD")
     _git(tmp_path, "update-ref", "refs/remotes/origin/main", advanced)
     _git(tmp_path, "checkout", "--detach", head)
-    assert validation_scope(tmp_path, advanced, head) == "full"
+    declared_base = advanced if baseline_choice == "current" else base
+    assert validation_scope(tmp_path, declared_base, head) == "full"
+    command = [sys.executable, str(ROOT / "scripts/validation_scope.py"), "--base", declared_base, "--head", head]
+    rejected = subprocess.run(command, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False)
+    assert rejected.returncode == 0 and rejected.stdout.strip() == "full", rejected.stderr
+    _git(tmp_path, "-c", "commit.gpgsign=false", "merge", "--no-edit", advanced)
+    rebound = _git(tmp_path, "rev-parse", "HEAD")
+    index_before = (tmp_path / ".git" / "index").read_bytes()
+    assert validation_scope(tmp_path, advanced, rebound) == "docs"
+    corrected = [sys.executable, str(ROOT / "scripts/validation_scope.py"), "--base", advanced, "--head", rebound]
+    recovered = subprocess.run(
+        corrected, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False
+    )
+    assert recovered.returncode == 0 and recovered.stdout.strip() == "docs", recovered.stderr
+    assert (tmp_path / ".git" / "index").read_bytes() == index_before
 
 
 def test_inherited_git_selectors_do_not_mutate_or_classify_the_caller(
