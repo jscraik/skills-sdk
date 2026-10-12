@@ -22,7 +22,8 @@ Optional `onboardingSkill` names a validated direct child skill's `SKILL.md`.
 Images are nonempty and at most five MiB. Icons are square and at least 48 by 48;
 raster dimensions cannot exceed 4096. Screenshots may be non-square. PNG, JPEG
 and WebP match their extension and decode completely as static images. Optional
-`skills-sdk[images]` pins Pillow 12.3.0; missing decoding support returns
+`skills-sdk[images]` accepts Pillow `>=12.3.0,<13`; the repository lockfile retains
+12.3.0 for reproducible validation. Missing decoding support returns
 `image_decoder_unavailable`. Bounded static SVG geometry is not rendering or
 full SVG conformance; active/linked content and SVG screenshots block. Base
 help does not import Pillow. Icons additionally require supplied recognisability,
