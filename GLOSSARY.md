@@ -13,25 +13,27 @@ with them.
 ### Package and identity
 
 **Agent Skills package**:
-A collection of skill instructions and supporting content prepared for portable
-use by agents. The source package alone does not establish installation or activation.
+A filesystem package of skill instructions and supporting content with a
+required regular, non-symlink `SKILL.md` entrypoint at its root. The source
+package alone does not establish installation or activation.
 _Avoid_: runtime installation, plugin cache
 
 **SDK-managed release**:
-A checked, versioned Agent Plugins package, including releases containing only
-one skill. Standalone skill evidence does not establish clearance for the
-complete plugin.
+A checked, versioned Agent Plugins package with canonical root `plugin.json`;
+managed releases are plugin-only, including releases containing one skill.
+Standalone skill evidence does not establish clearance for the complete plugin.
 _Avoid_: bare-skill receipt, source custody, installed runtime
 
 **Candidate identity**:
-The combination of package identity, source revision, and content digest that
-identifies the exact source state under consideration.
+The exact tuple of `package_id`, `source_revision`, and `content_sha256` that
+identifies the source state carried into downstream manifests and receipts.
 _Avoid_: package path, display name, runtime name
 
 **Source revision**:
-The supplied reference identifying a particular state of the package source.
-It is distinct from a package's release version.
-_Avoid_: package version, timestamp
+The supplied 40-character lowercase hexadecimal revision identifying a
+particular state of the package source, normally a Git revision. It is distinct
+from a package's release version.
+_Avoid_: package version, timestamp, branch name, tag name, uppercase SHA
 
 **Content digest**:
 A fingerprint of the captured package paths and file contents that identifies
@@ -44,8 +46,9 @@ It identifies that manifest rather than replacing the candidate identity.
 _Avoid_: content digest, source revision
 
 **Portable path**:
-A relative location within a declared package, workspace, or source context
-that is independent of a particular machine's filesystem layout.
+A non-empty, normalized relative POSIX path within a declared package,
+workspace, or source context. Absolute paths, parent traversal, backslashes,
+line terminators, and unnormalized forms are invalid.
 _Avoid_: machine path, absolute path, host path
 
 **Skill identity**:
