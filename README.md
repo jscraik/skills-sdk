@@ -437,7 +437,7 @@ and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution contract.
 
 ## Project language and further reading
 
-Use the canonical vocabulary in [`UBIQUITOUS.md`](UBIQUITOUS.md) when “build”,
+Use the canonical vocabulary in [`GLOSSARY.md`](GLOSSARY.md) when “build”,
 “publish”, “install”, “candidate”, “receipt”, or “verification” could mean more
 than one lane. For a coarse-grained map of the code and its invariants, see
 [`ARCHITECTURE.md`](ARCHITECTURE.md). The remaining public trust surfaces are:

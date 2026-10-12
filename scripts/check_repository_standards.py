@@ -33,7 +33,7 @@ PORTABLE_TEXT_FILES = (
     "README.md",
     "SECURITY.md",
     "SUPPORT.md",
-    "UBIQUITOUS.md",
+    "GLOSSARY.md",
     "pyproject.toml",
     ".mise.toml",
 )

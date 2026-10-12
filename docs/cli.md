@@ -407,3 +407,19 @@ Both commands return `pr-sweep-validation/v1`: exit `0` for `pass` and `2` for
 `fail` or `blocked`. Host paths are input arguments; the result contains only
 repository-relative dirty paths. The skill's hosted checks, review, receipt,
 authorization, and merge gates remain separate.
+
+## Prompt translations
+
+Run the checkout-scoped commands below from the repository checkout root so
+`$PWD/.mise.toml` and relative paths resolve to this checkout.
+
+| User phrase | Canonical action |
+| --- | --- |
+| “Validate this skill” | Run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate "<package-root>" --source-revision "<40-lowercase-hex>" --json --robot`; for an invocation that reaches the validator, treat exit `0` as a passing result and exit `2` as a typed blocker. Argparse also uses exit `2` for malformed invocations before a versioned result exists. |
+| “Build this package” | Run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build "<package-root>" --source-revision "<40-lowercase-hex>" --json --robot`; a successful build returns a candidate-bound receipt. A blocked result may lack candidate identity when it cannot be resolved. Neither result is an archive or publication. Argparse rejects malformed invocations before a versioned receipt exists. |
+| “Make it available” | First name the target lane. Local `validate` or `build` proves only a candidate contract. The intended path checks the exact plugin version, publishes through a verified registry adapter (initially private Tessl `jscraik`), and installs through a selected host adapter. These external operations are not implemented by the current CLI; a future registry default needs separate transition proof. Only Jamie may select public release. |
+| “Check the schemas” | Run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check` for generated-schema drift. For hand-maintained resources, also run `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_core_contracts.py tests/test_package_lifecycle.py tests/test_package_receipts.py`. This focused test route loads the hand-maintained schemas through `SchemaRegistry` and exercises their Draft 2020-12 and payload contracts. Record `pass` only when both commands exit `0` and all tests pass; record `fail` for schema drift or a failed assertion, and `blocked` if either command cannot run or complete, with the concrete reason and nearest meaningful fallback. |
+| “Is it verified?” | Identify the evidence lane and candidate identity, then inspect that lane's result; a local receipt alone does not prove runtime, provider, registry, or hosted state. |
+| “Move this workflow into the SDK” | Move the portable lifecycle behavior, contracts, schemas, tests, documentation, and evidence production together; do not leave a wrapper or required checkout dependency on Agent-Skills. |
+| “Put this skill in the Foundry” | Hold the candidate and provenance for SDK processing without treating custody as clearance, installation, distribution, or permanent post-processing ownership. |
+| “Retire Agent-Skills” | Require the documented clean-room SDK and Foundry independence evidence plus replacement-or-retirement coverage; documentary ownership alone is not a retirement pass. |
