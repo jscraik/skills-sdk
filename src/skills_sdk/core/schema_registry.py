@@ -93,6 +93,10 @@ SCHEMA_NAMES = frozenset(
         "scorer-profile.v1",
         "skill-package-validation.v1",
         "plugin-package-validation.v1",
+        "plugin-image-approval.v1",
+        "plugin-presentation-copy-approval.v1",
+        "plugin-presentation-request.v1",
+        "plugin-presentation-check.v1",
         "skill-package-intake.v1",
         "skill-package-intake-context.v1",
     }
@@ -520,6 +524,25 @@ class SchemaRegistry:
             from skills_sdk.models.plugin import PluginPackageValidation
 
             model = PluginPackageValidation
+        elif name in {
+            "plugin-image-approval.v1",
+            "plugin-presentation-copy-approval.v1",
+            "plugin-presentation-request.v1",
+            "plugin-presentation-check.v1",
+        }:
+            from skills_sdk.models.plugin_presentation import (
+                PluginImageApproval,
+                PluginPresentationCheck,
+                PluginPresentationCopyApproval,
+                PluginPresentationRequest,
+            )
+
+            model = {
+                "plugin-image-approval.v1": PluginImageApproval,
+                "plugin-presentation-copy-approval.v1": PluginPresentationCopyApproval,
+                "plugin-presentation-request.v1": PluginPresentationRequest,
+                "plugin-presentation-check.v1": PluginPresentationCheck,
+            }[name]
         elif name == "skill-package-validation.v1":
             from skills_sdk.models.validation import SkillPackageValidation
 

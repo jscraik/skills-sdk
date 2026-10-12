@@ -1,0 +1,465 @@
+{
+  "$defs": {
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PluginImageApproval": {
+      "additionalProperties": false,
+      "description": "Public-safe supplied approval for one exact candidate image.",
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "distinctive": {
+          "anyOf": [
+            {
+              "const": true,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distinctive"
+        },
+        "evidence_ref": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "evidence_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Evidence Sha256",
+          "type": "string"
+        },
+        "image_path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Image Path",
+          "type": "string"
+        },
+        "image_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Image Sha256",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "icon",
+            "screenshot"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "light_dark": {
+          "anyOf": [
+            {
+              "const": true,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Light Dark"
+        },
+        "professional": {
+          "const": true,
+          "title": "Professional",
+          "type": "boolean"
+        },
+        "recognisable": {
+          "anyOf": [
+            {
+              "const": true,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recognisable"
+        },
+        "rights_confirmed": {
+          "const": true,
+          "title": "Rights Confirmed",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "plugin-image-approval/v1",
+          "default": "plugin-image-approval/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "small_size": {
+          "anyOf": [
+            {
+              "const": true,
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Small Size"
+        }
+      },
+      "required": [
+        "candidate",
+        "image_path",
+        "image_sha256",
+        "kind",
+        "professional",
+        "rights_confirmed",
+        "evidence_ref",
+        "evidence_sha256"
+      ],
+      "title": "PluginImageApproval",
+      "type": "object"
+    },
+    "PluginPresentationCopyApproval": {
+      "additionalProperties": false,
+      "description": "Supplied copy-accuracy assertion for the exact selected settings object.",
+      "properties": {
+        "accurate": {
+          "const": true,
+          "title": "Accurate",
+          "type": "boolean"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "evidence_ref": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "evidence_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Evidence Sha256",
+          "type": "string"
+        },
+        "openai_settings_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Openai Settings Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "plugin-presentation-copy-approval/v1",
+          "default": "plugin-presentation-copy-approval/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "openai_settings_sha256",
+        "accurate",
+        "evidence_ref",
+        "evidence_sha256"
+      ],
+      "title": "PluginPresentationCopyApproval",
+      "type": "object"
+    },
+    "PluginPresentationImage": {
+      "additionalProperties": false,
+      "description": "Decoded facts and supplied approval for one captured presentation image.",
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/PluginImageApproval"
+        },
+        "format": {
+          "enum": [
+            "png",
+            "jpeg",
+            "webp",
+            "svg"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "number"
+        },
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "enum": [
+              "logo",
+              "composerIcon",
+              "logoDark",
+              "composerIconDark",
+              "screenshot"
+            ],
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Roles",
+          "type": "array"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "maximum": 5242880,
+          "minimum": 1,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "format",
+        "width",
+        "height",
+        "roles",
+        "approval"
+      ],
+      "title": "PluginPresentationImage",
+      "type": "object"
+    },
+    "SkillPackageFinding": {
+      "additionalProperties": false,
+      "description": "One stable, evidence-bound standalone-skill finding.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "title": "SkillPackageFinding",
+      "type": "object"
+    },
+    "ValidationSeverity": {
+      "description": "Whether a finding blocks immutable candidate construction.",
+      "enum": [
+        "warning",
+        "blocker"
+      ],
+      "title": "ValidationSeverity",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/plugin-presentation-check.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Offline assessment of supplied assertions and freshly captured image bytes.",
+  "properties": {
+    "archive_verified": {
+      "const": false,
+      "default": false,
+      "title": "Archive Verified",
+      "type": "boolean"
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "copy_approval": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PluginPresentationCopyApproval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "execution_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Execution Authorized",
+      "type": "boolean"
+    },
+    "findings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SkillPackageFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "host_display_observed": {
+      "const": false,
+      "default": false,
+      "title": "Host Display Observed",
+      "type": "boolean"
+    },
+    "images": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PluginPresentationImage"
+      },
+      "maxItems": 64,
+      "title": "Images",
+      "type": "array"
+    },
+    "mode_manifest_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mode Manifest Sha256"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "openai_settings_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Openai Settings Sha256"
+    },
+    "openai_settings_source": {
+      "default": "none",
+      "enum": [
+        "none",
+        "inline",
+        "compatibility"
+      ],
+      "title": "Openai Settings Source",
+      "type": "string"
+    },
+    "profile": {
+      "const": "openai-icons-2026-10-08/v1",
+      "default": "openai-icons-2026-10-08/v1",
+      "title": "Profile",
+      "type": "string"
+    },
+    "publication_verified": {
+      "const": false,
+      "default": false,
+      "title": "Publication Verified",
+      "type": "boolean"
+    },
+    "release_ready": {
+      "const": false,
+      "default": false,
+      "title": "Release Ready",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "plugin-presentation-check/v1",
+      "default": "plugin-presentation-check/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "PluginPresentationCheck",
+  "type": "object"
+}

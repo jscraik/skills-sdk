@@ -11,7 +11,7 @@ from typing import Any, cast
 
 from skills_sdk import __version__
 from skills_sdk.cli import COMMAND_HELP
-from skills_sdk.cli.plugin import add_plugin_parser, run_plugin_validation
+from skills_sdk.cli.plugin import add_plugin_parsers, run_plugin_command
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 
 _MAX_INTAKE_CONTEXT_BYTES = 1_048_576
@@ -151,7 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", title="commands")
     _add_content_review_parser(commands)
     _add_quality_parser(commands)
-    add_plugin_parser(commands)
+    add_plugin_parsers(commands)
     for name, help_text in COMMAND_HELP.items():
         if name in {"intake", "check-local", "validate", "build", "eval", "verify"}:
             continue
@@ -702,12 +702,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _local_check(arguments, parser)
     if arguments.command == "verify":
         return _verify(arguments)
-    if arguments.command == "validate-plugin":
-        return run_plugin_validation(
-            arguments,
-            lambda path: _read_intake_context(path, max_bytes=16 * 1024 * 1024),
-            _reject_duplicate_members,
-        )
+    if arguments.command in {"validate-plugin", "check-plugin-presentation"}:
+        return run_plugin_command(arguments, _read_intake_context, _reject_duplicate_members)
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)
     if arguments.command == "compare-copy":

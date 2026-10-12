@@ -72,8 +72,8 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 
 ## Accepted delivery ledger
 
-Accepted SDK baseline: [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d),
-verified on 2026-10-11. The workflow and migration map describe this same
+Accepted SDK baseline: [`e9ad586`](https://github.com/jscraik/skills-sdk/commit/e9ad5867eae08055cea9b156cb5d323bd2572965),
+verified on 2026-10-12. The workflow and migration map describe this same
 revision. These merges accept the bounded capabilities below, not all acceptance
 criteria of their parent slices.
 
@@ -100,12 +100,28 @@ file trees. Hosted merge does not retroactively prove a passing local readiness
 receipt or completion of previously pending independent review and CI gates.
 
 Repository tests and installed-entrypoint proof are linked in the migration map.
+PR #57 accepted instruction alignment at `580bf266`; PR #58 accepted validation
+timings, two-worker execution and conservative prose classification at `dedefa81`.
+Its merge tree equals validated source tree `166f62b9`; source passed 3,556 tests
+with one skip, while hosted CI passed 3,557. PR #59 accepted glossary naming at
+`e9ad586`. These historical results do not validate this changed S2 candidate.
 The ledger records hosted acceptance; it does not replace exact candidate
 validation, current PR checks/reviews, or live provider and runtime evidence.
 
 ## Proof lanes and resume point
 
-Current bounded slice, 2026-10-11: documentation-only instruction alignment
+Current bounded slice, 2026-10-12: reconcile root-owned presentation work against
+accepted `e9ad586` on `codex/sdk-presentation-reconciliation`. Add fresh complete
+plugin image/mode/settings binding and supplied-approval checks through existing
+validation seams. Retain old approval through valid byte/mode drift rejection,
+then prove corrected source and renewed approval recovery through installed
+public API/schema/CLI. Source remains unchanged by checks. Closeout requires
+final focused/schema proof, the canonical aggregate, signature verification,
+non-force delivery, current-head independent review/checks, receipts and merge.
+This is unmerged; no prior aggregate proves its changed bytes. Actual visual
+approval, rights verification, archive inclusion and host display remain separate.
+
+Historical bounded slice, 2026-10-11: documentation-only instruction alignment
 from accepted PR #56 revision `047260b`. Reconcile accepted capabilities,
 Jamie's security selections and dependency order in existing records. Closeout
 requires the final changed documents' repository validation, signed delivery,
@@ -151,14 +167,12 @@ local validation but no accepted delivery; portable-export branch
 proof only and no aggregate or delivery. Preserve both and unrelated primary
 edits. The earlier S4 review-export approval does not cover presentation.
 
-One next dependency-ready slice after this reconciliation: resume the existing
-S2 presentation/preparation candidate against accepted `047260b`, without
-rebasing or overwriting parked bytes. Use one representative canonical complete
-plugin to prove candidate-bound metadata, artwork-file and supplied rights/approval
-checks through public APIs and installed CLI, with rejected inputs and corrected
-recovery. Review any destination conversion separately. Explicit standalone
-normalisation remains an input-route obligation; it must preserve the original
-source and cannot silently turn bare-skill evidence into plugin clearance.
+One next dependency-ready action after presentation acceptance: explicitly
+normalise standalone inputs into a separate canonical plugin candidate and join
+whole-plugin preparation evidence without changing original source or inheriting
+bare-skill clearance. Reconcile preserved portable-export work before selecting
+any archive or destination conversion; review conversion separately. Presentation
+acceptance alone does not complete S2 or grant release authority.
 
 That representative plugin still cannot traverse the complete workflow. Retain
 these dependent gates, in workflow order, rather than choosing later evaluation

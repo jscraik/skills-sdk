@@ -53,6 +53,14 @@ credentials, registry identity, or distribution authority.
 
 ## Managed release gates
 
+The current unmerged S2 increment adds
+[presentation assessment](api.md#plugin-presentation-assessment) and
+[installed rejection/recovery proof](../tests/installed_plugin_presentation_smoke.py).
+It checks files and supplied assertions; it does not independently approve
+professional artwork or rights, emit archives, observe host display or complete
+the managed release gates. The accepted proof below remains distinct from that
+candidate until delivery closes.
+
 The following strengthen existing SDK-2 through SDK-8 acceptance; they are not
 a second delivery tracker. Coverage below was inspected at accepted code
 `047260b1c1d051f1b3c54bf6327881987305e52d` on 2026-10-11. These requirements

@@ -6,8 +6,8 @@ workflow and its current implementation boundaries. Maintain it with each
 public route change; use [the migration map](migration-map.md) for legacy
 coverage and [the task record](projects/sdk-workflow/tasks.md) for execution state.
 
-Accepted implementation baseline: [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d),
-verified on 2026-10-11. The diagram is the intended process, not a claim that
+Accepted implementation baseline: [`e9ad586`](https://github.com/jscraik/skills-sdk/commit/e9ad5867eae08055cea9b156cb5d323bd2572965),
+verified on 2026-10-12. The diagram is the intended process, not a claim that
 every gate is executable. The table describes that accepted baseline; branch
 prototypes and local test passes do not add capabilities to it.
 
@@ -30,6 +30,14 @@ adapters. Presentation, normalisation, release preparation and live provider
 integration remain incomplete; these services do not establish release clearance.
 
 ## Entry routes and independence
+
+PR #57 accepted instruction alignment; PR #58 accepted timed parallel validation
+and fail-closed prose routing; PR #59 accepted canonical glossary naming.
+The current unmerged S2 candidate adds
+[presentation assessment](api.md#plugin-presentation-assessment): fresh image,
+mode and supplied-approval binding, not normalisation, archive preparation,
+independent rights/visual review or observed display. Retained approval blocks
+after candidate drift; corrected inputs rebind and rerun affected gates.
 
 Select one intent before editing: create, update, or inspect an external
 candidate. Installation is a later decision after checking an exact version.

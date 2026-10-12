@@ -12,6 +12,14 @@ if TYPE_CHECKING:
     from skills_sdk.models.plugin import PluginPackageValidation
 
 
+def add_plugin_parsers(commands: Any) -> None:
+    """Keep plugin-only route registration outside standalone dispatch."""
+    from skills_sdk.cli.plugin_presentation import add_parser
+
+    add_plugin_parser(commands)
+    add_parser(commands)
+
+
 def add_plugin_parser(commands: Any) -> None:
     """Register a distinct route; standalone validate/build keep their meanings."""
     parser = commands.add_parser("validate-plugin", help="capture and validate a portable root-manifest plugin")
@@ -61,6 +69,19 @@ def _validation_result(
     return verify_plugin_package_validation(
         arguments.plugin_root, evidence, source_revision=arguments.source_revision, policy=policy
     )
+
+
+def run_plugin_command(
+    arguments: argparse.Namespace,
+    read_input: Callable[..., bytes],
+    pairs: Callable[[list[tuple[str, object]]], dict[str, object]],
+) -> int:
+    """Dispatch read-only plugin routes with their distinct input-size limits."""
+    if arguments.command == "check-plugin-presentation":
+        from skills_sdk.cli.plugin_presentation import run
+
+        return run(arguments, read_input)
+    return run_plugin_validation(arguments, lambda path: read_input(path, max_bytes=16 * 1024 * 1024), pairs)
 
 
 def run_plugin_validation(

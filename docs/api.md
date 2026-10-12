@@ -1,5 +1,41 @@
 # Python API
 
+## Plugin presentation assessment
+
+The unmerged S2 candidate adds
+`check_plugin_presentation(plugin_root, *, source_revision, request)` in
+`skills_sdk.validation`, returning `PluginPresentationCheck`. Supply a `Path`
+and dictionary or canonical `PluginPresentationRequest`. Four additive families
+carry assertions and results: `plugin-image-approval/v1`,
+`plugin-presentation-copy-approval/v1`, `plugin-presentation-request/v1` and
+`plugin-presentation-check/v1`. Models/schemas check supplied consistency;
+only the service freshly captures actual complete-plugin bytes and modes.
+
+Requests bind candidate, modes, exactly one approval per unique referenced image
+and copy approval for the selected settings digest. Approvals retain public-safe
+evidence references/digests and supplied rights/professional-quality assertions.
+The fixed `openai-icons-2026-10-08/v1` profile requires `interface.logo` and
+`composerIcon`; dark variants and up to twenty unique raster screenshots are
+optional. References use explicit `./` paths to captured ordinary files.
+Optional `onboardingSkill` names a validated direct child skill's `SKILL.md`.
+
+Images are nonempty and at most five MiB. Icons are square and at least 48 by 48;
+raster dimensions cannot exceed 4096. Screenshots may be non-square. PNG, JPEG
+and WebP match their extension and decode completely as static images. Optional
+`skills-sdk[images]` pins Pillow 12.3.0; missing decoding support returns
+`image_decoder_unavailable`. Bounded static SVG geometry is not rendering or
+full SVG conformance; active/linked content and SVG screenshots block. Base
+help does not import Pillow. Icons additionally require supplied recognisability,
+small-size, light/dark and distinctiveness assertions; screenshots omit these.
+
+The service is read-only and checks source stability after inspection. Valid
+byte or mode drift rejects retained approvals; corrected source or renewed
+candidate-bound approval recovers. Raw settings and private copy are not echoed.
+Rights, visual judgement and copy accuracy remain supplied claims, not independent
+review. Mutation, execution, release, archive, publication and host-display
+authority remain false. A pass neither normalises standalone input nor prepares
+a release archive. Delivery state is in the [task record](projects/sdk-workflow/tasks.md).
+
 ## Portable plugin validation
 
 The additive `validate_plugin_package` service in `skills_sdk.validation` captures

@@ -1,5 +1,12 @@
 # Skills SDK
 
+The current S2 candidate adds read-only
+[`check-plugin-presentation`](docs/cli.md#plugin-presentation-assessment) for
+fresh complete-plugin assets and supplied candidate-bound approvals. Optional
+`skills-sdk[images]` enables raster decoding. This unmerged route is not release,
+archive, independent visual/rights review or host-display clearance; see the
+[delivery record](docs/projects/sdk-workflow/tasks.md).
+
 Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines explicit, versioned contracts for inventory,
 intake, evaluation, risk, security, manifests, and receipts. Its local
