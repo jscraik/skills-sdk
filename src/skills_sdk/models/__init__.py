@@ -122,6 +122,13 @@ from skills_sdk.models.plugin import (
     PluginValidationPolicy,
     PortablePluginManifest,
 )
+from skills_sdk.models.plugin_presentation import (
+    PluginImageApproval,
+    PluginPresentationCheck,
+    PluginPresentationCopyApproval,
+    PluginPresentationImage,
+    PluginPresentationRequest,
+)
 from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
@@ -279,8 +286,13 @@ __all__ = [
     "PackageType",
     "PluginCapturedFile",
     "PluginIdentity",
+    "PluginImageApproval",
     "PluginPackageValidation",
     "PluginPreExecutionSafetyEvidence",
+    "PluginPresentationCheck",
+    "PluginPresentationCopyApproval",
+    "PluginPresentationImage",
+    "PluginPresentationRequest",
     "PluginSkillBinding",
     "PluginValidationPolicy",
     "PortablePluginManifest",

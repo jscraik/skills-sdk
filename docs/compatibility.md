@@ -24,6 +24,23 @@ endpoint override. Recheck the chosen backend and host independently; a
 catalogue is not distribution, and runtime hooks may retain a CLI dependency
 after registry storage changes. This section records a target, not new APIs.
 
+## Presentation assessment increment
+
+The unmerged S2 candidate adds four presentation v1 contracts and the
+`check_plugin_presentation` / `check-plugin-presentation` entrypoints. It does
+not reinterpret standalone receipts, default plugin inspection or release
+authority. Preserved implementation `0c6eea3` is reconciled against accepted
+`e9ad586`; historical validation does not prove these integrated bytes.
+
+The fixed OpenAI profile and optional Pillow decoder remain outside core models.
+Supplied rights, professional-quality and copy assertions are not independently
+authenticated. Models/schemas check consistency; the service recaptures bytes
+and modes. Installed public API/schema/CLI proof covers retained approval after
+valid asset/mode drift, rejected inputs and corrected recovery without sibling
+repositories. Synthetic approval is not artwork approval, archive inclusion or
+observed display. Explicit normalisation, whole-plugin quality composition and
+release preparation remain separate gaps; see the [API boundary](api.md#plugin-presentation-assessment).
+
 ## Selected-case safety admission
 
 The additive `pre-execution-safety-evidence/v1` input retains actual artifacts

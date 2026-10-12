@@ -14,12 +14,21 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d),
-verified on 2026-10-11 and shared with the workflow and task record. Entries below
+Accepted SDK baseline: [`e9ad586`](https://github.com/jscraik/skills-sdk/commit/e9ad5867eae08055cea9b156cb5d323bd2572965),
+verified on 2026-10-12 and shared with the workflow and task record. Entries below
 describe that revision, not queued branches. Each row names its entrypoint or
 absence, a proof or boundary reference, its limitation, and the remaining action.
 
 PR #54 reconciled the descriptions without adding executable capabilities.
+PRs #57–59 accepted instruction alignment, bounded validation-performance
+improvements and canonical glossary naming without closing any parent stage.
+Unmerged S2 presentation work separately implements
+`check_plugin_presentation` / `check-plugin-presentation` for fresh assets and
+supplied approval; [focused proof](../tests/test_plugin_presentation.py) and
+[installed proof](../tests/installed_plugin_presentation_smoke.py) retain drift
+rejection/recovery. It is not independent visual/rights review, archive inclusion,
+normalisation or whole-plugin release clearance. Those remain S2/S5 actions;
+no accepted capability row is promoted merely because this branch contains code.
 PR #55 accepted fresh per-trial adapters and
 [lifecycle proof](../tests/test_calibration_lifetime.py). PR #56 accepted
 explicit local/cloud profile binding and controlled settings delivery through

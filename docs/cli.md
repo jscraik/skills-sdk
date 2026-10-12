@@ -17,8 +17,25 @@ external-intake, registry delivery, or host installation workflow:
 ```text
 inventory   intake   check-local   check-quality   validate   build   review-content   eval   package   project   verify
 tessl prepare   tessl verify
-compare-copy   maintain-entrypoint   validate-plugin
+compare-copy   maintain-entrypoint   validate-plugin   check-plugin-presentation
 ```
+
+### Plugin presentation assessment
+
+The unmerged S2 candidate adds
+`skills-sdk check-plugin-presentation ./my-plugin --source-revision '<40-lowercase-hex>' --request ./request.json --json --robot`.
+Keep the request outside plugin source. It must be regular no-follow JSON bounded
+to one MiB; duplicate members, malformed input and symlinks block. Exit `0` means
+offline assessment pass; `2` returns typed `plugin-presentation-check/v1` blockers.
+Human output states the limitation; `--robot` is prompt-free, not authority.
+
+The [API profile](api.md#plugin-presentation-assessment) defines image limits,
+approval coverage and optional onboarding references. `skills-sdk[images]` adds
+raster decoding; missing support blocks raster inspection while base help and
+bounded SVG remain available. Retained approval is invalid after byte/mode drift.
+Corrected inputs need fresh affected checks. A pass is not release, archive,
+independent rights/visual review, installation or display clearance. Existing
+`validate-plugin` and standalone commands retain their meanings.
 
 ### Portable plugin inspection
 

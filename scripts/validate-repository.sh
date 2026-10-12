@@ -31,7 +31,7 @@ if [[ "$phase" == docs-tests ]]; then
     tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py --durations=10
 fi
 if [[ "$phase" == all || "$phase" == tests ]]; then
-  run_timed tests mise exec -- uv run --frozen pytest -n 2 --dist load --durations=25 --durations-min=0.1
+  run_timed tests mise exec -- uv run --frozen --extra images pytest -n 2 --dist load --durations=25 --durations-min=0.1
 fi
 if [[ "$phase" == all || "$phase" == build ]]; then
   run_timed build mise exec -- uv build

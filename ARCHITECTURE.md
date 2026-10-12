@@ -275,6 +275,13 @@ repository-evidence validators. Their proof remains separate from hosted PR
 readiness, provider execution and runtime installation. Use
 [CLI status](docs/cli.md) for the maintained command surface.
 
+The unmerged S2 presentation increment adds read-only
+`check_plugin_presentation` and its CLI over fresh complete-plugin capture.
+Pure models bind supplied approval; optional raster decoding is lazy in the
+validation helper. No provider, registry or host dependency enters core.
+Asset validity, supplied approval, archive proof and observed display stay
+distinct. This is not a standalone normalisation or release-preparation writer.
+
 ## Code map
 
 The paths below are coarse-grained ownership boundaries. Use symbol search for
