@@ -10,6 +10,40 @@ compatibility documentation synchronized with contract changes.
 
 ## Contract acceptance and review
 
+### Contributing skill authoring and update behaviour
+
+Skills SDK owns the authoring guidance and enforcement for managed skills,
+not only inspection after authoring elsewhere. Use the
+[skill authoring contract](docs/workflow.md#skill-authoring-contract) when
+designing or updating `SKILL.md`, its resources and its evaluation evidence.
+Keep the portable implementation independent of Agent-Skills and Foundry.
+This responsibility does not imply that every authoring route is executable;
+check [current CLI support](docs/cli.md) before claiming automation.
+
+1. Select create, update or inspect/adopt before changing a candidate. For
+   creation, define the user outcome and selection boundaries. For an update,
+   retain the known baseline and the finding or regression being corrected.
+   For external adoption, retain provenance, ownership, rights and risk evidence
+   before execution; do not silently rewrite the supplied source.
+2. Choose a layout suited to the task and identify applicable package rules.
+   Explain inputs, resources, authority limits, actions, recovery, outputs and
+   completion evidence. Use supporting files only when they serve that outcome.
+   Required fields and safe resource relationships are contracts; identical
+   headings, line counts and prose style are not universal quality proof.
+3. Separate deterministic validation from semantic review and behavioural
+   evaluation. Retain findings and gaps, test neighbouring negative cases and
+   corrected inputs, and distinguish skill selection from successful execution.
+   An authoring improvement needs observed evidence, not only a cleaner document.
+4. Bind changed source to a fresh candidate and rerun affected and dependent
+   gates. Preserve the baseline and legitimate unchanged, rejected or
+   inconclusive results. Bare-skill proof does not grant whole-plugin release
+   clearance; publication, installation and runtime proof remain separate.
+
+Change existing SDK guidance, services and tests together when their contract
+changes. Do not create a second authoring framework or transfer ownership back
+to a neighbouring repository. Review research-derived recommendations before
+turning them into enforced rules; use the public-contract procedure below.
+
 Before implementation, name one consuming workflow, the contract invariant,
 and accepted and rejected examples. Keep these cases in the existing tests or
 fixtures. For migration, follow the
