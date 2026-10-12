@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import stat
 import subprocess
 from pathlib import Path
 
@@ -17,12 +18,19 @@ def git_environment() -> dict[str, str]:
         **{key: value for key, value in os.environ.items() if not key.startswith("GIT_")},
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
     }
 
 
 def _git(root: Path, *arguments: str) -> bytes:
     """Run a Git query in the checkout with inherited Git settings removed."""
-    return subprocess.run(["git", *arguments], cwd=root, env=git_environment(), check=True, capture_output=True).stdout
+    return subprocess.run(
+        ["git", "-c", "core.fileMode=true", "-c", "diff.autoRefreshIndex=false", *arguments],
+        cwd=root,
+        env=git_environment(),
+        check=True,
+        capture_output=True,
+    ).stdout
 
 
 def _paths(output: bytes) -> set[str]:
@@ -51,6 +59,23 @@ def _ordinary_prose(root: Path, path: str, revisions: tuple[str, str]) -> bool:
     return not source.exists() or (source.is_file() and not source.stat().st_mode & 0o111)
 
 
+def _tracked_executable_drift(root: Path) -> bool:
+    """Detect any execute bit on tracked non-executable files, including bits Git ignores."""
+    for entry in _git(root, "ls-files", "--stage", "-z").split(b"\0"):
+        if not entry:
+            continue
+        metadata, _, path = entry.partition(b"\t")
+        if metadata.split()[0] != b"100644":
+            continue
+        try:
+            mode = (root / path.decode("utf-8")).lstat().st_mode
+        except FileNotFoundError:
+            continue
+        if stat.S_ISREG(mode) and mode & 0o111:
+            return True
+    return False
+
+
 def validation_scope(root: Path, base: str, head: str) -> str:
     """Fail closed on unknown identity, non-prose bytes, modes and dirty paths."""
     if Path(_git(root, "rev-parse", "--show-toplevel").decode().strip()).resolve() != root.resolve():
@@ -71,11 +96,12 @@ def validation_scope(root: Path, base: str, head: str) -> str:
         return "full"
     # Index flags can hide modified tracked files from every diff query.
     indexed = _git(root, "ls-files", "-v", "-z")
-    if any(entry and not entry.startswith(b"H ") for entry in indexed.split(b"\0")):
+    if any(entry and not entry.startswith(b"H ") for entry in indexed.split(b"\0")) or _tracked_executable_drift(root):
         return "full"
     paths = _paths(_git(root, "diff", "--no-renames", "--name-only", "-z", baseline, resolved, "--"))
     paths |= _paths(_git(root, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD", "--"))
-    paths |= _paths(_git(root, "diff", "--no-renames", "--name-only", "-z", "--"))
+    worktree = _git(root, "status", "--porcelain=v1", "--untracked-files=no", "--no-renames", "-z")
+    paths |= {entry[3:].decode("utf-8") for entry in worktree.split(b"\0") if entry}
     paths |= _paths(_git(root, "ls-files", "--others", "--exclude-standard", "-z"))
     if not paths or not all(_ordinary_prose(root, path, (baseline, resolved)) for path in paths):
         return "full"
@@ -90,7 +116,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         print(validation_scope(Path.cwd(), args.base, args.head))
-    except (subprocess.CalledProcessError, UnicodeDecodeError, ValueError) as error:
+    except (OSError, subprocess.CalledProcessError, UnicodeDecodeError, ValueError) as error:
         parser.exit(2, f"validation scope blocked: {error}\n")
     return 0
 

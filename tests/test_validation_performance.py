@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from scripts.validation_scope import git_environment, validation_scope
+from scripts.validation_scope import main as validation_main
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -182,6 +183,77 @@ def test_hidden_index_flags_require_full_proof_without_mutating_index(tmp_path: 
     assert recovered.returncode == 0 and recovered.stdout.strip() == "docs"
 
 
+@pytest.mark.parametrize("file_mode", ["true", "false"])
+@pytest.mark.parametrize("mode", [0o755, 0o654, 0o645])
+def test_worktree_executable_mode_requires_full_even_when_git_ignores_it(
+    tmp_path: Path, file_mode: str, mode: int
+) -> None:
+    """Detect physical mode drift without changing the caller's index or Git configuration."""
+    _repository(tmp_path)
+    source = tmp_path / "runtime.py"
+    source.write_text("value = 1\n")
+    source.chmod(0o644)
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "-m", "fixture mode baseline")
+    head = _git(tmp_path, "rev-parse", "HEAD")
+    _git(tmp_path, "update-ref", "refs/remotes/origin/main", head)
+    _git(tmp_path, "config", "core.fileMode", file_mode)
+    (tmp_path / "README.md").write_text("new guidance\n")
+    command = [sys.executable, str(ROOT / "scripts/validation_scope.py"), "--base", head, "--head", head]
+    assert validation_scope(tmp_path, head, head) == "docs"
+    source.chmod(mode)
+    if file_mode == "false":
+        assert _git(tmp_path, "diff", "--name-only") == "README.md"
+    index, config = tmp_path / ".git/index", tmp_path / ".git/config"
+    before = index.read_bytes(), config.read_bytes()
+    assert validation_scope(tmp_path, head, head) == "full"
+    rejected = subprocess.run(command, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False)
+    assert rejected.returncode == 0 and rejected.stdout.strip() == "full", rejected.stderr
+    assert (index.read_bytes(), config.read_bytes()) == before
+    source.chmod(0o644)
+    assert validation_scope(tmp_path, head, head) == "docs"
+    recovered = subprocess.run(
+        command, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False
+    )
+    assert recovered.returncode == 0 and recovered.stdout.strip() == "docs", recovered.stderr
+    assert (index.read_bytes(), config.read_bytes()) == before
+
+
+def test_worktree_metadata_error_blocks_cli_and_corrected_access_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Fail closed on a controlled metadata-access error without modifying caller state."""
+    _repository(tmp_path)
+    source = tmp_path / "runtime.py"
+    source.write_text("value = 1\n")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "-m", "fixture metadata baseline")
+    head = _git(tmp_path, "rev-parse", "HEAD")
+    _git(tmp_path, "update-ref", "refs/remotes/origin/main", head)
+    (tmp_path / "README.md").write_text("new guidance\n")
+    index, config = tmp_path / ".git/index", tmp_path / ".git/config"
+    before = index.read_bytes(), config.read_bytes()
+    original = Path.lstat
+
+    def denied(path: Path) -> os.stat_result:
+        if path == source:
+            raise PermissionError("fixture metadata access denied")
+        return original(path)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["validation_scope", "--base", head, "--head", head])
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "lstat", denied)
+        with pytest.raises(SystemExit) as blocked:
+            validation_main()
+        assert blocked.value.code == 2
+    assert "validation scope blocked: fixture metadata access denied" in capsys.readouterr().err
+    assert (index.read_bytes(), config.read_bytes()) == before
+    assert validation_main() == 0
+    assert capsys.readouterr().out.strip() == "docs"
+    assert (index.read_bytes(), config.read_bytes()) == before
+
+
 @pytest.mark.parametrize("baseline_choice", ["current", "historical"])
 def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path, baseline_choice: str) -> None:
     """Require full proof when accepted main has advanced outside the candidate ancestry."""
@@ -316,6 +388,10 @@ def test_parallel_workers_preserve_isolation_and_propagate_failure(tmp_path: Pat
 def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> None:
     """Check trusted-base workflow routing and preservation of the full validation phases."""
     workflow = (ROOT / ".github/workflows/validate.yml").read_text()
+    steps = yaml.safe_load(workflow)["jobs"]["validate"]["steps"]
+    docs_step = next(step for step in steps if step.get("name") == "Documentation-dependent contract tests")
+    assert docs_step["if"] == "github.event_name == 'pull_request' && steps.pr_contract.outputs.scope == 'docs'"
+    assert docs_step["run"] == "bash scripts/validate-repository.sh docs-tests"
     assert "cp trusted-base/scripts/validation_scope.py" in workflow
     assert "scope=full" in workflow
     assert "github.event_name != 'pull_request' || steps.pr_contract.outputs.scope != 'docs'" in workflow

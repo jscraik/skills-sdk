@@ -53,7 +53,12 @@ be an ancestor of the exact head. A historical caller-supplied base cannot hide
 accepted changes missing from a stale branch; that case selects full validation.
 An unmerged candidate cannot serve
 as its own accepted base to hide earlier executable changes. Index and working
-tree modes are checked separately. Assume-unchanged, skip-worktree and other
+tree modes are checked separately. Classifier queries force file-mode detection
+even when checkout configuration ignores it, without changing that configuration.
+Tracked non-executable files are also checked for group- or other-execute bits
+that Git's file-mode tracking does not report.
+Optional Git index refreshes are disabled for those read-only queries.
+Assume-unchanged, skip-worktree and other
 non-ordinary index flags select full validation, even when tracked bytes appear
 unchanged. The classifier does not clear these flags or modify the index.
 Inherited Git directory, worktree, index and configuration selectors are removed
