@@ -162,23 +162,40 @@ Use the existing quality and evaluation services in this order:
 1. Check deterministic requirements: applicable field types and schemas,
    package structure, required files under the selected contract, safe resource
    paths, candidate identity, evidence binding and scenario-set constraints.
-   Check only rules the selected validator actually implements. A syntactically
-   valid description or existing reference is not proof of accuracy or usefulness.
+   Use the applicable [`validate`, `eval scenario-quality`, `eval scorer-quality`,
+   and `eval scorer-calibration` command entries](cli.md#existing-local-routes),
+   or the supported [`check-quality` composition](cli.md#explicit-local-quality-workflow).
+   Check only rules the selected validator actually implements. If an applicable
+   requirement has no implemented command, record it as `not_run` or `blocked`;
+   do not imply that an adjacent check covers it. A syntactically valid
+   description or existing reference is not proof of accuracy or usefulness.
 2. Review meaning: description accuracy, selection boundaries, progressive
    disclosure, resource usefulness, example consistency, omissions and recovery
    guidance. Retain candidate-bound findings and gaps with a responsible owner.
-   A heuristic warning is not a deterministic conformance failure unless an
-   explicit, tested contract makes it one.
+   The [`review-content` route](cli.md#supplied-content-review-evidence) checks
+   supplied assessment evidence only; it does not perform semantic review. If
+   no reviewer has assessed the candidate, record that gate as `not_run` or
+   `blocked`. A heuristic warning is not a deterministic conformance failure
+   unless an explicit, tested contract makes it one.
 3. Prove behaviour with representative tasks and neighbouring negative cases.
    Separate correct skill selection from correct execution. Use hidden criteria,
    calibrated scorers and matched comparisons for claimed improvements; check
    observed actions or outputs rather than trusting a completion statement.
-   Preserve exactly ten active managed scenarios. Held-out probes, repetitions
-   and implementation regressions remain separate from that active set.
+   Use [`eval scenario-quality` for scenario definitions and `eval
+   selected-case` for a declared case](cli.md#existing-local-routes);
+   [`eval scenario-coverage`](cli.md#existing-local-routes) audits claim mapping
+   but does not execute cases. `selected-case` uses its documented caller
+   adapter; supplied-offline proof is not live-provider execution. Record
+   unavailable execution as `not_run` or `blocked`. Preserve exactly ten active
+   managed scenarios. Held-out probes, repetitions and implementation
+   regressions remain separate from that active set.
 4. Retain failures, correct the responsible input, rebind changed candidates,
    and rerun affected and dependent gates. Accept unchanged, rejected and
    inconclusive outcomes. Record what supplied or controlled offline evidence
-   proves without claiming live provider, host or release proof.
+   proves without claiming live provider, host or release proof. Rerun the
+   owning command for each affected gate; the documented `check-quality`
+   composition can repeat its supported stages, but it does not cover gates it
+   does not implement. Record those gates as `not_run` or `blocked`.
 
 Research-derived authoring recommendations guide review and experiments; they
 do not become universal hard failures from creator reputation or small-sample
