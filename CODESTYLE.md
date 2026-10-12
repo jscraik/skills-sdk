@@ -47,6 +47,13 @@ runtime policy are not dependencies of this SDK.
   regressions. The repository-wide AST gate separately requires typed public
   interfaces without reinterpreting frozen Pydantic v1/v2 inheritance.
 - Run `bash scripts/validate-repository.sh` before a commit or pull request.
+  Ordinary prose-only changes may use
+  `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`
+  after its exact-change classifier confirms that scope. Agent instructions,
+  validation policy, templates, code, configuration and symlinks require full
+  validation. Accepted-main CI always runs the full route.
+  The prose route retains documentation-dependent contract tests as well as
+  schema, codestyle and diff checks; it does not prove the full behavioural suite.
   Both validation wrappers bind trust to this checkout's plain-version
   `.mise.toml` for the command and invoke `uv` through `mise`; they do not
   mutate global trust state or accept an ambient `uv` release.

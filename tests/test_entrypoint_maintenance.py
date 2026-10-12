@@ -17,6 +17,14 @@ from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models import EntrypointMaintenanceBlocker, EntrypointMaintenanceResult, RuntimeCopyComparison
 
 
+@pytest.fixture(autouse=True)
+def isolated_lock_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep each test's lock namespace absent initially and independent of order."""
+    from skills_sdk.host import entrypoint
+
+    monkeypatch.setattr(entrypoint, "_LOCK_ROOT", tmp_path / "entrypoint-locks")
+
+
 def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, list[str]]:
     """Create maintained source, runtime target, backup root, and CLI arguments."""
     source = tmp_path / "source" / "example" / "SKILL.md"
@@ -94,6 +102,7 @@ def test_live_advisory_lock_blocks_maintenance(tmp_path: Path) -> None:
     _source, target, backup, args = _fixture(tmp_path)
     from skills_sdk.host.entrypoint import _LOCK_ROOT, _lock_name
 
+    _LOCK_ROOT.mkdir(mode=0o700)
     target_parent = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
     try:
         lock_path = _LOCK_ROOT / _lock_name(target_parent, target.name)
@@ -111,11 +120,13 @@ def test_live_advisory_lock_blocks_maintenance(tmp_path: Path) -> None:
 
 
 def test_non_regular_lock_is_rejected_without_blocking(tmp_path: Path) -> None:
+    """Verify a FIFO lock path is rejected without waiting for a writer."""
     if not hasattr(os, "mkfifo"):
         pytest.skip("FIFO creation is unavailable")
     _source, target, _backup, args = _fixture(tmp_path)
     from skills_sdk.host.entrypoint import _LOCK_ROOT, _lock_name
 
+    _LOCK_ROOT.mkdir(mode=0o700)
     target_parent = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
     try:
         lock_path = _LOCK_ROOT / _lock_name(target_parent, target.name)
@@ -135,6 +146,7 @@ def test_lock_namespace_is_independent_of_alias_and_backup_root(
     """Verify target aliases and alternate backup roots serialize one repair."""
     from skills_sdk.host.entrypoint import _LOCK_ROOT, _lock_name
 
+    _LOCK_ROOT.mkdir(mode=0o700)
     _source, target, _backup, args = _fixture(tmp_path)
     alternate_backup = tmp_path / "alternate-backups"
     alternate_backup.mkdir()

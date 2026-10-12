@@ -109,5 +109,12 @@ operate the Tessl registry, or claim an installed runtime from local receipts.
 - Before a commit or pull request, run
   `bash scripts/validate-repository.sh`. The wrapper runs the generated-schema
   check, Ruff, the full pytest suite, `uv build`, and `git diff --check`.
+  Ordinary prose-only changes may instead use
+  `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`
+  after its exact-change classifier accepts that scope. Code, policy,
+  configuration, symlinks, executable modes and unidentified revisions cannot
+  use that exception. Executable changes and accepted-main CI remain full.
+  Two isolated pytest workers retain all collected tests and print the slowest
+  cases. Named CI phases expose timings; one phase alone is not aggregate proof.
 - Report exact validation commands as `pass`, `fail`, or `blocked`, including
   the blocker when the exact production or provider path cannot run.

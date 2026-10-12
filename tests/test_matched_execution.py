@@ -15,7 +15,7 @@ import yaml
 from pydantic import ValidationError
 from test_live_selected_case import _Provider
 from test_matched_calibration import DimensionJudge
-from test_matched_comparison import _plan
+from test_matched_comparison import _plan, _scope_fixture
 from test_plugin_pre_execution_safety import _evidence as plugin_safety_fixture
 from test_selected_case_evaluation import REVISION, _case, _prepared_request, _safety_for, _skill
 
@@ -82,7 +82,8 @@ def _calibrate_child(
     payload = prepare_selected_case_context(definition)
     request = request.model_copy(update={"input_sha256": canonical_json_sha256(payload)})
     identity = request.candidate.model_dump(mode="json")
-    scorer = _plan().plugin_scope.cases[0].baseline_scorer.model_dump(mode="json")
+    # Copy a leaf declaration; no complete ten-case comparison plan is needed here.
+    scorer = dict(_scope_fixture()["cases"][0]["baseline_scorer"])
     scorer.update(candidate=identity, calibration_probe_ids=[f"held-out-{index}" for index in range(6)])
     texts = [f"calibration output {index}" for index in range(6)]
     calibration = ObservedCalibrationPlan.model_validate(
@@ -234,17 +235,19 @@ def _matched(
     child_count: int = 1,
     provider_identity: ProviderIdentityV2 | None = None,
 ) -> tuple[object, tuple[object, object], tuple[object, ...], list[str]]:
-    rubric = _plan().rubric
+    """Build a matched plan, calibration receipts, paired executions, and a shared event log."""
+    template = _plan()
+    rubric = template.rubric
     events: list[str] = []
     selected = (
         provider_identity
         if provider_identity is not None
-        else (None if variants[2] == "local" else _plan().lanes[1].generator)
+        else (None if variants[2] == "local" else template.lanes[1].generator)
     )
     settings = (trials, selected, child_count)
     left_scorers, left_receipt, left = _variant(root / "baseline", variants[0], rubric, events, settings)
     right_scorers, right_receipt, right = _variant(root / "candidate", variants[1], rubric, events, settings)
-    raw = _plan().model_dump(mode="json")
+    raw = template.model_dump(mode="json")
     scope = raw["plugin_scope"]
     for name, frames in (("baseline", left), ("candidate", right)):
         capture = frames[0].plugin_context.validation

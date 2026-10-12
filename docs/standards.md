@@ -20,6 +20,69 @@ structural standards program. Run
 `bash scripts/validate-repository.sh` before a commit or pull request; it adds
 schema drift, the full test suite, package builds, and diff hygiene.
 
+## Validation scope and phases
+
+The default aggregate runs every phase and stops at the first failure. Each
+phase prints its start, exit status and elapsed seconds. The hosted `validate`
+job exposes quality, tests, build, installed-entrypoint proof and diff hygiene
+as separate steps; its successful result still requires every applicable step.
+The same wrapper accepts `quality`, `docs-tests`, `tests`, `build`, `installed` or `diff`
+for those steps. Running one phase does not establish aggregate completion.
+
+The test phase uses pinned pytest-xdist with two independent worker processes,
+retains all collected tests, and prints the 25 slowest cases. Temporary fixture
+paths and environment changes remain worker-local. Package builds and installed
+smokes remain sequential after tests. Runtime source recapture, calibration,
+drift, failure and recovery checks are not cached or removed for speed.
+
+The documentation-only route is
+`bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`.
+It runs schema drift, all codestyle/structural/link/prose checks, documentation-dependent
+contract tests and diff hygiene
+only after an exact-change classifier accepts ordinary prose. The allowlist is
+`docs/` prose with Markdown, MDX, AsciiDoc or reStructuredText suffixes, plus
+root `README.md`, `ARCHITECTURE.md`, `UBIQUITOUS.md`, `CHANGELOG.md` and
+`SUPPORT.md`. Instructions, validation policy, templates, executable examples,
+source, fixtures, configuration and dependencies are outside that exception.
+Any nested `AGENTS.md` and this validation-policy document are excluded.
+Symlink and executable-mode changes, empty comparisons, stale or unknown heads
+and non-prose dirty paths cannot select documentation-only proof.
+The base must be an ancestor of the locally fetched `origin/main`; refresh that
+ref before selecting an accepted baseline. The current accepted ref must also
+be an ancestor of the exact head. A historical caller-supplied base cannot hide
+accepted changes missing from a stale branch; that case selects full validation.
+An unmerged candidate cannot serve
+as its own accepted base to hide earlier executable changes. Index and working
+tree modes are checked separately. Classifier queries force file-mode detection
+even when checkout configuration ignores it, without changing that configuration.
+Tracked non-executable files are also checked for group- or other-execute bits
+that Git's file-mode tracking does not report.
+Optional Git index refreshes are disabled for those read-only queries.
+Assume-unchanged, skip-worktree and other
+non-ordinary index flags select full validation, even when tracked bytes appear
+unchanged. The classifier does not clear these flags or modify the index.
+Inherited Git directory, worktree, index and configuration selectors are removed
+from classifier subprocesses. If accepted main advanced after a branch was
+created, the non-ancestor comparison selects full validation instead of blocking
+the otherwise valid PR.
+
+Hosted PR scope comes from the trusted base classifier, never from an unreviewed
+candidate classifier. A base without that classifier uses full validation.
+Validation retains GitHub's default PR merge-result checkout so tests, builds
+and installed proof include the base changes. Classification alone runs in a
+temporary detached worktree at the exact PR head; it does not move or rewrite
+the validation checkout. An advanced base requires full merge-tree proof, not
+head-only tests. Invalid head identity blocks classification; corrected inputs
+recover. The temporary head worktree is removed after successful classification.
+The `docs-tests` phase runs `test_public_repository_boundary.py` and
+`test_skill_validation_architecture.py`, retaining their repository-document,
+portable-boundary and documented-command checks. Keep this bounded set aligned
+with tests that read allowed prose. Those tests also run once within the full
+suite; the full aggregate does not repeat the separate documentation phase.
+All accepted-main push runs remain full. Documentation proof does not establish
+full behavioural regression, build or installed-entrypoint proof, and must be reported
+as documentation-only rather than as a full aggregate result.
+
 The standards program scans all Python source and tests for public annotations,
 module and function bounds, broad exception handling, global declarations,
 dependency-direction violations, suppressions, and machine-specific paths. It
