@@ -266,6 +266,19 @@ or completed reviewer execution.
   `SkillPackageIntakeReceipt`. It does not copy source, execute package code,
   access a network, establish ownership or rights truth, or admit a package to
   Foundry. Archive intake remains a separate composition boundary.
+- **Explicit standalone-to-plugin preparation:**
+  `normalize_standalone_skill_package`, `PluginNormalizationMetadata` and
+  `PluginNormalizationReceipt` copy one admitted standalone skill into a new
+  plugin candidate, generate caller-supplied root `plugin.json` metadata, then
+  freshly validate the whole plugin and bind its one child to the original
+  intake identity. Source is not rewritten and an existing destination is never
+  replaced. The receipt requires `admit`
+  caller-supplied provenance, rights, ownership and continuity checks; those
+  assertions are not independently authenticated. This route does not normalize
+  updates against an existing plugin baseline, combine multiple skills, assess
+  visual approval, build an archive, publish, install or clear release:
+  `release_ready` is always `false`. Validate its serialized receipt with
+  `SchemaRegistry().validate("plugin-normalization.v1", payload)`.
 - **Packaging:** `PackageManifest`, `PackageManifestFile`, `PackageReceipt`,
   `PackageReceiptV2`,
   `PackageHardeningPolicy`, and `PackageHardeningReceipt` with typed blockers,
@@ -777,6 +790,53 @@ serialized intake receipts with
 structural and model-level bindings. The context schema is registered as
 `skill-package-intake-context.v1`; neither family is supported by the generic
 `parse_receipt` function.
+
+## Explicit standalone-skill plugin preparation
+
+Managed single-skill releases are explicitly normalized into a separate
+complete-plugin candidate. Supply a valid standalone skill directory, a new
+destination, truthful caller-owned intake evidence, and root plugin metadata.
+The API preserves the source, copies its files and permissions beneath
+`skills/<skill-name>/`, creates root `plugin.json`, and captures fresh
+whole-plugin validation. The whole-plugin identity covers the new candidate;
+its sole child retains the standalone skill candidate identity.
+
+The operation is create-only: unsafe paths, symlinks, and existing destinations
+are rejected rather than overwritten. On a partial filesystem error, the
+receipt reports whether a candidate directory was created so the caller can
+inspect and correct it before retrying. A prepared result is not complete
+product acceptance, visual approval, archive proof, publication, installation,
+or runtime evidence. Updates to an existing managed plugin must retain and
+compare a known baseline in a separate update route.
+
+```python
+from pathlib import Path
+
+from skills_sdk.intake import normalize_standalone_skill_package
+from skills_sdk.models import PluginNormalizationMetadata, SkillPackageIntakeContext
+
+# Synthetic example only; production callers must supply verified evidence.
+context = SkillPackageIntakeContext.model_validate(context_payload)
+receipt = normalize_standalone_skill_package(
+    Path("./skills/example"),
+    Path("./prepared/example-plugin"),
+    context,
+    PluginNormalizationMetadata(
+        name="example-plugin",
+        version="1.0.0",
+        description="A single-skill plugin.",
+    ),
+)
+if receipt.status == "blocked":
+    print(receipt.blocker.code)
+else:
+    print(receipt.plugin_validation.candidate.content_sha256)
+    assert receipt.release_ready is False
+```
+
+The metadata uses `plugin-normalization-metadata/v1`; the result uses
+`plugin-normalization/v1`. Neither is accepted by generic `parse_receipt`.
+Use the registered schemas for structural and semantic binding checks.
 
 The additive `skills_sdk.evaluation.check_local_quality` async service accepts
 a package path and a `LocalCheckRequestV2` or closed raw request. Keyword inputs

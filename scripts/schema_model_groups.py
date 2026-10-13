@@ -38,6 +38,7 @@ from skills_sdk.models.packaging import (
     PackageReceiptV2,
 )
 from skills_sdk.models.plugin import PluginPackageValidation
+from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata, PluginNormalizationReceipt
 from skills_sdk.models.plugin_presentation import (
     PluginImageApproval,
     PluginPresentationCheck,
@@ -133,6 +134,8 @@ def intake_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (PluginPresentationCheck, "plugin-presentation-check.v1.schema.json"),
         (SkillPackageIntakeContext, "skill-package-intake-context.v1.schema.json"),
         (SkillPackageIntakeReceipt, "skill-package-intake.v1.schema.json"),
+        (PluginNormalizationMetadata, "plugin-normalization-metadata.v1.schema.json"),
+        (PluginNormalizationReceipt, "plugin-normalization.v1.schema.json"),
     )
 
 

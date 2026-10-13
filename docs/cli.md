@@ -10,14 +10,17 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 ```
 
 The CLI exposes these routes. Existing-copy maintenance is the only route
-below that permits a host write, and requires explicit `--apply`. The names
-do not by themselves implement the SDK's target create, update, full check,
-external-intake, registry delivery, or host installation workflow:
+below that permits a host/runtime write, and requires explicit `--apply`.
+`normalize-plugin` is a separate create-only operation: it writes a new plugin
+candidate at the caller's destination and refuses to replace an existing path.
+Apart from those two documented write operations, the other routes are
+read-only. The routes do not by themselves implement the complete SDK create,
+update, external-intake, registry delivery, or host installation workflow:
 
 ```text
 inventory   intake   check-local   check-quality   validate   build   review-content   eval   package   project   verify
 tessl prepare   tessl verify
-compare-copy   maintain-entrypoint   validate-plugin   check-plugin-presentation
+compare-copy   maintain-entrypoint   validate-plugin   normalize-plugin   check-plugin-presentation
 ```
 
 ### Plugin presentation assessment
@@ -51,6 +54,39 @@ See [the API boundary](api.md#portable-plugin-validation) for capture limits and
 [delivery state](projects/sdk-workflow/tasks.md) for subsequent workflow slices.
 Portable plugin inspection was accepted in PR #52. Existing `validate` and `build` remain
 standalone-skill commands; they do not auto-detect plugins.
+
+### Explicit standalone-skill plugin preparation
+
+Use `normalize-plugin` only when the caller explicitly wants to preserve a
+standalone skill and create a separate managed-plugin candidate:
+
+```bash
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk normalize-plugin ./skills/example ./prepared/example-plugin --context ./intake-context.json --plugin-name example-plugin --plugin-version 1.0.0 --plugin-description "A concise description of the plugin." --json --robot
+```
+
+The command requires a bounded, regular no-follow
+`skill-package-intake-context/v1` JSON file (at most one MiB) whose provenance,
+ownership, rights and continuity checks admit the source. Metadata is supplied
+explicitly by the caller and validated against
+`plugin-normalization-metadata/v1`. The command copies the standalone skill beneath
+`skills/<skill-name>/`, writes a canonical root `plugin.json`, and freshly
+validates the complete plugin. It never edits the input, follows unsafe paths,
+or overwrites an existing destination. A partial write is reported with
+`candidate_created` so the caller can inspect and correct the destination
+before retrying.
+
+With `--json`, a completed service call emits `plugin-normalization/v1`.
+Exit `0` means a separate candidate was prepared and whole-plugin structural
+validation passed; exit `2` means a typed blocker. Malformed or unreadable
+context and invalid metadata are rejected before a versioned receipt is created.
+A prepared receipt
+retains the standalone intake result and binds the sole plugin child to that
+candidate. Caller-supplied provenance, ownership and rights assertions are not
+independently authenticated. The receipt always sets `release_ready` to
+`false`: preparation is not semantic accuracy, presentation or rights approval,
+archive creation, publication, installation, or runtime verification. This
+route does not update an existing plugin against a baseline; updates retain a
+known baseline and require a separate update workflow.
 
 The accepted route includes `--verify-evidence FILE` on this same command. Keep
 the evidence file outside the plugin source root to avoid self-inclusion and a
@@ -149,8 +185,10 @@ a wall-clock timeout.
 Neither policy is required by default. The existing `check-local/v1` composition
 does not expose these flags; do not infer full package-quality coverage from it.
 
-All listed commands are non-interactive and non-mutating. For an invocation that
-reaches a service, exit `0` means intake normalized with an `admit` decision,
+The CLI is non-interactive. Except for the explicit destination creation of
+`normalize-plugin` and `maintain-entrypoint --apply`, the listed operations are
+non-mutating. For an invocation that reaches a service, exit `0` means intake
+normalized with an `admit` decision,
 validation passed, a receipt was built, or a scenario/scorer assessment
 passed. Exit `2` means a structured blocker, blocked receipt, or
 normalized non-admit intake decision was returned. Intake decision blocker

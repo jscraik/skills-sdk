@@ -291,6 +291,78 @@ def _verify_required_metadata_findings(root: Path) -> None:
     _cli(root, "pass", evidence, ("--require-version", "--require-description"))
 
 
+def _verify_standalone_normalization(root: Path) -> None:
+    """Prove installed API and console entrypoint create a separate bound plugin candidate."""
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.intake import normalize_standalone_skill_package
+    from skills_sdk.models.intake import SkillPackageIntakeContext
+    from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata
+
+    owner = {
+        "owner": "sdk-tests",
+        "maintainer": "sdk-tests",
+        "ownership_state": "canonical",
+        "rights": {"basis": "authored", "license": "Apache-2.0", "evidence_ref": "source/SKILL.md"},
+    }
+    source = root / "fixture-skill"
+    source.mkdir()
+    skill = b"---\nname: fixture-skill\ndescription: Inspect synthetic examples.\n---\n\n# Fixture\n"
+    (source / "SKILL.md").write_bytes(skill)
+    context = SkillPackageIntakeContext.model_validate(
+        {
+            "source_repository": "jscraik/skills-sdk",
+            "source_revision": "1" * 40,
+            "source_path": "fixture-skill",
+            "source_kind": "local",
+            "owner": owner,
+            "checks": {"identity": True, "provenance": True, "rights": True, "owner_unchanged": True},
+        }
+    )
+    receipt = normalize_standalone_skill_package(
+        source,
+        root / "api-plugin",
+        context,
+        PluginNormalizationMetadata(
+            name="fixture-plugin",
+            version="1.0.0",
+            description="Synthetic plugin.",
+        ),
+    )
+    assert receipt.status == "prepared" and receipt.plugin_validation is not None
+    assert receipt.plugin_validation.status == "pass" and receipt.release_ready is False
+    assert receipt.plugin_validation.skills[0].validation.candidate == receipt.source_intake.candidate
+    assert (source / "SKILL.md").read_bytes() == skill
+    SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
+
+    context_path = root / "normalization-context.json"
+    context_path.write_text(context.model_dump_json(), encoding="utf-8")
+    command = [
+        str(Path(sys.executable).with_name("skills-sdk")),
+        "normalize-plugin",
+        str(source),
+        str(root / "cli-plugin"),
+        "--context",
+        str(context_path),
+        "--plugin-name",
+        "fixture-cli-plugin",
+        "--plugin-version",
+        "1.0.0",
+        "--plugin-description",
+        "Synthetic CLI plugin.",
+        "--json",
+        "--robot",
+    ]
+    completed = subprocess.run(command, cwd=root, capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    cli_receipt = json.loads(completed.stdout)
+    assert cli_receipt["status"] == "prepared" and cli_receipt["release_ready"] is False
+    assert (
+        cli_receipt["plugin_validation"]["skills"][0]["validation"]["candidate"]
+        == cli_receipt["source_intake"]["candidate"]
+    )
+    assert (source / "SKILL.md").read_bytes() == skill
+
+
 def main() -> int:
     """Exercise complete-source acceptance, rejection and recovery without siblings."""
     import skills_sdk
@@ -333,6 +405,7 @@ def main() -> int:
         _verify_exact_identities(root)
         _verify_retained_settings_and_mcp(root)
         _verify_required_metadata_findings(root)
+        _verify_standalone_normalization(Path(directory).resolve())
     print("installed portable plugin API and CLI: accepted/rejected/recovery pass")
     return 0
 

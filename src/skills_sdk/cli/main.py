@@ -702,7 +702,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _local_check(arguments, parser)
     if arguments.command == "verify":
         return _verify(arguments)
-    if arguments.command in {"validate-plugin", "check-plugin-presentation"}:
+    if arguments.command in {"validate-plugin", "normalize-plugin", "check-plugin-presentation"}:
         return run_plugin_command(arguments, _read_intake_context, _reject_duplicate_members)
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)
