@@ -10,6 +10,10 @@ import subprocess
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from skills_sdk.models.plugin_normalization import PluginNormalizationReceipt
 
 
 def _cli(
@@ -543,6 +547,103 @@ def _verify_normalization_capture_limit(command: list[str], source: Path, root: 
     SchemaRegistry().validate("plugin-normalization.v1", recovered)
 
 
+def _normalization_api(command: list[str], destination: Path) -> PluginNormalizationReceipt:
+    """Call the installed public API with the controlled CLI fixture's identical inputs."""
+    from skills_sdk.intake import normalize_standalone_skill_package
+    from skills_sdk.models.intake import SkillPackageIntakeContext
+    from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata
+
+    return normalize_standalone_skill_package(
+        Path(command[2]),
+        destination,
+        SkillPackageIntakeContext.model_validate_json(Path(command[5]).read_bytes()),
+        PluginNormalizationMetadata(name=command[7], version=command[9], description=command[11]),
+    )
+
+
+def _normalization_cli(command: list[str], root: Path, destination: Path, expected: str) -> PluginNormalizationReceipt:
+    """Check installed JSON, exit codes and receipt binding without invoking a provider."""
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.models.plugin_normalization import PluginNormalizationReceipt
+
+    invocation = list(command)
+    invocation[3] = str(destination)
+    completed = subprocess.run(invocation, cwd=root, capture_output=True, text=True, check=False)
+    assert completed.returncode == (0 if expected == "prepared" else 2), completed.stderr + completed.stdout
+    assert not completed.stderr and "Traceback" not in completed.stdout
+    receipt = PluginNormalizationReceipt.model_validate_json(completed.stdout)
+    assert receipt.status == expected and not receipt.release_ready
+    SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
+    return receipt
+
+
+def _verify_normalization_loop(command: list[str], root: Path) -> None:
+    """Reject a real destination loop through installed API/CLI and recover after correcting its parent."""
+    parent = root / "loop-parent"
+    parent.symlink_to(parent, target_is_directory=True)
+    rejected = _normalization_api(command, parent / "api-plugin")
+    assert rejected.status == "blocked" and not rejected.candidate_created
+    assert rejected.blocker is not None and rejected.blocker.code == "candidate_normalization_failed"
+    cli = _normalization_cli(command, root, parent / "cli-plugin", "blocked")
+    assert not cli.candidate_created and cli.blocker is not None and cli.blocker.code == rejected.blocker.code
+    assert parent.is_symlink()
+    parent.unlink()
+    parent.mkdir()
+    recovered = _normalization_api(command, parent / "api-plugin")
+    assert recovered.status == "prepared"
+    assert recovered.source_intake.candidate == rejected.source_intake.candidate
+    _normalization_cli(command, root, parent / "cli-plugin", "prepared")
+
+
+def _verify_normalization_file_capacity(command: list[str], root: Path, source: Path) -> None:
+    """Reserve the real manifest slot, then recover to an exactly 1,024-file complete plugin."""
+    created = [source / f"capacity-{index:04d}.bin" for index in range(1023)]
+    try:
+        for path in created:
+            path.write_bytes(b"x")
+        rejected = _normalization_api(command, root / "capacity-api-blocked")
+        assert rejected.status == "blocked" and not rejected.candidate_created
+        assert rejected.blocker is not None and rejected.blocker.code == "standalone_source_capacity_exceeded"
+        assert len(rejected.source_intake.validation.files) == 1024
+        cli = _normalization_cli(command, root, root / "capacity-cli-blocked", "blocked")
+        assert not cli.candidate_created and cli.blocker is not None and cli.blocker.code == rejected.blocker.code
+        assert not (root / "capacity-api-blocked").exists() and not (root / "capacity-cli-blocked").exists()
+        created[-1].unlink()
+        recovered = _normalization_api(command, root / "capacity-api-recovered")
+        assert recovered.status == "prepared" and recovered.plugin_validation is not None
+        assert len(recovered.plugin_validation.files) == 1024
+        assert recovered.source_intake.candidate != rejected.source_intake.candidate
+        assert recovered.plugin_validation.skills[0].validation.candidate == recovered.source_intake.candidate
+        cli = _normalization_cli(command, root, root / "capacity-cli-recovered", "prepared")
+        assert cli.source_intake.candidate == recovered.source_intake.candidate
+    finally:
+        for path in created:
+            path.unlink(missing_ok=True)
+
+
+def _verify_normalization_alias(command: list[str], root: Path, source: Path) -> None:
+    """Prove real case-insensitive source aliases cannot become installed API/CLI output parents."""
+    alias = source.with_name(source.name.upper())
+    if not alias.exists():
+        return
+    original = (source / "SKILL.md").read_bytes()
+    nested = source / "alias-nested"
+    nested.mkdir()
+    for parent in (alias, alias / nested.name):
+        rejected = _normalization_api(command, parent / "alias-api-plugin")
+        assert rejected.status == "blocked" and not rejected.candidate_created
+        assert rejected.blocker is not None and rejected.blocker.code == "candidate_normalization_failed"
+        cli = _normalization_cli(command, root, parent / "alias-cli-plugin", "blocked")
+        assert not cli.candidate_created and cli.blocker is not None and cli.blocker.code == rejected.blocker.code
+        assert not (parent / "alias-api-plugin").exists() and not (parent / "alias-cli-plugin").exists()
+        assert (source / "SKILL.md").read_bytes() == original
+    nested.rmdir()
+    recovered = _normalization_api(command, root / "alias-outside-api")
+    assert recovered.status == "prepared"
+    _normalization_cli(command, root, root / "alias-outside-cli", "prepared")
+    assert (source / "SKILL.md").read_bytes() == original
+
+
 def _verify_standalone_normalization(root: Path) -> None:
     """Prove installed API and console entrypoint create a separate bound plugin candidate."""
     from skills_sdk.core.schema_registry import SchemaRegistry
@@ -630,6 +731,9 @@ def _verify_standalone_normalization(root: Path) -> None:
     _verify_normalization_metadata_budget(root, source, context.model_dump(mode="json"))
     _verify_normalization_output_closure(root, source, context.model_dump(mode="json"))
     _verify_normalization_capture_limit(command, source, root)
+    _verify_normalization_loop(command, root)
+    _verify_normalization_file_capacity(command, root, source)
+    _verify_normalization_alias(command, root, source)
     assert (source / "SKILL.md").read_bytes() == skill
 
 

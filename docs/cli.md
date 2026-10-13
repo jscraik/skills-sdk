@@ -95,7 +95,12 @@ before retrying. The destination parent must already exist; the example uses
 the current directory as that parent.
 The canonical manifest must fit one MiB after UTF-8 encoding and JSON escaping.
 Unsupported or unsafe source capture returns
-`standalone_source_capture_blocked`; an observed difference from admitted or
+`standalone_source_capture_blocked`. The complete output must also fit capture
+bounds after adding its manifest and wrapper; a pre-write capacity rejection
+returns `standalone_source_capacity_exceeded` with `candidate_created: false`.
+Destination symlink loops return typed `candidate_normalization_failed`
+output, not a traceback. Directory-identity checks also reject source-contained
+parents through different case spellings before creating output. An observed difference from admitted or
 pre-copy source evidence returns `source_changed`. Correct the responsible source or metadata and
 retry into a fresh destination, retaining previous failures. Changed candidates
 require fresh intake and downstream evidence.

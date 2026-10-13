@@ -862,6 +862,15 @@ file modes or empty directories; the service checks their preservation through
 live captures, rather than claiming receipt-only proof of them.
 An unsupported or unsafe initial capture returns
 `standalone_source_capture_blocked`, not an assertion of observed drift.
+Before creating a destination, normalization also reserves capacity for the
+canonical manifest and `skills/<source-name>/` wrapper. Exceeding complete-output
+file, byte, resource or directory-depth limits returns
+`standalone_source_capacity_exceeded` with `candidate_created: false`.
+Unsafe destination resolution, including Python 3.12 symlink loops, returns
+`candidate_normalization_failed` without writing through the path.
+Containment also checks live directory identities and parent descriptors, so
+different case spellings cannot place output inside the source. These checks
+and later recaptures are point-in-time safeguards, not an atomic namespace lock.
 `source_changed` means an observed difference in captured source relative to
 admitted or pre-copy evidence, including later permission or directory drift.
 Correct the responsible input, retain the blocker, and use a fresh destination;

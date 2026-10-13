@@ -30,6 +30,7 @@ from skills_sdk.models.plugin_normalization import (
     _canonical_normalization_manifest,
     _retained_validation_matches_source,
 )
+from skills_sdk.validation import plugin_capture
 from skills_sdk.validation.plugin_capture import capture_plugin_source
 from skills_sdk.validation.plugin_manifest import parse_plugin_manifest
 from skills_sdk.validation.plugin_package import plugin_candidate_id, validate_plugin_package
@@ -153,12 +154,21 @@ def _destination_parent(source_root: Path, destination_root: Path) -> int:
     """Open an existing safe parent and reject a destination nested in its source."""
     if ".." in source_root.parts or ".." in destination_root.parts or not destination_root.name:
         raise ValueError("candidate paths must not contain parent traversal")
-    source = source_root.resolve(strict=True)
     requested_parent = destination_root.parent.absolute()
-    parent = requested_parent.resolve(strict=True)
+    try:
+        source = source_root.resolve(strict=True)
+        parent = requested_parent.resolve(strict=True)
+    except RuntimeError as exc:
+        # Python 3.12 reports resolution loops as RuntimeError rather than OSError.
+        raise ValueError("candidate paths must resolve without symlink loops") from exc
     if parent == source or source in parent.parents:
         raise ValueError("candidate destination must be outside the standalone source")
-    return _open_existing_directory(requested_parent)
+    descriptor = _open_existing_directory(requested_parent)
+    try:
+        _reject_source_ancestor(source_root, descriptor)
+        return os.dup(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _open_existing_directory(path: Path) -> int:
@@ -168,6 +178,36 @@ def _open_existing_directory(path: Path) -> int:
     from skills_sdk.validation.skill_package import _open_directory_tree
 
     return _open_directory_tree(path)
+
+
+def _directory_identity(descriptor: int) -> tuple[int, int]:
+    """Identify the physical directory independently of pathname spelling or aliases."""
+    value = os.fstat(descriptor)
+    return value.st_dev, value.st_ino
+
+
+def _reject_source_ancestor(source_root: Path, parent: int) -> None:
+    """Reject actual source containment by walking no-follow parent descriptors before writing."""
+    source = _open_existing_directory(source_root.absolute())
+    try:
+        source_identity = _directory_identity(source)
+        ancestor = os.dup(parent)
+        try:
+            previous: tuple[int, int] | None = None
+            while True:
+                current = _directory_identity(ancestor)
+                if current == source_identity:
+                    raise ValueError("candidate destination must be physically outside the standalone source")
+                if current == previous:
+                    return
+                previous = current
+                outer = os.open("..", _DIRECTORY_FLAGS, dir_fd=ancestor)
+                os.close(ancestor)
+                ancestor = outer
+        finally:
+            os.close(ancestor)
+    finally:
+        os.close(source)
 
 
 def _write_candidate(
@@ -210,9 +250,7 @@ def _same_created_directory(destination_root: Path, created_directory: int) -> b
     """Compare the current no-follow destination with the retained directory this call created."""
     descriptor = _open_existing_directory(destination_root.absolute())
     try:
-        created = os.fstat(created_directory)
-        current = os.fstat(descriptor)
-        return (created.st_dev, created.st_ino) == (current.st_dev, current.st_ino)
+        return _directory_identity(created_directory) == _directory_identity(descriptor)
     finally:
         os.close(descriptor)
 
@@ -268,6 +306,23 @@ def _expected_plugin_files(
     return tuple(sorted(expected, key=lambda item: item.path))
 
 
+def _fits_wrapped_capture(
+    manifest: bytes,
+    skill_name: str,
+    files: tuple[PluginCapturedFile, ...],
+    directories: tuple[str, ...],
+) -> bool:
+    """Reserve the canonical manifest and wrapper's complete capture capacity before writing."""
+    output_directories = _directory_paths(skill_name, directories, files)
+    return (
+        len(manifest) <= plugin_capture.MAX_FILE_BYTES
+        and len(files) + 1 <= plugin_capture.MAX_FILES
+        and sum(item.size_bytes for item in files) + len(manifest) <= plugin_capture.MAX_TOTAL_BYTES
+        and len(files) + 1 + len(output_directories) <= plugin_capture.MAX_RESOURCES
+        and max(path.count("/") + 1 for path in output_directories) <= plugin_capture.MAX_DEPTH
+    )
+
+
 def normalize_standalone_skill_package(
     skill_root: Path,
     destination_root: Path,
@@ -301,6 +356,12 @@ def normalize_standalone_skill_package(
     if not _same_skill_capture(intake, files):
         return _block(intake, "source_changed", "standalone source differs from its admitted capture")
     assert intake.validation.identity is not None
+    if not _fits_wrapped_capture(manifest, intake.validation.identity.name, files, directories):
+        return _block(
+            intake,
+            "standalone_source_capacity_exceeded",
+            "source plus plugin manifest and wrapper exceeds capture bounds; reduce source resources before retrying",
+        )
     try:
         created_directory = _write_candidate(
             skill_root,
