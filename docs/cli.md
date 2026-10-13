@@ -55,6 +55,24 @@ See [the API boundary](api.md#portable-plugin-validation) for capture limits and
 Portable plugin inspection was accepted in PR #52. Existing `validate` and `build` remain
 standalone-skill commands; they do not auto-detect plugins.
 
+Add `--verify-evidence FILE` to `validate-plugin` to verify a supplied envelope.
+Keep the evidence file outside the plugin source root to avoid self-inclusion
+and a changed candidate. Supply the same source revision and explicit
+`--require-version` / `--require-description` flags used for the original capture; the CLI
+compares the supplied envelope with a fresh capture of the actual plugin root
+through `verify_plugin_package_validation`. Evidence must be a regular no-follow
+JSON file of at most 16 MiB. Duplicate members, malformed JSON, invalid or stale
+evidence, mismatches and unreadable source return typed blocked output with exit
+`2`. A matching structural result uses the existing output and exit conventions,
+and known special evidence files are rejected before opening the leaf. Post-open
+type and drift checks remain; this is not an atomic filesystem snapshot.
+Verification is not permission or release approval. Settings values are not echoed. Explicit
+metadata-policy flags remain in blocked output, including evidence read, JSON
+and mismatch failures. Corrected evidence retains the same requested policy.
+The default validation route without this option is unchanged. Structural
+verification does not establish matched evaluation, execution permission or
+release readiness.
+
 ### Explicit standalone-skill plugin preparation
 
 Use `normalize-plugin` only when the caller explicitly wants to preserve a
@@ -88,24 +106,6 @@ independently authenticated. The receipt always sets `release_ready` to
 archive creation, publication, installation, or runtime verification. This
 route does not update an existing plugin against a baseline; updates retain a
 known baseline and require a separate update workflow.
-
-The accepted route includes `--verify-evidence FILE` on this same command. Keep
-the evidence file outside the plugin source root to avoid self-inclusion and a
-changed candidate. Supply the same source revision and explicit
-`--require-version` / `--require-description` flags used for the original capture; the CLI
-compares the supplied envelope with a fresh capture of the actual plugin root
-through `verify_plugin_package_validation`. Evidence must be a regular no-follow
-JSON file of at most 16 MiB. Duplicate members, malformed JSON, invalid or stale
-evidence, mismatches and unreadable source return typed blocked output with exit
-`2`. A matching structural result uses the existing output and exit conventions,
-and known special evidence files are rejected before opening the leaf. Post-open
-type and drift checks remain; this is not an atomic filesystem snapshot.
-Verification is not permission or release approval. Settings values are not echoed. Explicit
-metadata-policy flags remain in blocked output, including evidence read, JSON
-and mismatch failures. Corrected evidence retains the same requested policy.
-The default
-validation route without this option is unchanged. Structural verification does
-not establish matched evaluation, execution permission or release readiness.
 
 ### Existing local routes
 

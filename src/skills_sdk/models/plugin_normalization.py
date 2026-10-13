@@ -15,6 +15,21 @@ from skills_sdk.models.plugin import PluginPackageValidation
 _NormalizationPluginName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$", max_length=64)]
 
 
+def _retained_validation_matches_source(
+    source: SkillPackageIntakeReceipt, validation: PluginPackageValidation | None
+) -> bool:
+    """Allow blocked diagnostics but bind every retained passing proof to its sole source child."""
+    return (
+        validation is None
+        or validation.status != "pass"
+        or (
+            source.candidate is not None
+            and len(validation.skills) == 1
+            and validation.skills[0].validation.candidate == source.candidate
+        )
+    )
+
+
 class PluginNormalizationMetadata(_ContractModel):
     """Caller-owned canonical root-manifest metadata for a new plugin candidate."""
 
@@ -57,6 +72,8 @@ class PluginNormalizationReceipt(_ContractModel):
     def bind_source_and_plugin(self) -> PluginNormalizationReceipt:
         """Require a fresh single-child plugin proof tied to admitted source evidence."""
         source = self.source_intake
+        if not _retained_validation_matches_source(source, self.plugin_validation):
+            raise ValueError("retained passing plugin validation must bind the exact standalone source candidate")
         if self.status == "blocked":
             if self.blocker is None or self.normalized_package is not None:
                 raise ValueError("blocked normalization requires a blocker and no normalized package")
@@ -80,15 +97,10 @@ class PluginNormalizationReceipt(_ContractModel):
             raise ValueError("prepared normalization must retain the normalized lifecycle")
         if normalized.dependencies:
             raise ValueError("standalone normalization cannot introduce unverified plugin dependencies")
-        if len(validation.skills) != 1:
-            raise ValueError("standalone normalization must produce exactly one contained skill")
         if not validation.policy.require_version or not validation.policy.require_description:
             raise ValueError("prepared normalization requires version and description validation policy")
         if not (validation.manifest.version or "").strip() or not (validation.manifest.description or "").strip():
             raise ValueError("prepared normalization requires nonempty manifest version and description")
-        child = validation.skills[0]
-        if child.validation.candidate != source.candidate:
-            raise ValueError("plugin child must retain the exact standalone skill candidate identity")
         if normalized.identity.package_id != validation.candidate.package_id:
             raise ValueError("normalized plugin and whole-plugin candidate identities must match")
         if normalized.owner != source.normalized_package.owner:

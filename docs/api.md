@@ -806,6 +806,12 @@ receipt, a final no-follow capture checks destination files, bytes, permissions
 and directories against the candidate this invocation wrote, and checks its
 directory identity against the retained creation descriptor. The receipt binds
 that captured state; later changes require fresh downstream validation.
+Any retained passing validation, including in a blocked receipt, must bind its
+sole child to the original standalone candidate. If destination validation
+belongs to another child, the blocker and creation signal remain, but that
+unrelated passing validation is not retained as source proof. Packaged JSON
+Schema checks structure; the model and schema registry enforce this identity
+relationship.
 
 The operation is create-only: unsafe paths, symlinks, and existing destinations
 are rejected rather than overwritten. The destination's parent directory must

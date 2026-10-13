@@ -26,7 +26,11 @@ from skills_sdk.models.plugin import (
     PluginPackageValidation,
     PluginValidationPolicy,
 )
-from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata, PluginNormalizationReceipt
+from skills_sdk.models.plugin_normalization import (
+    PluginNormalizationMetadata,
+    PluginNormalizationReceipt,
+    _retained_validation_matches_source,
+)
 from skills_sdk.validation.plugin_capture import capture_plugin_source
 from skills_sdk.validation.plugin_manifest import parse_plugin_manifest
 from skills_sdk.validation.plugin_package import plugin_candidate_id, validate_plugin_package
@@ -39,6 +43,7 @@ class _CandidateWriteError(OSError):
     """Keep whether this invocation created a partial output candidate."""
 
     def __init__(self, candidate_created: bool) -> None:
+        """Retain the partial-candidate signal alongside the write failure."""
         super().__init__("safe candidate creation failed")
         self.candidate_created = candidate_created
 
@@ -57,6 +62,8 @@ def _block(
     refs: tuple[str, ...] = (),
 ) -> PluginNormalizationReceipt:
     """Retain source proof while returning a typed non-clearance result."""
+    if not _retained_validation_matches_source(intake, validation):
+        validation = None
     return PluginNormalizationReceipt(
         status="blocked",
         source_intake=intake,

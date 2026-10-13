@@ -309,6 +309,69 @@ def _reject_normalization_dependencies(payload: dict[str, object]) -> None:
     registry.validate("plugin-normalization.v1", payload)
 
 
+def _reject_blocked_normalization_validation(payload: dict[str, object], foreign: dict[str, object]) -> None:
+    """Keep matching blocked evidence and reject unrelated passing proof through installed contracts."""
+    from pydantic import ValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.models.plugin_normalization import PluginNormalizationReceipt
+
+    registry = SchemaRegistry()
+    blocked = json.loads(json.dumps(payload))
+    blocked.update(status="blocked", normalized_package=None, blocker={"code": "fixture_blocked", "message": "Stop."})
+    PluginNormalizationReceipt.model_validate(blocked)
+    registry.validate("plugin-normalization.v1", blocked)
+    forged = {**blocked, "plugin_validation": foreign}
+    try:
+        PluginNormalizationReceipt.model_validate(forged)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("installed blocked normalization model accepted unrelated passing proof")
+    try:
+        registry.validate("plugin-normalization.v1", forged)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("installed blocked normalization registry accepted unrelated passing proof")
+    registry.validate("plugin-normalization.v1", blocked)
+
+
+def _verify_normalization_foreign_child(root: Path, source: Path, context_payload: dict[str, object]) -> None:
+    """Retain an actual changed-child blocker without claiming unrelated passing source evidence."""
+    from unittest.mock import patch
+
+    from skills_sdk.intake import plugin_normalization as normalization
+    from skills_sdk.models import PluginPackageValidation, PluginValidationPolicy
+    from skills_sdk.models.intake import SkillPackageIntakeContext
+    from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata
+
+    validate = normalization.validate_plugin_package
+
+    def validate_changed_child(
+        candidate: Path, *, source_revision: str, policy: PluginValidationPolicy | None = None
+    ) -> PluginPackageValidation:
+        """Produce genuine installed validation for a deliberately changed child."""
+        child = candidate / "skills" / source.name / "SKILL.md"
+        child.write_bytes(child.read_bytes() + b"\nDifferent captured child.\n")
+        return validate(candidate, source_revision=source_revision, policy=policy)
+
+    context = SkillPackageIntakeContext.model_validate(context_payload)
+    metadata = PluginNormalizationMetadata(name="fixture-plugin", version="1.0.0", description="Synthetic plugin.")
+    with patch.object(normalization, "validate_plugin_package", validate_changed_child):
+        receipt = normalization.normalize_standalone_skill_package(
+            source, root / "foreign-child-plugin", context, metadata
+        )
+    assert receipt.status == "blocked" and receipt.candidate_created
+    assert receipt.blocker is not None and receipt.blocker.code == "standalone_candidate_binding_mismatch"
+    assert receipt.plugin_validation is None and receipt.normalized_package is None
+    assert (
+        normalization.normalize_standalone_skill_package(source, root / "fixed-child-plugin", context, metadata).status
+        == "prepared"
+    )
+
+
 def _verify_normalization_destination_drift(root: Path, source: Path, context_payload: dict[str, object]) -> None:
     """Prove the installed public API rejects post-validation drift and permits a fresh candidate."""
     from unittest.mock import patch
@@ -324,6 +387,7 @@ def _verify_normalization_destination_drift(root: Path, source: Path, context_pa
     def validate_then_change(
         candidate: Path, *, source_revision: str, policy: PluginValidationPolicy | None = None
     ) -> PluginPackageValidation:
+        """Change the manifest after obtaining genuine installed validation."""
         result = validate(candidate, source_revision=source_revision, policy=policy)
         manifest = candidate / "plugin.json"
         manifest.write_bytes(manifest.read_bytes() + b"\n")
@@ -343,6 +407,7 @@ def _verify_normalization_destination_drift(root: Path, source: Path, context_pa
     def capture_then_replace(
         candidate: Path,
     ) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
+        """Replace the captured destination while retaining identical copied bytes."""
         result = capture(candidate)
         if candidate == replaced_destination:
             retained = root / "retained-original-plugin"
@@ -404,6 +469,16 @@ def _verify_standalone_normalization(root: Path) -> None:
     SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
     _reject_normalization_dependencies(receipt.model_dump(mode="json"))
     _verify_normalization_destination_drift(root, source, context.model_dump(mode="json"))
+    _verify_normalization_foreign_child(root, source, context.model_dump(mode="json"))
+    other = normalize_standalone_skill_package(
+        source,
+        root / "other-revision-plugin",
+        context.model_copy(update={"source_revision": "2" * 40}),
+        PluginNormalizationMetadata(name="fixture-other-plugin", version="1.0.0", description="Synthetic plugin."),
+    )
+    assert other.status == "prepared" and other.plugin_validation is not None
+    foreign_validation = other.plugin_validation.model_dump(mode="json")
+    _reject_blocked_normalization_validation(receipt.model_dump(mode="json"), foreign_validation)
 
     context_path = root / "normalization-context.json"
     context_path.write_text(context.model_dump_json(), encoding="utf-8")
@@ -433,6 +508,7 @@ def _verify_standalone_normalization(root: Path) -> None:
     )
     assert (source / "SKILL.md").read_bytes() == skill
     _reject_normalization_dependencies(cli_receipt)
+    _reject_blocked_normalization_validation(cli_receipt, foreign_validation)
 
 
 def main() -> int:
