@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
 from pathlib import Path
 
+from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.intake.normalization import intake_skill_package
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.inventory import PackageType, SourceProvenance
@@ -228,6 +230,32 @@ def _normalized_package(intake: SkillPackageIntakeReceipt, validation: PluginPac
     )
 
 
+def _expected_plugin_files(
+    manifest_payload: bytes,
+    skill_name: str,
+    files: tuple[PluginCapturedFile, ...],
+) -> tuple[PluginCapturedFile, ...]:
+    """Bind validation to the complete manifest and child bytes this call wrote."""
+    expected = [
+        PluginCapturedFile(
+            path="plugin.json",
+            sha256=hashlib.sha256(manifest_payload).hexdigest(),
+            size_bytes=len(manifest_payload),
+            permission_mode=0o644,
+        )
+    ]
+    expected.extend(
+        PluginCapturedFile(
+            path=f"skills/{skill_name}/{item.path}",
+            sha256=item.sha256,
+            size_bytes=item.size_bytes,
+            permission_mode=item.permission_mode,
+        )
+        for item in files
+    )
+    return tuple(sorted(expected, key=lambda item: item.path))
+
+
 def normalize_standalone_skill_package(
     skill_root: Path,
     destination_root: Path,
@@ -246,9 +274,12 @@ def normalize_standalone_skill_package(
     try:
         metadata = PluginNormalizationMetadata.model_validate(metadata)
         manifest = _manifest_payload(metadata)
-        files, payloads, directories = capture_plugin_source(skill_root)
     except (TypeError, ValueError):
         return _block(intake, "plugin_metadata_invalid", "plugin metadata is invalid; correct it before normalization")
+    try:
+        files, payloads, directories = capture_plugin_source(skill_root)
+    except (TypeError, ValueError):
+        return _block(intake, "source_changed", "standalone source differs from its admitted capture")
     except OSError:
         return _block(intake, "standalone_source_unavailable", "standalone source cannot be safely captured")
     if not _same_skill_capture(intake, files):
@@ -278,7 +309,16 @@ def normalize_standalone_skill_package(
     except (OSError, TypeError, ValueError):
         return _block(intake, "candidate_normalization_failed", "safe candidate normalization could not complete")
     return _validate_and_receipt(
-        intake, skill_root, destination_root, context.source_revision, files, payloads, directories
+        intake,
+        skill_root,
+        destination_root,
+        context.source_revision,
+        metadata,
+        manifest,
+        intake.validation.identity.name,
+        files,
+        payloads,
+        directories,
     )
 
 
@@ -287,6 +327,9 @@ def _validate_and_receipt(
     skill_root: Path,
     destination_root: Path,
     source_revision: str,
+    metadata: PluginNormalizationMetadata,
+    manifest_payload: bytes,
+    skill_name: str,
     files: tuple[PluginCapturedFile, ...],
     payloads: dict[str, bytes],
     directories: tuple[str, ...],
@@ -326,6 +369,28 @@ def _validate_and_receipt(
             intake,
             "standalone_candidate_binding_mismatch",
             "whole-plugin validation did not retain the admitted standalone skill identity",
+            candidate_created=True,
+            validation=validation,
+        )
+    expected_files = _expected_plugin_files(manifest_payload, skill_name, files)
+    manifest = validation.manifest
+    candidate = validation.candidate
+    if (
+        validation.files != expected_files
+        or manifest.name != metadata.name
+        or manifest.version != metadata.version
+        or manifest.description != metadata.description
+        or manifest.source_sha256 != hashlib.sha256(manifest_payload).hexdigest()
+        or candidate.source_revision != source_revision
+        or candidate.content_sha256 != candidate_content_sha256(expected_files)
+    ):
+        return _block(
+            intake,
+            "normalized_candidate_changed",
+            (
+                "destination no longer matches the manifest and source captured for this normalization; "
+                "inspect it before retrying"
+            ),
             candidate_created=True,
             validation=validation,
         )

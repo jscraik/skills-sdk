@@ -14,21 +14,23 @@ Maintain this table when a public service, consumer, or retirement decision
 changes. Every pending row requires implementation or an explicit reviewed
 retirement decision before Agent-Skills retirement.
 
-Accepted SDK baseline: [`e9ad586`](https://github.com/jscraik/skills-sdk/commit/e9ad5867eae08055cea9b156cb5d323bd2572965),
-verified on 2026-10-12 and shared with the workflow and task record. Entries below
-describe that revision, not queued branches. Each row names its entrypoint or
-absence, a proof or boundary reference, its limitation, and the remaining action.
+Accepted baseline before the current S2 closeout: [`ed67328`](https://github.com/jscraik/skills-sdk/commit/ed67328281fd8c7227ec806d42258337076d0c0e),
+verified on 2026-10-13 and shared with the workflow and task record. Entries below
+describe the accepted baseline except where an in-flight PR is explicitly
+labelled; they do not imply that unmerged work is available on main or complete
+for its parent stage. Each row names its entrypoint or absence, a proof or
+boundary reference, its limitation, and the remaining action.
 
 PR #54 reconciled the descriptions without adding executable capabilities.
 PRs #57–59 accepted instruction alignment, bounded validation-performance
 improvements and canonical glossary naming without closing any parent stage.
-Unmerged S2 presentation work separately implements
+Accepted PR #60 adds bounded presentation assessment through
 `check_plugin_presentation` / `check-plugin-presentation` for fresh assets and
 supplied approval; [focused proof](../tests/test_plugin_presentation.py) and
 [installed proof](../tests/installed_plugin_presentation_smoke.py) retain drift
 rejection/recovery. It is not independent visual/rights review, archive inclusion,
-normalisation or whole-plugin release clearance. Those remain S2/S5 actions;
-no accepted capability row is promoted merely because this branch contains code.
+normalisation or whole-plugin release clearance. Those remain separate S2/S5 actions;
+no bounded child capability closes its parent acceptance criteria.
 PR #55 accepted fresh per-trial adapters and
 [lifecycle proof](../tests/test_calibration_lifetime.py). PR #56 accepted
 explicit local/cloud profile binding and controlled settings delivery through
@@ -88,7 +90,7 @@ does not describe the implemented SDK SchemaRegistry.
 
 | Source capability id | SDK state | SDK entrypoint, proof and limitation | Remaining action |
 | --- | --- | --- | --- |
-| `authoring` | Partial | `build_skill_ir` and intent-aware `check-quality` checking; [quality proof](../tests/test_quality_workflow.py). Neither edits source. | S2: create a minimal plugin before release-bound checks; preserve standalone intake source. |
+| `authoring` | Partial | `build_skill_ir`, intent-aware `check-quality`, and (in this PR) `normalize_standalone_skill_package` / `normalize-plugin` for a separate one-skill plugin candidate; [quality proof](../tests/test_quality_workflow.py) and [normalisation proof](../tests/test_plugin_normalization.py). These services do not edit the standalone source or provide a general source editor. | S2: compose authoring/adoption with whole-plugin quality and release preparation; preserve baselines for updates and provenance for external intake. |
 | `check` | Partial | `check_local_quality` / `check-quality` join ordered local gates; [installed proof](../tests/installed_quality_workflow_smoke.py). No execution or promotion clearance. | S2/S3: close remaining semantic and security handoffs without duplicating local stages. |
 | `manifest_schema` | Implemented | `PackageManifest`; [manifest tests](../tests/test_package_receipts.py). Structural content contract, not an archive. | Retain schema and semantic compatibility proof. |
 | `receipt_schema` | Implemented | Versioned models and receipt parsing; [receipt tests](../tests/test_package_receipts.py). A receipt proves only its lane. | Retain family/version and rejection tests. |
@@ -98,7 +100,7 @@ does not describe the implemented SDK SchemaRegistry.
 | `skill_ir` | Implemented | `build_skill_ir` and `read_frontmatter`; [package parsing proof](../tests/test_skill_package_validation.py). Portable representation used by validation, not authoring or execution. | Retain parsing and identity proof. |
 | `package_identity` | Implemented | `build_skill_package` and `validate_plugin_package`; [plugin identity proof](../tests/test_plugin_package.py). Complete-plugin bytes and a separate mode ledger are bound; capture is not publication. | S2/S5: compose release checks and emitted archives under the captured plugin identity and modes. |
 | `install_preview` | Partial | `plan_runtime_install`; [planning proof](../tests/test_installation_planning.py). No host apply. | S5: implement selected host application and failure recovery. |
-| `skill_intake` | Partial | `intake_skill_package` handles directory skills; `validate_plugin_package` inspects root-manifest plugins; [plugin proof](../tests/test_plugin_package.py). Neither silently wraps source or clears managed release. | S2/S5: explicitly normalise standalone inputs to a separate plugin candidate without rewriting source. |
+| `skill_intake` | Partial | `intake_skill_package` handles directory skills; `validate_plugin_package` inspects root-manifest plugins; this PR adds `normalize_standalone_skill_package` / `normalize-plugin` to create a separate one-skill plugin candidate; [normalisation proof](../tests/test_plugin_normalization.py) and [installed proof](../tests/installed_plugin_intake_smoke.py). Source is preserved and the receipt is not release clearance. | S2/S5: compose the bounded create route with whole-plugin quality, presentation and archive preparation; existing-plugin updates retain a baseline and remain separate. |
 | `skill_intake_review` | Partial | Intake rights/owner checks plus `assess_content_review`; [review proof](../tests/test_content_review.py). Claims and semantic quality are not independently authenticated. | S2/S3: verify external provenance and reviewer quality for adoption. |
 | `lockfile_preview` | Partial | `RuntimeLock` and `InstallPlan`; [planning proof](../tests/test_installation_planning.py). No applied lock/runtime state. | S5: join plans to observed installation and rollback. |
 | `real_install` | Pending | No host apply service; `InstallationResult` is [supplied evidence](../tests/test_runtime_execution_evidence.py). | S5: implement a bounded install adapter with exact-version readback. |

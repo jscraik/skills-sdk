@@ -61,7 +61,7 @@ Use `normalize-plugin` only when the caller explicitly wants to preserve a
 standalone skill and create a separate managed-plugin candidate:
 
 ```bash
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk normalize-plugin ./skills/example ./prepared/example-plugin --context ./intake-context.json --plugin-name example-plugin --plugin-version 1.0.0 --plugin-description "A concise description of the plugin." --json --robot
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk normalize-plugin ./skills/example ./example-plugin --context ./intake-context.json --plugin-name example-plugin --plugin-version 1.0.0 --plugin-description "A concise description of the plugin." --json --robot
 ```
 
 The command requires a bounded, regular no-follow
@@ -73,7 +73,8 @@ explicitly by the caller and validated against
 validates the complete plugin. It never edits the input, follows unsafe paths,
 or overwrites an existing destination. A partial write is reported with
 `candidate_created` so the caller can inspect and correct the destination
-before retrying.
+before retrying. The destination parent must already exist; the example uses
+the current directory as that parent.
 
 With `--json`, a completed service call emits `plugin-normalization/v1`.
 Exit `0` means a separate candidate was prepared and whole-plugin structural

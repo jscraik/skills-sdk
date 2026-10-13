@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, StrictStr, field_validator, model_validator
+from pydantic import ConfigDict, StrictStr, StringConstraints, field_validator, model_validator
 
 from skills_sdk.models.intake import SkillPackageIntakeReceipt
 from skills_sdk.models.inventory import PackageType, _ContractModel
-from skills_sdk.models.package import IntakeDecisionStatus, NormalizedPackage, PluginName
+from skills_sdk.models.package import IntakeDecisionStatus, NormalizedPackage, PackageLifecycleState
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.plugin import PluginPackageValidation
+
+_NormalizationPluginName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$", max_length=64)]
 
 
 class PluginNormalizationMetadata(_ContractModel):
@@ -19,17 +21,9 @@ class PluginNormalizationMetadata(_ContractModel):
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=False, revalidate_instances="always")
 
     schema_version: Literal["plugin-normalization-metadata/v1"] = "plugin-normalization-metadata/v1"
-    name: PluginName = Field(max_length=64)
+    name: _NormalizationPluginName
     version: StrictStr
     description: StrictStr
-
-    @field_validator("name")
-    @classmethod
-    def portable_plugin_name(cls, value: str) -> str:
-        """Reject repeated separators excluded by the canonical plugin manifest."""
-        if "--" in value or ".." in value:
-            raise ValueError("plugin name cannot contain repeated separators")
-        return value
 
     @field_validator("version", "description")
     @classmethod
@@ -64,6 +58,8 @@ class PluginNormalizationReceipt(_ContractModel):
         if self.status == "blocked":
             if self.blocker is None or self.normalized_package is not None:
                 raise ValueError("blocked normalization requires a blocker and no normalized package")
+            if self.plugin_validation is not None and not self.candidate_created:
+                raise ValueError("plugin validation requires a created normalization candidate")
             return self
         if not self.candidate_created or self.blocker is not None or self.plugin_validation is None:
             raise ValueError("prepared normalization requires a created candidate and fresh plugin validation")
@@ -78,8 +74,14 @@ class PluginNormalizationReceipt(_ContractModel):
             raise ValueError("prepared normalization requires passing complete-plugin validation")
         if normalized is None or normalized.package_type is not PackageType.PLUGIN:
             raise ValueError("prepared normalization requires a normalized plugin identity")
+        if normalized.lifecycle is not PackageLifecycleState.NORMALIZED:
+            raise ValueError("prepared normalization must retain the normalized lifecycle")
         if len(validation.skills) != 1:
             raise ValueError("standalone normalization must produce exactly one contained skill")
+        if not validation.policy.require_version or not validation.policy.require_description:
+            raise ValueError("prepared normalization requires version and description validation policy")
+        if not (validation.manifest.version or "").strip() or not (validation.manifest.description or "").strip():
+            raise ValueError("prepared normalization requires nonempty manifest version and description")
         child = validation.skills[0]
         if child.validation.candidate != source.candidate:
             raise ValueError("plugin child must retain the exact standalone skill candidate identity")

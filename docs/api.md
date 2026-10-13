@@ -802,7 +802,8 @@ whole-plugin validation. The whole-plugin identity covers the new candidate;
 its sole child retains the standalone skill candidate identity.
 
 The operation is create-only: unsafe paths, symlinks, and existing destinations
-are rejected rather than overwritten. On a partial filesystem error, the
+are rejected rather than overwritten. The destination's parent directory must
+already exist. On a partial filesystem error, the
 receipt reports whether a candidate directory was created so the caller can
 inspect and correct it before retrying. A prepared result is not complete
 product acceptance, visual approval, archive proof, publication, installation,
@@ -819,7 +820,7 @@ from skills_sdk.models import PluginNormalizationMetadata, SkillPackageIntakeCon
 context = SkillPackageIntakeContext.model_validate(context_payload)
 receipt = normalize_standalone_skill_package(
     Path("./skills/example"),
-    Path("./prepared/example-plugin"),
+    Path("./example-plugin"),
     context,
     PluginNormalizationMetadata(
         name="example-plugin",

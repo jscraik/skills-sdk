@@ -6,10 +6,11 @@ workflow and its current implementation boundaries. Maintain it with each
 public route change; use [the migration map](migration-map.md) for legacy
 coverage and [the task record](projects/sdk-workflow/tasks.md) for execution state.
 
-Accepted implementation baseline: [`e9ad586`](https://github.com/jscraik/skills-sdk/commit/e9ad5867eae08055cea9b156cb5d323bd2572965),
-verified on 2026-10-12. The diagram is the intended process, not a claim that
-every gate is executable. The table describes that accepted baseline; branch
-prototypes and local test passes do not add capabilities to it.
+Accepted implementation baseline: [`ed67328`](https://github.com/jscraik/skills-sdk/commit/ed67328281fd8c7227ec806d42258337076d0c0e),
+verified on 2026-10-13. The diagram is the intended process, not a claim that
+every gate is executable. The table describes that accepted baseline and labels
+this PR's additions explicitly; branch prototypes and local test passes do not
+add capabilities to the baseline.
 
 PR #54 accepted the instruction-alignment documentation reconciliation.
 PR #55 accepted fresh per-trial calibration adapters, schedule admission and
@@ -18,22 +19,34 @@ capture, compiled settings delivery to controlled drivers, drift rejection and
 corrected-input recovery. Controlled adapter proof is not real-provider settings
 application or live quality evidence; remaining delivery state is in the task record.
 
+Accepted PR #60 adds bounded presentation assessment through
+`check_plugin_presentation` / `check-plugin-presentation`, binding captured
+image bytes, modes and supplied approval to the complete plugin. It does not
+establish independent rights or visual approval, archive inclusion or observed
+host display.
+
 Accepted PR #52 adds the bounded
 [`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including
 fresh source comparison through `--verify-evidence` for supplied validation,
 tracked
 in the [task record](projects/sdk-workflow/tasks.md). It binds complete files and
-immediate skill subtrees, not release approval. Accepted PR #53 adds bounded
+immediate skill subtrees, not release approval. This PR adds the explicit
+`normalize_standalone_skill_package` / `normalize-plugin` route to create a
+separate one-skill plugin candidate from admitted standalone input without
+rewriting the source. Its receipt binds fresh whole-plugin validation but always
+sets `release_ready` to false; it does not update an existing plugin baseline,
+compose all quality and presentation evidence, prepare an archive, publish,
+install or verify runtime. Accepted PR #53 adds bounded
 matched whole-plugin evaluation, child calibration, local-to-cloud handoff and
 feedback/rerun services through supplied-offline CLI inputs or injected Python
-adapters. Presentation, normalisation, release preparation and live provider
-integration remain incomplete; these services do not establish release clearance.
+adapters. Joined release preparation and live provider integration remain
+incomplete; these services do not establish release clearance.
 
 ## Entry routes and independence
 
 PR #57 accepted instruction alignment; PR #58 accepted timed parallel validation
 and fail-closed prose routing; PR #59 accepted canonical glossary naming.
-The current unmerged S2 candidate adds
+PR #60 accepted
 [presentation assessment](api.md#plugin-presentation-assessment): fresh image,
 mode and supplied-approval binding, not normalisation, archive preparation,
 independent rights/visual review or observed display. Retained approval blocks
@@ -270,10 +283,10 @@ retain separate provenance and score interpretation.
 
 | Gate | Required outcome | Current SDK boundary |
 | --- | --- | --- |
-| Intent and intake | Explicit create, update, or external-check intent; source and owner evidence; baseline for updates; whole-plugin candidate before release-bound evidence. | Directory skill intake and `check-quality` implement intent-aware checking and baseline capture, not plugin normalisation, source authoring or installation. Complete authoring/adoption composition remains. |
+| Intent and intake | Explicit create, update, or external-check intent; source and owner evidence; baseline for updates; whole-plugin candidate before release-bound evidence. | Directory skill intake and `check-quality` implement intent-aware checking and baseline capture. This PR adds explicit standalone-to-plugin normalisation without source edits; it does not update an existing plugin, author source, or install. Complete authoring/adoption composition remains. |
 | Package and description | Safe structure, truthful trigger description, applicable metadata, and useful progressive disclosure. | Structural policy, build, candidate-bound content-review assessment and bounded offline reviewer execution exist. General semantic accuracy and live reviewer quality remain unproved. |
 | References | Relevant, accurate, discoverable guidance with identified omissions and duplicate or stale content. | Applicable syntax checks and content-review coverage bind captured references, dispositions and source evidence. Independent accuracy, freshness and exhaustive gap discovery remain review obligations. |
-| Icons and presentation | Approved icon, rights evidence, accurate metadata, safe references and packed resources; selected destination and host proof remain distinct. | Generic asset capture and ZIP verification exist. Icon decoding, dimensions, approval, destination metadata validation and observed display are not implemented at this baseline. |
+| Icons and presentation | Approved icon, rights evidence, accurate metadata, safe references and packed resources; selected destination and host proof remain distinct. | PR #60 implements candidate-bound presentation assessment for captured image bytes, modes and supplied approval. Independent rights/visual approval, archive inclusion and observed host display remain separate. |
 | Scenarios and scorer | Realistic cases linked to claims, hidden criteria, gap inventory, scorer quality, and held-out calibration. | Scenario quality, declared claim coverage, supplied scorer checks and observed calibration callbacks exist. The calibration CLI uses supplied-offline fixtures; fresh model quality and matched experiments are separate. |
 | Security | Capability-specific checks, reviewer evidence and update-permission differences; unresolved risks block execution and expanded authority needs renewed approval. | `screen_package_security` runs bounded static screening. Guarded selected-case execution requires fresh candidate-bound review/checklist evidence and recapture. Permission-delta interpretation, external scanners, independent review and comprehensive security remain separate gaps. |
 | Local comparison | Baseline and candidate plugin versions run on the same oss-local model, frozen cases, settings, and rubric; include relevant cross-skill behaviour. | PR #53 adds bounded matched whole-plugin orchestration with ten active cases and per-trial capabilities; PR #56 binds explicitly supplied oss-local profile inputs. Installed offline proof exists, not real-provider settings application or lift. |

@@ -14,7 +14,7 @@ from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.intake import normalize_standalone_skill_package
-from skills_sdk.models import PluginNormalizationMetadata
+from skills_sdk.models import PluginNormalizationMetadata, PluginPackageValidation, PluginValidationPolicy
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.package import IntakeChecks, PackageOwner, PackageSourceKind
 
@@ -215,6 +215,7 @@ def test_normalization_rejects_output_inside_source_and_recovers(tmp_path: Path)
     "payload",
     [
         {"name": "bad/name", "version": "1.0.0", "description": "Fixture."},
+        {"name": "bad_name", "version": "1.0.0", "description": "Fixture."},
         {"name": "bad..name", "version": "1.0.0", "description": "Fixture."},
         {"name": "name", "version": " ", "description": "Fixture."},
         {"name": "name", "version": "1.0.0", "description": " padded "},
@@ -232,6 +233,18 @@ def test_normalization_metadata_uses_registered_schema() -> None:
     )
 
     SchemaRegistry().validate("plugin-normalization-metadata.v1", payload)
+
+
+def test_normalization_metadata_schema_rejects_manifest_name_that_identity_cannot_accept() -> None:
+    payload = {
+        "schema_version": "plugin-normalization-metadata/v1",
+        "name": "bad_name",
+        "version": "1.0.0",
+        "description": "Fixture.",
+    }
+
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-normalization-metadata.v1", payload)
 
 
 def test_normalization_rejects_unsafe_source_and_detects_change_after_intake(
@@ -266,6 +279,32 @@ def test_normalization_rejects_unsafe_source_and_detects_change_after_intake(
     (source / "SKILL.md").write_bytes(original)
 
 
+def test_normalization_reports_capture_value_error_as_source_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.intake import plugin_normalization as normalization
+
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    outside = tmp_path / "outside.md"
+    shutil.copytree(FIXTURE_ROOT, source)
+    outside.write_text("outside source", encoding="utf-8")
+    actual_intake = normalization.intake_skill_package
+
+    def mutate_after_intake(root: Path, context: SkillPackageIntakeContext) -> SkillPackageIntakeReceipt:
+        receipt = actual_intake(root, context)
+        (root / "external.md").symlink_to(outside)
+        return receipt
+
+    monkeypatch.setattr(normalization, "intake_skill_package", mutate_after_intake)
+
+    receipt = _normalize(source, tmp_path / "plugin")
+
+    assert receipt.status == "blocked" and not receipt.candidate_created
+    assert receipt.blocker is not None and receipt.blocker.code == "source_changed"
+    assert not (tmp_path / "plugin").exists()
+
+
 def test_normalization_receipt_rejects_forged_plugin_or_child_identity(tmp_path: Path) -> None:
     tmp_path = tmp_path.resolve(strict=True)
     source = tmp_path / "synthetic-skill"
@@ -279,3 +318,87 @@ def test_normalization_receipt_rejects_forged_plugin_or_child_identity(tmp_path:
         type(receipt).model_validate(payload)
     with pytest.raises(ContractError):
         SchemaRegistry().validate("plugin-normalization.v1", payload)
+
+
+def test_normalization_receipt_requires_normalized_lifecycle(tmp_path: Path) -> None:
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    shutil.copytree(FIXTURE_ROOT, source)
+    receipt = _normalize(source, tmp_path / "plugin")
+    assert receipt.status == "prepared"
+    payload = receipt.model_dump(mode="json")
+    payload["normalized_package"]["lifecycle"] = "admitted"
+
+    with pytest.raises(ValidationError):
+        type(receipt).model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-normalization.v1", payload)
+
+
+def test_normalization_receipt_requires_description_policy_and_metadata(tmp_path: Path) -> None:
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    shutil.copytree(FIXTURE_ROOT, source)
+    receipt = _normalize(source, tmp_path / "plugin")
+    assert receipt.status == "prepared"
+    payload = receipt.model_dump(mode="json")
+    payload["plugin_validation"]["policy"]["require_description"] = False
+    payload["plugin_validation"]["manifest"]["description"] = None
+
+    with pytest.raises(ValidationError):
+        type(receipt).model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-normalization.v1", payload)
+
+
+def test_blocked_normalization_cannot_retain_validation_without_created_candidate(tmp_path: Path) -> None:
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    shutil.copytree(FIXTURE_ROOT, source)
+    prepared = _normalize(source, tmp_path / "prepared")
+    blocked = _normalize(source, tmp_path / "blocked", rights=False)
+    assert prepared.status == "prepared" and blocked.blocker is not None
+    payload = prepared.model_dump(mode="json")
+    payload.update(
+        status="blocked",
+        normalized_package=None,
+        blocker=blocked.blocker.model_dump(mode="json"),
+        candidate_created=False,
+    )
+
+    with pytest.raises(ValidationError):
+        type(prepared).model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-normalization.v1", payload)
+
+
+def test_normalization_rejects_destination_replacement_before_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.intake import plugin_normalization as normalization
+
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    destination = tmp_path / "plugin"
+    shutil.copytree(FIXTURE_ROOT, source)
+    validate = normalization.validate_plugin_package
+
+    def validate_replaced_directory(
+        root: Path,
+        *,
+        source_revision: str,
+        policy: PluginValidationPolicy | None = None,
+    ) -> PluginPackageValidation:
+        manifest_path = root / "plugin.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest.update(name="attacker-plugin", version="9.9.9", description="Replacement.")
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        return validate(root, source_revision=source_revision, policy=policy)
+
+    monkeypatch.setattr(normalization, "validate_plugin_package", validate_replaced_directory)
+    receipt = _normalize(source, destination)
+
+    assert receipt.status == "blocked" and receipt.candidate_created
+    assert receipt.blocker is not None and receipt.blocker.code == "normalized_candidate_changed"
+    assert receipt.plugin_validation is not None and receipt.plugin_validation.status == "pass"
+    assert receipt.normalized_package is None

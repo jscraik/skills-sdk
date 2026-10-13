@@ -64,7 +64,7 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 | Slice | Work | Completion proof | State |
 | --- | --- | --- | --- |
 | S1 | Record the target workflow, map all 52 source capabilities, repair stale command discovery. | Links and repository checks pass; source statuses remain distinct from SDK statuses. | Accepted in PR #44; maintain affected rows at every feature closeout. |
-| S2 | Add applicable plugin/skill policy, approved icons and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48 and #52 merged. Skill policy, declared claim coverage, supplied content assessment, bounded offline review, local stage composition and canonical plugin inspection exist. Plugin normalisation, joined release preparation, icon validation/approval, comprehensive semantic accuracy, external reference quality and full legacy parity remain open. |
+| S2 | Add applicable plugin/skill policy, approved icons and reference/description quality checks through existing validation seams. | Accepted, rejected, and corrected package inputs through public services and installed CLI; original source remains unchanged and release proof binds the complete plugin. | Partial: PRs #45–48, #52 and #60 add skill policy, claim coverage, supplied content assessment, bounded offline review, local stage composition, canonical plugin inspection and candidate-bound presentation assessment. PR #62 adds an explicit standalone-to-plugin normalization route that creates a separate complete-plugin candidate without rewriting source. Joined release preparation, independent rights/visual approval, comprehensive semantic/reference accuracy and full legacy parity remain open; this child route does not complete S2. |
 | S3 | Bind applicable security evidence, update-permission differences and executed scenario/scorer evidence before evaluation. | Relevant checks are required; absent, stale, wrong-candidate, and contradictory evidence block; neighbouring valid inputs pass; expanded permissions need renewed authority. | Partial: PRs #49–50 merged. Static screening, guarded selected-case execution and observed numeric calibration exist. Permission-delta interpretation, independent scanner/reviewer provenance, live quality and remaining risk semantics remain open. |
 | S4 | Implement budgeted matched plugin evaluation, local then cloud adapter handoff, and failure ownership. | Frozen complete-plugin identities, both variants, per-skill/relevant cross-skill cases, same-model lift, calibrated judging, rejected drift and recovery; declared stopping, improvement and regression limits; no promotion for inconclusive results. | Partial: PRs #53, #55 and #56 merged. Strict plugin binding, child calibration, budgets, source/safety guards, fresh per-trial capabilities, one-to-nine-child offline routes, feedback/rerun and explicit named-profile binding exist. Real-driver settings application and live local/cloud quality remain open. |
 | S5 | Compose plugin archive/presentation verification, explicit exports and registry-independent publication/readback/install boundaries, initially Tessl. | Complete resources/modes, private-material exclusion, versioned destination profiles, separate portable/export digests, exact checked version, uncertain-outcome readback, idempotency and observed recovery; host display/activation separately proved. | Local Tessl-format plugin and transport prototypes, unmerged and not canonical portable intake. Reconcile metadata ownership and the transport input-boundary finding before integration. Initial Tessl execution and any future backend transition remain separate. |
@@ -72,8 +72,8 @@ Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 
 ## Accepted delivery ledger
 
-Accepted SDK baseline: [`e9ad586`](https://github.com/jscraik/skills-sdk/commit/e9ad5867eae08055cea9b156cb5d323bd2572965),
-verified on 2026-10-12. The workflow and migration map describe this same
+Accepted baseline before the current S2 closeout: [`ed67328`](https://github.com/jscraik/skills-sdk/commit/ed67328281fd8c7227ec806d42258337076d0c0e),
+verified on 2026-10-13. The workflow and migration map use this same starting
 revision. These merges accept the bounded capabilities below, not all acceptance
 criteria of their parent slices.
 
@@ -90,6 +90,7 @@ criteria of their parent slices.
 | [PR #52](https://github.com/jscraik/skills-sdk/pull/52) | [`1125d0e`](https://github.com/jscraik/skills-sdk/commit/1125d0e4fe339a4c4c60a47a11952ae70367a842) | Root-manifest plugin inspection, complete bytes and separate modes, child/settings binding and fresh source verification. No release approval or live-operation authority. |
 | [PR #53](https://github.com/jscraik/skills-sdk/pull/53) | [`ed378971`](https://github.com/jscraik/skills-sdk/commit/ed378971c863d97dddd1c9edcb3e6e6d5b31a5bd) | Bounded matched whole-plugin evaluation, child calibration, same-lane local/cloud handoff and feedback/rerun services. Supplied-offline CLI and injected API proof are not live quality or release clearance. |
 | [PR #56](https://github.com/jscraik/skills-sdk/pull/56) | [`047260b`](https://github.com/jscraik/skills-sdk/commit/047260b1c1d051f1b3c54bf6327881987305e52d) | Explicit local/cloud profile inputs, dependency/settings binding, controlled driver invocation, drift rejection and corrected-input recovery. Not real-provider settings application or quality proof. |
+| [PR #60](https://github.com/jscraik/skills-sdk/pull/60) | [`ed67328`](https://github.com/jscraik/skills-sdk/commit/ed67328281fd8c7227ec806d42258337076d0c0e) | Candidate-bound plugin presentation assessment for captured images, modes and supplied approval; not independent rights/visual approval, archive inclusion or host display. |
 
 PR #54 accepted instruction-alignment documentation at
 [`ec8f0dae`](https://github.com/jscraik/skills-sdk/commit/ec8f0dae3b370cf9f9c8a85ce91f70e4846481f1).
@@ -110,16 +111,13 @@ validation, current PR checks/reviews, or live provider and runtime evidence.
 
 ## Proof lanes and resume point
 
-Current bounded slice, 2026-10-12: reconcile root-owned presentation work against
-accepted `e9ad586` on `codex/sdk-presentation-reconciliation`. Add fresh complete
-plugin image/mode/settings binding and supplied-approval checks through existing
-validation seams. Retain old approval through valid byte/mode drift rejection,
-then prove corrected source and renewed approval recovery through installed
-public API/schema/CLI. Source remains unchanged by checks. Closeout requires
-final focused/schema proof, the canonical aggregate, signature verification,
-non-force delivery, current-head independent review/checks, receipts and merge.
-This is unmerged; no prior aggregate proves its changed bytes. Actual visual
-approval, rights verification, archive inclusion and host display remain separate.
+Historical bounded slice, 2026-10-12: reconcile root-owned presentation work
+against accepted `e9ad586` on `codex/sdk-presentation-reconciliation`. The scope
+was fresh complete-plugin image/mode/settings binding and supplied-approval
+checks through existing validation seams, with drift rejection and corrected
+source/renewed-approval recovery through installed public API/schema/CLI. PR #60
+later accepted the bounded presentation assessment at `ed673282`; independent
+visual/rights approval, archive inclusion and host display remain separate.
 
 Historical bounded slice, 2026-10-11: documentation-only instruction alignment
 from accepted PR #56 revision `047260b`. Reconcile accepted capabilities,
@@ -160,19 +158,34 @@ was still running and the local update receipt had not passed; merge topology
 does not retroactively establish those lanes. This is historical merge evidence,
 not an active instruction to repeat PR #53 work.
 
-Parked work remains root-owned, with no ownership transfer: presentation branch
-`codex/sdk-plugin-presentation-integration` at signed `0c6eea3` has historical
-local validation but no accepted delivery; portable-export branch
-`codex/sdk-portable-export` has local uncommitted work based on `1125d0e`, focused
-proof only and no aggregate or delivery. Preserve both and unrelated primary
-edits. The earlier S4 review-export approval does not cover presentation.
+Parked work remains root-owned, with no ownership transfer: the presentation
+branch `codex/sdk-plugin-presentation-integration` at signed `0c6eea3` is retained
+historical work; PR #60 accepted its bounded presentation assessment at
+`ed673282`, but that does not make this branch the accepted baseline or a cleanup
+target. The portable-export branch `codex/sdk-portable-export` retains local
+uncommitted work based on `1125d0e`, focused proof only and no aggregate or
+delivery. Preserve both and unrelated primary edits. The earlier S4 review-export
+approval does not cover presentation or other exports.
 
-One next dependency-ready action after presentation acceptance: explicitly
-normalise standalone inputs into a separate canonical plugin candidate and join
-whole-plugin preparation evidence without changing original source or inheriting
-bare-skill clearance. Reconcile preserved portable-export work before selecting
-any archive or destination conversion; review conversion separately. Presentation
-acceptance alone does not complete S2 or grant release authority.
+Current bounded child slice, 2026-10-13: explicitly normalize an admitted
+standalone skill into a new canonical one-skill plugin candidate without
+rewriting source or inheriting bare-skill release clearance. Closeout requires
+receipt integrity, destination/content binding, accepted/rejected/corrected
+input proof through installed API/schema/CLI, the final canonical aggregate,
+signed non-force delivery, current-head checks and independent review, resolved
+finding-specific threads, applicable receipts, and normal merge. This child
+route does not close parent S2, establish an existing-plugin update workflow,
+or imply publication, installation or runtime proof.
+
+One next dependency-ready action after normalization acceptance: compose the
+candidate through whole-plugin quality and preparation using existing services.
+Keep description/reference accuracy, scenario/scorer gaps, approved artwork,
+permission-change interpretation and applicable independent security review
+visible as distinct gates; do not let normalization or later model-profile/A/B
+success imply their clearance. Reconcile the preserved portable-export work
+before selecting an archive or destination conversion, and review that
+conversion separately. S2 remains partial until the joined workflow and its
+remaining gaps have their own proof.
 
 That representative plugin still cannot traverse the complete workflow. Retain
 these dependent gates, in workflow order, rather than choosing later evaluation
@@ -474,11 +487,13 @@ Documenting these commands does not claim a new test run.
   review, scenario execution, calibration, promotion and external-state proof
   separate; use the map's remaining actions before selecting further work.
 
-### Queued-work assessment and next bounded slice
+### Historical queued-work assessment and slice selection (2026-10-08)
 
-Historical assessment and slice selection, 2026-10-08. The intake slice below
-was subsequently accepted in PR #52; it is not the active instruction. See the
-[current resume point](#proof-lanes-and-resume-point) for delivery order.
+This section preserves the 2026-10-08 assessment and its then-current plan as
+history. The intake and presentation children were subsequently accepted in
+PRs #52 and #60; the current bounded slice and dependency order are stated once
+in the [current resume point](#proof-lanes-and-resume-point). Nothing below is
+an active instruction to reopen those accepted slices.
 
 Read-only assessment on 2026-10-08 found that queued capture, build, hardening
 and transport use `.tessl-plugin/plugin.json` as authoritative metadata. Root
@@ -495,9 +510,11 @@ within one cloud model lane. Preserve it. Callers still supply the refined
 candidate; neither candidate authoring nor live cloud quality is established.
 These are source-inspection results, not new test runs or accepted-main claims.
 
-Then-selected slice: **canonical portable plugin intake and binding**, within the existing
-validation, intake, packaging, model/schema and CLI seams. No registry server,
-provider execution, publication or installation is part of this slice.
+The then-selected slice was **canonical portable plugin intake and binding**,
+within the existing validation, intake, packaging, model/schema and CLI seams.
+PR #52 later accepted plugin inspection. The current normalization child is
+separately tracked in the current resume point. This historic selection did not
+authorise registry servers, provider execution, publication or installation.
 
 - Accept root-only single- and multi-skill Agent Plugins candidates using the
   selected specification and direct skill discovery, with Tessl unavailable.
@@ -522,7 +539,10 @@ provider execution, publication or installation is part of this slice.
   proof and the required aggregate after relevant implementation changes.
 
 The then-planned follow-up was a bounded icon/presentation validation slice using
-existing models and services, not a new framework. Prove approval/rights binding,
+existing models and services, not a new framework. PR #60 later accepted its
+bounded presentation-assessment child; independent visual/rights approval,
+archive inclusion and observed host display remain separate. The historical
+assessment proposed proving approval/rights binding,
 destination image limits, safe manifest references, exact packed assets, changed
 icon invalidation, and accepted/rejected/corrected inputs. Keep visual approval
 distinct from decoding and authorised host-display proof distinct from offline
@@ -530,10 +550,13 @@ validation. Inventory existing managed plugins for missing or unsuitable art
 through supplied candidates, then schedule normal versioned updates; preserve
 acceptable art and verified provider-managed exemptions.
 
-The remaining direction was explicit standalone normalisation, plugin-bound evaluation and
-archive preparation. Reconcile declared optimisation budgets and permission
-changes before dependent execution, and require adapter-version, presentation,
-interruption/retry and recovery proof before delivery. A separate bounded Tessl export adapter must retain
+At that assessment's end, the remaining direction included explicit standalone
+normalisation, plugin-bound evaluation and archive preparation. PR #53 later
+accepted bounded matched evaluation; this task record's current resume point
+now sequences the remaining work. The historical assessment called for
+reconciling declared optimisation budgets and permission changes before
+dependent execution, and adapter-version, presentation, interruption/retry and
+recovery proof before delivery. A separate bounded Tessl export adapter must retain
 unchanged skill contents, distinct artifact digests and a verified relationship,
 or block when required resources/modes cannot survive. Preserve the existing ten
 active scenarios. No current candidate authorises advancing to live operations.
