@@ -139,6 +139,72 @@ advancing packaging or registry integration; do not reinterpret existing skill
 receipts as whole-plugin proof. Preserve origin-verified provider-managed system
 skills and plugins on their supported routes, without automatic conversion.
 
+## Skill authoring contract
+
+Owner-approved direction, 2026-10-12: keep contracts rigid and task-specific
+content flexible. A consistent authoring contract is not a universal body
+template. Process, reference, exploratory and creative skills may need different
+layouts. Do not add empty sections or mandatory supporting files merely to
+match another skill. Names, descriptions and other variable values still obey
+the applicable schema and release policy.
+
+Each skill must make these answers discoverable where relevant: its intended
+outcome; when to select it and when not to; required inputs and resources;
+authority and safety limits; the steps or decision rules; failure and recovery;
+expected output; and the evidence needed to claim completion. Put concise
+selection and operating guidance in `SKILL.md`. Move supporting detail to
+referenced resources with an explicit reason and point at which to read them.
+Keep deterministic helpers in scripts rather than duplicating their logic in
+prose. Examples must agree with the rules; exceptions need a bounded condition.
+
+Use the existing quality and evaluation services in this order:
+
+1. Check deterministic requirements: applicable field types and schemas,
+   package structure, required files under the selected contract, safe resource
+   paths, candidate identity, evidence binding and scenario-set constraints.
+   Use the applicable [`validate`, `eval scenario-quality`, `eval scorer-quality`,
+   and `eval scorer-calibration` command entries](cli.md#existing-local-routes),
+   or the supported [`check-quality` composition](cli.md#explicit-local-quality-workflow).
+   Check only rules the selected validator actually implements. If an applicable
+   requirement has no implemented command, record it as `not_run` or `blocked`;
+   do not imply that an adjacent check covers it. A syntactically valid
+   description or existing reference is not proof of accuracy or usefulness.
+2. Review meaning: description accuracy, selection boundaries, progressive
+   disclosure, resource usefulness, example consistency, omissions and recovery
+   guidance. Retain candidate-bound findings and gaps with a responsible owner.
+   The [`review-content` route](cli.md#supplied-content-review-evidence) checks
+   supplied assessment evidence only; it does not perform semantic review. If
+   no reviewer has assessed the candidate, record that gate as `not_run` or
+   `blocked`. A heuristic warning is not a deterministic conformance failure
+   unless an explicit, tested contract makes it one.
+3. Prove behaviour with representative tasks and neighbouring negative cases.
+   Separate correct skill selection from correct execution. Use hidden criteria,
+   calibrated scorers and matched comparisons for claimed improvements; check
+   observed actions or outputs rather than trusting a completion statement.
+   Use [`eval scenario-quality` for scenario definitions and `eval
+   selected-case` for a declared case](cli.md#existing-local-routes);
+   [`eval scenario-coverage`](cli.md#existing-local-routes) audits claim mapping
+   but does not execute cases. `selected-case` uses its documented caller
+   adapter; supplied-offline proof is not live-provider execution. Record
+   unavailable execution as `not_run` or `blocked`. Preserve exactly ten active
+   managed scenarios. Held-out probes, repetitions and implementation
+   regressions remain separate from that active set.
+4. Retain failures, correct the responsible input, rebind changed candidates,
+   and rerun affected and dependent gates. Accept unchanged, rejected and
+   inconclusive outcomes. Record what supplied or controlled offline evidence
+   proves without claiming live provider, host or release proof. Rerun the
+   owning command for each affected gate; the documented `check-quality`
+   composition can repeat its supported stages, but it does not cover gates it
+   does not implement. Record those gates as `not_run` or `blocked`.
+
+Research-derived authoring recommendations guide review and experiments; they
+do not become universal hard failures from creator reputation or small-sample
+results alone. Promote a recommendation to deterministic enforcement only when
+its applicability, accepted and rejected inputs, corrected-input recovery and
+compatibility are proved through the existing public contract procedure.
+Maintain this section with affected feature closeouts; do not introduce another
+tracker, authoring framework or duplicate acceptance matrix.
+
 ## Icons and presentation
 
 Every Jamie-owned, SDK-managed plugin must have an approved professional icon,
