@@ -178,8 +178,8 @@ def _write_candidate(
     files: tuple[PluginCapturedFile, ...],
     payloads: dict[str, bytes],
     directories: tuple[str, ...],
-) -> None:
-    """Create a new candidate directory without replacing or following existing paths."""
+) -> int:
+    """Create a candidate safely and return an owned descriptor retaining its directory identity."""
     parent = _destination_parent(source_root, destination_root)
     candidate_created = False
     try:
@@ -195,6 +195,7 @@ def _write_candidate(
             for record in files:
                 _write_file(root, f"skills/{skill_name}/{record.path}", payloads[record.path], record.permission_mode)
             os.fsync(root)
+            return os.dup(root)
         finally:
             os.close(root)
     except _DestinationExistsError:
@@ -203,6 +204,17 @@ def _write_candidate(
         raise _CandidateWriteError(candidate_created) from exc
     finally:
         os.close(parent)
+
+
+def _same_created_directory(destination_root: Path, created_directory: int) -> bool:
+    """Compare the current no-follow destination with the retained directory this call created."""
+    descriptor = _open_existing_directory(destination_root.absolute())
+    try:
+        created = os.fstat(created_directory)
+        current = os.fstat(descriptor)
+        return (created.st_dev, created.st_ino) == (current.st_dev, current.st_ino)
+    finally:
+        os.close(descriptor)
 
 
 def _normalized_package(intake: SkillPackageIntakeReceipt, validation: PluginPackageValidation) -> NormalizedPackage:
@@ -286,7 +298,7 @@ def normalize_standalone_skill_package(
         return _block(intake, "source_changed", "standalone source differs from its admitted capture")
     assert intake.validation.identity is not None
     try:
-        _write_candidate(
+        created_directory = _write_candidate(
             skill_root,
             destination_root,
             manifest,
@@ -308,18 +320,22 @@ def normalize_standalone_skill_package(
         )
     except (OSError, TypeError, ValueError):
         return _block(intake, "candidate_normalization_failed", "safe candidate normalization could not complete")
-    return _validate_and_receipt(
-        intake,
-        skill_root,
-        destination_root,
-        context.source_revision,
-        metadata,
-        manifest,
-        intake.validation.identity.name,
-        files,
-        payloads,
-        directories,
-    )
+    try:
+        return _validate_and_receipt(
+            intake,
+            skill_root,
+            destination_root,
+            context.source_revision,
+            metadata,
+            manifest,
+            intake.validation.identity.name,
+            files,
+            payloads,
+            directories,
+            created_directory,
+        )
+    finally:
+        os.close(created_directory)
 
 
 def _validate_and_receipt(
@@ -333,8 +349,9 @@ def _validate_and_receipt(
     files: tuple[PluginCapturedFile, ...],
     payloads: dict[str, bytes],
     directories: tuple[str, ...],
+    created_directory: int,
 ) -> PluginNormalizationReceipt:
-    """Recheck source stability and bind fresh complete-plugin and child proof."""
+    """Recheck source, destination content and retained directory identity before binding plugin proof."""
     validation = validate_plugin_package(destination_root, source_revision=source_revision, policy=_PLUGIN_POLICY)
     try:
         current = capture_plugin_source(skill_root)
@@ -373,10 +390,26 @@ def _validate_and_receipt(
             validation=validation,
         )
     expected_files = _expected_plugin_files(manifest_payload, skill_name, files)
+    expected_payloads = {"plugin.json": manifest_payload}
+    expected_payloads.update((f"skills/{skill_name}/{path}", payload) for path, payload in payloads.items())
+    expected_directories = tuple(sorted(_directory_paths(skill_name, directories, files)))
+    try:
+        destination_capture = capture_plugin_source(destination_root)
+        same_directory = _same_created_directory(destination_root, created_directory)
+    except (OSError, TypeError, ValueError):
+        return _block(
+            intake,
+            "normalized_candidate_recheck_failed",
+            "candidate was created but destination stability could not be confirmed; inspect it before retrying",
+            candidate_created=True,
+            validation=validation,
+        )
     manifest = validation.manifest
     candidate = validation.candidate
     if (
-        validation.files != expected_files
+        not same_directory
+        or destination_capture != (expected_files, expected_payloads, expected_directories)
+        or validation.files != expected_files
         or manifest.name != metadata.name
         or manifest.version != metadata.version
         or manifest.description != metadata.description

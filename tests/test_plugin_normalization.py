@@ -8,6 +8,8 @@ import stat
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as SchemaValidationError
 from pydantic import ValidationError
 
 from skills_sdk.cli.main import main
@@ -402,3 +404,113 @@ def test_normalization_rejects_destination_replacement_before_validation(
     assert receipt.blocker is not None and receipt.blocker.code == "normalized_candidate_changed"
     assert receipt.plugin_validation is not None and receipt.plugin_validation.status == "pass"
     assert receipt.normalized_package is None
+
+
+@pytest.mark.parametrize("mutation", ["manifest", "skill", "directory", "permissions", "symlink"])
+def test_normalization_rechecks_destination_after_validation_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    """Block changes after a passing validation and permit a fresh corrected candidate."""
+    from skills_sdk.intake import plugin_normalization as normalization
+
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    destination = tmp_path / "plugin"
+    shutil.copytree(FIXTURE_ROOT, source)
+    original = (source / "SKILL.md").read_bytes()
+    validate = normalization.validate_plugin_package
+
+    def validate_then_change(
+        root: Path, *, source_revision: str, policy: PluginValidationPolicy | None = None
+    ) -> PluginPackageValidation:
+        validation = validate(root, source_revision=source_revision, policy=policy)
+        child = root / "skills" / "synthetic-skill" / "SKILL.md"
+        if mutation == "manifest":
+            manifest_path = root / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["description"] = "Changed after validation."
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        elif mutation == "skill":
+            child.write_bytes(original + b"\nChanged after validation.\n")
+        elif mutation == "directory":
+            (root / "unvalidated").mkdir()
+        elif mutation == "permissions":
+            child.chmod(0o600)
+        else:
+            child.unlink()
+            child.symlink_to(source / "SKILL.md")
+        return validation
+
+    with monkeypatch.context() as patch:
+        patch.setattr(normalization, "validate_plugin_package", validate_then_change)
+        receipt = _normalize(source, destination)
+
+    assert receipt.status == "blocked" and receipt.candidate_created
+    assert receipt.blocker is not None
+    expected = "normalized_candidate_recheck_failed" if mutation == "symlink" else "normalized_candidate_changed"
+    assert receipt.blocker.code == expected
+    assert receipt.plugin_validation is not None and receipt.plugin_validation.status == "pass"
+    assert receipt.normalized_package is None
+    assert (source / "SKILL.md").read_bytes() == original
+    SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
+    recovered = _normalize(source, tmp_path / "recovered-plugin")
+    assert recovered.status == "prepared" and recovered.candidate_created
+
+
+def test_normalization_rejects_directory_replacement_during_final_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Identical copied bytes must not conceal replacement of the directory this invocation created."""
+    from skills_sdk.intake import plugin_normalization as normalization
+    from skills_sdk.models.plugin import PluginCapturedFile
+
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    destination = tmp_path / "plugin"
+    shutil.copytree(FIXTURE_ROOT, source)
+    capture = normalization.capture_plugin_source
+
+    def capture_then_replace(root: Path) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
+        observed = capture(root)
+        if root == destination:
+            retained = tmp_path / "retained-original"
+            root.rename(retained)
+            shutil.copytree(retained, root)
+        return observed
+
+    with monkeypatch.context() as patch:
+        patch.setattr(normalization, "capture_plugin_source", capture_then_replace)
+        receipt = _normalize(source, destination)
+
+    assert receipt.status == "blocked" and receipt.candidate_created
+    assert receipt.blocker is not None and receipt.blocker.code == "normalized_candidate_changed"
+    assert receipt.normalized_package is None
+    assert _normalize(source, tmp_path / "recovered-plugin").status == "prepared"
+
+
+@pytest.mark.parametrize("representation", ["raw", "copy", "construct"])
+def test_normalization_receipt_rejects_forged_dependency_metadata(tmp_path: Path, representation: str) -> None:
+    """The dependency-free normalization result cannot acquire unverified dependencies."""
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    shutil.copytree(FIXTURE_ROOT, source)
+    receipt = _normalize(source, tmp_path / "plugin")
+    assert receipt.status == "prepared"
+    assert receipt.normalized_package is not None and receipt.normalized_package.dependencies == ()
+    payload = receipt.model_dump(mode="json")
+    validator = Draft202012Validator(SchemaRegistry().load("plugin-normalization.v1"))
+    validator.validate(payload)
+    payload["normalized_package"]["dependencies"] = ["unverified-dependency"]
+
+    with pytest.raises(SchemaValidationError):
+        validator.validate(payload)
+    normalized = receipt.normalized_package.model_copy(update={"dependencies": ("unverified-dependency",)})
+    forged = payload
+    if representation == "copy":
+        forged = receipt.model_copy(update={"normalized_package": normalized})
+    elif representation == "construct":
+        forged = type(receipt).model_construct(**{**receipt.__dict__, "normalized_package": normalized})
+    with pytest.raises(ValidationError):
+        type(receipt).model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-normalization.v1", payload)

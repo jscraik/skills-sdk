@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -291,6 +292,74 @@ def _verify_required_metadata_findings(root: Path) -> None:
     _cli(root, "pass", evidence, ("--require-version", "--require-description"))
 
 
+def _reject_normalization_dependencies(payload: dict[str, object]) -> None:
+    """Reject added dependencies through the installed schema and recover with the original receipt."""
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+
+    registry = SchemaRegistry()
+    forged = json.loads(json.dumps(payload))
+    forged["normalized_package"]["dependencies"] = ["unverified-dependency"]
+    try:
+        registry.validate("plugin-normalization.v1", forged)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("installed normalization schema accepted unverified dependencies")
+    registry.validate("plugin-normalization.v1", payload)
+
+
+def _verify_normalization_destination_drift(root: Path, source: Path, context_payload: dict[str, object]) -> None:
+    """Prove the installed public API rejects post-validation drift and permits a fresh candidate."""
+    from unittest.mock import patch
+
+    from skills_sdk.intake import plugin_normalization as normalization
+    from skills_sdk.models import PluginPackageValidation, PluginValidationPolicy
+    from skills_sdk.models.intake import SkillPackageIntakeContext
+    from skills_sdk.models.plugin import PluginCapturedFile
+    from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata
+
+    validate = normalization.validate_plugin_package
+
+    def validate_then_change(
+        candidate: Path, *, source_revision: str, policy: PluginValidationPolicy | None = None
+    ) -> PluginPackageValidation:
+        result = validate(candidate, source_revision=source_revision, policy=policy)
+        manifest = candidate / "plugin.json"
+        manifest.write_bytes(manifest.read_bytes() + b"\n")
+        return result
+
+    context = SkillPackageIntakeContext.model_validate(context_payload)
+    metadata = PluginNormalizationMetadata(name="fixture-plugin", version="1.0.0", description="Synthetic plugin.")
+    original = (source / "SKILL.md").read_bytes()
+    with patch.object(normalization, "validate_plugin_package", validate_then_change):
+        blocked = normalization.normalize_standalone_skill_package(source, root / "drifted-plugin", context, metadata)
+    assert blocked.status == "blocked" and blocked.candidate_created
+    assert blocked.blocker is not None and blocked.blocker.code == "normalized_candidate_changed"
+    assert blocked.normalized_package is None
+    capture = normalization.capture_plugin_source
+    replaced_destination = root / "replaced-plugin"
+
+    def capture_then_replace(
+        candidate: Path,
+    ) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
+        result = capture(candidate)
+        if candidate == replaced_destination:
+            retained = root / "retained-original-plugin"
+            candidate.rename(retained)
+            shutil.copytree(retained, candidate)
+        return result
+
+    with patch.object(normalization, "capture_plugin_source", capture_then_replace):
+        replaced = normalization.normalize_standalone_skill_package(source, replaced_destination, context, metadata)
+    assert replaced.status == "blocked" and replaced.candidate_created
+    assert replaced.blocker is not None and replaced.blocker.code == "normalized_candidate_changed"
+    assert replaced.normalized_package is None
+    recovered = normalization.normalize_standalone_skill_package(source, root / "recovered-plugin", context, metadata)
+    assert recovered.status == "prepared"
+    assert (source / "SKILL.md").read_bytes() == original
+
+
 def _verify_standalone_normalization(root: Path) -> None:
     """Prove installed API and console entrypoint create a separate bound plugin candidate."""
     from skills_sdk.core.schema_registry import SchemaRegistry
@@ -333,6 +402,8 @@ def _verify_standalone_normalization(root: Path) -> None:
     assert receipt.plugin_validation.skills[0].validation.candidate == receipt.source_intake.candidate
     assert (source / "SKILL.md").read_bytes() == skill
     SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
+    _reject_normalization_dependencies(receipt.model_dump(mode="json"))
+    _verify_normalization_destination_drift(root, source, context.model_dump(mode="json"))
 
     context_path = root / "normalization-context.json"
     context_path.write_text(context.model_dump_json(), encoding="utf-8")
@@ -361,6 +432,7 @@ def _verify_standalone_normalization(root: Path) -> None:
         == cli_receipt["source_intake"]["candidate"]
     )
     assert (source / "SKILL.md").read_bytes() == skill
+    _reject_normalization_dependencies(cli_receipt)
 
 
 def main() -> int:

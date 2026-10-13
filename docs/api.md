@@ -801,6 +801,12 @@ The API preserves the source, copies its files and permissions beneath
 whole-plugin validation. The whole-plugin identity covers the new candidate;
 its sole child retains the standalone skill candidate identity.
 
+Normalization introduces no plugin dependencies. Before issuing a prepared
+receipt, a final no-follow capture checks destination files, bytes, permissions
+and directories against the candidate this invocation wrote, and checks its
+directory identity against the retained creation descriptor. The receipt binds
+that captured state; later changes require fresh downstream validation.
+
 The operation is create-only: unsafe paths, symlinks, and existing destinations
 are rejected rather than overwritten. The destination's parent directory must
 already exist. On a partial filesystem error, the

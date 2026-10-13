@@ -275,7 +275,7 @@ repository-evidence validators. Their proof remains separate from hosted PR
 readiness, provider execution and runtime installation. Use
 [CLI status](docs/cli.md) for the maintained command surface.
 
-The unmerged S2 presentation increment adds read-only
+Accepted PR #60 at `ed673282` adds read-only S2 presentation assessment through
 `check_plugin_presentation` and its CLI over fresh complete-plugin capture.
 Pure models bind supplied approval; optional raster decoding is lazy in the
 validation helper. No provider, registry or host dependency enters core.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, StrictStr, StringConstraints, field_validator, model_validator
+from pydantic import ConfigDict, Field, StrictStr, StringConstraints, field_validator, model_validator
 
 from skills_sdk.models.intake import SkillPackageIntakeReceipt
 from skills_sdk.models.inventory import PackageType, _ContractModel
@@ -43,7 +43,9 @@ class PluginNormalizationReceipt(_ContractModel):
     status: Literal["prepared", "blocked"]
     source_intake: SkillPackageIntakeReceipt
     plugin_validation: PluginPackageValidation | None = None
-    normalized_package: NormalizedPackage | None = None
+    normalized_package: NormalizedPackage | None = Field(
+        default=None, json_schema_extra={"properties": {"dependencies": {"maxItems": 0}}}
+    )
     blocker: PackageReceiptBlocker | None = None
     candidate_created: bool = False
     source_mutated: Literal[False] = False
@@ -76,6 +78,8 @@ class PluginNormalizationReceipt(_ContractModel):
             raise ValueError("prepared normalization requires a normalized plugin identity")
         if normalized.lifecycle is not PackageLifecycleState.NORMALIZED:
             raise ValueError("prepared normalization must retain the normalized lifecycle")
+        if normalized.dependencies:
+            raise ValueError("standalone normalization cannot introduce unverified plugin dependencies")
         if len(validation.skills) != 1:
             raise ValueError("standalone normalization must produce exactly one contained skill")
         if not validation.policy.require_version or not validation.policy.require_description:

@@ -53,17 +53,17 @@ credentials, registry identity, or distribution authority.
 
 ## Managed release gates
 
-The current unmerged S2 increment adds
+Accepted PR #60 at `ed673282` adds
 [presentation assessment](api.md#plugin-presentation-assessment) and
 [installed rejection/recovery proof](../tests/installed_plugin_presentation_smoke.py).
 It checks files and supplied assertions; it does not independently approve
 professional artwork or rights, emit archives, observe host display or complete
-the managed release gates. The accepted proof below remains distinct from that
-candidate until delivery closes.
+the managed release gates. This accepts a bounded S2 child capability;
+the broader product requirements below remain open.
 
 The following strengthen existing SDK-2 through SDK-8 acceptance; they are not
 a second delivery tracker. Coverage below was inspected at accepted code
-`047260b1c1d051f1b3c54bf6327881987305e52d` on 2026-10-11. These requirements
+`ed67328281fd8c7227ec806d42258337076d0c0e` on 2026-10-13. These requirements
 are product policy, not claims that the gates already execute. Use the
 [workflow policy](workflow.md#icons-and-presentation) for icon design and current
 OpenAI destination limits, and the [current resume point](projects/sdk-workflow/tasks.md#proof-lanes-and-resume-point)
@@ -71,7 +71,7 @@ for implementation order.
 
 | Gate | Existing accepted proof and limitation | Required acceptance |
 | --- | --- | --- |
-| Icons and presentation | [Plugin inspection](cli.md#portable-plugin-inspection), [skill capture](../tests/test_skill_package_validation.py) and [ZIP verification](../tests/test_package_archive_verification.py) bind generic asset bytes. [Intake](../tests/test_package_intake.py) checks supplied package rights; neither proves image rights, approval, decoding or host display. | Every Jamie-owned managed plugin has approved professional artwork. Bind approval and rights, decoded file validation, safe manifest closure, exact archive presence and candidate identity. Reject missing, malformed, oversized, non-square, escaping, stale or unapproved artwork; corrected inputs recover without source mutation. Preserve licensed third-party branding. Verify names, descriptions and starter prompts against actual capability, with screenshots/onboarding only when applicable. An authorised host observation must separately show the correct icon. |
+| Icons and presentation | [Presentation assessment](api.md#plugin-presentation-assessment) binds fresh image bytes, modes and supplied approval. [Image checks](../tests/test_plugin_images.py) cover bounded SVG validation and optional raster decoding; [installed proof](../tests/installed_plugin_presentation_smoke.py) covers rejection and recovery. Independent rights/visual approval, archive inclusion and observed host display remain separate requirements. | Every Jamie-owned managed plugin has approved professional artwork. Bind approval and rights, decoded file validation, safe manifest closure, exact archive presence and candidate identity. Reject missing, malformed, oversized, non-square, escaping, stale or unapproved artwork; corrected inputs recover without source mutation. Preserve licensed third-party branding. Verify names, descriptions and starter prompts against actual capability, with screenshots/onboarding only when applicable. An authorised host observation must separately show the correct icon. |
 | Destination compatibility | Canonical portable-plugin inspection exists, not conversion or destination presentation profiles. Existing skill/archive contracts do not establish destination behaviour. | Pin specification and adapter versions; prove representative portable and destination packages preserve required content and behaviour. Unsupported components return explicit blockers, never silent loss. Distinguish declared, structurally checked and observed compatibility. |
 | Discovery and activation | [Runtime evidence contracts](../tests/test_runtime_execution_evidence.py) validate supplied observations; the SDK does not observe or activate a plugin. | An authorised observing adapter proves direct, indirect, incomplete and unrelated requests, including overlapping skills. Expected activation, negative activation and clarification/routing all need evidence for the exact installed candidate. |
 | Update permissions | [Safety evidence](../tests/test_pre_execution_safety.py) and [static screening](../tests/test_security_screening.py) support candidate-bound checks, not baseline-to-candidate permission interpretation. | Compare hooks, MCP servers, destinations, dependencies and access. Unchanged or reduced permissions have valid neighbouring cases; expansion is visible and blocks dependent operations without renewed authority. Corrected input or applicable approval recovers without inheriting baseline authority. |
