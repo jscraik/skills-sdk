@@ -68,6 +68,13 @@ operate the Tessl registry, or claim an installed runtime from local receipts.
 
 ## Working language and discovery
 
+- Keep skill authoring contracts rigid and task-specific content flexible.
+  Enforce applicable schemas, safe resource paths, candidate binding and
+  evidence gates; do not impose one universal `SKILL.md` body template.
+  Names and descriptions still follow their applicable field constraints.
+  Use the [authoring contract](docs/workflow.md#skill-authoring-contract)
+  to separate deterministic checks, semantic review and behavioural proof.
+
 - Use [`GLOSSARY.md`](GLOSSARY.md) as the canonical project vocabulary.
   Consult it when ambiguous public-contract terms such as “build”, “publish”,
   “install”, “candidate”, or “receipt” affect the requested action or meaning.
