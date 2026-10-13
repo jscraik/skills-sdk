@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import stat
 from pathlib import Path
@@ -21,7 +20,6 @@ from skills_sdk.models.package import (
 )
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.plugin import (
-    PLUGIN_SCHEMA_URI,
     PluginCapturedFile,
     PluginPackageValidation,
     PluginValidationPolicy,
@@ -29,6 +27,7 @@ from skills_sdk.models.plugin import (
 from skills_sdk.models.plugin_normalization import (
     PluginNormalizationMetadata,
     PluginNormalizationReceipt,
+    _canonical_normalization_manifest,
     _retained_validation_matches_source,
 )
 from skills_sdk.validation.plugin_capture import capture_plugin_source
@@ -75,13 +74,7 @@ def _block(
 
 def _manifest_payload(metadata: PluginNormalizationMetadata) -> bytes:
     """Build only the canonical portable metadata requested by the caller."""
-    values = {
-        "$schema": PLUGIN_SCHEMA_URI,
-        "name": metadata.name,
-        "version": metadata.version,
-        "description": metadata.description,
-    }
-    payload = (json.dumps(values, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    payload = _canonical_normalization_manifest(metadata.name, metadata.version, metadata.description)
     parse_plugin_manifest({"plugin.json": payload})
     PluginIdentity(package_id=plugin_candidate_id(metadata.name), name=metadata.name, version=metadata.version)
     return payload
@@ -298,7 +291,11 @@ def normalize_standalone_skill_package(
     try:
         files, payloads, directories = capture_plugin_source(skill_root)
     except (TypeError, ValueError):
-        return _block(intake, "source_changed", "standalone source differs from its admitted capture")
+        return _block(
+            intake,
+            "standalone_source_capture_blocked",
+            "standalone source cannot be captured within safe plugin bounds; inspect and correct it before retrying",
+        )
     except OSError:
         return _block(intake, "standalone_source_unavailable", "standalone source cannot be safely captured")
     if not _same_skill_capture(intake, files):

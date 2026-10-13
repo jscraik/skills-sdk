@@ -850,6 +850,22 @@ else:
 The metadata uses `plugin-normalization-metadata/v1`; the result uses
 `plugin-normalization/v1`. Neither is accepted by generic `parse_receipt`.
 Use the registered schemas for structural and semantic binding checks.
+Metadata admission enforces the canonical manifest's aggregate one-MiB UTF-8
+byte limit, including JSON escapes and both required text fields. Structural
+JSON Schema provides necessary per-field character bounds; only the model and
+`SchemaRegistry` enforce the combined encoded-byte budget.
+Prepared receipts require the exact canonical manifest digest, size and mode
+`0644`, no host-settings overlay, and exactly the admitted files beneath
+`skills/<source-name>/`. Structural schema checks do not enforce this file
+closure or authenticate hashes. Original standalone evidence does not record
+file modes or empty directories; the service checks their preservation through
+live captures, rather than claiming receipt-only proof of them.
+An unsupported or unsafe initial capture returns
+`standalone_source_capture_blocked`, not an assertion of observed drift.
+`source_changed` means an observed difference in captured source relative to
+admitted or pre-copy evidence, including later permission or directory drift.
+Correct the responsible input, retain the blocker, and use a fresh destination;
+changed source requires fresh intake and downstream evidence.
 
 The additive `skills_sdk.evaluation.check_local_quality` async service accepts
 a package path and a `LocalCheckRequestV2` or closed raw request. Keyword inputs

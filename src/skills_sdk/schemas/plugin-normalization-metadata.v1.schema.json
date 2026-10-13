@@ -5,6 +5,8 @@
   "description": "Caller-owned canonical root-manifest metadata for a new plugin candidate.",
   "properties": {
     "description": {
+      "maxLength": 1048576,
+      "minLength": 1,
       "title": "Description",
       "type": "string"
     },
@@ -21,6 +23,8 @@
       "type": "string"
     },
     "version": {
+      "maxLength": 1048576,
+      "minLength": 1,
       "title": "Version",
       "type": "string"
     }

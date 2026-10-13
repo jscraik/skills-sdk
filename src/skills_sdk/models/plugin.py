@@ -15,6 +15,7 @@ from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile, _f
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 
 PLUGIN_SCHEMA_URI = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+PLUGIN_MANIFEST_MAX_BYTES = 1_048_576
 
 
 def _is_skill_entrypoint(path: str) -> bool:

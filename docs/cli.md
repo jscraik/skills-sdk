@@ -93,6 +93,12 @@ or overwrites an existing destination. A partial write is reported with
 `candidate_created` so the caller can inspect and correct the destination
 before retrying. The destination parent must already exist; the example uses
 the current directory as that parent.
+The canonical manifest must fit one MiB after UTF-8 encoding and JSON escaping.
+Unsupported or unsafe source capture returns
+`standalone_source_capture_blocked`; an observed difference from admitted or
+pre-copy source evidence returns `source_changed`. Correct the responsible source or metadata and
+retry into a fresh destination, retaining previous failures. Changed candidates
+require fresh intake and downstream evidence.
 
 With `--json`, a completed service call emits `plugin-normalization/v1`.
 Exit `0` means a separate candidate was prepared and whole-plugin structural

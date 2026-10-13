@@ -425,6 +425,124 @@ def _verify_normalization_destination_drift(root: Path, source: Path, context_pa
     assert (source / "SKILL.md").read_bytes() == original
 
 
+def _verify_normalization_metadata_budget(root: Path, source: Path, context_payload: dict[str, object]) -> None:
+    """Prove exact-byte metadata acceptance, rejection and recovery through installed public contracts."""
+    from pydantic import ValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.intake import normalize_standalone_skill_package
+    from skills_sdk.models.intake import SkillPackageIntakeContext
+    from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI
+    from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata
+
+    values = {"name": "fixture-budget-plugin", "version": "1.0.0", "description": ""}
+    overhead = len((json.dumps({"$schema": PLUGIN_SCHEMA_URI, **values}, indent=2) + "\n").encode())
+    values["description"] = "d" * (1_048_576 - overhead)
+    metadata = PluginNormalizationMetadata.model_validate(values)
+    registry = SchemaRegistry()
+    registry.validate("plugin-normalization-metadata.v1", values)
+    invalid = {**values, "description": values["description"] + "d"}
+    try:
+        PluginNormalizationMetadata.model_validate(invalid)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("installed metadata model admitted an oversized canonical manifest")
+    try:
+        registry.validate("plugin-normalization-metadata.v1", invalid)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("installed metadata registry admitted an oversized canonical manifest")
+    context = SkillPackageIntakeContext.model_validate(context_payload)
+    rejected = normalize_standalone_skill_package(
+        source, root / "invalid-budget-plugin", context, metadata.model_copy(update=invalid)
+    )
+    assert rejected.status == "blocked" and rejected.blocker.code == "plugin_metadata_invalid"
+    assert not rejected.candidate_created and not (root / "invalid-budget-plugin").exists()
+    accepted = normalize_standalone_skill_package(source, root / "exact-budget-plugin", context, metadata)
+    assert accepted.status == "prepared"
+    assert (root / "exact-budget-plugin" / "plugin.json").stat().st_size == 1_048_576
+    registry.validate("plugin-normalization.v1", accepted.model_dump(mode="json"))
+
+
+def _verify_normalization_output_closure(root: Path, source: Path, context_payload: dict[str, object]) -> None:
+    """Reject genuine but non-normalization plugin output and recover through the installed API."""
+    from pydantic import ValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.intake import normalize_standalone_skill_package
+    from skills_sdk.models.intake import SkillPackageIntakeContext
+    from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata, PluginNormalizationReceipt
+    from skills_sdk.validation import validate_plugin_package
+
+    context = SkillPackageIntakeContext.model_validate(context_payload)
+    metadata = PluginNormalizationMetadata(
+        name="fixture-closure-plugin", version="1.0.0", description="Synthetic plugin."
+    )
+    destination = root / "closure-plugin"
+    prepared = normalize_standalone_skill_package(source, destination, context, metadata)
+    assert prepared.status == "prepared"
+    (destination / "extra.md").write_text("Not normalization output.\n", encoding="utf-8")
+    validation = validate_plugin_package(
+        destination, source_revision=context.source_revision, policy=prepared.plugin_validation.policy
+    )
+    assert validation.status == "pass" and validation.candidate is not None
+    payload = prepared.model_dump(mode="json")
+    payload["plugin_validation"] = validation.model_dump(mode="json")
+    payload["normalized_package"]["source"]["provenance"]["content_sha256"] = validation.candidate.content_sha256
+    try:
+        PluginNormalizationReceipt.model_validate(payload)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("installed normalization model accepted extra root files")
+    registry = SchemaRegistry()
+    try:
+        registry.validate("plugin-normalization.v1", payload)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("installed normalization registry accepted extra root files")
+    recovered = normalize_standalone_skill_package(source, root / "closure-recovered-plugin", context, metadata)
+    assert recovered.status == "prepared"
+    registry.validate("plugin-normalization.v1", recovered.model_dump(mode="json"))
+
+
+def _verify_normalization_capture_limit(command: list[str], source: Path, root: Path) -> None:
+    """Retain a real capture-limit CLI blocker, correct its input and prove fresh candidate binding."""
+    from skills_sdk.core.schema_registry import SchemaRegistry
+
+    oversized = source / "oversized.md"
+    oversized.write_bytes(b"x" * (16 * 1024 * 1024 + 1))
+    rejected_command = list(command)
+    rejected_command[3] = str(root / "capture-blocked-plugin")
+    completed = subprocess.run(rejected_command, cwd=root, capture_output=True, text=True, check=False)
+    assert completed.returncode == 2, completed.stderr + completed.stdout
+    rejected = json.loads(completed.stdout)
+    assert rejected["status"] == "blocked" and not rejected["candidate_created"]
+    assert rejected["blocker"]["code"] == "standalone_source_capture_blocked"
+    assert rejected["source_intake"]["status"] == "normalized" and not (root / "capture-blocked-plugin").exists()
+    SchemaRegistry().validate("plugin-normalization.v1", rejected)
+    oversized.unlink()
+    recovered_command = list(command)
+    recovered_command[3] = str(root / "capture-recovered-plugin")
+    completed = subprocess.run(recovered_command, cwd=root, capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stderr + completed.stdout
+    recovered = json.loads(completed.stdout)
+    assert (
+        recovered["status"] == "prepared"
+        and recovered["source_intake"]["candidate"] != rejected["source_intake"]["candidate"]
+    )
+    assert (
+        recovered["plugin_validation"]["skills"][0]["validation"]["candidate"]
+        == recovered["source_intake"]["candidate"]
+    )
+    SchemaRegistry().validate("plugin-normalization.v1", recovered)
+
+
 def _verify_standalone_normalization(root: Path) -> None:
     """Prove installed API and console entrypoint create a separate bound plugin candidate."""
     from skills_sdk.core.schema_registry import SchemaRegistry
@@ -509,6 +627,10 @@ def _verify_standalone_normalization(root: Path) -> None:
     assert (source / "SKILL.md").read_bytes() == skill
     _reject_normalization_dependencies(cli_receipt)
     _reject_blocked_normalization_validation(cli_receipt, foreign_validation)
+    _verify_normalization_metadata_budget(root, source, context.model_dump(mode="json"))
+    _verify_normalization_output_closure(root, source, context.model_dump(mode="json"))
+    _verify_normalization_capture_limit(command, source, root)
+    assert (source / "SKILL.md").read_bytes() == skill
 
 
 def main() -> int:

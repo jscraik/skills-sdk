@@ -295,10 +295,10 @@ def test_normalization_rejects_unsafe_source_and_detects_change_after_intake(
     (source / "SKILL.md").write_bytes(original)
 
 
-def test_normalization_reports_capture_value_error_as_source_changed(
+def test_normalization_reports_unsafe_capture_without_claiming_observed_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Report unsafe post-intake capture as source drift, not invalid metadata."""
+    """Report unsupported capture without claiming that two snapshots were compared."""
     from skills_sdk.intake import plugin_normalization as normalization
 
     tmp_path = tmp_path.resolve(strict=True)
@@ -319,7 +319,7 @@ def test_normalization_reports_capture_value_error_as_source_changed(
     receipt = _normalize(source, tmp_path / "plugin")
 
     assert receipt.status == "blocked" and not receipt.candidate_created
-    assert receipt.blocker is not None and receipt.blocker.code == "source_changed"
+    assert receipt.blocker is not None and receipt.blocker.code == "standalone_source_capture_blocked"
     assert not (tmp_path / "plugin").exists()
 
 
@@ -611,3 +611,127 @@ def test_normalization_retains_binding_failure_without_foreign_passing_validatio
     assert (source / "SKILL.md").read_bytes() == original
     SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
     assert _normalize(source, tmp_path / "corrected-plugin").status == "prepared"
+
+
+@pytest.mark.parametrize("character", ["a", "é", "💡", '"', "\\", "\x00"])
+@pytest.mark.parametrize("field", ["version", "description"])
+def test_normalization_metadata_enforces_exact_serialized_byte_budget(character: str, field: str) -> None:
+    """Accept exactly one MiB and reject the next encoded byte, including JSON escapes."""
+    from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI
+
+    values = {"name": "synthetic-plugin", "version": "v", "description": "d"}
+    values[field] = ""
+    overhead = len((json.dumps({"$schema": PLUGIN_SCHEMA_URI, **values}, ensure_ascii=False, indent=2) + "\n").encode())
+    cost = len(json.dumps(character, ensure_ascii=False).encode()) - 2
+    count, remainder = divmod(1_048_576 - overhead, cost)
+    values[field] = character * count + "a" * remainder
+    accepted = PluginNormalizationMetadata.model_validate(values)
+    registry = SchemaRegistry()
+    registry.validate("plugin-normalization-metadata.v1", accepted.model_dump(mode="json"))
+    invalid = {**values, field: values[field] + "a"}
+    # Necessary per-field limits cannot express the aggregate UTF-8/escaping budget.
+    Draft202012Validator(registry.load("plugin-normalization-metadata.v1")).validate(invalid)
+    for payload in (invalid, accepted.model_copy(update={field: invalid[field]})):
+        with pytest.raises(ValidationError):
+            PluginNormalizationMetadata.model_validate(payload)
+    with pytest.raises(ContractError):
+        registry.validate("plugin-normalization-metadata.v1", invalid)
+    registry.validate("plugin-normalization-metadata.v1", values)
+
+
+def test_normalization_metadata_budget_combines_fields_and_rejects_invalid_unicode() -> None:
+    """Reject combined oversized fields and unencodable input without coercion."""
+    registry = SchemaRegistry()
+    for values in (
+        {"name": "synthetic-plugin", "version": "v" * 600_000, "description": "d" * 600_000},
+        {"name": "synthetic-plugin", "version": "v", "description": "bad\ud800unicode"},
+    ):
+        with pytest.raises(ValidationError):
+            PluginNormalizationMetadata.model_validate(values)
+        with pytest.raises(ContractError):
+            registry.validate("plugin-normalization-metadata.v1", values)
+    registry.validate(
+        "plugin-normalization-metadata.v1", {"name": "synthetic-plugin", "version": "v", "description": "d"}
+    )
+
+
+@pytest.mark.parametrize("limit", ["MAX_FILE_BYTES", "MAX_FILES", "MAX_TOTAL_BYTES"])
+def test_normalization_stable_capture_limits_block_without_false_drift_and_recover(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, limit: str
+) -> None:
+    """An admitted unchanged source exceeding plugin bounds needs correction, not a drift retry."""
+    from skills_sdk.intake import intake_skill_package
+    from skills_sdk.validation import plugin_capture
+
+    tmp_path = tmp_path.resolve(strict=True)
+    source = tmp_path / "synthetic-skill"
+    shutil.copytree(FIXTURE_ROOT, source)
+    original = (source / "SKILL.md").read_bytes()
+    admitted = intake_skill_package(source, _context())
+    assert admitted.status == "normalized" and admitted.decision.decision.value == "admit"
+    with monkeypatch.context() as patch:
+        patch.setattr(plugin_capture, limit, 0)
+        receipt = _normalize(source, tmp_path / "bounded-plugin")
+    assert receipt.status == "blocked" and not receipt.candidate_created
+    assert receipt.blocker is not None and receipt.blocker.code == "standalone_source_capture_blocked"
+    assert receipt.source_intake.candidate == admitted.candidate
+    assert not (tmp_path / "bounded-plugin").exists() and (source / "SKILL.md").read_bytes() == original
+    SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
+    assert _normalize(source, tmp_path / "corrected-plugin").status == "prepared"
+
+
+@pytest.mark.parametrize("mutation", ["root-file", "format", "mode", "extra-field", "settings"])
+@pytest.mark.parametrize("representation", ["raw", "copy", "construct"])
+def test_prepared_normalization_rejects_genuine_validation_outside_created_output(
+    tmp_path: Path, mutation: str, representation: str
+) -> None:
+    """Genuine plugin validation is not proof of the exact output normalization creates."""
+    from skills_sdk.validation import validate_plugin_package
+
+    tmp_path = tmp_path.resolve(strict=True)
+    source, destination = tmp_path / "synthetic-skill", tmp_path / "plugin"
+    shutil.copytree(FIXTURE_ROOT, source)
+    prepared = _normalize(source, destination)
+    assert prepared.status == "prepared" and prepared.normalized_package is not None
+    manifest_path = destination / "plugin.json"
+    original = manifest_path.read_bytes()
+    if mutation == "root-file":
+        (destination / "extra.md").write_text("Not created by normalization.\n", encoding="utf-8")
+    elif mutation == "mode":
+        manifest_path.chmod(0o600)
+    else:
+        manifest = json.loads(original)
+        if mutation == "extra-field":
+            manifest["homepage"] = "https://example.com"
+        elif mutation == "settings":
+            manifest["extensions"] = {"com.openai": {"display_name": "Other presentation"}}
+        manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    validation = validate_plugin_package(
+        destination, source_revision="1" * 40, policy=prepared.plugin_validation.policy
+    )
+    assert validation.status == "pass" and validation.candidate is not None
+    assert validation.skills[0].validation.candidate == prepared.source_intake.candidate
+    normalized = prepared.normalized_package.model_dump(mode="json")
+    normalized["source"]["provenance"]["content_sha256"] = validation.candidate.content_sha256
+    normalized_model = type(prepared.normalized_package).model_validate(normalized)
+    payload = prepared.model_dump(mode="json")
+    payload.update(plugin_validation=validation.model_dump(mode="json"), normalized_package=normalized)
+    registry = SchemaRegistry()
+    # Structural JSON Schema does not authenticate hashes or enforce output closure.
+    Draft202012Validator(registry.load("plugin-normalization.v1")).validate(payload)
+    forged = payload
+    updates = {"plugin_validation": validation, "normalized_package": normalized_model}
+    if representation == "copy":
+        forged = prepared.model_copy(update=updates)
+    elif representation == "construct":
+        forged = type(prepared).model_construct(**{**prepared.__dict__, **updates})
+    with pytest.raises(ValidationError):
+        type(prepared).model_validate(forged)
+    with pytest.raises(ContractError):
+        registry.validate("plugin-normalization.v1", payload)
+    # Retaining the same-source validation as blocked diagnostics remains supported.
+    payload.update(status="blocked", normalized_package=None, blocker={"code": "fixture_blocked", "message": "Stop."})
+    registry.validate("plugin-normalization.v1", payload)
+    recovered = _normalize(source, tmp_path / "corrected-plugin")
+    assert recovered.status == "prepared"
+    registry.validate("plugin-normalization.v1", recovered.model_dump(mode="json"))

@@ -7,7 +7,7 @@ import json
 import math
 
 from skills_sdk.core.digests import canonical_json_sha256
-from skills_sdk.models.plugin import PLUGIN_SCHEMA_URI, PortablePluginManifest
+from skills_sdk.models.plugin import PLUGIN_MANIFEST_MAX_BYTES, PLUGIN_SCHEMA_URI, PortablePluginManifest
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 
 _KNOWN = frozenset(
@@ -61,7 +61,7 @@ def _check_json_budget(value: object) -> None:
 
 def _object(payload: bytes) -> dict[str, object]:
     """Decode a bounded UTF-8 JSON object with unique keys and standard finite values."""
-    if len(payload) > 1_048_576:
+    if len(payload) > PLUGIN_MANIFEST_MAX_BYTES:
         raise ValueError("plugin metadata exceeds one MiB")
     parsed = json.loads(payload.decode("utf-8"), object_pairs_hook=_pairs, parse_constant=_reject_constant)
     _check_json_budget(parsed)

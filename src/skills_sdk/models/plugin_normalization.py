@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, StrictStr, StringConstraints, field_validator, model_validator
@@ -10,9 +12,18 @@ from skills_sdk.models.intake import SkillPackageIntakeReceipt
 from skills_sdk.models.inventory import PackageType, _ContractModel
 from skills_sdk.models.package import IntakeDecisionStatus, NormalizedPackage, PackageLifecycleState
 from skills_sdk.models.packaging import PackageReceiptBlocker
-from skills_sdk.models.plugin import PluginPackageValidation
+from skills_sdk.models.plugin import PLUGIN_MANIFEST_MAX_BYTES, PLUGIN_SCHEMA_URI, PluginPackageValidation
 
 _NormalizationPluginName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$", max_length=64)]
+
+
+def _canonical_normalization_manifest(name: str, version: str, description: str) -> bytes:
+    """Render the only root metadata this operation creates within the shared parser budget."""
+    values = {"$schema": PLUGIN_SCHEMA_URI, "name": name, "version": version, "description": description}
+    payload = (json.dumps(values, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    if len(payload) > PLUGIN_MANIFEST_MAX_BYTES:
+        raise ValueError("canonical normalization manifest exceeds one MiB")
+    return payload
 
 
 def _retained_validation_matches_source(
@@ -37,8 +48,8 @@ class PluginNormalizationMetadata(_ContractModel):
 
     schema_version: Literal["plugin-normalization-metadata/v1"] = "plugin-normalization-metadata/v1"
     name: _NormalizationPluginName
-    version: StrictStr
-    description: StrictStr
+    version: StrictStr = Field(min_length=1, max_length=PLUGIN_MANIFEST_MAX_BYTES)
+    description: StrictStr = Field(min_length=1, max_length=PLUGIN_MANIFEST_MAX_BYTES)
 
     @field_validator("version", "description")
     @classmethod
@@ -47,6 +58,36 @@ class PluginNormalizationMetadata(_ContractModel):
         if not value or value != value.strip():
             raise ValueError("plugin version and description must be canonical non-empty text")
         return value
+
+    @model_validator(mode="after")
+    def bounded_manifest(self) -> PluginNormalizationMetadata:
+        """Enforce aggregate encoded bytes, which structural JSON Schema cannot express."""
+        _canonical_normalization_manifest(self.name, self.version, self.description)
+        return self
+
+
+def _prepared_output_matches_source(source: SkillPackageIntakeReceipt, validation: PluginPackageValidation) -> bool:
+    """Bind prepared evidence to canonical root bytes and the exact admitted child file set."""
+    manifest, identity = validation.manifest, source.validation.identity
+    assert manifest is not None and manifest.version is not None and manifest.description is not None
+    assert identity is not None
+    metadata = PluginNormalizationMetadata(
+        name=manifest.name, version=manifest.version, description=manifest.description
+    )
+    payload = _canonical_normalization_manifest(metadata.name, metadata.version, metadata.description)
+    digest = hashlib.sha256(payload).hexdigest()
+    expected = [("plugin.json", digest, len(payload))]
+    expected.extend(
+        (f"skills/{identity.name}/{item.path}", item.sha256, item.size_bytes) for item in source.validation.files
+    )
+    observed = [(item.path, item.sha256, item.size_bytes) for item in validation.files]
+    return (
+        observed == sorted(expected)
+        and manifest.source_sha256 == digest
+        and manifest.openai_settings_source == "none"
+        and manifest.openai_settings_sha256 is None
+        and next(item.permission_mode for item in validation.files if item.path == "plugin.json") == 0o644
+    )
 
 
 class PluginNormalizationReceipt(_ContractModel):
@@ -101,6 +142,8 @@ class PluginNormalizationReceipt(_ContractModel):
             raise ValueError("prepared normalization requires version and description validation policy")
         if not (validation.manifest.version or "").strip() or not (validation.manifest.description or "").strip():
             raise ValueError("prepared normalization requires nonempty manifest version and description")
+        if not _prepared_output_matches_source(source, validation):
+            raise ValueError("prepared normalization must bind its canonical manifest and exact admitted source files")
         if normalized.identity.package_id != validation.candidate.package_id:
             raise ValueError("normalized plugin and whole-plugin candidate identities must match")
         if normalized.owner != source.normalized_package.owner:
