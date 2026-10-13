@@ -25,7 +25,7 @@ compare-copy   maintain-entrypoint   validate-plugin   normalize-plugin   check-
 
 ### Plugin presentation assessment
 
-The unmerged S2 candidate adds
+Accepted PR #60 provides the bounded S2 presentation assessment through
 `skills-sdk check-plugin-presentation ./my-plugin --source-revision '<40-lowercase-hex>' --request ./request.json --json --robot`.
 Keep the request outside plugin source. It must be regular no-follow JSON bounded
 to one MiB; duplicate members, malformed input and symlinks block. Exit `0` means
@@ -264,7 +264,7 @@ candidate-bound lanes:
   proves external authenticity or authorises promotion. See the maintained
   [installed calibration proof](../tests/installed_observed_calibration_smoke.py)
   for a complete synthetic input and accepted/rejected/recovery example.
-  In the unmerged lifetime repair, repeated trials allocate fresh controlled
+  In the accepted PR #55 lifetime repair, repeated trials allocate fresh controlled
   provider/judge instances after plan validation. No extra JSON fields are
   required; this does not clone live adapters or turn fixture scores into
   external model evidence.

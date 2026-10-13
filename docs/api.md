@@ -2,7 +2,7 @@
 
 ## Plugin presentation assessment
 
-The unmerged S2 candidate adds
+Accepted PR #60 adds the bounded S2 presentation assessment
 `check_plugin_presentation(plugin_root, *, source_revision, request)` in
 `skills_sdk.validation`, returning `PluginPresentationCheck`. Supply a `Path`
 and dictionary or canonical `PluginPresentationRequest`. Four additive families
