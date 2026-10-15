@@ -165,6 +165,8 @@ def _destination_parent(source_root: Path, destination_root: Path) -> int:
         raise ValueError("candidate destination must be outside the standalone source")
     descriptor = _open_existing_directory(requested_parent)
     try:
+        if os.fstat(descriptor).st_mode & stat.S_ISGID:
+            raise ValueError("candidate parent must not propagate setgid directory modes")
         _reject_source_ancestor(source_root, descriptor)
         return os.dup(descriptor)
     finally:

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import stat
 from pathlib import Path
 
 import pytest
@@ -155,3 +157,31 @@ def test_normalization_rejects_physical_source_ancestry_despite_lexical_alias(
     assert main(_normalization_command(source, tmp_path / "outside-cli", context)) == 0
     assert json.loads(capsys.readouterr().out)["status"] == "prepared"
     assert (source / "SKILL.md").read_bytes() == original
+
+
+def test_normalization_rejects_setgid_parent_before_writing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reject inherited special modes before creating a partial candidate."""
+    source = tmp_path.resolve() / "synthetic-skill"
+    shutil.copytree(FIXTURE_ROOT, source)
+    parent = tmp_path.resolve() / "shared"
+    parent.mkdir()
+    original = parent.stat()
+    fstat = os.fstat
+
+    def shared_parent_stat(descriptor: int) -> os.stat_result:
+        info = fstat(descriptor)
+        if (info.st_dev, info.st_ino) == (original.st_dev, original.st_ino):
+            fields = list(info)
+            fields[0] |= stat.S_ISGID
+            return os.stat_result(fields)
+        return info
+
+    monkeypatch.setattr(os, "fstat", shared_parent_stat)
+    receipt = _normalize(source, parent / "plugin")
+
+    assert receipt.status == "blocked" and not receipt.candidate_created
+    assert receipt.blocker is not None and receipt.blocker.code == "candidate_normalization_failed"
+    assert list(parent.iterdir()) == []
+    assert stat.S_IMODE(parent.stat().st_mode) == stat.S_IMODE(original.st_mode)
+    assert (source / "SKILL.md").read_bytes() == (FIXTURE_ROOT / "SKILL.md").read_bytes()
+    assert _normalize(source, tmp_path.resolve() / "ordinary-plugin").status == "prepared"
