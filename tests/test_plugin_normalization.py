@@ -134,6 +134,37 @@ def test_normalization_receipt_rejects_coercible_flags(tmp_path: Path, field: st
         SchemaRegistry().validate("plugin-normalization.v1", payload)
 
 
+@pytest.mark.parametrize(
+    "field", ["mutation_performed", "network_used", "execution_performed", "validation.mutation_performed"]
+)
+@pytest.mark.parametrize("value", [0, 1, "false", "true", None])
+def test_normalization_receipt_rejects_coercible_nested_intake_flags(tmp_path: Path, field: str, value: object) -> None:
+    """Reject malformed retained evidence without changing the frozen standalone contract."""
+    receipt = _normalize(FIXTURE_ROOT, tmp_path.resolve() / "plugin", rights=False)
+    payload = receipt.model_dump(mode="json")
+    PluginNormalizationReceipt.model_validate(payload)
+    SchemaRegistry().validate("plugin-normalization.v1", payload)
+    if field.startswith("validation."):
+        payload["source_intake"]["validation"]["mutation_performed"] = value
+        validation = receipt.source_intake.validation.model_copy(update={"mutation_performed": value})
+        intake = receipt.source_intake.model_copy(update={"validation": validation})
+    else:
+        payload["source_intake"][field] = value
+        intake = receipt.source_intake.model_copy(update={field: value})
+    with pytest.raises(ValidationError):
+        PluginNormalizationReceipt.model_validate(payload)
+    with pytest.raises(ValidationError):
+        PluginNormalizationReceipt.model_validate_json(json.dumps(payload))
+    with pytest.raises(ValidationError):
+        PluginNormalizationReceipt.model_validate(receipt.model_copy(update={"source_intake": intake}))
+    with pytest.raises(ValidationError):
+        PluginNormalizationReceipt.model_validate({**payload, "source_intake": intake})
+    with pytest.raises(SchemaValidationError):
+        Draft202012Validator(SchemaRegistry().load("plugin-normalization.v1")).validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-normalization.v1", payload)
+
+
 def test_normalization_blocks_unapproved_rights_without_creating_candidate(tmp_path: Path) -> None:
     """Reject unconfirmed rights before creating any destination."""
     tmp_path = tmp_path.resolve(strict=True)

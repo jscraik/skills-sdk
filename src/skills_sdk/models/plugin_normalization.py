@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, StrictStr, StringConstraints, field_validator, model_validator
 
-from skills_sdk.models.intake import SkillPackageIntakeReceipt
+from skills_sdk.models.intake import SkillPackageIntakeReceipt, _intake_evidence_data
 from skills_sdk.models.inventory import PackageType, _ContractModel
 from skills_sdk.models.package import IntakeDecisionStatus, NormalizedPackage, PackageLifecycleState
 from skills_sdk.models.packaging import PackageReceiptBlocker
@@ -117,6 +118,24 @@ class PluginNormalizationReceipt(_ContractModel):
         """Reject non-boolean evidence before Pydantic can coerce it."""
         if type(value) is not bool:
             raise ValueError("normalization evidence flags must be booleans")
+        return value
+
+    @field_validator("source_intake", mode="before")
+    @classmethod
+    def strict_source_intake_flags(cls, value: object) -> object:
+        """Check retained intake flags before the frozen model can coerce them."""
+        value = _intake_evidence_data(value)
+        if isinstance(value, Mapping):
+            for field in ("mutation_performed", "network_used", "execution_performed"):
+                if field in value and type(value[field]) is not bool:
+                    raise ValueError("retained intake evidence flags must be booleans")
+            validation = value.get("validation")
+            if (
+                isinstance(validation, Mapping)
+                and "mutation_performed" in validation
+                and type(validation["mutation_performed"]) is not bool
+            ):
+                raise ValueError("retained validation mutation flag must be a boolean")
         return value
 
     @model_validator(mode="after")

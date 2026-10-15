@@ -624,7 +624,9 @@ remain outside generic `parse_receipt` dispatch.
 The source mechanisms are the SDK-owned `intake_skill_package` admission route
 and `capture_plugin_source` no-follow capture, not a claim of executed parity
 with Agent-Skills or Tessl. Required source identity, provenance, rights and
-unchanged ownership must pass before copying. The separate destination receives
+unchanged ownership must pass before copying. Rights and ownership are
+caller-supplied assertions; the service does not independently authenticate them.
+The separate destination receives
 canonical caller-supplied name, version and description in `plugin.json` and
 the exact admitted files under `skills/<skill-name>/`. Fresh complete-plugin
 validation binds that generated root and the retained child candidate; the
@@ -636,9 +638,12 @@ identity. Existing destinations, unsafe paths, changed source and exhausted
 capture budgets block preparation. Candidate creation is recorded separately
 from successful validation, so a blocked result can retain a created candidate
 without claiming release authority. Source mutation, network use, execution
-and release readiness remain false. Direct mapping, JSON, typed-instance and
-registry consumers reject non-boolean evidence flags before coercion; packaged
-JSON Schema enforces their structural boolean types and false-only constants.
+and release readiness remain false. Within the normalization family, direct
+mapping, JSON, typed-instance and registry consumers reject non-boolean evidence
+flags, including retained intake and child-validation flags, before coercion.
+Frozen standalone intake and validation models retain their existing behavior
+when used independently. Packaged JSON Schema enforces the structural boolean
+types and false-only constants.
 Models and registry validation additionally enforce cross-object identity and
 canonical generated-manifest relationships. Neither lane proves observed source
 freshness without the service's capture.
