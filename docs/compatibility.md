@@ -623,8 +623,10 @@ remain outside generic `parse_receipt` dispatch.
 
 The source mechanisms are the SDK-owned `intake_skill_package` admission route
 and `capture_plugin_source` no-follow capture, not a claim of executed parity
-with Agent-Skills or Tessl. Required source identity, provenance, rights and
-unchanged ownership must pass before copying. The separate destination receives
+with Agent-Skills or Tessl. Required source identity, provenance and caller-supplied
+assertions of rights and unchanged ownership must pass the service's checks before
+copying; the service does not independently authenticate those assertions.
+The separate destination receives
 canonical caller-supplied name, version and description in `plugin.json` and
 the exact admitted files under `skills/<skill-name>/`. Fresh complete-plugin
 validation binds that generated root and the retained child candidate; the
