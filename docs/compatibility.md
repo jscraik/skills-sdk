@@ -611,6 +611,47 @@ rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
 
+### Standalone normalization increment
+
+The additive `plugin-normalization-metadata/v1` and `plugin-normalization/v1`
+families serve callers that explicitly select `normalize-plugin` or
+`normalize_standalone_skill_package`. The operation preserves the standalone
+source and prepares a separate root-manifest plugin with one admitted child.
+Existing standalone intake, plugin capture and generic receipt dispatch retain
+their contracts; these new families use their models or `SchemaRegistry` and
+remain outside generic `parse_receipt` dispatch.
+
+The source mechanisms are the SDK-owned `intake_skill_package` admission route
+and `capture_plugin_source` no-follow capture, not a claim of executed parity
+with Agent-Skills or Tessl. Required source identity, provenance, rights and
+unchanged ownership must pass before copying. The separate destination receives
+canonical caller-supplied name, version and description in `plugin.json` and
+the exact admitted files under `skills/<skill-name>/`. Fresh complete-plugin
+validation binds that generated root and the retained child candidate; the
+standalone receipt alone cannot clear the assembled plugin.
+
+Deliberate differences from read-only intake and inspection are explicit
+destination creation, mandatory root metadata and a new complete-plugin
+identity. Existing destinations, unsafe paths, changed source and exhausted
+capture budgets block preparation. Candidate creation is recorded separately
+from successful validation, so a blocked result can retain a created candidate
+without claiming release authority. Source mutation, network use, execution
+and release readiness remain false. Direct mapping, JSON, typed-instance and
+registry consumers reject non-boolean evidence flags before coercion; packaged
+JSON Schema enforces their structural boolean types and false-only constants.
+Models and registry validation additionally enforce cross-object identity and
+canonical generated-manifest relationships. Neither lane proves observed source
+freshness without the service's capture.
+
+Accepted, rejected and corrected public API and CLI cases live in
+[`test_plugin_normalization.py`](../tests/test_plugin_normalization.py).
+[`installed_plugin_intake_smoke.py`](../tests/installed_plugin_intake_smoke.py)
+exercises the installed wheel's API, packaged schema and CLI without sibling
+repositories. These tests cover separate destination creation, source and mode
+preservation, blocked admission and fresh whole-plugin evidence; no provider,
+registry publication or runtime installation is implied. Joined quality,
+presentation and release preparation remain separate workflow increments.
+
 ### Portable plugin capture increment
 
 The additive `plugin-package-validation/v1` family does not reinterpret

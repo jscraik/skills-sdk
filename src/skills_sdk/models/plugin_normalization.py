@@ -109,6 +109,16 @@ class PluginNormalizationReceipt(_ContractModel):
     execution_performed: Literal[False] = False
     release_ready: Literal[False] = False
 
+    @field_validator(
+        "candidate_created", "source_mutated", "network_used", "execution_performed", "release_ready", mode="before"
+    )
+    @classmethod
+    def strict_evidence_flags(cls, value: object) -> object:
+        """Reject non-boolean evidence before Pydantic can coerce it."""
+        if type(value) is not bool:
+            raise ValueError("normalization evidence flags must be booleans")
+        return value
+
     @model_validator(mode="after")
     def bind_source_and_plugin(self) -> PluginNormalizationReceipt:
         """Require a fresh single-child plugin proof tied to admitted source evidence."""

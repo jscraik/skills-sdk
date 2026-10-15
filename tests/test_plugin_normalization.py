@@ -16,7 +16,12 @@ from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.intake import normalize_standalone_skill_package
-from skills_sdk.models import PluginNormalizationMetadata, PluginPackageValidation, PluginValidationPolicy
+from skills_sdk.models import (
+    PluginNormalizationMetadata,
+    PluginNormalizationReceipt,
+    PluginPackageValidation,
+    PluginValidationPolicy,
+)
 from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt
 from skills_sdk.models.package import IntakeChecks, PackageOwner, PackageSourceKind
 
@@ -104,6 +109,29 @@ def test_normalization_creates_bound_complete_plugin_without_changing_source(tmp
         if path.is_file()
     } == original
     SchemaRegistry().validate("plugin-normalization.v1", receipt.model_dump(mode="json"))
+
+
+@pytest.mark.parametrize(
+    "field", ["candidate_created", "source_mutated", "network_used", "execution_performed", "release_ready"]
+)
+@pytest.mark.parametrize("value", [0, 1, "false", "true", None])
+def test_normalization_receipt_rejects_coercible_flags(tmp_path: Path, field: str, value: object) -> None:
+    """Keep direct, JSON, typed, and registry consumers consistent about boolean evidence."""
+    receipt = _normalize(FIXTURE_ROOT, tmp_path.resolve() / "plugin", rights=False)
+    payload = receipt.model_dump(mode="json")
+    PluginNormalizationReceipt.model_validate(payload)
+    SchemaRegistry().validate("plugin-normalization.v1", payload)
+    payload[field] = value
+    with pytest.raises(ValidationError):
+        PluginNormalizationReceipt.model_validate(payload)
+    with pytest.raises(ValidationError):
+        PluginNormalizationReceipt.model_validate_json(json.dumps(payload))
+    with pytest.raises(ValidationError):
+        PluginNormalizationReceipt.model_validate(receipt.model_copy(update={field: value}))
+    with pytest.raises(SchemaValidationError):
+        Draft202012Validator(SchemaRegistry().load("plugin-normalization.v1")).validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-normalization.v1", payload)
 
 
 def test_normalization_blocks_unapproved_rights_without_creating_candidate(tmp_path: Path) -> None:
