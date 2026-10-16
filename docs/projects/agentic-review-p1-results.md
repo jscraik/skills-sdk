@@ -9,8 +9,8 @@ findings addressed and resolved both threads. Hosted validation passed on the
 published head. Final current-head clearance passed at 22:35 UTC on 16 October
 2026 after genuine reinspection and verification of one additional metadata
 repair. All five checks pass, both required independent reviewers qualify,
-and no review threads remain unresolved. The PR is open and ready for review;
-it has not been merged.
+and no review threads remain unresolved. After another passing update receipt
+at 22:49 UTC and exact-head local review, PR 63 merged as `e480d429`.
 
 ## Source and authority
 
@@ -343,8 +343,8 @@ for a completed review. The final PR description was refreshed through the
 normal receipt-bound body helper after passing dry-run, preserving the template.
 
 The 22:09 receipt is historical evidence, superseded by the later response below.
-Live-provider authentication, publication and merge remain separate work.
-No merge was requested or performed; the PR is open and non-draft.
+At that checkpoint, live-provider authentication, publication and merge were
+separate work. No merge was requested or performed during that phase.
 
 ### Later review freshness and reinspection
 
@@ -399,7 +399,8 @@ ignored evidence directory. No PR description update followed that clearance.
 
 The docstring coverage warning remains advisory and was not suppressed or
 reported as passing. No current-head clearance blocker remains for PR 63.
-Publication, live-provider authentication and merge remain outside this result.
+Publication and live-provider authentication remain outside this result; the
+subsequently authorized merge is recorded below.
 
 Final follow-up validation in the isolated Configs checkout:
 
@@ -434,11 +435,36 @@ The clean-checkout create receipt passed before PR creation. The operator
 handoff and unrelated primary-checkout edits were excluded. Hosted Configs
 checks and review are pending and are not inferred from SDK PR 63 clearance.
 
-The SDK pilot reports are published through a separate documentation branch,
+The SDK pilot reports are published in
+[SDK PR 64](https://github.com/jscraik/skills-sdk/pull/64) through a separate branch,
 preserving the reviewed source head of PR 63. Their classifier accepted ordinary
 prose scope. The first standards check rejected historical foreign-repository
 commands presented as SDK recipes; the report now preserves their exact argv
 as historical Configs evidence. No command was relabelled or claimed rerun.
+
+The skill-required local review compared the exact published source head to
+verified hosted base `d1cd2958122bbc67fbbfd96b3294700f2dc97560` and found no
+actionable regression. Its focused CLI and architecture tests passed; a blocked
+shell wrapper was not reported as passing. The final update receipt at
+22:49:15 UTC verified all five check contexts, both independent bots, zero
+unresolved threads, exact head/base agreement and clean source checkout.
+
+Command: `gh pr merge 63 --repo jscraik/skills-sdk --squash --match-head-commit 7f1c4b1489b7545c2d162fbf1144533c19486d49`
+-> pass. GitHub confirms merge at 22:49:36 UTC on 16 October 2026, accepted as
+[`e480d429`](https://github.com/jscraik/skills-sdk/commit/e480d429adaf400f3ae0ab78c4a4bacb0fbeae60).
+The accepted commit has the same file tree as the cleared source head. No admin
+merge, rule bypass, source-branch deletion or checkout cleanup was performed.
+The accepted revision is recorded in the existing SDK workflow task ledger.
+
+Configs PR 366 initially reported failed CircleCI docs-gate and test jobs.
+Direct changed-document Markdownlint passed with zero errors. GitHub exposed no
+failure annotations; the auth-backed CircleCI wrapper was rejected by the
+execution hook, public job reads returned unavailable, and the browser required
+login. Those hosted failures remain unclassified, not waived. SDK PR 64's first
+run rejected checklist status and command-evidence formatting in its description;
+the body-only repair passed the trusted validator and was saved through the
+repair helper before rerunning the affected check. Neither new PR is claimed
+merge-ready from PR 63's passing evidence.
 
 This repairs observed failures without claiming the three-occurrence learning
 threshold has been met. The initial sibling sweep covered equivalent import

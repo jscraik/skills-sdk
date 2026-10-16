@@ -16,7 +16,11 @@ passed with zero unresolved threads. The P1 report records the complete evidence
 and remaining advisory docstring warning. Configs repairs are signed and pushed
 in [Configs PR 366](https://github.com/jscraik/configs/pull/366); that PR's hosted
 validation and review remain separate from SDK PR 63 clearance.
-PR 63 is open and ready for review; it has not been merged.
+PR 63 merged at 22:49 UTC on 16 October 2026 as
+[`e480d429`](https://github.com/jscraik/skills-sdk/commit/e480d429adaf400f3ae0ab78c4a4bacb0fbeae60)
+after fresh readiness and exact-head local review. The reports are published in
+[SDK PR 64](https://github.com/jscraik/skills-sdk/pull/64); the Configs repair and
+report PRs remain separate open deliveries with their own CI and review gates.
 
 Start with reviewing changes to Skills SDK itself. Prove the review loop before
 adding package assessment features or new product interfaces. Reuse existing
