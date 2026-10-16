@@ -12,6 +12,7 @@ from typing import Any, cast
 from skills_sdk import __version__
 from skills_sdk.cli import COMMAND_HELP
 from skills_sdk.cli.plugin import add_plugin_parsers, run_plugin_command
+from skills_sdk.cli.routes import DISCOVERY_ONLY_EXIT, reject_discovery_only
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 
 _MAX_INTAKE_CONTEXT_BYTES = 1_048_576
@@ -691,9 +692,12 @@ def _evaluation_command(arguments: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run implemented commands and preserve parse-only future boundaries."""
+    """Run implemented commands and reject discovery-only routes explicitly."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    discovery_status = reject_discovery_only(arguments)
+    if discovery_status is not None:
+        return discovery_status
     if arguments.command == "check-quality":
         return _quality_check(arguments)
     if arguments.command == "review-content":
@@ -723,7 +727,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "eval":
         return _evaluation_command(arguments)
     if arguments.command not in {"intake", "validate", "build"}:
-        return 0
+        return DISCOVERY_ONLY_EXIT
     from skills_sdk.validation import SkillValidationPolicy
 
     policy = SkillValidationPolicy(

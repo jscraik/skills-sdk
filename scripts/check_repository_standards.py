@@ -219,30 +219,48 @@ def _import_targets(node: ast.Import | ast.ImportFrom, relative: str) -> tuple[s
 
 
 def _forbidden_imports(relative: str) -> tuple[str, ...]:
+    # Keep this table aligned with ARCHITECTURE.md dependency direction.
+    # Missing lanes (intake/distribution/lifecycle/host) previously let agents
+    # wire forbidden edges that only prose forbade.
+    core_forbidden = (
+        "skills_sdk.adapters",
+        "skills_sdk.cli",
+        "skills_sdk.distribution",
+        "skills_sdk.evaluation",
+        "skills_sdk.host",
+        "skills_sdk.host_adapters",
+        "skills_sdk.intake",
+        "skills_sdk.lifecycle",
+        "skills_sdk.packaging",
+        "skills_sdk.providers",
+        "skills_sdk.validation",
+    )
     if relative.startswith("src/skills_sdk/core/"):
-        return (
-            "skills_sdk.adapters",
-            "skills_sdk.cli",
-            "skills_sdk.evaluation",
-            "skills_sdk.host_adapters",
-            "skills_sdk.packaging",
-            "skills_sdk.providers",
-            "skills_sdk.validation",
-        )
+        return core_forbidden
     if relative.startswith("src/skills_sdk/models/"):
-        return (
-            "skills_sdk.adapters",
-            "skills_sdk.cli",
-            "skills_sdk.evaluation",
-            "skills_sdk.host_adapters",
-            "skills_sdk.packaging",
-            "skills_sdk.providers",
-            "skills_sdk.validation",
-        )
+        return core_forbidden
     if relative.startswith("src/skills_sdk/validation/"):
-        return ("skills_sdk.cli", "skills_sdk.evaluation", "skills_sdk.packaging")
-    if relative.startswith(("src/skills_sdk/evaluation/", "src/skills_sdk/packaging/")):
-        return ("skills_sdk.cli",)
+        return (
+            "skills_sdk.cli",
+            "skills_sdk.distribution",
+            "skills_sdk.evaluation",
+            "skills_sdk.host",
+            "skills_sdk.intake",
+            "skills_sdk.lifecycle",
+            "skills_sdk.packaging",
+        )
+    if relative.startswith("src/skills_sdk/intake/"):
+        return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.host", "skills_sdk.lifecycle", "skills_sdk.packaging")
+    if relative.startswith("src/skills_sdk/packaging/"):
+        return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.host", "skills_sdk.lifecycle")
+    if relative.startswith("src/skills_sdk/distribution/"):
+        return ("skills_sdk.cli", "skills_sdk.host", "skills_sdk.lifecycle", "skills_sdk.providers")
+    if relative.startswith("src/skills_sdk/lifecycle/"):
+        return ("skills_sdk.cli", "skills_sdk.host", "skills_sdk.providers")
+    if relative.startswith("src/skills_sdk/evaluation/"):
+        return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.host", "skills_sdk.lifecycle")
+    if relative.startswith("src/skills_sdk/host/"):
+        return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.lifecycle", "skills_sdk.packaging")
     return ()
 
 

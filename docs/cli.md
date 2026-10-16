@@ -179,11 +179,16 @@ and check evidence; a synthetic context cannot prove real provenance.
 Human output retains the blocked intake decision and blocker codes, or the
 blocked check's finding codes and messages, as well as the stage status.
 `--json` emits the versioned contract for individual routes. `--robot` is an accepted no-op that
-reserves the prompt-free automation contract. Other routes remain stable
-discovery boundaries while their deeper implementations are built in separate,
+reserves the prompt-free automation contract. Discovery-only reserved routes
+(`inventory`, `package`, `project`, `tessl prepare`, `tessl verify`) parse and
+then exit `3` with a `discovery-only:` stderr message. They do not perform the
+named lifecycle work and must not be treated as success. The machine-readable
+capability table lives in `skills_sdk.cli.routes.ROUTE_CAPABILITIES`; every
+argparse route must appear there. Other routes remain stable discovery
+boundaries while their deeper implementations are built in separate,
 candidate-bound lanes:
 
-- `inventory` is read-only source-inventory intent.
+- `inventory` is read-only source-inventory intent and currently discovery-only.
 - `eval scenario-quality` performs read-only package-local definition checks.
   Its default v1 contract retains the 5/8/10 release-set policy. Explicit
   `--contract-version v2 --scenario-set <id>` selects exactly ten active cases
