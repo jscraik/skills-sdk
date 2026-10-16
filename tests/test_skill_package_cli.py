@@ -122,8 +122,19 @@ def test_missing_source_revision_returns_structured_blocker(tmp_path: Path, comm
     assert payload["candidate"] is None
 
 
-@pytest.mark.parametrize("arguments", [["--help"], ["inventory"], ["validate-plugin", "--help"]])
-def test_reserved_routes_do_not_import_validation_dependencies(tmp_path: Path, arguments: list[str]) -> None:
+@pytest.mark.parametrize(
+    ("arguments", "expected_code"),
+    [
+        (["--help"], 0),
+        (["inventory"], 3),
+        (["validate-plugin", "--help"], 0),
+    ],
+)
+def test_reserved_routes_do_not_import_validation_dependencies(
+    tmp_path: Path,
+    arguments: list[str],
+    expected_code: int,
+) -> None:
     (tmp_path / "yaml.py").write_text("raise RuntimeError('validation dependency imported')\n", encoding="utf-8")
     environment = os.environ.copy()
     environment["PYTHONPATH"] = os.pathsep.join((str(tmp_path), environment.get("PYTHONPATH", "")))
@@ -136,7 +147,7 @@ def test_reserved_routes_do_not_import_validation_dependencies(tmp_path: Path, a
         env=environment,
     )
 
-    assert completed.returncode == 0, completed.stderr
+    assert completed.returncode == expected_code, completed.stderr
     assert "validation dependency imported" not in completed.stderr
 
 

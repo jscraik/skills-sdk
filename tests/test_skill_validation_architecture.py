@@ -63,7 +63,7 @@ def test_validation_service_does_not_depend_on_packaging_service() -> None:
 
 
 def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
-    """Verify parse-only CLI routes do not import the host mutation adapter."""
+    """Verify discovery-only CLI routes fail closed without importing host mutation."""
     result = subprocess.run(
         [
             sys.executable,
@@ -72,8 +72,9 @@ def test_reserved_cli_routes_do_not_load_host_mutation_adapter() -> None:
                 [
                     "import sys",
                     "from skills_sdk.cli.main import main",
+                    "from skills_sdk.cli.routes import DISCOVERY_ONLY_EXIT",
                     "for route in ('inventory', 'package', 'project'):",
-                    "    assert main([route]) == 0",
+                    "    assert main([route]) == DISCOVERY_ONLY_EXIT",
                     "assert 'skills_sdk.host.entrypoint' not in sys.modules",
                 ]
             ),
