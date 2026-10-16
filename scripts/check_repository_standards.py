@@ -245,20 +245,46 @@ def _forbidden_imports(relative: str) -> tuple[str, ...]:
             "skills_sdk.distribution",
             "skills_sdk.evaluation",
             "skills_sdk.host",
+            "skills_sdk.host_adapters",
             "skills_sdk.intake",
             "skills_sdk.lifecycle",
             "skills_sdk.packaging",
         )
     if relative.startswith("src/skills_sdk/intake/"):
-        return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.host", "skills_sdk.lifecycle", "skills_sdk.packaging")
+        return (
+            "skills_sdk.cli",
+            "skills_sdk.distribution",
+            "skills_sdk.host",
+            "skills_sdk.host_adapters",
+            "skills_sdk.lifecycle",
+            "skills_sdk.packaging",
+        )
     if relative.startswith("src/skills_sdk/packaging/"):
-        return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.host", "skills_sdk.lifecycle")
+        return (
+            "skills_sdk.cli",
+            "skills_sdk.distribution",
+            "skills_sdk.host",
+            "skills_sdk.host_adapters",
+            "skills_sdk.lifecycle",
+        )
     if relative.startswith("src/skills_sdk/distribution/"):
-        return ("skills_sdk.cli", "skills_sdk.host", "skills_sdk.lifecycle", "skills_sdk.providers")
+        return (
+            "skills_sdk.cli",
+            "skills_sdk.host",
+            "skills_sdk.host_adapters",
+            "skills_sdk.lifecycle",
+            "skills_sdk.providers",
+        )
     if relative.startswith("src/skills_sdk/lifecycle/"):
-        return ("skills_sdk.cli", "skills_sdk.host", "skills_sdk.providers")
+        return ("skills_sdk.cli", "skills_sdk.host", "skills_sdk.host_adapters", "skills_sdk.providers")
     if relative.startswith("src/skills_sdk/evaluation/"):
-        return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.host", "skills_sdk.lifecycle")
+        return (
+            "skills_sdk.cli",
+            "skills_sdk.distribution",
+            "skills_sdk.host",
+            "skills_sdk.host_adapters",
+            "skills_sdk.lifecycle",
+        )
     if relative.startswith("src/skills_sdk/host/"):
         return ("skills_sdk.cli", "skills_sdk.distribution", "skills_sdk.lifecycle", "skills_sdk.packaging")
     return ()
