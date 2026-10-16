@@ -44,7 +44,7 @@ def test_optional_contract_detail_is_loaded_by_explicit_command_help(capsys: pyt
 
     assert exc_info.value.code == 0
     output = capsys.readouterr().out
-    assert "read-only source inventory" in output
+    assert "discovery-only" in output
     assert "candidate_content_sha256" not in output
 
 
