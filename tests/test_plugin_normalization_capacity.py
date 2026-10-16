@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import stat
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -185,3 +186,70 @@ def test_normalization_rejects_setgid_parent_before_writing(tmp_path: Path, monk
     assert stat.S_IMODE(parent.stat().st_mode) == stat.S_IMODE(original.st_mode)
     assert (source / "SKILL.md").read_bytes() == (FIXTURE_ROOT / "SKILL.md").read_bytes()
     assert _normalize(source, tmp_path.resolve() / "ordinary-plugin").status == "prepared"
+
+
+@pytest.mark.parametrize("mask", [0o111, 0o222])
+def test_normalization_restores_created_directory_modes_under_umask(tmp_path: Path, mask: int) -> None:
+    """Restrictive process umasks cannot leave a partial or inaccessible candidate."""
+    source = tmp_path.resolve() / "synthetic-skill"
+    destination = tmp_path.resolve() / "plugin"
+    shutil.copytree(FIXTURE_ROOT, source)
+    previous = os.umask(mask)
+    try:
+        receipt = _normalize(source, destination)
+    finally:
+        os.umask(previous)
+
+    assert receipt.status == "prepared" and receipt.candidate_created
+    for path in (destination, destination / "skills", destination / "skills" / "synthetic-skill"):
+        assert stat.S_IMODE(path.stat().st_mode) == 0o755
+    assert (source / "SKILL.md").read_bytes() == (FIXTURE_ROOT / "SKILL.md").read_bytes()
+
+
+def test_normalization_captures_retained_directory_during_path_swap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clean pathname clone cannot hide changed bytes in the directory actually created."""
+    from skills_sdk.intake import plugin_normalization as normalization
+
+    source = tmp_path.resolve() / "synthetic-skill"
+    destination = tmp_path.resolve() / "plugin"
+    shutil.copytree(FIXTURE_ROOT, source)
+    original_path_capture = normalization.capture_plugin_source
+    original_descriptor_capture = normalization._capture_plugin_descriptor
+    attacked = False
+
+    def swap_for_capture(capture: Callable[[], tuple]) -> tuple:
+        nonlocal attacked
+        if attacked:
+            return capture()
+        attacked = True
+        retained = tmp_path / "retained-original"
+        destination.rename(retained)
+        shutil.copytree(retained, destination)
+        (retained / "skills" / "synthetic-skill" / "SKILL.md").write_bytes(b"changed after validation\n")
+        try:
+            return capture()
+        finally:
+            shutil.rmtree(destination)
+            retained.rename(destination)
+
+    def path_capture(root: Path) -> tuple:
+        if root == destination:
+            return swap_for_capture(lambda: original_path_capture(root))
+        return original_path_capture(root)
+
+    def descriptor_capture(descriptor: int) -> tuple:
+        return swap_for_capture(lambda: original_descriptor_capture(descriptor))
+
+    with monkeypatch.context() as patch:
+        patch.setattr(normalization, "capture_plugin_source", path_capture)
+        patch.setattr(normalization, "_capture_plugin_descriptor", descriptor_capture)
+        receipt = _normalize(source, destination)
+
+    assert attacked
+    assert receipt.status == "blocked" and receipt.candidate_created
+    assert receipt.blocker is not None and receipt.blocker.code == "normalized_candidate_changed"
+    assert receipt.normalized_package is None
+    assert (source / "SKILL.md").read_bytes() == (FIXTURE_ROOT / "SKILL.md").read_bytes()
+    assert _normalize(source, tmp_path / "recovered-plugin").status == "prepared"

@@ -550,19 +550,20 @@ def test_normalization_rejects_directory_replacement_during_final_capture(
     source = tmp_path / "synthetic-skill"
     destination = tmp_path / "plugin"
     shutil.copytree(FIXTURE_ROOT, source)
-    capture = normalization.capture_plugin_source
+    capture = normalization._capture_plugin_descriptor
 
-    def capture_then_replace(root: Path) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
+    def capture_then_replace(
+        descriptor: int,
+    ) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
         """Replace the captured directory with equal bytes but a different inode."""
-        observed = capture(root)
-        if root == destination:
-            retained = tmp_path / "retained-original"
-            root.rename(retained)
-            shutil.copytree(retained, root)
+        observed = capture(descriptor)
+        retained = tmp_path / "retained-original"
+        destination.rename(retained)
+        shutil.copytree(retained, destination)
         return observed
 
     with monkeypatch.context() as patch:
-        patch.setattr(normalization, "capture_plugin_source", capture_then_replace)
+        patch.setattr(normalization, "_capture_plugin_descriptor", capture_then_replace)
         receipt = _normalize(source, destination)
 
     assert receipt.status == "blocked" and receipt.candidate_created

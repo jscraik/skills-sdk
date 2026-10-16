@@ -47,8 +47,10 @@ def _read_file(parent: int, name: str) -> tuple[bytes, int]:
         os.close(descriptor)
 
 
-def capture_plugin_source(root: Path) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
-    """Capture all resources using no-follow descriptors and bounded reads."""
+def _capture_plugin_descriptor(
+    descriptor: int,
+) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
+    """Capture the directory retained by the caller using bounded, no-follow reads."""
     if not getattr(os, "O_NONBLOCK", 0):
         raise OSError("safe nonblocking package reads are unavailable")
     payloads: dict[str, bytes] = {}
@@ -104,9 +106,14 @@ def capture_plugin_source(root: Path) -> tuple[tuple[PluginCapturedFile, ...], d
         if before != _metadata(descriptor):
             raise ValueError("plugin directory changed during capture")
 
+    visit(descriptor, "", 0)
+    return tuple(sorted(records, key=lambda item: item.path)), payloads, tuple(sorted(directories))
+
+
+def capture_plugin_source(root: Path) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
+    """Capture all resources using no-follow descriptors and bounded reads."""
     descriptor = _open_directory_tree(root)
     try:
-        visit(descriptor, "", 0)
+        return _capture_plugin_descriptor(descriptor)
     finally:
         os.close(descriptor)
-    return tuple(sorted(records, key=lambda item: item.path)), payloads, tuple(sorted(directories))

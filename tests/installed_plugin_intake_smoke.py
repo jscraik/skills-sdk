@@ -405,21 +405,20 @@ def _verify_normalization_destination_drift(root: Path, source: Path, context_pa
     assert blocked.status == "blocked" and blocked.candidate_created
     assert blocked.blocker is not None and blocked.blocker.code == "normalized_candidate_changed"
     assert blocked.normalized_package is None
-    capture = normalization.capture_plugin_source
+    capture = normalization._capture_plugin_descriptor
     replaced_destination = root / "replaced-plugin"
 
     def capture_then_replace(
-        candidate: Path,
+        descriptor: int,
     ) -> tuple[tuple[PluginCapturedFile, ...], dict[str, bytes], tuple[str, ...]]:
         """Replace the captured destination while retaining identical copied bytes."""
-        result = capture(candidate)
-        if candidate == replaced_destination:
-            retained = root / "retained-original-plugin"
-            candidate.rename(retained)
-            shutil.copytree(retained, candidate)
+        result = capture(descriptor)
+        retained = root / "retained-original-plugin"
+        replaced_destination.rename(retained)
+        shutil.copytree(retained, replaced_destination)
         return result
 
-    with patch.object(normalization, "capture_plugin_source", capture_then_replace):
+    with patch.object(normalization, "_capture_plugin_descriptor", capture_then_replace):
         replaced = normalization.normalize_standalone_skill_package(source, replaced_destination, context, metadata)
     assert replaced.status == "blocked" and replaced.candidate_created
     assert replaced.blocker is not None and replaced.blocker.code == "normalized_candidate_changed"

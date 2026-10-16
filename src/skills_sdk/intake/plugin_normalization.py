@@ -31,7 +31,7 @@ from skills_sdk.models.plugin_normalization import (
     _retained_validation_matches_source,
 )
 from skills_sdk.validation import plugin_capture
-from skills_sdk.validation.plugin_capture import capture_plugin_source
+from skills_sdk.validation.plugin_capture import _capture_plugin_descriptor, capture_plugin_source
 from skills_sdk.validation.plugin_manifest import parse_plugin_manifest
 from skills_sdk.validation.plugin_package import plugin_candidate_id, validate_plugin_package
 
@@ -104,7 +104,14 @@ def _open_child_directory(parent: int, name: str, *, create: bool) -> int:
     """Open a directory relative to a trusted descriptor without following links."""
     if create:
         os.mkdir(name, 0o755, dir_fd=parent)
-    return os.open(name, _DIRECTORY_FLAGS, dir_fd=parent)
+    descriptor = os.open(name, _DIRECTORY_FLAGS, dir_fd=parent)
+    if create:
+        try:
+            os.fchmod(descriptor, 0o755)
+        except OSError:
+            os.close(descriptor)
+            raise
+    return descriptor
 
 
 def _create_directories(root: int, paths: tuple[str, ...]) -> None:
@@ -232,6 +239,7 @@ def _write_candidate(
         candidate_created = True
         root = _open_child_directory(parent, destination_root.name, create=False)
         try:
+            os.fchmod(root, 0o755)
             _create_directories(root, _directory_paths(skill_name, directories, files))
             _write_file(root, "plugin.json", manifest, 0o644)
             for record in files:
@@ -461,7 +469,7 @@ def _validate_and_receipt(
     expected_payloads.update((f"skills/{skill_name}/{path}", payload) for path, payload in payloads.items())
     expected_directories = tuple(sorted(_directory_paths(skill_name, directories, files)))
     try:
-        destination_capture = capture_plugin_source(destination_root)
+        destination_capture = _capture_plugin_descriptor(created_directory)
         same_directory = _same_created_directory(destination_root, created_directory)
     except (OSError, TypeError, ValueError):
         return _block(
