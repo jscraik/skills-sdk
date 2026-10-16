@@ -149,7 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Portable lifecycle contracts and tooling for Agent Skills packages.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    commands = parser.add_subparsers(dest="command", title="commands")
+    commands = parser.add_subparsers(dest="command", title="commands", required=True)
     _add_content_review_parser(commands)
     _add_quality_parser(commands)
     add_plugin_parsers(commands)
@@ -247,7 +247,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="prepare or verify a Tessl candidate without publishing",
         description="prepare or verify a Tessl candidate without publishing",
     )
-    tessl_commands = tessl.add_subparsers(dest="tessl_command", title="tessl commands")
+    tessl_commands = tessl.add_subparsers(dest="tessl_command", title="tessl commands", required=True)
     tessl_commands.add_parser(
         "prepare", help="prepare a candidate-bound Tessl payload", description="prepare a candidate-bound Tessl payload"
     )

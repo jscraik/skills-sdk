@@ -20,6 +20,10 @@ tessl prepare   tessl verify
 compare-copy   maintain-entrypoint   validate-plugin   check-plugin-presentation
 ```
 
+A missing command, including `skills-sdk tessl` without a subcommand, is a
+usage error: exit `2` with a diagnostic on stderr. Help requests still exit `0`.
+Named discovery-only routes use exit `3` with their explicit diagnostic.
+
 ### Plugin presentation assessment
 
 The unmerged S2 candidate adds

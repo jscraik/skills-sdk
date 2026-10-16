@@ -62,3 +62,27 @@ def test_discovery_only_routes_exit_loudly(
 
 def test_registry_marks_write_gated_entrypoint() -> None:
     assert ROUTE_CAPABILITIES["maintain-entrypoint"] is RouteCapability.WRITE_GATED
+
+
+@pytest.mark.parametrize("arguments", [[], ["tessl"], ["eval"], ["verify"]])
+def test_incomplete_route_reports_usage(arguments: list[str], capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as error:
+        main(arguments)
+
+    assert error.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "usage:" in captured.err
+    assert "required" in captured.err
+    assert "discovery-only:" not in captured.err
+
+
+@pytest.mark.parametrize("arguments", [["--help"], ["tessl", "--help"], ["tessl", "prepare", "--help"]])
+def test_discovery_help_remains_successful(arguments: list[str], capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as error:
+        main(arguments)
+
+    assert error.value.code == 0
+    captured = capsys.readouterr()
+    assert "usage:" in captured.out
+    assert captured.err == ""
