@@ -803,9 +803,19 @@ its sole child retains the standalone skill candidate identity.
 
 Normalization introduces no plugin dependencies. Before issuing a prepared
 receipt, a final no-follow capture checks destination files, bytes, permissions
-and directories against the candidate this invocation wrote, and checks its
-directory identity against the retained creation descriptor. The receipt binds
-that captured state; later changes require fresh downstream validation.
+and directories against the intended output, and checks its directory identity
+against the retained opened output descriptor. Capture rechecks each entry's
+identity and metadata after traversal. These sequential checks detect observed
+drift; they are not an atomic filesystem snapshot.
+
+Preparation requires a caller-controlled destination parent and an exclusive
+writer for the operation. Parents owned by another user or writable by group
+or others are rejected before creation. Owner and mode checks do not establish
+exclusive access through ACLs or exclude other processes running as the same
+user. Callers must exclude those writers; hostile concurrent namespace mutation
+requires isolation outside this API. Portable directory creation cannot
+atomically return the created inode's descriptor. The receipt binds captured
+state under this boundary; later changes require fresh downstream validation.
 Any retained passing validation, including in a blocked receipt, must bind its
 sole child to the original standalone candidate. If destination validation
 belongs to another child, the blocker and creation signal remain, but that

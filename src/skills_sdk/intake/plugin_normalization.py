@@ -103,7 +103,7 @@ def _directory_paths(
 def _open_child_directory(parent: int, name: str, *, create: bool) -> int:
     """Open a directory relative to a trusted descriptor without following links."""
     if create:
-        os.mkdir(name, 0o755, dir_fd=parent)
+        os.mkdir(name, 0o700, dir_fd=parent)
     descriptor = os.open(name, _DIRECTORY_FLAGS, dir_fd=parent)
     if create:
         try:
@@ -172,7 +172,10 @@ def _destination_parent(source_root: Path, destination_root: Path) -> int:
         raise ValueError("candidate destination must be outside the standalone source")
     descriptor = _open_existing_directory(requested_parent)
     try:
-        if os.fstat(descriptor).st_mode & stat.S_ISGID:
+        value = os.fstat(descriptor)
+        if value.st_uid != os.geteuid() or value.st_mode & 0o022:
+            raise ValueError("candidate parent must be caller-owned without group or other write permission")
+        if value.st_mode & stat.S_ISGID:
             raise ValueError("candidate parent must not propagate setgid directory modes")
         _reject_source_ancestor(source_root, descriptor)
         return os.dup(descriptor)
@@ -228,12 +231,12 @@ def _write_candidate(
     payloads: dict[str, bytes],
     directories: tuple[str, ...],
 ) -> int:
-    """Create a candidate safely and return an owned descriptor retaining its directory identity."""
+    """Create below a caller-controlled exclusive-writer parent and retain the opened output."""
     parent = _destination_parent(source_root, destination_root)
     candidate_created = False
     try:
         try:
-            os.mkdir(destination_root.name, 0o755, dir_fd=parent)
+            os.mkdir(destination_root.name, 0o700, dir_fd=parent)
         except FileExistsError as exc:
             raise _DestinationExistsError("candidate destination already exists") from exc
         candidate_created = True
@@ -257,7 +260,7 @@ def _write_candidate(
 
 
 def _same_created_directory(destination_root: Path, created_directory: int) -> bool:
-    """Compare the current no-follow destination with the retained directory this call created."""
+    """Compare the current no-follow destination with the retained opened output directory."""
     descriptor = _open_existing_directory(destination_root.absolute())
     try:
         return _directory_identity(created_directory) == _directory_identity(descriptor)

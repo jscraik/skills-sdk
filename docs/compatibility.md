@@ -648,6 +648,15 @@ Models and registry validation additionally enforce cross-object identity and
 canonical generated-manifest relationships. Neither lane proves observed source
 freshness without the service's capture.
 
+Normalization requires an exclusive writer beneath a caller-controlled
+destination parent. Another owner's parent and group- or other-writable
+parents block before creation. These checks do not authenticate ACL exclusivity
+or exclude same-user processes. Portable creation does not atomically return a
+directory descriptor, so the caller must exclude concurrent namespace writers.
+Capture rechecks retained file and directory metadata after traversal to detect
+observed drift. This remains sequential best-effort quiescence, consistent with
+the filesystem validation boundary above, rather than an atomic snapshot.
+
 Accepted, rejected and corrected public API and CLI cases live in
 [`test_plugin_normalization.py`](../tests/test_plugin_normalization.py).
 [`installed_plugin_intake_smoke.py`](../tests/installed_plugin_intake_smoke.py)

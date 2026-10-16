@@ -35,6 +35,31 @@ def _normalization_command(source: Path, destination: Path, context: Path) -> li
     ]
 
 
+@pytest.mark.parametrize("mode", [0o702, 0o720, 0o722])
+def test_normalization_rejects_shared_writable_parent_and_recovers(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], mode: int
+) -> None:
+    """Reject visibly shared parent permissions before writing through API and CLI."""
+    source, parent = tmp_path / "synthetic-skill", tmp_path / "output"
+    shutil.copytree(FIXTURE_ROOT, source)
+    parent.mkdir()
+    parent.chmod(mode)
+    context = tmp_path / "context.json"
+    context.write_text(_context().model_dump_json(), encoding="utf-8")
+    try:
+        rejected = _normalize(source, parent / "plugin")
+        assert rejected.status == "blocked" and not rejected.candidate_created
+        assert rejected.blocker is not None and rejected.blocker.code == "candidate_normalization_failed"
+        assert main(_normalization_command(source, parent / "cli-plugin", context)) == 2
+        assert not json.loads(capsys.readouterr().out)["candidate_created"]
+        assert list(parent.iterdir()) == []
+    finally:
+        parent.chmod(0o700)
+    assert _normalize(source, parent / "plugin").status == "prepared"
+    assert main(_normalization_command(source, parent / "cli-plugin", context)) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "prepared"
+
+
 @pytest.mark.parametrize("mutual", [False, True])
 def test_normalization_symlink_loop_blocks_api_cli_and_recovers(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], mutual: bool
