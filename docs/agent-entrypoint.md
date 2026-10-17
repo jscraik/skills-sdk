@@ -45,13 +45,14 @@ The standards and tool-pin contract is documented in
 
 ## Inspect an existing skill read-only
 
-Start with the clean, tracked synthetic fixture in the repository checkout.
+Start with the clean, tracked synthetic fixture in the repository checkout,
+including no ignored files within that fixture.
 Use the pinned route and the revision you are inspecting:
 
 ```bash
-test -z "$(git status --porcelain -- tests/fixtures/synthetic-skill)" &&
+test -z "$(git status --porcelain --ignored -- tests/fixtures/synthetic-skill)" &&
   MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill --source-revision "$(git rev-parse HEAD)" --json --robot &&
-  test -z "$(git status --porcelain -- tests/fixtures/synthetic-skill)" &&
+  test -z "$(git status --porcelain --ignored -- tests/fixtures/synthetic-skill)" &&
   echo "validation passed; fixture unchanged"
 ```
 
