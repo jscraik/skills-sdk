@@ -1300,7 +1300,9 @@ A schema-valid ledger can still contradict itself. At three occurrences of one
 finding class the validator expects either a declared validated guardrail or
 `merge_eligible: false`. This example writes four synthetic ledgers into a new
 temporary directory and, from the SDK checkout root, calls the checkout-scoped
-`verify recurring-findings` route once for each. The proof exits `0` when it
+`verify recurring-findings` route once for each. Prepare the pinned tools and
+locked environment first with the setup commands in
+[`CONTRIBUTING.md`](../CONTRIBUTING.md). The proof exits `0` when it
 observes exactly the SDK exits `0`, `2`, `0`, `0`. Any setup error, wrong exit
 code, non-empty stderr, malformed output (including a missing findings list or a
 finding without exactly nonempty string `code` and `message`), wrong schema,
@@ -1382,9 +1384,12 @@ The proof compared the bytes and permission mode of the ledger it passed to each
 call immediately before and after that call, and found them unchanged. It
 checks those properties only: it does not claim atomicity, or that timestamps or
 other filesystem metadata were preserved. Writing the ledgers was a deliberate
-setup step, not SDK behavior. The example touches no Git repository, network
-service or package, and its temporary directory stays in place; remove it when
-finished.
+setup step, not SDK behavior. The verifier itself reads only the synthetic
+ledgers: it performs no Git or hosted review access and executes no candidate
+package. The launcher is different: it runs the SDK and its dependencies, and
+when the pinned tools or locked environment are missing it can prepare the
+environment and download them. The example's temporary directory stays in place;
+remove it when finished.
 
 Every reference, owner and declaration in these ledgers is synthetic, and this
 verifier neither executes nor fetches any of them. The three-occurrence ledger
