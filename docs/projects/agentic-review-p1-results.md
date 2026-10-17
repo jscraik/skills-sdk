@@ -132,8 +132,8 @@ overrides, stdout, stderr, timestamps and exit status in ignored local evidence.
 Run this direct probe from the repository root in the pinned environment. It
 checks six layers against four explicit import targets: host and host-adapter
 imports must emit `dependency-direction`; core and near-prefix imports must
-produce no findings. This current-code rerun makes the validator portion of
-step 4 reproducible; the historical before evidence remains separate.
+produce no findings. This recipe makes the validator portion of step 4
+reproducible; the historical execution evidence remains separate.
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python - <<'PY'
@@ -165,7 +165,10 @@ print(f"pass: {checked} validator inputs; zero mismatches")
 PY
 ```
 
-Result: pass, exit 0; `pass: 24 validator inputs; zero mismatches`.
+Expected result: exit 0; `pass: 24 validator inputs; zero mismatches`.
+The current closeout could not execute this exact heredoc because the execution
+policy rejected indirect shell execution. The historical 24-input result above
+does not prove a fresh run of this recipe.
 
 Environment recovery is separate from source defects. The first environment
 setup could not write mise runtime state inside the default sandbox; the same
