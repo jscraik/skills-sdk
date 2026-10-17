@@ -13,9 +13,11 @@ Codex clearance passed the installed update gate at 22:35 UTC on 16 October
 2026 after authorized parser and request-helper repairs, genuine reinspection,
 and verification of the last metadata correction. The high-risk two-bot quorum
 passed with zero unresolved threads. The P1 report records the complete evidence
-and remaining advisory docstring warning. Configs repairs are signed and pushed
-in [Configs PR 366](https://github.com/jscraik/configs/pull/366); that PR's hosted
-validation and review remain separate from SDK PR 63 clearance.
+and remaining advisory docstring warning. Configs repairs and the follow-up
+timestamp correction are signed and pushed in [Configs PR 367](https://github.com/jscraik/configs/pull/367).
+The original [Configs PR 366](https://github.com/jscraik/configs/pull/366) remains
+open until its compliant replacement clears readiness. Configs validation and
+review remain separate from SDK PR 63 clearance.
 PR 63 merged at 22:49 UTC on 16 October 2026 as
 [`e480d429`](https://github.com/jscraik/skills-sdk/commit/e480d429adaf400f3ae0ab78c4a4bacb0fbeae60)
 after fresh readiness and exact-head local review. The reports are published in
