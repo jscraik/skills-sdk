@@ -127,12 +127,14 @@ release readiness.
 This example uses only synthetic data. The revision is a fixture value; its
 shape does not show where the source came from. Run every command from the SDK
 checkout root in one shell session, with the plugin and evidence in separate
-physical temporary paths. The example sets the modes it relies on, so it behaves
+physical temporary paths. The first command stops the session if the workspace cannot be created. The
+example sets the modes it relies on, so it behaves
 the same under a `022` or `002` umask without changing the umask. Create one
 valid root manifest and one child skill:
 
 ```bash
-WORK="$(cd "$(mktemp -d)" && pwd -P)"
+WORK="$(mktemp -d)" && WORK="$(cd "$WORK" && pwd -P)" && [ -n "$WORK" ] \
+  || { echo "workspace setup failed; stop" >&2; return 1 2>/dev/null || exit 1; }
 PLUGIN="$WORK/plugin"; EV="$WORK/evidence"; OUT="$WORK/out"; SNAP="$WORK/snap"
 mkdir -p "$PLUGIN/skills/demo-skill" "$EV" "$OUT" "$SNAP"
 chmod 0755 "$PLUGIN" "$PLUGIN/skills" "$PLUGIN/skills/demo-skill" "$EV"
@@ -151,12 +153,13 @@ FLAGS=(--source-revision "$REV" --require-version --require-description)
 ```
 
 Define the helpers. `measure` prints each regular file's relative path, SHA-256
-digest and permission bits, and fails when a path is missing, empty or not a
-regular file. `run` keeps stdout, stderr and the exit code apart and fails when
+digest and permission bits, and fails when any supplied path is missing, empty,
+unreadable or not a regular file, so one valid input cannot hide another. `run` keeps stdout, stderr and the exit code apart and fails when
 the exit code is not the expected one. `show` parses a result and checks that the
 authority flags are `false` and the requested policy was retained. `check`
 measures the plugin files and the supplied evidence before and after one
-verification and fails on any difference or measurement failure:
+verification and fails on any difference, measurement failure or rejected result, even when the
+CLI exit code was the expected one:
 
 ```bash
 sdk() { MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk "$@"; }
@@ -164,8 +167,17 @@ measure() {
   python3 - "$WORK" "$@" <<'EOF'
 import hashlib, os, stat, sys
 work, rows = sys.argv[1], []
+def unreadable(error):
+    sys.exit("cannot traverse: %s" % error.filename)
 for root in sys.argv[2:]:
-    paths = [root] if os.path.isfile(root) else [os.path.join(b, n) for b, _, fs in os.walk(root) for n in fs]
+    if not os.path.lexists(root):
+        sys.exit("missing input: " + root)
+    if os.path.isdir(root):
+        paths = [os.path.join(b, n) for b, _, fs in os.walk(root, onerror=unreadable) for n in fs]
+    else:
+        paths = [root]
+    if not paths:
+        sys.exit("empty input: " + root)
     for path in paths:
         mode = os.lstat(path).st_mode
         if not stat.S_ISREG(mode):
@@ -173,8 +185,6 @@ for root in sys.argv[2:]:
         with open(path, "rb") as handle:
             digest = hashlib.sha256(handle.read()).hexdigest()
         rows.append("%s %s %s" % (os.path.relpath(path, work), digest, oct(stat.S_IMODE(mode))))
-if not rows:
-    sys.exit("nothing measured")
 print("\n".join(sorted(rows)))
 EOF
 }
@@ -199,7 +209,7 @@ check() {  # check NAME EXPECTED_EXIT EVIDENCE_FILE
   run "$1" "$2" "$OUT/$1.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot --verify-evidence "$3"; local rc=$?
   measure "$PLUGIN" "$3" > "$SNAP/$1.after" || { echo "measurement failed: $1" >&2; return 1; }
   cmp -s "$SNAP/$1.before" "$SNAP/$1.after" && echo "inputs unchanged: $1" || { echo "INPUTS CHANGED: $1" >&2; return 1; }
-  show "$OUT/$1.json"; return $rc
+  show "$OUT/$1.json" || { echo "RESULT REJECTED: $1" >&2; return 1; }; return $rc
 }
 ```
 
