@@ -1,5 +1,24 @@
 # Compatibility
 
+This reference describes accepted contracts and their evidence limits. Local,
+unmerged native judge and whole-plugin quality additions remain separately
+labelled in their candidate branch; they are not accepted or published APIs.
+
+Contents:
+
+- [Plugin-first and registry-independent migration target](#plugin-first-and-registry-independent-migration-target)
+- [Accepted presentation assessment increment](#accepted-presentation-assessment-increment)
+- [Selected-case safety admission](#selected-case-safety-admission)
+- [Local quality composition v2](#local-quality-composition-v2)
+- [Observed calibration contracts](#observed-calibration-contracts)
+- [Matched evaluation integration](#matched-evaluation-integration)
+- [Supplied content-review contracts](#supplied-content-review-contracts)
+- [Runtime and dependency floor](#runtime-and-dependency-floor)
+- [Contract policy](#contract-policy)
+- [Workflow migration proof](#workflow-migration-proof)
+- [Separate evidence lanes](#separate-evidence-lanes)
+- [Tessl to Codex native-plugin compatibility question](#tessl-to-codex-native-plugin-compatibility-question)
+
 ## Plugin-first and registry-independent migration target
 
 The [managed release policy](workflow.md#managed-release-format) selects root
