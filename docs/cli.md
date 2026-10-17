@@ -1294,6 +1294,108 @@ contact GitHub, and a ledger entry cannot make a dirty file of unknown ownership
 legitimate. The example leaves its temporary directory in place; remove it when
 finished.
 
+### Worked example: a recurring-findings threshold is not merge readiness
+
+A schema-valid ledger can still contradict itself. At three occurrences of one
+finding class the validator expects either a declared validated guardrail or
+`merge_eligible: false`. This example writes four synthetic ledgers into a new
+temporary directory and, from the SDK checkout root, calls the checkout-scoped
+`verify recurring-findings` route once for each. The proof exits `0` when it
+observes exactly the SDK exits `0`, `2`, `0`, `0`. Any setup error, wrong exit
+code, non-empty stderr, malformed output (including a missing findings list or a
+finding without exactly nonempty string `code` and `message`), wrong schema,
+kind, status, finding message or result shape, or changed ledger stops the proof
+with `1`, including under `PYTHONOPTIMIZE=1`.
+
+```bash
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" python3 - <<'PY'
+import hashlib, json, stat, subprocess, sys, tempfile
+from pathlib import Path
+
+def stop(why):
+    print(f"proof failed: {why}", file=sys.stderr)
+    sys.exit(1)
+
+sdk = Path.cwd().resolve()
+if not (sdk / ".mise.toml").is_file():
+    stop("run from the SDK checkout root")
+work = Path(tempfile.mkdtemp(prefix="recurring-threshold.")).resolve()
+invariant = "synthetic invariant"
+blocked = {"status": "blocked", "owner": "synthetic-owner", "blocker_ref": "synthetic:blocker",
+           "expires_at": "2030-01-01T00:00:00Z", "next_review_at": "2029-12-01T00:00:00Z"}
+validated = {"status": "validated", "artifact_ref": "synthetic:artifact",
+             "validation_commands": [{"command": "synthetic declaration, not executed", "status": "pass"}]}
+
+def ledger(count, guardrail, eligible):
+    occurrences = [{"repository": "example/synthetic", "pull_request": n, "evidence_ref": f"synthetic:occurrence-{n}"}
+                   for n in range(1, count + 1)]
+    return {"schema_version": 1, "classes": [{
+        "finding_class_id": "finding_synthetic_threshold",
+        "fingerprint_sha256": hashlib.sha256(invariant.encode()).hexdigest(),
+        "normalized_invariant": invariant, "root_cause": "synthetic", "occurrences": occurrences,
+        "guardrail": guardrail, "merge_eligible": eligible}]}
+
+wrong = [{"code": "ledger_invariant", "message": "merge_eligible must be false: finding_synthetic_threshold"}]
+cases = [
+    ("two occurrences, blocked, eligible true", ledger(2, blocked, True), 0, "pass", []),
+    ("three occurrences, blocked, eligible true", ledger(3, blocked, True), 2, "fail", wrong),
+    ("three occurrences, blocked, eligible false", ledger(3, blocked, False), 0, "pass", []),
+    ("three occurrences, declared validated, eligible true", ledger(3, validated, True), 0, "pass", []),
+]
+for number, (name, content, code, status, findings) in enumerate(cases):
+    path = work / f"ledger-{number}.json"
+    path.write_text(json.dumps(content))
+    before = (path.read_bytes(), stat.S_IMODE(path.lstat().st_mode))
+    command = ["mise", "exec", "--", "uv", "run", "--frozen", "skills-sdk", "verify", "recurring-findings",
+               str(path), "--json", "--robot"]
+    try:
+        done = subprocess.run(command, cwd=sdk, capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        stop(f"{name}: cannot run the SDK: {type(error).__name__}")
+    if (path.read_bytes(), stat.S_IMODE(path.lstat().st_mode)) != before:
+        stop(f"{name}: ledger bytes or mode changed")
+    if done.returncode != code or done.stderr != "":
+        stop(f"{name}: exit {done.returncode} or stderr not as expected")
+    try:
+        result = json.loads(done.stdout)
+    except ValueError:
+        stop(f"{name}: stdout is not JSON")
+    if not isinstance(result, dict):
+        stop(f"{name}: result is not an object")
+    found = result.get("findings")
+    if not isinstance(found, list):
+        stop(f"{name}: findings is not a list")
+    for item in found:
+        if not (isinstance(item, dict) and set(item) == {"code", "message"}
+                and all(isinstance(item[key], str) and item[key] for key in item)):
+            stop(f"{name}: finding is not an object with nonempty string code and message")
+    expected = {"schema_version": "pr-sweep-validation/v1", "kind": "recurring_findings", "status": status,
+                "findings": findings, "dirty_state": None, "ledgered_paths": [], "unledgered_paths": []}
+    if result != expected:
+        stop(f"{name}: result differs from the expected contract")
+    print(f"{name}: SDK exit {done.returncode}, {status}, findings {[item['code'] for item in found]}")
+print("proof ok: four expected outcomes observed")
+PY
+```
+
+The proof compared the bytes and permission mode of the ledger it passed to each
+call immediately before and after that call, and found them unchanged. It
+checks those properties only: it does not claim atomicity, or that timestamps or
+other filesystem metadata were preserved. Writing the ledgers was a deliberate
+setup step, not SDK behavior. The example touches no Git repository, network
+service or package, and its temporary directory stays in place; remove it when
+finished.
+
+Every reference, owner and declaration in these ledgers is synthetic, and this
+verifier neither executes nor fetches any of them. The three-occurrence ledger
+that declares `merge_eligible` true fails with `ledger_invariant` because the
+guardrail is blocked. Correcting the field to false makes the ledger consistent
+and passes, yet the finding class is still declared ineligible: a pass proves
+only that the supplied declarations agree with each other. The declared
+validated record is likewise only a declaration: its command was not executed,
+no evidence was fetched, and it does not establish hosted CI, review, freshness,
+readiness or merge authority.
+
 ## Prompt translations
 
 Run the checkout-scoped commands below from the repository checkout root so
