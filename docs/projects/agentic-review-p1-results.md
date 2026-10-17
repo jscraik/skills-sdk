@@ -127,6 +127,46 @@ overrides, stdout, stderr, timestamps and exit status in ignored local evidence.
    These checks retain the offline/provider limits described above.
    Evidence is retained under `full-long-1/`, alongside the original timeout.
 
+### Reproduce the 24 validator inputs
+
+Run this direct probe from the repository root in the pinned environment. It
+checks six layers against four explicit import targets: host and host-adapter
+imports must emit `dependency-direction`; core and near-prefix imports must
+produce no findings. This current-code rerun makes the validator portion of
+step 4 reproducible; the historical before evidence remains separate.
+
+```bash
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python - <<'PY'
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from scripts.check_repository_standards import _python_findings
+
+layers = ("validation", "intake", "packaging", "distribution", "lifecycle", "evaluation")
+targets = (
+    ("skills_sdk.host", ["dependency-direction"]),
+    ("skills_sdk.host_adapters", ["dependency-direction"]),
+    ("skills_sdk.core.errors", []),
+    ("skills_sdk.host_adapters_extra", []),
+)
+checked = 0
+with TemporaryDirectory() as directory:
+    root = Path(directory)
+    for layer in layers:
+        source = root / "src" / "skills_sdk" / layer / "fixture.py"
+        source.parent.mkdir(parents=True)
+        for target, expected in targets:
+            source.write_text(f"import {target}\n", encoding="utf-8")
+            actual = [finding.code for finding in _python_findings(root, source)]
+            assert actual == expected, (layer, target, actual, expected)
+            checked += 1
+assert checked == 24, checked
+print(f"pass: {checked} validator inputs; zero mismatches")
+PY
+```
+
+Result: pass, exit 0; `pass: 24 validator inputs; zero mismatches`.
+
 Environment recovery is separate from source defects. The first environment
 setup could not write mise runtime state inside the default sandbox; the same
 pinned sync passed through the normal approved host-capable route. A direct
