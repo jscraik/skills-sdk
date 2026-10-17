@@ -13,8 +13,9 @@ and no review threads remain unresolved. After another passing update receipt
 at 22:49 UTC and exact-head local review, PR 63 merged as `e480d429`.
 Report delivery and the docstring follow-up are also merged; the final dated
 closeout below supersedes earlier pending-delivery checkpoints. P2's supplied
-history replay now has local fixture and independent proof in the linked plan;
-it has no hosted delivery or live-provider clearance claim.
+history replay has local fixture and independent proof in the linked plan.
+The dated P2 section below records its separate hosted delivery and remaining
+review conditions; no live-provider or installed-runtime clearance follows.
 
 ## Source and authority
 
@@ -624,3 +625,81 @@ records seven sanitized finding-history cases, a bounded Configs implementation,
 The real PR loop and the supplied-history replay are separate proof lanes.
 No package publication, installed-runtime clearance or cross-product rollout
 follows from either result.
+
+## P2 publication and hosted validation, 17 October 2026
+
+The supplied-history implementation is published in
+[Configs PR 368](https://github.com/jscraik/configs/pull/368) at
+`e9587e329bbc980abe52ba54dbbd32a953949fd0`, based on `ed9110f9`.
+That immutable tree contains both reproduced P2 corrections and the final
+17-test suite. [SDK PR 67](https://github.com/jscraik/skills-sdk/pull/67)
+delivers these reports separately. Unrelated primary-checkout installation
+and agent-configuration changes are excluded from both PRs.
+
+The first Configs pipeline started before PR target metadata was available;
+its duplication-history preparation failed before tests. The authenticated
+rerun passed source tests and the aggregate check. Its PR-template job retained
+the earlier description's command-format and checklist errors. The body-only
+repair passed the protected helper and exact hosted readback without a source
+change. The [failed-only rerun](https://app.circleci.com/workflow/787d20b4-0815-431b-be33-1104224a78e4)
+then passed the repaired metadata check. All 21 reported contexts passed before
+the separately approved CodeRabbit inspection began.
+
+SDK PR 67's first validation likewise stopped at description formatting.
+The protected body repair preserved the template's checklist labels, corrected
+status markers and command evidence, and classified three foreign Harness
+commands as not applicable to this SDK. Exact hosted-body and unchanged-head
+verification passed. The [hosted validation rerun](https://github.com/jscraik/skills-sdk/actions/runs/39030049294)
+passed at `14517bba7dbeaec79084596a407bccae52741176`; all five contexts passed.
+
+CodeRabbit's first clarification only reread its earlier report and explicitly
+declined clearance. The subsequent
+[fresh inspection](https://github.com/jscraik/skills-sdk/pull/67#issuecomment-6233694564)
+found that the P2 results lacked the final Configs implementation SHA. This
+report correction supplies that immutable binding and its published PR. The
+reviewer's Configs API access returned 404; the operator's authenticated
+readback remains a separate evidence source. No repository permission changed.
+
+The local SDK documentation wrapper subsequently became executable with the
+required cache access. Its schema, quality, twelve documentation-dependent
+tests and diff phases passed for the report correction. Earlier blocked
+attempts remain historical; they are not rewritten as passes. Current-head
+review clearance remains separate from these hosted and local CI results.
+
+The explicitly approved, single on-demand Configs review completed against
+`e9587e329bbc980abe52ba54dbbd32a953949fd0` under run
+`57c1f97f-91a8-4f7a-9ad1-70e373f006e6`.
+Its [six-file review and billing receipt](https://github.com/jscraik/configs/pull/368#issuecomment-6233519037)
+reported no actionable review comments and a charge of $1.50. No automatic
+billing was enabled. The same report retained a docstring-coverage warning,
+an outdated CI-pending description and incomplete auxiliary tools. Those
+limitations are retained rather than equating the green review context with
+clearance. A [clarification request](https://github.com/jscraik/configs/pull/368#issuecomment-6233807894)
+asks for the completed inspection's verdict without another inspection or
+charge. Its [reply](https://github.com/jscraik/configs/pull/368#issuecomment-6233811814)
+kept those gaps open. A follow-up adds all 29 missing function docstrings;
+17 focused tests pass after that correction, and independent native review
+confirms no executable behavior changed. Configs' pinned `pnpm lint` passes
+all 553 JSON files, including both files that the provider's Biome 2.5.14
+could not check. This is maintained lint proof, not a successful Biome run.
+Configs PR 368 was merged outside this task at 12:26:37 UTC as
+`3002f3a92c8164fd3475b91fda188fd0917236fd`, from `e9587e329`.
+The local update gate had not cleared the remaining CodeRabbit concerns;
+the observed merge does not retroactively establish that clearance. SDK PR 67
+remains open. This task did not perform the merge.
+
+The signed Configs correction is
+`fa0de50f866d82f4eb69c9c6891b984edd4f40fb`, pushed after that merge and
+therefore absent from its accepted tree. It adds docstrings only; the
+original executable reconciliation proof remains bound to `e9587e329` above.
+The canonical `bash scripts/validate-codestyle.sh` also completed successfully:
+669 maintained policy tests passed in 947.708 seconds, along with the
+37 duplication regressions, duplication baseline and maintained wiring.
+The aggregate overlapped the documentation correction; the final 17-test
+suite and independent review separately checked that correction. Fresh
+hosted checks and review must bind to the separately authorized follow-up PR.
+The [follow-up PR 369](https://github.com/jscraik/configs/pull/369) is based
+on accepted `3002f3a9`, with signed correction
+`2d13d2daaf7949b81f928ad092ab6a471f646fe7`; its two changed files exactly
+match the independently reviewed `fa0de50f` candidate. The 29-line follow-up
+fits the normal diff budget and needs no additional exception.

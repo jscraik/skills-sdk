@@ -2,7 +2,7 @@
 
 Status: P0 baseline, P1 SDK repair and report delivery completed. The docstring
 follow-up is merged. P2's seven supplied-history cases are implemented,
-validated and independently checked locally; delivery remains pending.
+validated and independently checked locally; hosted delivery is in progress.
 Later product implementation phases are proposed.
 This document authorizes no external installation, PR messaging, paid execution,
 publication, or merge.
@@ -213,7 +213,10 @@ repeatable P2 lifecycle regressions or the later P5 usefulness trial.
 The smallest executable change belongs in Configs, alongside the existing
 review disposition loader, rather than in SDK core. The isolated implementation
 branch is `codex/jsc-517-p2-finding-reconciliation`, based on accepted Configs
-`ed9110f9aa94967357f7b111e922ecbd8ddadc33`. The primary Configs checkout and
+`ed9110f9aa94967357f7b111e922ecbd8ddadc33`. The final tested implementation is
+[`e9587e329bbc980abe52ba54dbbd32a953949fd0`](https://github.com/jscraik/configs/commit/e9587e329bbc980abe52ba54dbbd32a953949fd0),
+published in [Configs PR 368](https://github.com/jscraik/configs/pull/368).
+Its tree includes both corrections described below. The primary Configs checkout and
 its live projected scripts were left untouched. This SDK report branch remains
 `codex/update-review-pilot-closeout`, based on `0d4a39d8`.
 
@@ -254,8 +257,9 @@ active closure, preserves the previous response and verification history, and
 requires a fresh matching independent recheck. A neighboring identity probe
 also reproduced accidental merging of `Parser` and `parser` anchors; retaining
 anchor case corrected it without changing invariant normalization.
-The complete 17-test focused
-suite then passed, including all seven cases through the real read-only CLI.
+The complete 17-test focused suite then passed against the tree committed as
+`e9587e329bbc980abe52ba54dbbd32a953949fd0`, including all seven cases through
+the real read-only CLI.
 Independent re-review and independent execution returned no findings.
 
 The bounded sibling search covered the existing disposition loader and repair
@@ -275,8 +279,11 @@ blocked and unverified results. The helper does not authenticate providers,
 fetch evidence, write receipts, mutate threads or grant merge authority. The
 existing live gate remains mandatory. The Configs baseline and final focused
 local proof passed, including the maintained test wiring.
-The implementation is committed locally; publication and hosted clearance are
-pending. No hosted result is claimed.
+The implementation and these reports are published in separate
+[Configs PR 368](https://github.com/jscraik/configs/pull/368) and
+[SDK PR 67](https://github.com/jscraik/skills-sdk/pull/67). Hosted CI and review
+clearance retain their own current-head evidence; the local results above do
+not grant either PR clearance.
 
 Validation commands below ran in their named checkout with
 `MISE_CEILING_PATHS="$PWD/.."` and
