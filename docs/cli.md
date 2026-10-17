@@ -355,21 +355,26 @@ Each `$WORK/<label>.err` file was empty. Each `$WORK/<label>.out` file holds one
 | Step | Exit | Status | Finding code | Meaning |
 | --- | --- | --- | --- | --- |
 | `missing` | `2` | `blocked` | `required_file_missing` | The selected policy requires `references/README.md`, and no readable regular file exists there. |
-| `empty` | `2` | `blocked` | `empty_reference` | The file now exists, and `--check-reference-content` rejects it because a textual reference must contain content. |
+| `empty` | `2` | `blocked` | `empty_reference` | The file now exists, and `--check-reference-content` rejects it because a textual reference must contain content. The flag checks every captured reference, so another malformed reference, such as invalid JSON, would also block. |
 | `corrected` | `0` | `pass` | none | The same selected policy accepts the nonempty UTF-8 reference. |
 
 Without `--check-reference-content`, the empty file would satisfy the
 `--require-file` presence check. Creating the empty file and then the nonempty
 file are the author's own repairs between calls. The unchanged inventory before
-and after each call shows that validation did not write into the package;
-each result also carries `mutation_performed`. The inventory runs each stage
+and after each call shows that the paths and bytes of regular files did not
+change; it does not cover permissions, timestamps, symlinks or other metadata,
+so a `chmod` alone leaves it unchanged. Each result also carries
+`mutation_performed`. The inventory runs each stage
 as its own checked step, writes to files under `$WORK` rather than a pipeline,
 and sorts plain text lines, so it needs no `sort -z` option. If any stage fails
 or finds no files, the script prints `INVENTORY FAILED` and never claims the
 input is unchanged. Both flags are opt-in. A pass
-shows only that the required file exists and its bytes are nonempty UTF-8; it does
-not establish semantic accuracy, review execution, publication or release
-clearance.
+shows that the required file exists and, with the content flag, that every
+captured reference is well formed. It also means the ordinary `validate` checks
+passed, including the package root, safe capture, frontmatter and identity, so
+a valid `references/README.md` beside a `SKILL.md` without frontmatter still
+returns exit `2` with `invalid_frontmatter`. A pass does not establish semantic
+accuracy, review execution, publication or release clearance.
 
 The CLI is non-interactive. Except for the explicit destination creation of
 `normalize-plugin` and `maintain-entrypoint --apply`, the listed operations are
