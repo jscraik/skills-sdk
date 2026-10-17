@@ -27,6 +27,51 @@ A missing command, including `skills-sdk tessl` without a subcommand, is a
 usage error: exit `2` with a diagnostic on stderr. Help requests still exit `0`.
 Named discovery-only routes use exit `3` with their explicit diagnostic.
 
+### Distinguishing usage errors from typed blockers
+
+Exit `2` alone does not show that a versioned result exists. Check stdout and
+stderr separately. This example creates a disposable package named `demo-skill`
+in a temporary directory outside the checkout, then runs the `validate` route
+from the checkout root. The revision is a synthetic value with the required
+shape; it does not identify real source history. The `pwd -P` step resolves
+symlinked ancestors, such as the one in a default macOS `mktemp` path. The SDK
+refuses to traverse them and reports `unreadable_package_root` and
+`unreadable_skill_md` with exit `2` for an otherwise valid package. Passing the
+physical path keeps that no-follow check in force:
+
+```bash
+DEMO="$(cd "$(mktemp -d)" && pwd -P)"
+mkdir "$DEMO/demo-skill"
+printf -- '---\nname: demo-skill\ndescription: Demonstrates validate exit codes.\n---\n\n# Demo skill\n' > "$DEMO/demo-skill/SKILL.md"
+REV=0123456789abcdef0123456789abcdef01234567
+export MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"
+mise exec -- uv run --frozen skills-sdk validate --json --robot
+mise exec -- uv run --frozen skills-sdk validate "$DEMO/demo-skill" --source-revision abc123 --json --robot
+mise exec -- uv run --frozen skills-sdk validate "$DEMO/demo-skill" --source-revision "$REV" --json --robot
+```
+
+- The first command omits the required `package_root`. `argparse` rejects it with
+  exit `2`, empty stdout, and a usage text plus an `error:` line on stderr. No
+  JSON exists, so a caller that parses stdout loses the diagnostic. Recover by
+  correcting the invocation, using `--help` for the accepted arguments.
+- The second command is well formed, so it reaches the validator. It exits `2`
+  with empty stderr and a parseable `skill-package-validation/v1` result on
+  stdout with `"status": "blocked"` and the finding `invalid_source_revision`
+  for the short revision `abc123`.
+  Valid JSON and exit `2` still mean the operation was rejected. Read the
+  `findings` codes, fix the cause, and run again.
+- The third command supplies the 40-character lowercase `$REV`. It exits `0`
+  with `"status": "pass"` and no findings. Here `mutation_performed` is `false`.
+  The pass shows only that the revision has a valid shape and the package is
+  structurally valid. `$REV` is synthetic, not authenticated provenance.
+
+Observed on disposable synthetic inputs, the package files kept identical
+SHA-256 digests across all three runs. Argparse wording can change, and other
+routes can format diagnostics differently, so branch on the exit status first.
+Then parse stdout only when the invocation reached a service, and check its
+`schema_version` and `status`. Never run skill or plugin content to diagnose a
+result.
+
 ### Plugin presentation assessment
 
 Accepted PR #60 provides the bounded S2 presentation assessment through
