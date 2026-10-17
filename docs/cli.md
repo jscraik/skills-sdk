@@ -89,6 +89,247 @@ Corrected inputs need fresh affected checks. A pass is not release, archive,
 independent rights/visual review, installation or display clearance. Existing
 `validate-plugin` and standalone commands retain their meanings.
 
+#### Worked example: matching request, stale approval and renewal
+
+This example uses only synthetic data. The revision is a fixture value; its
+shape does not show where the source came from. The approval booleans, evidence
+references and evidence digests are fixture assertions written by the example
+itself. They are not authenticated approvals, independent artwork, rights or
+copy review, or release permission. Run every command from the SDK checkout
+root in one Bash session, because the helpers use Bash `local` and array
+slicing, with the plugin and the requests in separate physical
+temporary paths. The first command stops the session if the workspace cannot be
+created. The example sets the modes it relies on, so it behaves the same under a
+`022` or `002` umask without changing the umask. Create a plugin whose root
+manifest shares one small static square SVG between `logo` and `composerIcon`
+and carries a private-copy marker that no output may echo:
+
+```bash
+WORK="$(mktemp -d)" && WORK="$(cd "$WORK" && pwd -P)" && [ -n "$WORK" ] \
+  || { echo "workspace setup failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+PLUGIN="$WORK/plugin"; REQS="$WORK/requests"; OUT="$WORK/out"; SNAP="$WORK/snap"
+mkdir -p "$PLUGIN/assets" "$REQS" "$OUT" "$SNAP"
+chmod 0755 "$PLUGIN" "$PLUGIN/assets" "$REQS"
+cat > "$PLUGIN/plugin.json" <<'JSON'
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "demo-presentation",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "logo": "./assets/icon.svg",
+        "composerIcon": "./assets/icon.svg",
+        "shortDescription": "PRIVATE-COPY-MARKER synthetic copy"
+      }
+    }
+  }
+}
+JSON
+printf '%s\n' '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48"/></svg>' > "$PLUGIN/assets/icon.svg"
+chmod 0644 "$PLUGIN/plugin.json" "$PLUGIN/assets/icon.svg"
+REV="0123456789abcdef0123456789abcdef01234567"
+MARKER="PRIVATE-COPY-MARKER"
+```
+
+Define the helpers. `bind` reads a passing `validate-plugin` capture, the public
+observation of the candidate, mode manifest, selected-settings digest and image
+digest, and writes a synthetic request bound to it. The helper never invents a
+binding hash. `measure` prints each regular file's relative path, SHA-256 digest
+and permission bits, and fails when a supplied path is missing, empty, unreadable
+or not a regular file. `run` keeps stdout, stderr and the exit code apart and
+fails on an unexpected exit code and records the raw CLI exit code in `RAW`. It also
+runs `leak` on every captured stdout and stderr file, so a capture that contains
+the marker fails before any request is bound. `leak` names the file and never
+prints its content. `show` checks the schema version
+`plugin-presentation-check/v1`, the status, the exact finding codes, all six
+authority and display flags (`mutation_performed`, `execution_authorized`,
+`release_ready`, `archive_verified`, `host_display_observed`,
+`publication_verified`) being `false`, and that the private-copy marker is absent
+from stdout and stderr. `assess` measures the plugin and the supplied request
+before and after one assessment and fails on any difference, measurement failure
+or rejected result, even when the CLI exit code was the expected one. When every
+check holds, `assess` returns the raw CLI exit code, so a verified blocked
+assessment returns `2`. Any helper failure returns `1`. A helper returning `1`
+does not stop Bash by itself, and the example does not rely on `set -e`. Each
+top-level call below ends with an explicit guard that prints the failed step and
+stops the session with `return 1`, or `exit 1` when `return` is not allowed. Only
+the verified `2` from `assess stale-v1` continues:
+
+```bash
+sdk() { MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk "$@"; }
+measure() {
+  python3 - "$WORK" "$@" <<'PY'
+import hashlib, os, stat, sys
+work, rows = sys.argv[1], []
+def unreadable(error):
+    sys.exit("cannot traverse: %s" % error.filename)
+for root in sys.argv[2:]:
+    if not os.path.lexists(root):
+        sys.exit("missing input: " + root)
+    if os.path.isdir(root):
+        paths = [os.path.join(b, n) for b, _, fs in os.walk(root, onerror=unreadable) for n in fs]
+    else:
+        paths = [root]
+    if not paths:
+        sys.exit("empty input: " + root)
+    for path in paths:
+        mode = os.lstat(path).st_mode
+        if not stat.S_ISREG(mode):
+            sys.exit("not a regular file: " + path)
+        with open(path, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        rows.append("%s %s %s" % (os.path.relpath(path, work), digest, oct(stat.S_IMODE(mode))))
+print("\n".join(sorted(rows)))
+PY
+}
+leak() {  # leak FILE...: fail, naming the file but not echoing it, when the marker appears
+  python3 - "$MARKER" "$@" <<'PY'
+import sys
+marker = sys.argv[1].encode()
+for path in sys.argv[2:]:
+    with open(path, "rb") as handle:
+        if marker in handle.read():
+            sys.exit("synthetic private copy found in " + path)
+PY
+}
+run() {  # run NAME EXPECTED_EXIT STDOUT_FILE ARGS...
+  local name="$1" want="$2" dest="$3" got; shift 3
+  sdk "$@" > "$dest" 2> "$OUT/$name.err"; got=$?
+  echo "$name: exit=$got expected=$want stderr_bytes=$(wc -c < "$OUT/$name.err")"
+  RAW="$got"
+  [ "$got" -eq "$want" ] || { echo "UNEXPECTED EXIT: $name" >&2; return 1; }
+  leak "$dest" "$OUT/$name.err" || { echo "PRIVATE COPY FOUND: $name" >&2; return 1; }
+}
+bind() {  # bind CAPTURE_FILE REQUEST_FILE: write a synthetic request bound to the capture
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+capture = json.load(open(sys.argv[1]))
+if capture["schema_version"] != "plugin-package-validation/v1" or capture["status"] != "pass":
+    sys.exit("capture is not a passing plugin-package-validation/v1 result")
+image = [f for f in capture["files"] if f["path"] == "assets/icon.svg"]
+if len(image) != 1:
+    sys.exit("expected exactly one captured assets/icon.svg")
+candidate = capture["candidate"]
+request = {
+    "schema_version": "plugin-presentation-request/v1",
+    "candidate": candidate,
+    "mode_manifest_sha256": capture["mode_manifest_sha256"],
+    "image_approvals": [{
+        "candidate": candidate, "image_path": "assets/icon.svg", "image_sha256": image[0]["sha256"],
+        "kind": "icon", "professional": True, "rights_confirmed": True, "recognisable": True,
+        "small_size": True, "light_dark": True, "distinctive": True,
+        "evidence_ref": "synthetic:icon", "evidence_sha256": "a" * 64,
+    }],
+    "copy_approval": {
+        "candidate": candidate, "openai_settings_sha256": capture["manifest"]["openai_settings_sha256"],
+        "accurate": True, "evidence_ref": "synthetic:copy", "evidence_sha256": "b" * 64,
+    },
+}
+json.dump(request, open(sys.argv[2], "w"))
+PY
+}
+show() {  # show NAME EXPECTED_STATUS [EXPECTED_FINDING_CODE]
+  python3 - "$OUT/$1.json" "$OUT/$1.err" "$MARKER" "${@:2}" <<'PY'
+import json, sys
+path, err_path, marker = sys.argv[1:4]
+raw = open(path).read()
+r = json.loads(raw)
+codes = [f["code"] for f in r["findings"]]
+flags = ("mutation_performed", "execution_authorized", "release_ready",
+         "archive_verified", "host_display_observed", "publication_verified")
+print(r["schema_version"], r["status"], codes, {k: r[k] for k in flags})
+if r["schema_version"] != "plugin-presentation-check/v1":
+    sys.exit("unexpected schema_version: %r" % r["schema_version"])
+if r["status"] != sys.argv[4]:
+    sys.exit("unexpected status: %r, expected %r" % (r["status"], sys.argv[4]))
+if codes != sys.argv[5:6]:
+    sys.exit("unexpected findings: %r, expected %r" % (codes, sys.argv[5:6]))
+if any(r[k] is not False for k in flags):
+    sys.exit("authority flag is not false: %r" % {k: r[k] for k in flags})
+if marker in raw or marker in open(err_path).read():
+    sys.exit("synthetic private copy was echoed")
+PY
+}
+assess() {  # assess NAME EXPECTED_EXIT REQUEST_FILE
+  measure "$PLUGIN" "$3" > "$SNAP/$1.before" || { echo "measurement failed: $1" >&2; return 1; }
+  run "$1" "$2" "$OUT/$1.json" check-plugin-presentation "$PLUGIN" --source-revision "$REV" --request "$3" --json --robot || return 1
+  measure "$PLUGIN" "$3" > "$SNAP/$1.after" || { echo "measurement failed: $1" >&2; return 1; }
+  cmp -s "$SNAP/$1.before" "$SNAP/$1.after" && echo "inputs unchanged: $1" || { echo "INPUTS CHANGED: $1" >&2; return 1; }
+  if [ "$2" -eq 0 ]; then show "$1" pass; else show "$1" blocked plugin_presentation_binding_mismatch; fi \
+    || { echo "RESULT REJECTED: $1" >&2; return 1; }; return "$RAW"
+}
+```
+
+Capture the plugin once, bind a request to that capture and keep the request
+outside the plugin. Assess it. Expect exit `0`, status `pass` and no findings:
+
+```bash
+run capture-v1 0 "$OUT/capture-v1.json" validate-plugin "$PLUGIN" --source-revision "$REV" --json --robot \
+  && bind "$OUT/capture-v1.json" "$REQS/request-v1.json" && chmod 0644 "$REQS/request-v1.json" \
+  || { echo "capture-v1 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+assess match-v1 0 "$REQS/request-v1.json" \
+  || { echo "match-v1 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+```
+
+Make one valid SVG content edit, adding a fill, without changing `REV`. The
+`diff` is the control: exactly the SVG changes. The plugin is still valid, but
+the retained request binds the old candidate. Expect exit `2`, status `blocked`
+and exactly the finding `plugin_presentation_binding_mismatch`. This is the
+expected rejection, not an ordinary pass command. `assess` returns `2` here
+after it verifies that result, an intentional negative CLI result that is not a
+pass and does not count as a full SDK pass. After that verified
+expected `2`, continue recovery in the same Bash session. A return of `1` means
+the proof itself failed: the guard stops the session before recovery, so
+investigate before proceeding. Never carry on after a failed measurement,
+malformed output or wrong reason. Keep the old request. The `diff` exits `1` when
+the SVG changed, which is the expected result here, and `0` or `2` stops. Both
+expected-nonzero commands run in an `if` condition and keep their status, so the
+example also runs under `bash -e` without `set +e`; the explicit checks inside
+the helpers still run:
+
+```bash
+measure "$PLUGIN" > "$SNAP/source.v1" \
+  || { echo "measurement failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+sed -i.bak 's|<rect width="48" height="48"/>|<rect width="48" height="48" fill="#336699"/>|' "$PLUGIN/assets/icon.svg" \
+  && rm "$PLUGIN/assets/icon.svg.bak" && chmod 0644 "$PLUGIN/assets/icon.svg" \
+  || { echo "edit failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+measure "$PLUGIN" > "$SNAP/source.v2" \
+  || { echo "measurement failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+if diff "$SNAP/source.v1" "$SNAP/source.v2"; then DIFF_STATUS=0; else DIFF_STATUS=$?; fi
+[ "$DIFF_STATUS" -eq 1 ] || { echo "source did not change as expected; stop" >&2; return 1 2>/dev/null || exit 1; }
+if assess stale-v1 2 "$REQS/request-v1.json"; then STALE_STATUS=0; else STALE_STATUS=$?; fi
+[ "$STALE_STATUS" -eq 2 ] || { echo "stale-v1 proof failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+```
+
+Recovery needs a new request bound to fresh observations of the edited plugin,
+written beside the old one. In real use the applicable review of the changed
+artwork must happen first; replacing hashes alone would renew nothing. Here the
+fresh approvals are synthetic. Assess the new request. Expect exit `0` and
+`pass`. The final `measure` shows the old request retained with its original
+digest:
+
+```bash
+run capture-v2 0 "$OUT/capture-v2.json" validate-plugin "$PLUGIN" --source-revision "$REV" --json --robot \
+  && bind "$OUT/capture-v2.json" "$REQS/request-v2.json" && chmod 0644 "$REQS/request-v2.json" \
+  || { echo "capture-v2 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+assess renewed-v2 0 "$REQS/request-v2.json" \
+  || { echo "renewed-v2 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+measure "$REQS/request-v1.json" "$REQS/request-v2.json" \
+  || { echo "measurement failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+```
+
+Each `assess` compares regular-file paths, SHA-256 content digests and permission
+bits of the plugin and of the supplied request before and after the call. Those
+are the only preserved properties claimed: not symlinks, directory modes,
+timestamps or other metadata. Writing the fixture, the capture outputs, the
+requests and the SVG edit are intentional actions, not assessment effects. A line
+starting `INPUTS CHANGED` or `measurement failed` means the preservation claim is
+not established.
+
+The bounded SVG check covers geometry only. It is not rendering, and it is not
+independent visual, rights or copy review. No plugin content is executed, and
+every pass keeps the display, archive, release and publication flags `false`.
+
 ### Portable plugin inspection
 
 Use `skills-sdk validate-plugin ./my-plugin --source-revision "<40-lowercase-hex>" --json --robot`
