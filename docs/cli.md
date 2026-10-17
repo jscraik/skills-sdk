@@ -355,7 +355,7 @@ Each `$WORK/<label>.err` file was empty. Each `$WORK/<label>.out` file holds one
 | Step | Exit | Status | Finding code | Meaning |
 | --- | --- | --- | --- | --- |
 | `missing` | `2` | `blocked` | `required_file_missing` | The selected policy requires `references/README.md`, and no readable regular file exists there. |
-| `empty` | `2` | `blocked` | `empty_reference` | The file now exists, and `--check-reference-content` rejects it because a textual reference must contain content. The flag checks every captured reference, so another malformed reference, such as invalid JSON, would also block. |
+| `empty` | `2` | `blocked` | `empty_reference` | The file now exists, and `--check-reference-content` rejects it because a textual reference must contain content. The flag checks captured files under `references/` with a supported textual suffix (Markdown, `.txt`, `.json`, `.yaml`, `.yml`), so another malformed JSON or YAML reference would also block. Other suffixes, such as `.toml` or `.png`, are not content-checked. |
 | `corrected` | `0` | `pass` | none | The same selected policy accepts the nonempty UTF-8 reference. |
 
 Without `--check-reference-content`, the empty file would satisfy the
@@ -369,8 +369,9 @@ as its own checked step, writes to files under `$WORK` rather than a pipeline,
 and sorts plain text lines, so it needs no `sort -z` option. If any stage fails
 or finds no files, the script prints `INVENTORY FAILED` and never claims the
 input is unchanged. Both flags are opt-in. A pass
-shows that the required file exists and, with the content flag, that every
-captured reference is well formed. It also means the ordinary `validate` checks
+shows that the required file exists and, with the content flag, that each
+supported textual reference under `references/` is nonempty UTF-8 and, for JSON
+and YAML, parses. It also means the ordinary `validate` checks
 passed, including the package root, safe capture, frontmatter and identity, so
 a valid `references/README.md` beside a `SKILL.md` without frontmatter still
 returns exit `2` with `invalid_frontmatter`. A pass does not establish semantic
