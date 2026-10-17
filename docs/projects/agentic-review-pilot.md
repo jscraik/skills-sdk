@@ -1,7 +1,9 @@
 # Agentic review pilot and product rollout
 
-Status: P0 baseline and P1 SDK repair delivery completed; Configs and report
-clearance remain open. Later product implementation phases are proposed.
+Status: P0 baseline, P1 SDK repair and report delivery completed. The docstring
+follow-up is merged. P2's seven supplied-history cases are implemented,
+validated and independently checked locally; hosted delivery is in progress.
+Later product implementation phases are proposed.
 This document authorizes no external installation, PR messaging, paid execution,
 publication, or merge.
 
@@ -15,16 +17,29 @@ Codex clearance passed the installed update gate at 22:35 UTC on 16 October
 2026 after authorized parser and request-helper repairs, genuine reinspection,
 and verification of the last metadata correction. The high-risk two-bot quorum
 passed with zero unresolved threads. The P1 report records the complete evidence
-and remaining advisory docstring warning. Configs repairs and the follow-up
-timestamp correction are signed and pushed in [Configs PR 367](https://github.com/jscraik/configs/pull/367).
-The original [Configs PR 366](https://github.com/jscraik/configs/pull/366) remains
-open until its compliant replacement clears readiness. Configs validation and
-review remain separate from SDK PR 63 clearance.
+and the historical advisory docstring warning. Configs validation and review
+remain separate from SDK PR 63 clearance.
 PR 63 merged at 22:49 UTC on 16 October 2026 as
 [`e480d429`](https://github.com/jscraik/skills-sdk/commit/e480d429adaf400f3ae0ab78c4a4bacb0fbeae60)
 after fresh readiness and exact-head local review. The reports are published in
-[SDK PR 64](https://github.com/jscraik/skills-sdk/pull/64); the Configs repair and
-report PRs remain separate open deliveries with their own CI and review gates.
+[SDK PR 64](https://github.com/jscraik/skills-sdk/pull/64), merged on 17 October
+at 02:46 UTC as `8733065a`. The subsequent
+[SDK PR 65](https://github.com/jscraik/skills-sdk/pull/65) retained three useful
+helper docstrings and deliberately omitted six redundant test descriptions.
+It merged at 10:58 UTC as `0d4a39d8`, after both required reviewers and the final
+current-head update receipt passed. All five hosted checks passed. Its completed
+local full suite recorded 3,915 passed and one skipped. The accepted file tree
+matches the tested candidate. The primary checkout was then fast-forwarded to
+clean main; the old source and merged delivery branches were removed after
+their work was accounted for. This is the P2 starting revision.
+
+Live readback on 17 October also shows
+[Configs PR 366](https://github.com/jscraik/configs/pull/366) merged at 03:09 UTC
+as `ed9110f9`, while [Configs PR 367](https://github.com/jscraik/configs/pull/367)
+remains open at `3b4d6875` with passing reported checks. These are distinct
+deliveries. No merge or current-head review clearance is inferred for PR 367,
+and its later corrections are not assumed present in the accepted PR 366 tree.
+That cross-repository follow-up does not reopen the completed SDK repair.
 
 Start with reviewing changes to Skills SDK itself. Prove the review loop before
 adding package assessment features or new product interfaces. Reuse existing
@@ -149,6 +164,169 @@ Exit: fixtures prove unchanged finding deduplication, line movement, verified
 repair, recurrence, changed-head invalidation, and failed-review handling.
 Human authorization is required to accept an unresolved blocking exception;
 an agent's decline alone does not clear it.
+
+#### P2 first slice from accepted main
+
+Consumer: the SDK maintainer reconciling a review and its next revision. Start
+from accepted `0d4a39d8`. Adapt the existing review packet and tests before
+considering another service or public model. The implementation checkpoint
+below adds the missing offline replay proof; PR 63's real repair loop alone
+did not establish these transitions.
+
+| Reuse now | Gap to prove in P2 |
+| --- | --- |
+| PR 63's two confirmed findings, original head, repair head and provider-resolved threads | A sanitized fixture preserves each finding's invariant, source identity, author response and independently checked disposition across revisions. |
+| Existing recurring-findings schema and validator | They validate supplied class fingerprints and occurrence records; they do not track line movement or reconcile a finding lifecycle. Keep class identity separate from occurrence identity. |
+| Existing workstation head, reviewer, check and thread gate | Keep it authoritative for merge readiness. Replay stale-head and failed-review cases without a second SDK merge gate. |
+| PR 65's metadata repair, later summary, reinspection and qualified verdict sequence | Preserve evidence event order. A later concern reopens assessment even on an unchanged source head; an earlier clean verdict cannot erase it. |
+
+Implement the smallest fixture-driven reconciliation slice in this order:
+
+1. Extract sanitized records from PR 63 and PR 65. Retain public evidence links,
+   full base/head identities, policy revision and reviewer identity; exclude
+   raw transcripts, generated receipts and machine-specific paths.
+2. Define expected transitions in the existing pilot record: open to verified
+   fixed, refuted with evidence, declined but still blocking, and reopened.
+   Keep provider outcome separate from finding disposition. Unknown evidence
+   stays unverified.
+3. Prove six acceptance cases: unchanged finding produces one identity; line
+   movement preserves identity; repair closes only on the checked revision;
+   recurrence creates a new linked occurrence; changed head invalidates old
+   clearance; failed or unavailable review cannot produce a clean result.
+   Add the observed later-concern case as a seventh ordering regression.
+4. Put executable fixture behavior in the existing review-integration owner.
+   Keep portable recurring-ledger checks in the SDK's existing validator.
+   Establish the ownership seam before implementation; do not copy the
+   workstation parser or GitHub transport into SDK core.
+5. Run focused acceptance cases, the applicable repository validation route,
+   and independent review of identity and event-order boundaries. A second
+   named consumer is required before proposing a new public SDK contract.
+
+P2 exit is a repeatable reconciliation result with those cases passing and
+each disposition tied to its evidence. It does not authorize bot messaging,
+exception acceptance, merging, package publication or runtime installation.
+PR 63 already provides a useful P3 real-loop example, but it does not replace
+repeatable P2 lifecycle regressions or the later P5 usefulness trial.
+
+#### P2 local implementation checkpoint, 17 October 2026
+
+The smallest executable change belongs in Configs, alongside the existing
+review disposition loader, rather than in SDK core. The isolated implementation
+branch is `codex/jsc-517-p2-finding-reconciliation`, based on accepted Configs
+`ed9110f9aa94967357f7b111e922ecbd8ddadc33`. The final tested implementation is
+[`e9587e329bbc980abe52ba54dbbd32a953949fd0`](https://github.com/jscraik/configs/commit/e9587e329bbc980abe52ba54dbbd32a953949fd0),
+published in [Configs PR 368](https://github.com/jscraik/configs/pull/368).
+Its tree includes both corrections described below. The primary Configs checkout and
+its live projected scripts were left untouched. This SDK report branch remains
+`codex/update-review-pilot-closeout`, based on `0d4a39d8`.
+
+The review-integration maintainer owns the new internal
+`codex/scripts/pr_finding_history.py` helper. Its consumer is the maintainer
+comparing supplied review packets across revisions. It replaces manual history
+comparison for this pilot; existing source-disposition loading did not model
+line movement or recurrence. The seven sanitized reconstructions and their
+limits are in `codex/scripts/tests/fixtures/p2-reconciliation.json` and its
+companion documentation. The maintained Configs policy test lane includes
+`codex/scripts/tests/test_pr_finding_history.py` and a wiring assertion.
+No dependency or public SDK contract was added.
+
+| Case | Local acceptance result |
+| --- | --- |
+| Unchanged finding | One stable identity and occurrence; repeated observations retained. |
+| Line movement | Same identity despite a new line and provider alias. |
+| Verified repair | A matching author response and independent checked revision close the occurrence. |
+| Recurrence | New linked occurrence; original response and repair evidence remain available. |
+| Changed head | Current disposition becomes unverified without rewriting historical repair proof. |
+| Failed review | Failed, unavailable and incomplete runs cannot produce a clean diagnostic. |
+| Later concern | A later finding blocks after an earlier completed empty inventory. |
+
+The key binds repository, PR, normalized invariant and semantic anchor, not line
+number or provider prose. Anchors preserve case for case-sensitive symbols.
+This is explicit-anchor reconciliation within one PR, not fuzzy
+matching. The packet retains full base/head/policy revisions, reviewed scope,
+source identity, severity, confidence, consequence, responses and checked
+dispositions. Conflicting aliases, ambiguous event order, wrong repository/PR,
+unsafe paths and malformed evidence fail validation. Stale, self-reviewed and
+uncovered repair claims remain unverified. No unresolved-exception acceptance
+route exists.
+
+Independent review found one response-lifetime defect: a later author decline
+or refutation could inherit an earlier verified fix. All three superseding
+response variants reproduced it before repair. The correction invalidates the
+active closure, preserves the previous response and verification history, and
+requires a fresh matching independent recheck. A neighboring identity probe
+also reproduced accidental merging of `Parser` and `parser` anchors; retaining
+anchor case corrected it without changing invariant normalization.
+The complete 17-test focused suite then passed against the tree committed as
+`e9587e329bbc980abe52ba54dbbd32a953949fd0`, including all seven cases through
+the real read-only CLI.
+Independent re-review and independent execution returned no findings.
+
+The bounded sibling search covered the existing disposition loader and repair
+endorsement module. They validate immutable supplied records or source-bound
+endorsements and do not replace an active response during history replay;
+neither required this correction. No live readiness or reviewer parser changed.
+
+The fixtures are labeled sanitized reconstructions. Public PR 63/65 references
+are retained; actor labels, event times and counterfactual variants are not
+claims of additional observed defects. There are no raw provider transcripts,
+credentials, runtime receipts or private source in the fixture packet.
+Synthetic recurrences do not count toward P4's three-occurrence learning rule.
+
+Output always identifies supplied offline evidence and states
+`readiness_claimed: false`. Exit zero means the packet was processed, including
+blocked and unverified results. The helper does not authenticate providers,
+fetch evidence, write receipts, mutate threads or grant merge authority. The
+existing live gate remains mandatory. The Configs baseline and final focused
+local proof passed, including the maintained test wiring.
+The implementation and these reports are published in separate
+[Configs PR 368](https://github.com/jscraik/configs/pull/368) and
+[SDK PR 67](https://github.com/jscraik/skills-sdk/pull/67). Hosted CI and review
+clearance retain their own current-head evidence; the local results above do
+not grant either PR clearance.
+
+Validation commands below ran in their named checkout with
+`MISE_CEILING_PATHS="$PWD/.."` and
+`MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"` for mise invocations. Foreign
+repository argv is retained as evidence, not as an SDK command recipe.
+
+- Historical Configs argv: `["mise", "exec", "uv@0.11.3", "--", "uv", "run", "--offline", "--no-config", "--no-project", "--python", "3.12", "--with", "pyyaml==6.0.3", "--with", "pydantic==2.13.4", "--with", "markdown-it-py==4.2.0", "python", "-m", "unittest", "codex/scripts/tests/test_pr_finding_history.py"]`
+  -> pass, final 17 tests, including all seven CLI cases and the two repaired
+  mechanisms. Independent execution passed the same final suite.
+- Historical Configs argv: `["mise", "exec", "node@24.13.1", "pnpm@10.33.2", "--", "pnpm", "check"]`
+  -> pass, exit zero: lint, typecheck, source tests, 37 duplication regressions,
+  duplication baseline, 667 maintained policy tests in 871.315 seconds, and
+  maintained test wiring passed. The aggregate ran while the narrow review
+  corrections were completed; the final 17-test suite was also run separately
+  after both corrections, by the implementer and the independent reviewer.
+- Historical Configs argv: `["mise", "exec", "ruff@0.15.11", "--", "ruff", "check", "codex/scripts/pr_finding_history.py", "codex/scripts/tests/test_pr_finding_history.py"]`
+  -> pass on the final candidate. Pyright is not installed in this checkout;
+  no Python static-typecheck result is claimed.
+- Historical Configs argv: `["mise", "exec", "node@24.13.1", "pnpm@10.33.2", "--", "pnpm", "exec", "markdownlint-cli2", "codex/scripts/tests/fixtures/p2-reconciliation.md"]`
+  -> pass, zero errors.
+- Historical Configs argv: `["mise", "exec", "vale@3.14.1", "--", "vale", "--config", ".vale.ini", "codex/scripts/tests/fixtures/p2-reconciliation.md"]`
+  -> pass, zero errors and warnings.
+- Historical Configs argv: `["bash", "scripts/validate-codestyle.sh"]` and
+  `["bash", "codex/scripts/verify-work.sh", "--fast"]`
+  -> blocked by the automatic execution hook's protected indirect-shell rule.
+  The direct documented package baseline and pinned unittest route supply the
+  meaningful fallback; neither rejected wrapper is reported as passing.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_pr_sweep_validation.py tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py --durations=10`
+  -> pass in the SDK checkout, 49 tests in 16.02 seconds. This verifies the
+  unchanged recurring-ledger seam and documentation-dependent contracts.
+- Command: `git diff --check` -> pass in both checkouts.
+
+SDK generated schemas, Ruff format/lint, MyPy, repository standards and report
+Vale also passed directly. These checks do not stand in for the full SDK
+behavioral suite, new hosted CI, provider authentication or merge readiness.
+
+At closeout, unrelated SDK agent-instruction and integration-installation files
+appeared in the primary checkout. They were preserved and excluded from this
+task's owned report scope. The current combined checkout classifies as full,
+so the earlier docs-only classification is not current whole-checkout proof.
+The two report files are validated separately against an isolated snapshot of
+accepted `0d4a39d8`; no acceptance of those unrelated installation changes is
+inferred from the P2 result.
 
 ### P3: Complete one real PR loop
 
