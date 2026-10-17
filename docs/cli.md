@@ -194,6 +194,85 @@ archive creation, publication, installation, or runtime verification. This
 route does not update an existing plugin against a baseline; updates retain a
 known baseline and require a separate update workflow.
 
+#### Worked example: rights refusal, occupied destination and recovery
+
+This example uses only synthetic data. The repository name, revision, owner and
+rights decision are fixture assertions, not authenticated evidence. Run every
+command from the SDK checkout root and keep the fixture outside the source tree.
+Set up a physical temporary directory, one standalone skill and an intake context
+whose rights decision is still unconfirmed:
+
+```bash
+WORK="$(cd "$(mktemp -d)" && pwd -P)"
+mkdir -p "$WORK/source/demo-skill" "$WORK/output"
+printf '%s\n' '---' 'name: demo-skill' 'description: Synthetic skill used to demonstrate plugin preparation.' '---' '' '# Demo skill' '' 'Reply with a short greeting.' > "$WORK/source/demo-skill/SKILL.md"
+cat > "$WORK/intake-context.json" <<'EOF'
+{
+  "schema_version": "skill-package-intake-context/v1",
+  "source_repository": "example/synthetic-skills",
+  "source_revision": "0123456789abcdef0123456789abcdef01234567",
+  "source_path": "demo-skill",
+  "source_kind": "local",
+  "owner": {
+    "owner": "synthetic-owner",
+    "maintainer": "synthetic-owner",
+    "ownership_state": "canonical",
+    "rights": {"basis": "authored", "license": "Apache-2.0", "evidence_ref": "SKILL.md"}
+  },
+  "checks": {"identity": true, "provenance": true, "rights": false, "owner_unchanged": true}
+}
+EOF
+prepare() {
+  MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk normalize-plugin "$WORK/source/demo-skill" "$WORK/output/$1" --context "$WORK/intake-context.json" --plugin-name demo-plugin --plugin-version 1.0.0 --plugin-description "Synthetic plugin candidate." --json --robot
+}
+measure() { (cd "$1" && find . -type f | LC_ALL=C sort | while read -r f; do printf '%s %s %s\n' "$f" "$(wc -c < "$f" | tr -d ' ')" "$(python3 -c 'import os,sys;print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$f")"; done); }
+measure "$WORK/source"
+```
+
+First run with the unconfirmed rights decision. Expect exit `2`, blocker
+`rights_unconfirmed`, `candidate_created: false` and no `demo-plugin` directory:
+
+```bash
+prepare demo-plugin; echo "exit=$?"; ls "$WORK/output"; measure "$WORK/source"
+```
+
+Correct only the fixture rights decision, then occupy the intended destination
+with a sentinel file:
+
+```bash
+python3 -c 'import json,sys;p=sys.argv[1];d=json.load(open(p));d["checks"]["rights"]=True;open(p,"w").write(json.dumps(d,indent=2)+"\n")' "$WORK/intake-context.json"
+mkdir "$WORK/output/demo-plugin" && printf 'keep me\n' > "$WORK/output/demo-plugin/sentinel.txt"
+```
+
+Run the same command again. Expect exit `2`, blocker `candidate_destination_exists`
+and `candidate_created: false`. The command does not replace or delete the
+sentinel; measure it to confirm its bytes and mode did not change:
+
+```bash
+prepare demo-plugin; echo "exit=$?"; measure "$WORK/output/demo-plugin"; measure "$WORK/source"
+```
+
+Recover by choosing a fresh destination beneath the existing caller-owned
+`$WORK/output` parent. Never delete the occupied directory to recover. Expect exit
+`0`, `status: prepared`, `candidate_created: true`, `release_ready: false` and
+`source_mutated: false`. The candidate has a root `plugin.json` and a copied
+`skills/demo-skill/SKILL.md`, and `source_intake.candidate` binds the standalone
+revision and content digest:
+
+```bash
+prepare fresh; echo "exit=$?"; measure "$WORK/output/fresh"; measure "$WORK/output/demo-plugin"; measure "$WORK/source"
+```
+
+The measurements record each regular file's relative path, byte count and
+permission bits before and after every call. They cover those properties only: not
+timestamps, other metadata or provenance. Writing the fixture, changing the
+rights decision and creating `fresh` are intentional edits, not source mutation.
+The prepared receipt shows structural validation only. It does not authenticate
+the caller's provenance or rights assertions, replace semantic review, approve
+icons, or authorize release, publication or installation, and no package content
+is executed. This route creates a new candidate; it does not update an existing
+plugin.
+
 ### Existing local routes
 
 Use `mise exec -- uv run --frozen skills-sdk "<route>" --help` for a short route description. The
