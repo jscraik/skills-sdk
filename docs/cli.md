@@ -198,13 +198,16 @@ known baseline and require a separate update workflow.
 
 This example uses only synthetic data. The repository name, revision, owner and
 rights decision are fixture assertions, not authenticated evidence. Run every
-command from the SDK checkout root and keep the fixture outside the source tree.
+command from the SDK checkout root, in one shell session, and keep the fixture
+outside the source tree. The example sets the permissions it relies on, so it
+behaves the same under a `022` or `002` umask without changing the umask.
 Set up a physical temporary directory, one standalone skill and an intake context
 whose rights decision is still unconfirmed:
 
 ```bash
 WORK="$(cd "$(mktemp -d)" && pwd -P)"
-mkdir -p "$WORK/source/demo-skill" "$WORK/output"
+mkdir -p "$WORK/source/demo-skill" "$WORK/output" "$WORK/snap"
+chmod 0755 "$WORK/output"
 printf '%s\n' '---' 'name: demo-skill' 'description: Synthetic skill used to demonstrate plugin preparation.' '---' '' '# Demo skill' '' 'Reply with a short greeting.' > "$WORK/source/demo-skill/SKILL.md"
 cat > "$WORK/intake-context.json" <<'EOF'
 {
@@ -225,31 +228,60 @@ EOF
 prepare() {
   MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk normalize-plugin "$WORK/source/demo-skill" "$WORK/output/$1" --context "$WORK/intake-context.json" --plugin-name demo-plugin --plugin-version 1.0.0 --plugin-description "Synthetic plugin candidate." --json --robot
 }
-measure() { (cd "$1" && find . -type f | LC_ALL=C sort | while read -r f; do printf '%s %s %s\n' "$f" "$(wc -c < "$f" | tr -d ' ')" "$(python3 -c 'import os,sys;print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$f")"; done); }
-measure "$WORK/source"
+measure() {
+  python3 - "$1" <<'EOF'
+import hashlib, os, stat, sys
+root, rows = sys.argv[1], []
+if not os.path.isdir(root):
+    sys.exit("not a directory: " + root)
+for base, dirs, files in os.walk(root):
+    for name in dirs + files:
+        path = os.path.join(base, name)
+        mode = os.lstat(path).st_mode
+        if stat.S_ISDIR(mode):
+            continue
+        if not stat.S_ISREG(mode):
+            sys.exit("not a regular file: " + path)
+        with open(path, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        rows.append("%s %s %s" % (os.path.relpath(path, root), digest, oct(stat.S_IMODE(mode))))
+if not rows:
+    sys.exit("no files under: " + root)
+print("\n".join(sorted(rows)))
+EOF
+}
+snap() { measure "$1" > "$WORK/snap/$2" || { echo "measurement failed: $2" >&2; return 1; }; }
+same() { snap "$1" "$3" && cmp -s "$WORK/snap/$2" "$WORK/snap/$3" && echo "unchanged: $3" || { echo "CHANGED or unmeasured: $3" >&2; return 1; }; }
+snap "$WORK/source" source.before
 ```
+
+`measure` records each regular file's relative path, SHA-256 content digest and
+permission bits. It fails, and prints no rows, when the directory is missing,
+empty or holds a non-regular file. `same` compares a fresh measurement with an
+earlier one and returns non-zero on any difference or measurement failure.
 
 First run with the unconfirmed rights decision. Expect exit `2`, blocker
 `rights_unconfirmed`, `candidate_created: false` and no `demo-plugin` directory:
 
 ```bash
-prepare demo-plugin; echo "exit=$?"; ls "$WORK/output"; measure "$WORK/source"
+prepare demo-plugin; echo "exit=$?"; ls "$WORK/output"; same "$WORK/source" source.before source.refused
 ```
 
 Correct only the fixture rights decision, then occupy the intended destination
-with a sentinel file:
+with a sentinel file and record its baseline before the next call:
 
 ```bash
 python3 -c 'import json,sys;p=sys.argv[1];d=json.load(open(p));d["checks"]["rights"]=True;open(p,"w").write(json.dumps(d,indent=2)+"\n")' "$WORK/intake-context.json"
 mkdir "$WORK/output/demo-plugin" && printf 'keep me\n' > "$WORK/output/demo-plugin/sentinel.txt"
+snap "$WORK/output/demo-plugin" sentinel.before
 ```
 
 Run the same command again. Expect exit `2`, blocker `candidate_destination_exists`
 and `candidate_created: false`. The command does not replace or delete the
-sentinel; measure it to confirm its bytes and mode did not change:
+sentinel; compare it and the source with their earlier measurements:
 
 ```bash
-prepare demo-plugin; echo "exit=$?"; measure "$WORK/output/demo-plugin"; measure "$WORK/source"
+prepare demo-plugin; echo "exit=$?"; same "$WORK/output/demo-plugin" sentinel.before sentinel.refused; same "$WORK/source" source.before source.occupied
 ```
 
 Recover by choosing a fresh destination beneath the existing caller-owned
@@ -260,18 +292,19 @@ Recover by choosing a fresh destination beneath the existing caller-owned
 revision and content digest:
 
 ```bash
-prepare fresh; echo "exit=$?"; measure "$WORK/output/fresh"; measure "$WORK/output/demo-plugin"; measure "$WORK/source"
+prepare fresh; echo "exit=$?"; measure "$WORK/output/fresh"; same "$WORK/output/demo-plugin" sentinel.before sentinel.recovered; same "$WORK/source" source.before source.recovered
 ```
 
-The measurements record each regular file's relative path, byte count and
-permission bits before and after every call. They cover those properties only: not
-timestamps, other metadata or provenance. Writing the fixture, changing the
-rights decision and creating `fresh` are intentional edits, not source mutation.
-The prepared receipt shows structural validation only. It does not authenticate
-the caller's provenance or rights assertions, replace semantic review, approve
-icons, or authorize release, publication or installation, and no package content
-is executed. This route creates a new candidate; it does not update an existing
-plugin.
+Each `same` line compares regular-file paths, content digests and permission
+bits against the baseline taken before the call. The comparison covers those
+properties only: not symlinks, timestamps, other metadata or provenance. Writing
+the fixture, changing the rights decision and creating `fresh` are intentional
+edits, not source mutation. A line starting `CHANGED or unmeasured` means the
+preservation claim is not established. The prepared receipt shows structural
+validation only. It does not authenticate the caller's provenance or rights
+assertions, replace semantic review, approve icons, or authorize release,
+publication or installation, and no package content is executed. This route
+creates a new candidate; it does not update an existing plugin.
 
 ### Existing local routes
 
