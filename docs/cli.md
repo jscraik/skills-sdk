@@ -142,6 +142,20 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk eval selected-case ./skills/example --source-revision "<40-lowercase-hex>" --case happy-diff --mode release --host-input ./host-input.json --json --robot
 ```
 
+### Revision metadata and captured content
+
+`--source-revision` is caller-supplied metadata. The validator checks only its
+shape: 40 lowercase hexadecimal characters. The SDK does not read Git history
+and does not prove that the inspected bytes are the contents of that commit.
+The candidate's `content_sha256` is the digest of the package bytes captured
+from the directory. Editing a file changes `content_sha256`, while the same
+`--source-revision` value is carried unchanged. A malformed revision such as
+uppercase or short hexadecimal returns `invalid_source_revision` with exit `2`
+and no candidate. Callers must establish provenance and source-to-revision
+agreement independently. A structural pass is not semantic review, execution
+approval or release authority. See [the API contract](api.md) for the
+candidate model.
+
 ## Explicit local quality workflow
 
 `skills-sdk check-quality '<package>' --request '<request.json>' --assessment '<assessment.json>' --json --robot`
