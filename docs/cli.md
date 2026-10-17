@@ -282,7 +282,10 @@ expected `2`, continue recovery in the same Bash session. A return of `1` means
 the proof itself failed: the guard stops the session before recovery, so
 investigate before proceeding. Never carry on after a failed measurement,
 malformed output or wrong reason. Keep the old request. The `diff` exits `1` when
-the SVG changed, which is the expected result here, and `0` or `2` stops:
+the SVG changed, which is the expected result here, and `0` or `2` stops. Both
+expected-nonzero commands run in an `if` condition and keep their status, so the
+example also runs under `bash -e` without `set +e`; the explicit checks inside
+the helpers still run:
 
 ```bash
 measure "$PLUGIN" > "$SNAP/source.v1" \
@@ -292,10 +295,10 @@ sed -i.bak 's|<rect width="48" height="48"/>|<rect width="48" height="48" fill="
   || { echo "edit failed; stop" >&2; return 1 2>/dev/null || exit 1; }
 measure "$PLUGIN" > "$SNAP/source.v2" \
   || { echo "measurement failed; stop" >&2; return 1 2>/dev/null || exit 1; }
-diff "$SNAP/source.v1" "$SNAP/source.v2"
-[ "$?" -eq 1 ] || { echo "source did not change as expected; stop" >&2; return 1 2>/dev/null || exit 1; }
-assess stale-v1 2 "$REQS/request-v1.json"
-[ "$?" -eq 2 ] || { echo "stale-v1 proof failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+if diff "$SNAP/source.v1" "$SNAP/source.v2"; then DIFF_STATUS=0; else DIFF_STATUS=$?; fi
+[ "$DIFF_STATUS" -eq 1 ] || { echo "source did not change as expected; stop" >&2; return 1 2>/dev/null || exit 1; }
+if assess stale-v1 2 "$REQS/request-v1.json"; then STALE_STATUS=0; else STALE_STATUS=$?; fi
+[ "$STALE_STATUS" -eq 2 ] || { echo "stale-v1 proof failed; stop" >&2; return 1 2>/dev/null || exit 1; }
 ```
 
 Recovery needs a new request bound to fresh observations of the edited plugin,
