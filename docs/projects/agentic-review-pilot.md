@@ -4,7 +4,8 @@ Status: P0 baseline, P1 SDK repair and report delivery completed. SDK PR 65's
 docstring follow-up merged after its final readiness receipt. P2's seven supplied-history cases are implemented,
 validated and independently checked locally. The implementation and reports
 merged. Configs PR 369's separate docstring follow-up merged before its final
-readiness receipt; Configs PR 370's request-helper follow-up remains open.
+readiness receipt. Configs PR 370's request-helper follow-up subsequently merged
+after a fresh passing readiness receipt and explicit merge authorisation.
 Later product implementation phases are proposed.
 This document authorizes no external installation, PR messaging, paid execution,
 publication, or merge.
@@ -442,7 +443,14 @@ The metadata-triggered summary update required a later
 [CodeRabbit verdict](https://github.com/jscraik/configs/pull/370#issuecomment-6240204791).
 The final update receipt passed at 20:10:59 UTC with all 21 checks, both required
 reviewers and zero unresolved threads. GitHub reports the same head mergeable
-with clean merge state. PR 370 remains open; its merge is not authorised.
+with clean merge state. At that checkpoint PR 370 remained open without merge
+authorisation. Jamie subsequently authorised the conditional merge. The final
+20:37:49 UTC receipt again passed all 21 checks, both required reviewers and
+zero unresolved threads. [PR 370](https://github.com/jscraik/configs/pull/370)
+merged at 20:38:36 UTC as `fd218f07d748b4b6f39239d4a052623f7bab9718`.
+The entire accepted tree matches cleared source `29f3504d`; no bypass or branch
+deletion was used. This completes the helper delivery without retroactively
+clearing PR 369 or SDK report PR 85.
 
 The exact reviewed helper was projected with backup and byte comparison.
 Installed help, read-only rejection of the authentic stale quota source and

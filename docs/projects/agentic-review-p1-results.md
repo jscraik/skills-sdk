@@ -1020,3 +1020,39 @@ not the intended reference: SDK PR 65 cleared before merging, while Configs
 PR 369 merged before final clearance. The introduction now names both PRs
 explicitly and preserves both verified chronologies. This is a report clarity
 repair, not a change to Configs behaviour or retrospective clearance.
+
+### Final PR 370 merge, 17 October 2026
+
+Jamie subsequently authorised refreshing readiness and merging the helper
+repair if it remained clear. No source or PR-description changes were needed.
+
+Command: `python3 ~/.codex/scripts/pr-readiness.py --phase update --base main --scope-file codex/.tmp/review-delivery-scope.txt --write-receipt`
+-> pass at **20:37:49 UTC** for `29f3504df31fb8dc8034a223080e9dc7f8b75557`:
+all 21 current check contexts, both required reviewers, zero unresolved threads,
+clean declared scope, matching hosted head/base and remote ancestry.
+
+The normal exact-head squash merge of
+[Configs PR 370](https://github.com/jscraik/configs/pull/370) succeeded.
+GitHub confirms merge at **20:38:36 UTC** as
+`fd218f07d748b4b6f39239d4a052623f7bab9718`, from cleared source
+`29f3504df31fb8dc8034a223080e9dc7f8b75557`. No admin merge, rule bypass,
+force push, branch deletion or worktree removal was used.
+
+Command: `git diff --exit-code 29f3504df31fb8dc8034a223080e9dc7f8b75557 origin/main`
+-> pass after fetching accepted `fd218f07`. The entire accepted repository
+tree matches the validated and independently reviewed source. This is content
+parity, not a claim that a new accepted-main pipeline or additional runtime
+paths ran. The existing 23-test helper proof, 732-test policy aggregate,
+37 duplication regressions and hosted review remain bound to that same content.
+The credit window remained closed; no further paid or manual review was needed.
+
+The preceding report delivery,
+[SDK PR 85](https://github.com/jscraik/skills-sdk/pull/85), merged externally
+at 20:30:19 UTC as `676d87fbee3613d9f2aa4367e6ebf7661e5bb337`, from
+`4d2527719a143a52cf55d7c2be9ef841c098e3de`. Its accepted tree matched the
+documentation-validated candidate. All six reported contexts passed, and the
+new-head Codex code and security reviews completed without findings. Fresh
+CodeRabbit inspection was rate-limited, its validation-evidence advisory was
+not finally reassessed, and no final update receipt passed before that external
+merge. Those limitations and PR 369's earlier gap remain historical facts;
+PR 370's later passing receipt does not retroactively clear either delivery.
