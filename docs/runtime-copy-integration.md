@@ -6,8 +6,11 @@ Use the SDK entrypoint to compare a maintained skill source with an existing
 runtime copy without executing package code or changing either tree:
 
 ```bash
-skills-sdk compare-copy /path/to/source/example /path/to/runtime/example --source-revision <40-character-source-revision>
+skills-sdk compare-copy /path/to/source/example /path/to/runtime/example --source-revision "<40-lowercase-hex>"
 ```
+
+Replace `"<40-lowercase-hex>"` with the actual source revision. From this
+checkout, use the pinned command prefix described in the [CLI guide](cli.md).
 
 Both trees must pass the existing package validator. The command compares every
 captured relative filename, file hash, and byte count. Missing, extra, and changed

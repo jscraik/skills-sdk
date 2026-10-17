@@ -1,11 +1,12 @@
 # Skills SDK
 
-The current S2 candidate adds read-only
+Accepted PR #60 provides read-only
 [`check-plugin-presentation`](docs/cli.md#plugin-presentation-assessment) for
 fresh complete-plugin assets and supplied candidate-bound approvals. Optional
-`skills-sdk[images]` enables raster decoding. This unmerged route is not release,
-archive, independent visual/rights review or host-display clearance; see the
-[delivery record](docs/projects/sdk-workflow/tasks.md).
+`skills-sdk[images]` enables raster decoding. This assessment does not establish
+release, archive, independent visual/rights review or host-display clearance.
+Unmerged whole-plugin quality and native judge work remains outside this
+accepted capability set; see the [delivery record](docs/projects/sdk-workflow/tasks.md).
 
 Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines explicit, versioned contracts for inventory,
@@ -50,12 +51,13 @@ existing-copy comparison and maintenance routes are documented in
 ## Current status
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
-series. The implemented local commands are `intake`, `check-local`, `check-quality`, `review-content`, `validate`,
-`build`, `eval scenario-quality`, `eval scorer-quality`,
-`eval scorer-calibration`, `eval observed-calibration`, `eval selected-case`, `verify recurring-findings`,
-`verify pr-sweep-dirty-closeout`, `compare-copy`, and `maintain-entrypoint`.
-Comparison is read-only. Maintenance is read-only by
-default and requires explicit `--apply` to change an existing host file. The
+series. Accepted local routes cover standalone intake/quality/validation/build,
+plugin inspection, explicit standalone-to-plugin preparation, presentation,
+scenario/scorer assessment, bounded matched evaluation and local PR-sweep checks.
+Use the [CLI reference](docs/cli.md) for the maintained route catalogue, required
+inputs, evidence limits and exit codes. `normalize-plugin` creates a separate
+candidate without replacing an existing destination. `compare-copy` is read-only;
+`maintain-entrypoint` requires explicit `--apply` to change an existing host file. The
 other lifecycle names, including `inventory`, `package`,
 `project`, and `tessl prepare`/`tessl verify`, are explicit discovery
 boundaries: they parse arguments and provide route-specific help when
