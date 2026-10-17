@@ -89,9 +89,12 @@ skills-sdk validate-plugin ./my-plugin "${FLAGS[@]}" --json --robot --verify-evi
 
 Capture exits `0` and writes a `plugin-package-validation/v1` result with
 `"status": "pass"`. Verification of the unchanged plugin exits `0` and prints the
-same structural result. If the evidence file is edited after capture, the second
-command prints `"status": "blocked"` with finding `plugin_evidence_invalid` and
-exits `2`. That exit is the expected rejection, not an ordinary pass command.
+same structural result. A formatting-only edit to the evidence file still
+verifies, because the parsed result is unchanged. A content edit is blocked with
+exit `2`: finding `plugin_evidence_invalid` when the file is malformed or breaks
+the evidence contract, and `plugin_evidence_mismatch` when it parses but differs
+from the fresh capture (for example a changed `openai_settings_sha256`). That
+exit is the expected rejection, not an ordinary pass command.
 After a source change, capture again and verify the new file; after an evidence
 change, restore or recapture it. Keep the same revision and policy flags in both
 commands.
