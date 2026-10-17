@@ -227,13 +227,24 @@ package-assessment lane; they are not PR-review execution tests.
 For SDK implementation, use the pinned Python 3.12/uv environment and the
 repository command contracts. Public model/schema changes require generated
 schema checks, focused contract tests, behavior and compatibility proof. Before
-a commit or PR, run `bash scripts/validate-repository.sh`; use the documented
-docs-only route only when its classifier accepts the exact change.
+a commit or PR, run `bash scripts/validate-repository.sh`. For ordinary prose,
+use `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`
+only when its classifier accepts the exact change.
 
 External setup, review publication, pushes, merges, paid runs, installation and
 schedules retain their separate authorization and effective approval boundaries.
 This plan changes no runtime, reviewer, branch-protection or product settings.
 
-Plan verification: local source/document inventory completed; relative links and
-diff hygiene checked separately. No implementation test, hosted check, live
-review, or cross-product integration has been run as part of creating this plan.
+The initial draft reported source/document inventory, relative-link and diff
+checks without preserving their exact commands. Those historical observations
+are not reproducible command-level proof. The following current checks verify
+the report's repository context and links:
+
+- Command: `git ls-files -- docs/projects/agentic-review-pilot.md docs/projects/agentic-review-p0-baseline.md docs/projects/agentic-review-p1-results.md docs/projects/sdk-workflow/tasks.md`
+  -> pass; all four report and task-ledger paths are tracked.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/check_repository_standards.py`
+  -> pass; includes repository documentation-link checks.
+- Command: `git diff --check` -> pass; checks diff hygiene.
+
+These checks do not prove implementation behavior, hosted review, or
+cross-product integration. Later P0/P1 evidence is recorded in the linked reports.
