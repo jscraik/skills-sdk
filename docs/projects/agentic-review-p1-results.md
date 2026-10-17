@@ -11,6 +11,10 @@ published head. Final current-head clearance passed at 22:35 UTC on 16 October
 repair. All five checks pass, both required independent reviewers qualify,
 and no review threads remain unresolved. After another passing update receipt
 at 22:49 UTC and exact-head local review, PR 63 merged as `e480d429`.
+Report delivery and the docstring follow-up are also merged; the final dated
+closeout below supersedes earlier pending-delivery checkpoints. P2's supplied
+history replay now has local fixture and independent proof in the linked plan;
+it has no hosted delivery or live-provider clearance claim.
 
 ## Source and authority
 
@@ -554,3 +558,69 @@ At this dated checkpoint, hosted CI and bot clearance for `a6853c04` are still
 pending. The preceding head's passing workflow does not clear this correction.
 Neither Configs PR has been merged, and closing PR 366 remains conditional on
 PR 367's fresh readiness receipt. This follow-up changes no SDK runtime claim.
+
+## Final SDK merge and review closeout, 17 October 2026
+
+The preceding sections retain the evidence available at each checkpoint.
+Subsequent live GitHub readback confirms these accepted SDK deliveries:
+
+| Delivery | Reviewed source head | Accepted merge | Result |
+| --- | --- | --- | --- |
+| [PR 63](https://github.com/jscraik/skills-sdk/pull/63) | `7f1c4b1489b7545c2d162fbf1144533c19486d49` | `e480d429adaf400f3ae0ab78c4a4bacb0fbeae60`, 16 October at 22:49:36 UTC | Both confirmed findings repaired, both threads resolved, both required bots qualified and all five check contexts passed before merge. |
+| [PR 64](https://github.com/jscraik/skills-sdk/pull/64) | `db9cd11e49dd7898f05fdbbc9d9b42b39d0fa3d6` | `8733065a3d3a2d7ae8d72630ba132b3eb67f92bd`, 17 October at 02:46:07 UTC | Pilot reports published; final hosted check contexts all succeeded. PR 63's review does not substitute for this delivery's evidence. |
+| [PR 65](https://github.com/jscraik/skills-sdk/pull/65) | `dea1c2e49d0008c98b71f33c329c8f1751ba03e3` | `0d4a39d8d1cd214e3fd29895f30f13780d562d4a`, 17 October at 10:58:28 UTC | Three helper docstrings retained; six redundant test descriptions deliberately omitted. Both independent reviewers qualified, all five checks passed, zero unresolved threads and a fresh update receipt preceded the normal squash merge. |
+
+PR 65's [hosted validation](https://github.com/jscraik/skills-sdk/actions/runs/39002377562)
+completed successfully. Its completed local full suite recorded 3,915 passed
+and one skipped in 3,292.03 seconds. Schemas, quality checks, build and installed
+API/CLI proof also passed. The local aggregate wrapper was blocked by the
+execution guard; it was not relabelled as passing. Direct component proof and
+hosted aggregate proof remain separate.
+
+Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen --extra images pytest -n 2 --dist load --durations=25 --durations-min=0.1 --junitxml=.tmp/docstrings-20261017/full-tests.xml`
+-> pass for the PR 65 candidate; 3,915 passed, one skipped. This historical
+candidate run was not repeated for this report-only update.
+
+CodeRabbit's original review had incomplete metadata and check context.
+The concise body repair, [evidence-backed reinspection](https://github.com/jscraik/skills-sdk/pull/65#issuecomment-6232984452)
+and [final clarification](https://github.com/jscraik/skills-sdk/pull/65#issuecomment-6233087285)
+established no findings at the full PR 65 head. The final clarification followed
+a metadata-triggered update of the older summary; the earlier passing receipt
+was not reused to ignore that later evidence. Codex's
+[code review](https://github.com/jscraik/skills-sdk/pull/65#issuecomment-6233025348)
+and [security review](https://github.com/jscraik/skills-sdk/pull/65#issuecomment-6233056882)
+also completed without findings.
+
+Command: `python3 ~/.codex/scripts/pr-readiness.py --phase update --base main --scope-file .tmp/docstrings-20261017/scope.txt --write-receipt --json`
+-> pass at 10:57:55 UTC, after the final body refresh and later clarification.
+Both required bots, five current-head checks, zero unresolved threads, clean
+checkout, declared scope and remote ancestry passed.
+
+Command: `gh pr merge 65 --repo jscraik/skills-sdk --squash --match-head-commit dea1c2e49d0008c98b71f33c329c8f1751ba03e3`
+-> pass; GitHub subsequently confirmed the accepted revision above.
+
+Command: `git diff --exit-code dea1c2e49d0008c98b71f33c329c8f1751ba03e3 origin/main`
+-> pass immediately after fetching the merge; the entire accepted tree matched
+the tested candidate. The primary checkout then fast-forwarded to main.
+The old source branch still ended at the reviewed nine-docstring commit;
+its predecessor matched accepted PR 63. Both remote source branches and the
+merged local task branch were removed after this accounting. Final inventory
+showed clean main, zero divergence from origin/main, and one primary worktree.
+Ignored evidence and backups were preserved.
+
+The related Configs state is different from the earlier checkpoint:
+[PR 366](https://github.com/jscraik/configs/pull/366) merged at 03:09:08 UTC as
+`ed9110f9aa94967357f7b111e922ecbd8ddadc33`, from `d3a632ac`.
+[PR 367](https://github.com/jscraik/configs/pull/367) remains open at
+`3b4d68751fdcfcc3e33600a199d1e3fa660de080` with passing reported checks on live
+readback. Its later correction is not assumed present in PR 366's accepted
+tree, and no final review clearance or merge is claimed for PR 367. Resolving
+that separate delivery is outside this SDK report update.
+
+P1 SDK repair and follow-up delivery are complete. The subsequent
+[P2 local checkpoint](agentic-review-pilot.md#p2-local-implementation-checkpoint-17-october-2026)
+records seven sanitized finding-history cases, a bounded Configs implementation,
+17 passing focused tests and independent re-review after two reproduced repairs.
+The real PR loop and the supplied-history replay are separate proof lanes.
+No package publication, installed-runtime clearance or cross-product rollout
+follows from either result.
