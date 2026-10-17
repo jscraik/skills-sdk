@@ -1177,6 +1177,114 @@ Both commands return `pr-sweep-validation/v1`: exit `0` for `pass` and `2` for
 repository-relative dirty paths. The skill's hosted checks, review, receipt,
 authorization, and merge gates remain separate.
 
+### Worked example: account for dirty files without waiving a clean checkout
+
+This example builds two synthetic repositories in a new temporary directory.
+The first is unborn (it has no commit) and holds one staged file and one
+untracked file whose name contains a space. A separate ledger sits outside both
+repositories. From the SDK checkout root, the proof runs the checkout-scoped
+`verify pr-sweep-dirty-closeout` route four times and checks the raw exit code,
+stdout and stderr of each call. It recognizes the two expected refusals, so the
+proof exits `0` when it observes exactly the SDK exits `2`, `0`, `2`, `0`. A
+proof exit `0` does not mean that every SDK call passed. Any setup error,
+malformed output, wrong schema, kind, status, finding or path category, or
+changed file stops the proof with `1`, including under `PYTHONOPTIMIZE=1`.
+
+```bash
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" python3 - <<'PY'
+import json, stat, subprocess, sys, tempfile
+from pathlib import Path
+
+def stop(why):
+    print(f"proof failed: {why}", file=sys.stderr)
+    sys.exit(1)
+
+def run(args, cwd):
+    try:
+        return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        stop(f"cannot run {args[0]}: {type(error).__name__}")
+
+sdk = Path.cwd().resolve()
+if not (sdk / ".mise.toml").is_file():
+    stop("run from the SDK checkout root")
+work = Path(tempfile.mkdtemp(prefix="dirty-closeout.")).resolve()
+dirty, fresh, ledger = work / "dirty", work / "fresh", work / "ledger.json"
+for root in (dirty, fresh):
+    root.mkdir()
+    if run(["git", "init", "-q"], root).returncode != 0:
+        stop("git init failed")
+private = "PRIVATE-FIXTURE-CONTENT"
+(dirty / "staged.txt").write_text(private + "\n")
+(dirty / "needs review.txt").write_text(private + "\n")
+if run(["git", "add", "staged.txt"], dirty).returncode != 0:
+    stop("git add failed")
+entries = [{"path": "staged.txt"}, {"path": "needs review.txt"}]
+ledger.write_text(json.dumps({"dirty_worktree_ledger": entries, "note": private}))
+
+def snapshot(root):
+    files = {}
+    for path in [ledger, *sorted(root.rglob("*"))]:
+        parts = path.relative_to(work).parts
+        if parts[1:2] == (".git",) and parts[2:] != ("index",):
+            continue
+        info = path.lstat()
+        if stat.S_ISREG(info.st_mode):
+            files[parts] = (path.read_bytes(), stat.S_IMODE(info.st_mode))
+    return files
+
+base = ["mise", "exec", "--", "uv", "run", "--frozen", "skills-sdk", "verify", "pr-sweep-dirty-closeout"]
+both = ["needs review.txt", "staged.txt"]
+empty = {"staged_paths": [], "unstaged_paths": [], "untracked_paths": [], "dirty_paths": []}
+state = {"staged_paths": ["staged.txt"], "unstaged_paths": [], "untracked_paths": ["needs review.txt"], "dirty_paths": both}
+cases = [
+    ("missing ledger", dirty, [], 2, "fail", ["dirty_worktree_ledger_required"], state, [], both),
+    ("complete ledger", dirty, ["--ledger", str(ledger)], 0, "pass", [], state, both, []),
+    ("ledger and --require-clean", dirty, ["--ledger", str(ledger), "--require-clean"], 2, "fail", ["primary_worktree_dirty"], state, both, []),
+    ("fresh repository and --require-clean", fresh, ["--require-clean"], 0, "pass", [], empty, [], []),
+]
+for name, root, extra, code, status, findings, dirty_state, ledgered, unledgered in cases:
+    before = snapshot(root)
+    done = run(base + ["--repo-root", str(root), *extra, "--json", "--robot"], sdk)
+    if snapshot(root) != before:
+        stop(f"{name}: fixture, index or ledger changed")
+    if done.returncode != code or done.stderr != "":
+        stop(f"{name}: exit {done.returncode} or stderr not as expected")
+    try:
+        result = json.loads(done.stdout)
+    except ValueError:
+        stop(f"{name}: stdout is not JSON")
+    if not isinstance(result, dict):
+        stop(f"{name}: result is not an object")
+    codes = [f.get("code") if isinstance(f, dict) else None for f in result.get("findings", [])]
+    expected = {"schema_version": "pr-sweep-validation/v1", "kind": "dirty_closeout", "status": status,
+                "findings": findings, "dirty_state": dirty_state, "ledgered_paths": ledgered, "unledgered_paths": unledgered}
+    if dict(result, findings=codes) != expected:
+        stop(f"{name}: result differs from the expected contract")
+    if any(text in done.stdout for text in (str(work), str(sdk), private)):
+        stop(f"{name}: result leaks a host path or file content")
+    print(f"{name}: SDK exit {done.returncode}, {status}, findings {findings}")
+print("proof ok: four expected outcomes observed")
+PY
+```
+
+The proof compared the regular-file content and mode of every fixture file,
+the Git index file and the ledger immediately before and after each SDK call,
+and found them unchanged. It checks those properties only: it does not claim
+atomicity, or that timestamps, ignored files or other Git metadata were
+preserved. Creating the fixtures, staging one file and writing the ledger were
+deliberate setup steps, not SDK behavior; the SDK route only reads the checkout.
+
+The complete ledger gives a `pass` that accounts for the dirty paths, which are
+still dirty. The same ledger with `--require-clean` fails with
+`primary_worktree_dirty`. Only the separate fresh repository passes that gate,
+and it does not clean the first one. An accounting `pass` is not cleanliness,
+hosted CI or review evidence, a readiness receipt, permission to move a branch,
+merge authority, or completion of a larger SDK workflow. The SDK does not
+contact GitHub, and a ledger entry cannot make a dirty file of unknown ownership
+legitimate. The example leaves its temporary directory in place; remove it when
+finished.
+
 ## Prompt translations
 
 Run the checkout-scoped commands below from the repository checkout root so
