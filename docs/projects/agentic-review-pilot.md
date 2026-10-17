@@ -1,10 +1,10 @@
 # Agentic review pilot and product rollout
 
 Status: P0 baseline, P1 SDK repair and report delivery completed. SDK PR 65's
-docstring follow-up is merged. P2's seven supplied-history cases are implemented,
+docstring follow-up merged after its final readiness receipt. P2's seven supplied-history cases are implemented,
 validated and independently checked locally. The implementation and reports
-merged. The separate docstring follow-up also merged before its final readiness
-receipt; the request-helper follow-up remains open and is recorded separately.
+merged. Configs PR 369's separate docstring follow-up merged before its final
+readiness receipt; Configs PR 370's request-helper follow-up remains open.
 Later product implementation phases are proposed.
 This document authorizes no external installation, PR messaging, paid execution,
 publication, or merge.

@@ -1013,3 +1013,10 @@ review could duplicate completed work or incur unapproved cost. No repeat was
 sent; installed dry-run and read-only source-binding probes passed instead.
 No live quota-retry write or whole-runtime validation is claimed. Primary Git
 state and unrelated installation changes were preserved.
+
+The separate SDK report review identified an ambiguous reference to a
+"docstring follow-up" in the introduction. Its proposed PR 65 identity was
+not the intended reference: SDK PR 65 cleared before merging, while Configs
+PR 369 merged before final clearance. The introduction now names both PRs
+explicitly and preserves both verified chronologies. This is a report clarity
+repair, not a change to Configs behaviour or retrospective clearance.
