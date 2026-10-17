@@ -122,27 +122,191 @@ The default validation route without this option is unchanged. Structural
 verification does not establish matched evaluation, execution permission or
 release readiness.
 
-Worked capture and verification, run from a directory that holds both the plugin
-and a separate `evidence/` directory:
+#### Worked example: evidence match, reformat, source drift, permission drift and recovery
+
+This example uses only synthetic data. The revision is a fixture value; its
+shape does not show where the source came from. Run every command from the SDK
+checkout root in one shell session, with the plugin and evidence in separate
+physical temporary paths. The first command stops the session if the workspace cannot be created. The
+example sets the modes it relies on, so it behaves
+the same under a `022` or `002` umask without changing the umask. Create one
+valid root manifest and one child skill:
 
 ```bash
-REV="<40-lowercase-hex>"
+WORK="$(mktemp -d)" && WORK="$(cd "$WORK" && pwd -P)" && [ -n "$WORK" ] \
+  || { echo "workspace setup failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+PLUGIN="$WORK/plugin"; EV="$WORK/evidence"; OUT="$WORK/out"; SNAP="$WORK/snap"
+mkdir -p "$PLUGIN/skills/demo-skill" "$EV" "$OUT" "$SNAP"
+chmod 0755 "$PLUGIN" "$PLUGIN/skills" "$PLUGIN/skills/demo-skill" "$EV"
+cat > "$PLUGIN/plugin.json" <<'EOF'
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "demo-plugin",
+  "version": "1.0.0",
+  "description": "Synthetic plugin for evidence drift."
+}
+EOF
+printf '%s\n' '---' 'name: demo-skill' 'description: Synthetic skill used to demonstrate evidence drift.' '---' '' '# Demo skill' '' 'Reply with a short greeting.' > "$PLUGIN/skills/demo-skill/SKILL.md"
+chmod 0644 "$PLUGIN/plugin.json" "$PLUGIN/skills/demo-skill/SKILL.md"
+REV="0123456789abcdef0123456789abcdef01234567"
 FLAGS=(--source-revision "$REV" --require-version --require-description)
-skills-sdk validate-plugin ./my-plugin "${FLAGS[@]}" --json --robot > evidence/plugin-validation.json
-skills-sdk validate-plugin ./my-plugin "${FLAGS[@]}" --json --robot --verify-evidence evidence/plugin-validation.json
 ```
 
-Capture exits `0` and writes a `plugin-package-validation/v1` result with
-`"status": "pass"`. Verification of the unchanged plugin exits `0` and prints the
-same structural result. A formatting-only edit to the evidence file still
-verifies, because the parsed result is unchanged. A content edit is blocked with
-exit `2`: finding `plugin_evidence_invalid` when the file is malformed or breaks
-the evidence contract, and `plugin_evidence_mismatch` when it parses but differs
-from the fresh capture (for example a changed `openai_settings_sha256`). That
-exit is the expected rejection, not an ordinary pass command.
-After a source change, capture again and verify the new file; after an evidence
-change, restore or recapture it. Keep the same revision and policy flags in both
-commands.
+Define the helpers. `measure` prints each regular file's relative path, SHA-256
+digest and permission bits, and fails when any supplied path is missing, empty,
+unreadable or not a regular file, so one valid input cannot hide another. `run` keeps stdout, stderr and the exit code apart and fails when
+the exit code is not the expected one. `show` parses a result and checks the schema version, the expected status and
+exact finding codes, that the authority flags are `false` and that the requested
+policy was retained, so a different valid blocker such as `plugin_evidence_invalid`
+cannot stand in for the one expected. `check`
+measures the plugin files and the supplied evidence before and after one
+verification and fails on any difference, measurement failure or rejected result, even when the
+CLI exit code was the expected one:
+
+```bash
+sdk() { MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk "$@"; }
+measure() {
+  python3 - "$WORK" "$@" <<'EOF'
+import hashlib, os, stat, sys
+work, rows = sys.argv[1], []
+def unreadable(error):
+    sys.exit("cannot traverse: %s" % error.filename)
+for root in sys.argv[2:]:
+    if not os.path.lexists(root):
+        sys.exit("missing input: " + root)
+    if os.path.isdir(root):
+        paths = [os.path.join(b, n) for b, _, fs in os.walk(root, onerror=unreadable) for n in fs]
+    else:
+        paths = [root]
+    if not paths:
+        sys.exit("empty input: " + root)
+    for path in paths:
+        mode = os.lstat(path).st_mode
+        if not stat.S_ISREG(mode):
+            sys.exit("not a regular file: " + path)
+        with open(path, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        rows.append("%s %s %s" % (os.path.relpath(path, work), digest, oct(stat.S_IMODE(mode))))
+print("\n".join(sorted(rows)))
+EOF
+}
+run() {  # run NAME EXPECTED_EXIT STDOUT_FILE ARGS...
+  local name="$1" want="$2" dest="$3" got; shift 3
+  sdk "$@" > "$dest" 2> "$OUT/$name.err"; got=$?
+  echo "$name: exit=$got expected=$want stderr_bytes=$(wc -c < "$OUT/$name.err")"
+  [ "$got" -eq "$want" ] || { echo "UNEXPECTED EXIT: $name" >&2; return 1; }
+}
+show() {  # show RESULT_FILE EXPECTED_STATUS [EXPECTED_FINDING_CODE]
+  python3 - "$@" <<'EOF'
+import json, sys
+r = json.load(open(sys.argv[1]))
+codes = [f["code"] for f in r["findings"]]
+print(r["schema_version"], r["status"], codes, {k: r[k] for k in ("mutation_performed", "execution_authorized", "release_ready")}, r["policy"])
+flags = ("mutation_performed", "execution_authorized", "release_ready")
+if r["schema_version"] != "plugin-package-validation/v1":
+    sys.exit("unexpected schema_version: %r" % r["schema_version"])
+if r["status"] != sys.argv[2]:
+    sys.exit("unexpected status: %r, expected %r" % (r["status"], sys.argv[2]))
+if codes != sys.argv[3:4]:
+    sys.exit("unexpected findings: %r, expected %r" % (codes, sys.argv[3:4]))
+if any(r[k] is not False for k in flags):
+    sys.exit("authority flag is not false: %r" % {k: r[k] for k in flags})
+if r["policy"] != {"require_version": True, "require_description": True}:
+    sys.exit("unexpected policy: %r" % r["policy"])
+EOF
+}
+check() {  # check NAME EXPECTED_EXIT EVIDENCE_FILE
+  measure "$PLUGIN" "$3" > "$SNAP/$1.before" || { echo "measurement failed: $1" >&2; return 1; }
+  run "$1" "$2" "$OUT/$1.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot --verify-evidence "$3"; local rc=$?
+  measure "$PLUGIN" "$3" > "$SNAP/$1.after" || { echo "measurement failed: $1" >&2; return 1; }
+  cmp -s "$SNAP/$1.before" "$SNAP/$1.after" && echo "inputs unchanged: $1" || { echo "INPUTS CHANGED: $1" >&2; return 1; }
+  if [ "$2" -eq 0 ]; then show "$OUT/$1.json" pass; else show "$OUT/$1.json" blocked plugin_evidence_mismatch; fi || { echo "RESULT REJECTED: $1" >&2; return 1; }; return $rc
+}
+```
+
+Capture once into the evidence directory. Expect exit `0` and a passing
+`plugin-package-validation/v1` result with no findings. Then verify the unchanged
+plugin against it with the same revision and policy. Expect exit `0` and the
+same passing result:
+
+```bash
+run capture 0 "$EV/plugin-validation.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/plugin-validation.json" && show "$EV/plugin-validation.json" pass
+check verify-unchanged 0 "$EV/plugin-validation.json"
+```
+
+Reformat only the evidence, keeping its parsed value. The bytes differ, the
+parsed value does not, and verification still exits `0` because the parsed
+result, not the byte sequence, is compared:
+
+```bash
+python3 - "$EV/plugin-validation.json" <<'EOF'
+import json, sys
+path = sys.argv[1]
+raw = open(path, "rb").read()
+value = json.loads(raw)
+open(path, "w").write(json.dumps(value, indent=2, sort_keys=True) + "\n")
+if open(path, "rb").read() == raw or json.load(open(path)) != value:
+    sys.exit("reformat did not change bytes while keeping the parsed value")
+print("evidence reformatted; parsed value unchanged")
+EOF
+chmod 0644 "$EV/plugin-validation.json"
+check verify-reformatted 0 "$EV/plugin-validation.json"
+```
+
+Make one valid, same-length source edit ("short" becomes "brief") without
+changing `REV`. The `diff` is the control: exactly the edited file changes and
+its neighbour `plugin.json` does not. The plugin is still structurally valid,
+but verification against the retained evidence is blocked. Expect exit `2`, status
+`blocked` and exactly the finding `plugin_evidence_mismatch`. This is the expected rejection, not an
+ordinary pass command. Keep the old evidence file:
+
+```bash
+measure "$PLUGIN" > "$SNAP/source.v1"
+sed -i.bak 's/short greeting/brief greeting/' "$PLUGIN/skills/demo-skill/SKILL.md" && rm "$PLUGIN/skills/demo-skill/SKILL.md.bak"
+chmod 0644 "$PLUGIN/skills/demo-skill/SKILL.md"
+measure "$PLUGIN" > "$SNAP/source.v2"; diff "$SNAP/source.v1" "$SNAP/source.v2"
+check verify-stale 2 "$EV/plugin-validation.json"
+```
+
+Recover by capturing the edited plugin into a new evidence file, leaving the old
+one in place. Verification of the new file exits `0`:
+
+```bash
+run recapture 0 "$EV/after-edit.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/after-edit.json" && show "$EV/after-edit.json" pass
+check verify-recaptured 0 "$EV/after-edit.json"
+```
+
+Permission-only drift works the same way. Change only the mode of the captured
+regular file, which the evidence records. The control `diff` shows the mode
+column of that one file changing and the content digest staying the same.
+Expect exit `2` and `plugin_evidence_mismatch`, then recover with another new
+capture:
+
+```bash
+measure "$PLUGIN" > "$SNAP/mode.before"
+chmod 0755 "$PLUGIN/skills/demo-skill/SKILL.md"
+measure "$PLUGIN" > "$SNAP/mode.after"; diff "$SNAP/mode.before" "$SNAP/mode.after"
+check verify-mode-drift 2 "$EV/after-edit.json"
+run recapture-mode 0 "$EV/after-mode.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/after-mode.json" && show "$EV/after-mode.json" pass
+check verify-mode-recaptured 0 "$EV/after-mode.json"
+```
+
+Each `check` compares regular-file paths, SHA-256 content digests and permission
+bits of the plugin and of the supplied evidence file before and after the call.
+Those are the only preserved properties claimed: not symlinks, directory modes,
+timestamps or other metadata. Writing the fixture, reformatting the evidence,
+editing the skill, changing its mode and the capture outputs are intentional
+actions, not verification effects. A line starting `INPUTS CHANGED` or
+`measurement failed` means the preservation claim is not established. Every
+result keeps the mutation, execution and release flags `false` and the requested
+policy.
+
+Verification is a structural comparison of fresh observations with the parsed
+evidence. It is not an atomic snapshot, external provenance, independent review,
+skill execution, publication, installation or release permission. A
+finding `plugin_evidence_invalid` instead means the file is malformed or breaks
+the evidence contract. After a source change, capture again into a new file and
+verify that file; keep the same revision and policy flags in both commands.
 
 This check is structural. It does not authenticate caller-supplied provenance,
 establish that the skills are accurate or useful, execute the plugin, or grant
