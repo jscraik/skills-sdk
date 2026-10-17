@@ -202,10 +202,17 @@ import json, sys
 r = json.load(open(sys.argv[1]))
 codes = [f["code"] for f in r["findings"]]
 print(r["schema_version"], r["status"], codes, {k: r[k] for k in ("mutation_performed", "execution_authorized", "release_ready")}, r["policy"])
-assert r["schema_version"] == "plugin-package-validation/v1"
-assert r["status"] == sys.argv[2] and codes == sys.argv[3:4]
-assert not any(r[k] for k in ("mutation_performed", "execution_authorized", "release_ready"))
-assert r["policy"] == {"require_version": True, "require_description": True}
+flags = ("mutation_performed", "execution_authorized", "release_ready")
+if r["schema_version"] != "plugin-package-validation/v1":
+    sys.exit("unexpected schema_version: %r" % r["schema_version"])
+if r["status"] != sys.argv[2]:
+    sys.exit("unexpected status: %r, expected %r" % (r["status"], sys.argv[2]))
+if codes != sys.argv[3:4]:
+    sys.exit("unexpected findings: %r, expected %r" % (codes, sys.argv[3:4]))
+if any(r[k] is not False for k in flags):
+    sys.exit("authority flag is not false: %r" % {k: r[k] for k in flags})
+if r["policy"] != {"require_version": True, "require_description": True}:
+    sys.exit("unexpected policy: %r" % r["policy"])
 EOF
 }
 check() {  # check NAME EXPECTED_EXIT EVIDENCE_FILE
@@ -238,7 +245,8 @@ path = sys.argv[1]
 raw = open(path, "rb").read()
 value = json.loads(raw)
 open(path, "w").write(json.dumps(value, indent=2, sort_keys=True) + "\n")
-assert open(path, "rb").read() != raw and json.load(open(path)) == value
+if open(path, "rb").read() == raw or json.load(open(path)) != value:
+    sys.exit("reformat did not change bytes while keeping the parsed value")
 print("evidence reformatted; parsed value unchanged")
 EOF
 chmod 0644 "$EV/plugin-validation.json"
