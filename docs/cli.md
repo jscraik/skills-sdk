@@ -1296,11 +1296,14 @@ finished.
 
 ### Worked example: a recurring-findings threshold is not merge readiness
 
-A schema-valid ledger can still contradict itself. At three occurrences of one
-finding class the validator expects either a declared validated guardrail or
-`merge_eligible: false`. This example writes four synthetic ledgers into a new
-temporary directory and, from the SDK checkout root, calls the checkout-scoped
-`verify recurring-findings` route once for each. Prepare the pinned tools and
+A schema-valid ledger can still contradict itself. For each finding class the
+validator ties `merge_eligible` to the occurrence count and
+guardrail status. Below three occurrences it must be `true`, whatever the
+guardrail. At three or more with a `blocked` guardrail it must be `false`. At
+three or more with a `validated` guardrail it must be `true`. This example
+writes four synthetic ledgers into a new temporary directory and, from the SDK
+checkout root, calls the checkout-scoped `verify recurring-findings` route once
+for each. Prepare the pinned tools and
 locked environment first with the setup commands in
 [`CONTRIBUTING.md`](../CONTRIBUTING.md). The proof exits `0` when it
 observes exactly the SDK exits `0`, `2`, `0`, `0`. Any setup error, wrong exit
@@ -1310,7 +1313,7 @@ kind, status, finding message or result shape, or changed ledger stops the proof
 with `1`, including under `PYTHONOPTIMIZE=1`.
 
 ```bash
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" python3 - <<'PY'
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- python - <<'PY'
 import hashlib, json, stat, subprocess, sys, tempfile
 from pathlib import Path
 
