@@ -289,10 +289,10 @@ does not expose these flags; do not infer full package-quality coverage from it.
 
 ### Worked example: required reference recovery
 
-Run this from the SDK checkout root after `mise install python uv ruff vale` and
-`mise exec -- uv sync --frozen`. Export
-`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"` first.
-The script creates a disposable synthetic package under the physical temporary
+From the SDK checkout root, first export
+`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"`.
+With those variables set, run `mise install python uv ruff vale` and then
+`mise exec -- uv sync --frozen`, and only then run the example. The script creates a disposable synthetic package under the physical temporary
 path, so it also works on macOS.
 The revision is a concrete 40-character lowercase hexadecimal value. The script
 never executes package content; `inventory` hashes the package files before and
