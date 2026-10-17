@@ -470,3 +470,44 @@ This repairs observed failures without claiming the three-occurrence learning
 threshold has been met. The initial sibling sweep covered equivalent import
 rules; the later approved parser repair covered the observed CodeRabbit,
 Codex code, security and summary formats. No new review service was introduced.
+
+## Configs delivery follow-up, 17 October 2026
+
+The initial CircleCI log-access blocker above was subsequently resolved through
+the authenticated browser session. This does not establish credential-wrapper
+or CLI-token access: the auth-backed shell wrapper remains blocked by the
+execution hook, and no credentials or security settings were changed.
+
+The authenticated rerun passed the source test and docs jobs. The remaining
+delivery failures were the enforced Linear branch-key contract and the
+unchecked validation checklist item without a pending marker. With Jamie's
+explicit approval, [JSC-516](https://linear.app/jscraik/issue/JSC-516/configs-clear-authentic-review-receipts-and-guarded-reinspection)
+was created and the reviewed repair was published on
+`codex/JSC-516-review-receipts` in [replacement PR 367](https://github.com/jscraik/configs/pull/367).
+PR 366 remains open until the replacement clears its own readiness checks.
+The replacement's first pipeline preceded PR metadata availability; one
+[authenticated rerun](https://app.circleci.com/workflow/81f8eadd-605f-43d0-9342-239fb058b04d)
+passed every CircleCI job at `d3a632ac`. No check was waived.
+
+Hosted Codex then identified a separate request-helper defect:
+[an older concern edited later could authorize reinspection](https://github.com/jscraik/configs/pull/367#discussion_r4300565633).
+The repair compares concern creation time with the authenticated original
+request. Concerns created before or at that request are rejected even when
+edited afterward. Both added rejection cases failed before the correction;
+the documented focused request-helper route passed all 15 tests afterward.
+The same pinned Configs aggregate command recorded above passed again,
+including all 627 policy tests in 873.701 seconds, 37 duplication tests and
+maintained test wiring. Pinned Ruff and diff hygiene passed.
+
+The signed correction is published as
+[`a6853c04`](https://github.com/jscraik/configs/commit/a6853c0464a6498cbf09dc42e0517c553c66cccc).
+Independent static review found no remaining actionable defect. Native review
+was bound to that exact published head and accepted base `aab0960667`; it found
+no actionable regression and independently passed 189 parser, readiness and
+request-helper tests. A real edited provider concern was not manufactured to
+exercise the rejection path; the regression uses supplied event inventories.
+
+At this dated checkpoint, hosted CI and bot clearance for `a6853c04` are still
+pending. The preceding head's passing workflow does not clear this correction.
+Neither Configs PR has been merged, and closing PR 366 remains conditional on
+PR 367's fresh readiness receipt. This follow-up changes no SDK runtime claim.
