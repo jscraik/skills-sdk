@@ -532,7 +532,7 @@ unchecked validation checklist item without a pending marker. With Jamie's
 explicit approval, [JSC-516](https://linear.app/jscraik/issue/JSC-516/configs-clear-authentic-review-receipts-and-guarded-reinspection)
 was created and the reviewed repair was published on
 `codex/JSC-516-review-receipts` in [replacement PR 367](https://github.com/jscraik/configs/pull/367).
-PR 366 remains open until the replacement clears its own readiness checks.
+At that checkpoint, PR 366 remained open pending the replacement's readiness checks.
 The replacement's first pipeline preceded PR metadata availability; one
 [authenticated rerun](https://app.circleci.com/workflow/81f8eadd-605f-43d0-9342-239fb058b04d)
 passed every CircleCI job at `d3a632ac`. No check was waived.
@@ -612,7 +612,7 @@ Ignored evidence and backups were preserved.
 The related Configs state is different from the earlier checkpoint:
 [PR 366](https://github.com/jscraik/configs/pull/366) merged at 03:09:08 UTC as
 `ed9110f9aa94967357f7b111e922ecbd8ddadc33`, from `d3a632ac`.
-[PR 367](https://github.com/jscraik/configs/pull/367) remains open at
+At that checkpoint, [PR 367](https://github.com/jscraik/configs/pull/367) was open at
 `3b4d68751fdcfcc3e33600a199d1e3fa660de080` with passing reported checks on live
 readback. Its later correction is not assumed present in PR 366's accepted
 tree, and no final review clearance or merge is claimed for PR 367. Resolving
@@ -686,7 +686,7 @@ Configs PR 368 was merged outside this task at 12:26:37 UTC as
 `3002f3a92c8164fd3475b91fda188fd0917236fd`, from `e9587e329`.
 The local update gate had not cleared the remaining CodeRabbit concerns;
 the observed merge does not retroactively establish that clearance. SDK PR 67
-remains open. This task did not perform the merge.
+was still open at that checkpoint. This task did not perform the merge.
 
 The signed Configs correction is
 `fa0de50f866d82f4eb69c9c6891b984edd4f40fb`, pushed after that merge and
@@ -703,3 +703,320 @@ on accepted `3002f3a9`, with signed correction
 `2d13d2daaf7949b81f928ad092ab6a471f646fe7`; its two changed files exactly
 match the independently reviewed `fa0de50f` candidate. The 29-line follow-up
 fits the normal diff budget and needs no additional exception.
+
+### P2 hosted follow-up checkpoint
+
+GitHub confirmed SDK PR 67 merged on 17 October at 13:14:05 UTC as
+`3e3ae014ac38622522c99d428636a3b3cd61af69`, from report head
+`857b3e3da085a179c34a868fae08125ce58a8221`. All five hosted checks passed.
+The metadata-summary disclosure was explicitly approved; its later template
+formatting defect was repaired, exact saved-body readback passed, and hosted
+validation attempt two passed. CodeRabbit still could not independently read
+the private Configs evidence. Observed merge is not retrospective clearance.
+
+The approved temporary manual repository link could not be saved while
+preserving the organization's two inherited custom checks on the existing
+plan. The unsaved draft was discarded; original repository YAML and
+organization inheritance were restored exactly. No link, upgrade, permission
+expansion or additional charge was applied.
+
+At the earlier checkpoint, Configs PR 369 was at `2d13d2daaf7949b81f928ad092ab6a471f646fe7` with
+all 21 hosted checks passing. Hosted Codex code and security review found no
+issues. Exact-base native review repeated 17 passing focused tests and found
+no changed-line regression. Its supplemental unpinned Ruff check reported
+pre-existing import formatting and subprocess-check warnings; Pyright was
+unavailable. Those observations are separate from the earlier maintained
+aggregate and do not identify a defect introduced by the docstrings.
+
+A fresh CodeRabbit chat inspection again returned no findings with a provider
+marker, but its subsequent
+[clarification](https://github.com/jscraik/configs/pull/369#issuecomment-6234505029)
+declared the persisted inspection inconclusive. The installed update gate
+failed its review lane and retained zero unresolved threads; no merge was
+performed at this checkpoint. Jamie then approved a bounded request-helper
+repair, keeping PR 369's two-file scope unchanged. Sixteen focused tests,
+pinned Ruff and independent review passed. The repaired
+[real request](https://github.com/jscraik/configs/pull/369#issuecomment-6234585512)
+received an authenticated command acknowledgment and allowance-limit response.
+Command routing was proven; the subsequent completed review follows below.
+
+The separate helper delivery is signed as
+`34e835492796a6bcdccf4cdc31403dab42f21e96` in
+[Configs PR 370](https://github.com/jscraik/configs/pull/370). Its canonical
+aggregate passed 670 maintained policy tests in 981.903 seconds, 37 duplication
+regressions and maintained wiring. Normal commit/push hooks and signature
+verification passed. Its first hosted test job stopped before tests because
+PR-target metadata was unknown; an authenticated workflow rerun refreshed
+metadata and passed all 21 hosted check contexts. No source repair or waiver was used
+for that CI metadata race.
+
+CodeRabbit accepted the later included review for PR 369 and completed
+run `0f5bc071-42b0-4d95-a760-d53bc47d2827` at 14:01:35 UTC. It reviewed
+both changed files and posted
+[one minor finding](https://github.com/jscraik/configs/pull/369#discussion_r4302934040):
+the docstring incorrectly implied that every evidence URL is bound to the PR,
+whereas the implementation binds all URLs to the repository and only pull
+references to the PR number. The sentence was corrected without changing
+executable statements. Seventeen focused tests passed in 1.470 seconds,
+pinned Ruff passed, and independent native review confirmed the wording.
+The corrected sentence is published as
+`22e5d74e53f676bd20c5a0d749e15cfa8d1935ea`. Its full canonical aggregate
+passed 669 policy tests in 1074.934 seconds, 37 duplication regressions and
+maintained checks. Exact-base native review independently repeated 17 passing
+tests and found no regression. All 21 corrected-head hosted checks passed.
+Fresh included full review `4313d935-7409-49db-bb02-e8b35e45cdc9` completed
+both files without actionable comments and passed 100% touched-function
+docstring coverage. Its
+[exact-head clarification](https://github.com/jscraik/configs/pull/369#issuecomment-6235457637)
+qualifies in the live gate. At 15:04:52 UTC, the only remaining review blocker
+was hosted Codex clearance; zero threads remained unresolved. Merge remains
+conditional on the full current-head gate. The provider reported included allowance consumption,
+zero included reviews remaining and a one-review-per-hour limit. No additional
+paid review was requested. One confirmed wording finding is useful evidence,
+but does not establish a general accuracy comparison with native review.
+
+PR 370's manual hosted Codex request returned an authenticated usage-limit
+response. Its exact-body deduplication then reused that failed request.
+The bounded follow-up adds one source-bound service-failure retry, retaining
+inspection receipts and all readiness gates. It requires an authenticated
+Codex failure after an unedited exact-head request by the authenticated actor,
+rejects intervening requests or completed responses, rechecks evidence before
+mutation and deduplicates the source. Independent review identified missing
+request correlation, then a completion after the quota notice that could still
+permit a redundant review. Both were corrected, including late completion
+comments and exact retry reuse. The 18-test suite and complete independent
+re-review pass. The first quota candidate is published as `2ed410d3` after
+672 policy tests and 37 duplication regressions passed. The later completion
+correction is signed and published as
+`5351de5e27d24b859dd45c95304119be3053fe6c`. Complete independent re-review
+found no actionable regression; a fresh full aggregate passed 672 policy tests
+in 974.675 seconds, 37 duplication regressions and maintained checks. Exact
+preimage verification, backup and byte comparison preceded projection of only
+the reviewed helper. The installed read-only probe correctly rejected the
+authentic old-head quota response after the PR advanced. This proves live
+source binding, not a posted retry, provider completion or merge clearance.
+Final-head hosted CI and independent provider clearance remain pending.
+
+Live activity inspection then showed that Codex edits an existing status
+comment rather than always creating a new one. A regression reproduced the
+missed edited completion; another reproduced ambiguous same-second activity.
+The fix uses provider update times and permits only known pending metadata
+strictly before the failure. Same-second edits fail closed. Newly created
+comments use authenticated same-PR IDs to resolve timestamp ties, consistent
+with [GitHub's ordering contract](https://docs.github.com/en/rest/issues/comments).
+Formal reviews are bound to the exact current head, and explicit empty or
+mixed retry modes reject without posting a normal request.
+The signed correction is published as
+`7c7ce7dbb8fa915da49278ceff7ca18d3fe09b73`. All 20 focused tests and pinned
+Ruff pass. The canonical aggregate passed 674 policy tests in 1078.510 seconds,
+37 duplication regressions and maintained checks. Independent review supplied
+the corrected chronology and head-binding cases; no final native no-findings
+verdict is claimed on the last one-line correction. CodeRabbit then completed
+full review `6ccb41fc-c163-46ba-93b2-8d3f3aa29ac9` of this head and found one
+[test gap](https://github.com/jscraik/configs/pull/370#discussion_r4303391545).
+The final retry check already received freshly fetched comments, but its test
+returned identical initial and refreshed inventories. The test-only correction
+uses distinct inventories, resets the source mock and checks both exact input
+identities. Twenty focused tests and pinned Ruff pass. An in-memory mutation
+that passes stale comments fails the new assertion, with tracked source
+unchanged. The signed test-only follow-up is published as
+`87c66a4543b68ec9fe5611ba695c870373e8ebc3`. Its full aggregate passed 674 policy
+tests in 951.593 seconds, 37 duplication regressions and maintained checks.
+Independent native review repeated all 20 focused cases and found no
+correctness regression; fresh hosted CI is running. No live
+paid retry was exercised. Both providers must cover the corrected published
+candidate; earlier 5351de5e remains installed until final review is established.
+
+Jamie approved a single existing-credit Code Review window of up to 15 minutes,
+with at most one manual request each for PR 369 and PR 370 and restoration to
+off afterward. It has not started; both candidates must first have green CI
+and fresh inspection receipts. No credit purchase, auto-reload, automatic-review
+preference change or paid CodeRabbit review is authorized by that window.
+
+After the PR 369 description refresh, CodeRabbit updated its older summary at
+16:20:38 UTC. The 16:26:26 update gate rejected the later unrecognised evidence;
+the earlier qualifying verdict was not silently reused. No new source finding
+was observed in that summary. Final metadata must precede a later explicit
+verdict and a fresh gate, with the missing Codex lane checked separately.
+
+### Observed PR 369 merge and remaining helper repair
+
+GitHub confirms that `jscraik` merged PR 369 at 16:39:55 UTC as
+`0157cedd0572f4e4c37c1109a5010d6bf6cdf58e`. Comparing only its two owned paths
+against reviewed head `22e5d74e` gives no difference. The accepted repository
+also contains other merged work, so no whole-tree equivalence is claimed.
+The last readiness result had not cleared: the metadata-triggered CodeRabbit
+summary required a later explicit verdict and hosted current-head Codex was
+missing. Merge is observed; final pre-merge review clearance is not established.
+The approved credit window remained off and unused, and no inspection was
+requested on the closed PR.
+
+The automatic Codex review of helper head `87c66a45` completed at 16:38:19 UTC
+with one new valid finding,
+[edited retry deduplication](https://github.com/jscraik/configs/pull/370#discussion_r4303515770).
+Four rejection cases first failed for missing, invalid, earlier and later
+update metadata. Requiring the retry's parsed update time to equal its creation
+time fixes those cases. The isolated checkout is integrating accepted main's
+independent CodeRabbit retry route without dropping it. Separate local names
+retain both modes, and mixed modes reject. All 22 focused tests and pinned
+Ruff pass. Independent native review
+`01a14ac1-418b-7a62-add5-f01cbc7e52d9` inspected the complete two-file diff
+against accepted main, repeated all 22 tests and found no actionable defect.
+The full wrapper passed 730 policy tests in 1030.726 seconds, 37 duplication
+regressions and maintained checks. Its first attempt failed for a missing
+local-only handoff note about guidance imported unchanged from main; supplying
+that truthful note allowed the final rerun to pass without a policy change.
+
+The normal signed merge commit is
+`57eb68bb0ed35acc7a7bbcf0f188757abbda77eb`, retaining accepted main `0157cedd`
+as its second parent. Signature verification and normal push hooks passed.
+A transient index lock blocked the first push; a normal retry succeeded
+without deleting the lock or bypassing hooks. Against current main, only the
+helper and its test module differ. Protected PR-description repair and exact
+body, head and base readback passed. Fresh hosted CI and provider reviews are
+running. No live paid retry or final clearance is claimed from this local
+proof, and the approved credit window remains off and unused.
+
+CodeRabbit's included incremental run
+`e53c3354-47bb-492a-9777-c4d5430f0809` processed both files from `7c7ce7db`
+to `57eb68bb` without actionable code comments. Its aggregate CI context
+collection timed out, and its issue-scope and docstring warnings remain
+advisory. Codex then reported
+[pending-marker trailing content](https://github.com/jscraik/configs/pull/370#discussion_r4303669837)
+and [edited legacy requests](https://github.com/jscraik/configs/pull/370#discussion_r4303669841).
+Fourteen rejection subcases first failed. The narrow correction rejects
+substantive or unknown trailing content and non-neutral security metadata,
+and requires valid unchanged update timestamps for modern and legacy
+reinspection requests. All 22 focused tests and pinned lint pass. Independent
+native review `01a14ade-7c88-7c60-a351-3b3518934fc2` repeated the 22 tests and
+found no actionable defect in the complete two-file PR diff. The full aggregate
+passed 730 policy tests in 1113.817 seconds, 37 duplication regressions and
+maintained checks. The signed correction is published as
+`6db30f8a33b145ec39f327208d3e8ea5acbfaf44`.
+Only minimal neutral pending markers are ignored: full unsupported layouts
+remain blocking for retry admission rather than being silently ignored.
+
+The authenticated Codex summary completed code and security reviews without
+findings for this full head at 17:41:59 and 17:41:44 UTC. Its PR-body thumbs-up
+reaction was created at 17:42:02 UTC. Following a fresh reconciliation receipt,
+all three repaired threads received finding-specific proof and were resolved.
+The live update gate at 18:09:03 verified all 21 current-head check contexts
+passing, zero unresolved threads and only CodeRabbit outstanding. This joins
+the Codex evidence rather than treating a bare reaction as clearance.
+CodeRabbit's earlier green status explicitly said `Review rate limited`.
+The [guarded included full-review request](https://github.com/jscraik/configs/pull/370#issuecomment-6238328399)
+started run `dd330ddd-e662-4e82-bcc4-44ea22c6b00d` on both final files against
+current main. It finished at 18:12:49. The summary's no-concrete-merge-risk
+statement was not a no-findings verdict: its
+[published review](https://github.com/jscraik/configs/pull/370#pullrequestreview-5559277578)
+recorded [duplicated actor and request filtering](https://github.com/jscraik/configs/pull/370#discussion_r4303878539).
+[Clarification](https://github.com/jscraik/configs/pull/370#issuecomment-6238413828)
+explicitly retained that trivial finding. The local extraction centralises
+authenticated actor lookup and unedited exact-PR request filtering without
+combining the paths' body matching or time versus time/comment-ID ordering.
+Later Codex findings independently repeated the duplication and identified
+[retry reuse after a neutral pending update](https://github.com/jscraik/configs/pull/370#discussion_r4303899421).
+A new execution-level regression reproduced the failure before repair. It now
+returns the existing authenticated, unedited source-bound retry without posting;
+removing it before mutation, editing it, changing ownership, PR, body or order,
+and adding substantive pending content remain rejected. All 23 focused tests
+and pinned lint passed. The pre-integration aggregate passed 732 policy tests
+in 1091.535 seconds, 37 duplication regressions and maintained checks. Native
+complete-base review `01a14b19-288b-7260-9737-8714ffa5a4c8` repeated 23 tests
+without an actionable regression. Before push, an authenticated read found
+CodeRabbit's completed autofix commit `e613492b480786af1c8c06faa2633fcb0014567f`
+on the remote branch. A normal local merge preserves its shared helper API and
+additional actor and malformed-request cases with the retry correction. The
+repeated pending-summary fixture setup was consolidated without dropping its
+distinct admission, execution or rejection assertions. All 23 focused tests
+and pinned lint pass on the combined tree. Complete-base native review
+`01a14b2e-b4d7-7052-8b96-65c517f5cf08` repeated those 23 tests without an
+actionable regression. The final aggregate passed 732 policy tests in 1099.822
+seconds, 37 duplication regressions and maintained checks. The normal signed
+merge `29f3504df31fb8dc8034a223080e9dc7f8b75557` preserves both histories and
+is pushed. Its committed budget passed at 398 net lines across two files,
+without an override. Own signatures and normal commit/push hooks passed;
+the existing bot commit is retained as published. Protected description
+dry-run, save and exact hosted body/head/base readback passed. Hosted workflow
+`d1963146-a538-4258-aba2-c58f0963df5f` passed all 21 reported check contexts.
+The later completed reviews and temporary credit window are recorded below.
+
+The next Codex review raised [edited failure chronology](https://github.com/jscraik/configs/pull/370#discussion_r4304093598).
+Independent read-only assessment `01a14b48-6ed2-72a2-b2b5-f098841d01a1`
+repeated 23 tests and refuted it as an established defect: an old run can edit
+its headless failure after a new-head request, so update time alone cannot
+identify which request failed. Numeric IDs order creation, not edit causality.
+This is a conservative implementation boundary, not an explicit prose rule for
+that exact case. A provider reusing an old headless comment for a genuine new
+failure remains unsupported without stronger correlation evidence. Creation
+ordering is still a bounded heuristic, not absolute causal proof. No code or
+hosted state changed during assessment. A fresh restricted receipt passed at
+19:24:12 UTC, the refutation was published and the thread resolved. The later
+full update gate independently verified zero unresolved threads.
+
+### Final helper inspection and credit-window results
+
+CodeRabbit full run `2e584bbb-c916-4c05-bb06-84cf93db09c8` inspected both
+files from `0157cedd` to `29f3504d` and completed without actionable comments.
+Its [trigger](https://github.com/jscraik/configs/pull/370#issuecomment-6239527015),
+[completion acknowledgement](https://github.com/jscraik/configs/pull/370#issuecomment-6239528990)
+and [explicit no-findings verdict](https://github.com/jscraik/configs/pull/370#issuecomment-6239887999)
+are separate provider artifacts. The first clarification included an unsupported
+evidence wrapper and did not qualify. A later clarification of the existing
+inspection qualified without reinspection, a paid review or parser changes.
+
+The approved existing-credit Code Review window was used for exactly one
+[manual PR 370 request](https://github.com/jscraik/configs/pull/370#issuecomment-6239766642).
+No request was sent to closed PR 369. Code inspection completed at 19:41:29 UTC
+and security inspection at 19:42:03, both without findings. Code Review credits
+were restored OFF by 19:43:14; the conservative maximum window was 4 minutes
+13 seconds, below the approved 15 minutes. Automatic-review and exhaustive
+preferences stayed on; automatic security review and its separate credits
+stayed off. No purchase or auto-reload setting changed. Actual credit consumption
+and monetary cost were not observed; the earlier approved $1.50 CodeRabbit
+review is a separate event, not evidence of this window's cost.
+
+Command: `python3 ~/.codex/scripts/pr-readiness.py --phase update --base main --scope-file codex/.tmp/review-delivery-scope.txt --write-receipt`
+-> pass at 19:50:52 UTC for `29f3504d`: all 21 check contexts, both required
+reviewers, clean two-file scope, matching hosted head/base and zero unresolved
+threads. An earlier invocation without explicit base used the isolated clone's
+stale default-branch reference and failed scope/base checks; correcting that
+local reference to verified `main` did not change source or hosted PR metadata.
+The final description refresh used the normal receipt-bound helper and exact
+body/head/base readback passed. The refreshed workflow
+`28fa3abf-ffab-424c-b52e-556ba30f083d` then passed metadata and the full test
+job. The 20:08:37 UTC gate accepted all checks and Codex but rejected the
+metadata-triggered later CodeRabbit summary as unrecognised evidence. A fresh
+inspection-only receipt passed at 20:08:56 and the guarded helper requested
+clarification of the existing inspection, without another full review or paid
+execution. PR 370 is open and no merge authority is asserted.
+
+The [later clarification](https://github.com/jscraik/configs/pull/370#issuecomment-6240204791)
+at 20:10:07 UTC confirmed no findings for the full unchanged head. The same
+update command passed at **20:10:59 UTC**, with no blockers: all 21 reported
+check contexts, both required reviewers, zero unresolved threads, clean
+checkout, exact hosted head/base, remote ancestry and declared two-file scope.
+GitHub separately reported `MERGEABLE` and `CLEAN` for this open PR. No later
+description edit or source change followed that clearance. This establishes
+the helper's final current-head readiness, not retrospective clearance of
+PR 369 and not authority to merge PR 370. A fresh settings read also confirmed
+Code Review credits remained OFF, with automatic and exhaustive review
+preferences unchanged.
+
+The reviewed helper was projected through the canonical scripts path after
+checking and backing up its preimage. Its SHA-256 is
+`538ac09821cf5825b4618555c05225827ad148eb40f5546e65a22ffa8d6bf7a4`.
+Installed help and read-only stale quota-source rejection passed. The normal
+manual Codex request above exercised the installed route. An optional repeat
+live CodeRabbit invocation was automatic-approval rejected because a second
+review could duplicate completed work or incur unapproved cost. No repeat was
+sent; installed dry-run and read-only source-binding probes passed instead.
+No live quota-retry write or whole-runtime validation is claimed. Primary Git
+state and unrelated installation changes were preserved.
+
+The separate SDK report review identified an ambiguous reference to a
+"docstring follow-up" in the introduction. Its proposed PR 65 identity was
+not the intended reference: SDK PR 65 cleared before merging, while Configs
+PR 369 merged before final clearance. The introduction now names both PRs
+explicitly and preserves both verified chronologies. This is a report clarity
+repair, not a change to Configs behaviour or retrospective clearance.
