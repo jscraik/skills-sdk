@@ -77,6 +77,30 @@ The default validation route without this option is unchanged. Structural
 verification does not establish matched evaluation, execution permission or
 release readiness.
 
+Worked capture and verification, run from a directory that holds both the plugin
+and a separate `evidence/` directory:
+
+```bash
+REV="<40-lowercase-hex>"
+FLAGS=(--source-revision "$REV" --require-version --require-description)
+skills-sdk validate-plugin ./my-plugin "${FLAGS[@]}" --json --robot > evidence/plugin-validation.json
+skills-sdk validate-plugin ./my-plugin "${FLAGS[@]}" --json --robot --verify-evidence evidence/plugin-validation.json
+```
+
+Capture exits `0` and writes a `plugin-package-validation/v1` result with
+`"status": "pass"`. Verification of the unchanged plugin exits `0` and prints the
+same structural result. If the evidence file is edited after capture, the second
+command prints `"status": "blocked"` with finding `plugin_evidence_invalid` and
+exits `2`. That exit is the expected rejection, not an ordinary pass command.
+After a source change, capture again and verify the new file; after an evidence
+change, restore or recapture it. Keep the same revision and policy flags in both
+commands.
+
+This check is structural. It does not authenticate caller-supplied provenance,
+establish that the skills are accurate or useful, execute the plugin, or grant
+release, publication or installation authority. Skill bodies stay flexible and
+the plugin remains the unit of ownership; see [the API boundary](api.md#portable-plugin-validation).
+
 ### Explicit standalone-skill plugin preparation
 
 Use `normalize-plugin` only when the caller explicitly wants to preserve a
