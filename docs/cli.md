@@ -287,6 +287,77 @@ a wall-clock timeout.
 Neither policy is required by default. The existing `check-local/v1` composition
 does not expose these flags; do not infer full package-quality coverage from it.
 
+### Worked example: required reference recovery
+
+Run this from the SDK checkout root after `mise install python uv ruff vale` and
+`mise exec -- uv sync --frozen`. Export
+`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"` first.
+The script creates a disposable synthetic package under the physical temporary
+path, so it also works on macOS.
+The revision is a concrete 40-character lowercase hexadecimal value. The script
+never executes package content; `inventory` hashes the package files before and
+after each validation call.
+
+```bash
+WORK="$(cd "$(mktemp -d)" && pwd -P)"
+PKG="$WORK/sample-skill"
+REV=0123456789abcdef0123456789abcdef01234567
+mkdir -p "$PKG/references"
+cat > "$PKG/SKILL.md" <<'EOF'
+---
+name: sample-skill
+description: Use when checking a disposable example of required reference validation.
+---
+
+# Sample skill
+
+Read `references/README.md` for the sample notes.
+EOF
+inventory() { (cd "$PKG" && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256); }
+run() {
+  label="$1"; shift
+  before="$(inventory)"
+  mise exec -- uv run --frozen skills-sdk validate "$PKG" --source-revision "$REV" \
+    --require-file references/README.md "$@" --json >"$WORK/$label.out" 2>"$WORK/$label.err"
+  echo "$label exit=$?"
+  [ "$before" = "$(inventory)" ] && echo "$label input unchanged" || echo "$label INPUT CHANGED"
+}
+run missing
+: > "$PKG/references/README.md"
+run empty --check-reference-content
+printf '# Sample notes\n\nThese notes are intentionally short.\n' > "$PKG/references/README.md"
+run corrected --check-reference-content
+```
+
+The observed output of exactly these commands was:
+
+```text
+missing exit=2
+missing input unchanged
+empty exit=2
+empty input unchanged
+corrected exit=0
+corrected input unchanged
+```
+
+Each `$WORK/<label>.err` file was empty. Each `$WORK/<label>.out` file holds one
+`skill-package-validation/v1` result:
+
+| Step | Exit | Status | Finding code | Meaning |
+| --- | --- | --- | --- | --- |
+| `missing` | `2` | `blocked` | `required_file_missing` | The selected policy requires `references/README.md`, and no readable regular file exists there. |
+| `empty` | `2` | `blocked` | `empty_reference` | The file now exists, and `--check-reference-content` rejects it because a textual reference must contain content. |
+| `corrected` | `0` | `pass` | none | The same selected policy accepts the nonempty UTF-8 reference. |
+
+Without `--check-reference-content`, the empty file would satisfy the
+`--require-file` presence check. Creating the empty file and then the nonempty
+file are the author's own repairs between calls. The unchanged inventory before
+and after each call shows that validation did not write into the package;
+each result also carries `mutation_performed`. Both flags are opt-in. A pass
+shows only that the required file exists and its bytes are nonempty UTF-8; it does
+not establish semantic accuracy, review execution, publication or release
+clearance.
+
 The CLI is non-interactive. Except for the explicit destination creation of
 `normalize-plugin` and `maintain-entrypoint --apply`, the listed operations are
 non-mutating. For an invocation that reaches a service, exit `0` means intake
