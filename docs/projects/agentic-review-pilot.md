@@ -1,7 +1,9 @@
 # Agentic review pilot and product rollout
 
-Status: proposed implementation plan. This document authorizes no external
-installation, PR messaging, paid execution, publication, or merge.
+Status: P0 baseline and P1 SDK repair delivery completed; Configs and report
+clearance remain open. Later product implementation phases are proposed.
+This document authorizes no external installation, PR messaging, paid execution,
+publication, or merge.
 
 P0 baseline completed on 16 October 2026: [integration inventory and selected
 PR 63](agentic-review-p0-baseline.md). [P1 results](agentic-review-p1-results.md)
