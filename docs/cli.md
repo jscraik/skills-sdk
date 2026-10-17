@@ -30,14 +30,20 @@ Named discovery-only routes use exit `3` with their explicit diagnostic.
 ### Distinguishing usage errors from typed blockers
 
 Exit `2` alone does not show that a versioned result exists. Check stdout and
-stderr separately. This example uses a disposable package named `demo-skill`
-and the `validate` route from the checkout root:
+stderr separately. This example creates a disposable package named `demo-skill`
+in a temporary directory outside the checkout, then runs the `validate` route
+from the checkout root. The revision is a synthetic value with the required
+shape; it does not identify real source history:
 
 ```bash
+DEMO="$(mktemp -d)"
+mkdir "$DEMO/demo-skill"
+printf -- '---\nname: demo-skill\ndescription: Demonstrates validate exit codes.\n---\n\n# Demo skill\n' > "$DEMO/demo-skill/SKILL.md"
+REV=0123456789abcdef0123456789abcdef01234567
 export MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"
 mise exec -- uv run --frozen skills-sdk validate --json --robot
-mise exec -- uv run --frozen skills-sdk validate ./demo-skill --source-revision abc123 --json --robot
-mise exec -- uv run --frozen skills-sdk validate ./demo-skill --source-revision "<40-lowercase-hex>" --json --robot
+mise exec -- uv run --frozen skills-sdk validate "$DEMO/demo-skill" --source-revision abc123 --json --robot
+mise exec -- uv run --frozen skills-sdk validate "$DEMO/demo-skill" --source-revision "$REV" --json --robot
 ```
 
 - The first command omits the required `package_root`. `argparse` rejects it with
@@ -46,11 +52,14 @@ mise exec -- uv run --frozen skills-sdk validate ./demo-skill --source-revision 
   correcting the invocation, using `--help` for the accepted arguments.
 - The second command is well formed, so it reaches the validator. It exits `2`
   with empty stderr and a parseable `skill-package-validation/v1` result on
-  stdout with `"status": "blocked"` and the finding `invalid_source_revision`.
+  stdout with `"status": "blocked"` and the finding `invalid_source_revision`
+  for the short revision `abc123`.
   Valid JSON and exit `2` still mean the operation was rejected. Read the
   `findings` codes, fix the cause, and run again.
-- The third command supplies a 40-character lowercase revision. It exits `0`
+- The third command supplies the 40-character lowercase `$REV`. It exits `0`
   with `"status": "pass"` and no findings. Here `mutation_performed` is `false`.
+  The pass shows only that the revision has a valid shape and the package is
+  structurally valid. `$REV` is synthetic, not authenticated provenance.
 
 Observed on disposable synthetic inputs, the package files kept identical
 SHA-256 digests across all three runs. Argparse wording can change, and other
