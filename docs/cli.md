@@ -257,8 +257,10 @@ the retained request binds the old candidate. Expect exit `2`, status `blocked`
 and exactly the finding `plugin_presentation_binding_mismatch`. This is the
 expected rejection, not an ordinary pass command. `assess` returns `2` here
 after it verifies that result, an intentional negative CLI result that is not a
-pass and does not count as a full SDK pass. A return of `1` means the proof
-itself failed. Either way, continue recovery in the same Bash session. Keep the
+pass and does not count as a full SDK pass. After that verified
+expected `2`, continue recovery in the same Bash session. A return of `1` means
+the proof itself failed: stop and investigate before proceeding, and do not
+carry on after a failed measurement, malformed output or wrong reason. Keep the
 old request:
 
 ```bash
