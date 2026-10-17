@@ -99,6 +99,8 @@ SCHEMA_NAMES = frozenset(
         "plugin-presentation-check.v1",
         "skill-package-intake.v1",
         "skill-package-intake-context.v1",
+        "plugin-normalization-metadata.v1",
+        "plugin-normalization.v1",
     }
 )
 
@@ -287,6 +289,14 @@ class SchemaRegistry:
             from skills_sdk.models.intake import SkillPackageIntakeContext
 
             model = SkillPackageIntakeContext
+        elif name == "plugin-normalization-metadata.v1":
+            from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata
+
+            model = PluginNormalizationMetadata
+        elif name == "plugin-normalization.v1":
+            from skills_sdk.models.plugin_normalization import PluginNormalizationReceipt
+
+            model = PluginNormalizationReceipt
         elif name == "package-inventory-set.v2":
             from skills_sdk.models.inventory import PackageInventoryV2
 

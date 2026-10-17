@@ -2,7 +2,7 @@
 
 ## Plugin presentation assessment
 
-The unmerged S2 candidate adds
+Accepted PR #60 adds the bounded S2 presentation assessment
 `check_plugin_presentation(plugin_root, *, source_revision, request)` in
 `skills_sdk.validation`, returning `PluginPresentationCheck`. Supply a `Path`
 and dictionary or canonical `PluginPresentationRequest`. Four additive families
@@ -266,6 +266,19 @@ or completed reviewer execution.
   `SkillPackageIntakeReceipt`. It does not copy source, execute package code,
   access a network, establish ownership or rights truth, or admit a package to
   Foundry. Archive intake remains a separate composition boundary.
+- **Explicit standalone-to-plugin preparation:**
+  `normalize_standalone_skill_package`, `PluginNormalizationMetadata` and
+  `PluginNormalizationReceipt` copy one admitted standalone skill into a new
+  plugin candidate, generate caller-supplied root `plugin.json` metadata, then
+  freshly validate the whole plugin and bind its one child to the original
+  intake identity. Source is not rewritten and an existing destination is never
+  replaced. The receipt requires `admit`
+  caller-supplied provenance, rights, ownership and continuity checks; those
+  assertions are not independently authenticated. This route does not normalize
+  updates against an existing plugin baseline, combine multiple skills, assess
+  visual approval, build an archive, publish, install or clear release:
+  `release_ready` is always `false`. Validate its serialized receipt with
+  `SchemaRegistry().validate("plugin-normalization.v1", payload)`.
 - **Packaging:** `PackageManifest`, `PackageManifestFile`, `PackageReceipt`,
   `PackageReceiptV2`,
   `PackageHardeningPolicy`, and `PackageHardeningReceipt` with typed blockers,
@@ -777,6 +790,101 @@ serialized intake receipts with
 structural and model-level bindings. The context schema is registered as
 `skill-package-intake-context.v1`; neither family is supported by the generic
 `parse_receipt` function.
+
+## Explicit standalone-skill plugin preparation
+
+Managed single-skill releases are explicitly normalized into a separate
+complete-plugin candidate. Supply a valid standalone skill directory, a new
+destination, truthful caller-owned intake evidence, and root plugin metadata.
+The API preserves the source, copies its files and permissions beneath
+`skills/<skill-name>/`, creates root `plugin.json`, and captures fresh
+whole-plugin validation. The whole-plugin identity covers the new candidate;
+its sole child retains the standalone skill candidate identity.
+
+Normalization introduces no plugin dependencies. Before issuing a prepared
+receipt, a final no-follow capture checks destination files, bytes, permissions
+and directories against the intended output, and checks its directory identity
+against the retained opened output descriptor. Capture rechecks each entry's
+identity and metadata after traversal. These sequential checks detect observed
+drift; they are not an atomic filesystem snapshot.
+
+Preparation requires a caller-controlled destination parent and an exclusive
+writer for the operation. Parents owned by another user or writable by group
+or others are rejected before creation. Owner and mode checks do not establish
+exclusive access through ACLs or exclude other processes running as the same
+user. Callers must exclude those writers; hostile concurrent namespace mutation
+requires isolation outside this API. Portable directory creation cannot
+atomically return the created inode's descriptor. The receipt binds captured
+state under this boundary; later changes require fresh downstream validation.
+Any retained passing validation, including in a blocked receipt, must bind its
+sole child to the original standalone candidate. If destination validation
+belongs to another child, the blocker and creation signal remain, but that
+unrelated passing validation is not retained as source proof. Packaged JSON
+Schema checks structure; the model and schema registry enforce this identity
+relationship.
+
+The operation is create-only: unsafe paths, symlinks, and existing destinations
+are rejected rather than overwritten. The destination's parent directory must
+already exist. On a partial filesystem error, the
+receipt reports whether a candidate directory was created so the caller can
+inspect and correct it before retrying. A prepared result is not complete
+product acceptance, visual approval, archive proof, publication, installation,
+or runtime evidence. Updates to an existing managed plugin must retain and
+compare a known baseline in a separate update route.
+
+```python
+from pathlib import Path
+
+from skills_sdk.intake import normalize_standalone_skill_package
+from skills_sdk.models import PluginNormalizationMetadata, SkillPackageIntakeContext
+
+# Synthetic example only; production callers must supply verified evidence.
+context = SkillPackageIntakeContext.model_validate(context_payload)
+receipt = normalize_standalone_skill_package(
+    Path("./skills/example"),
+    Path("./example-plugin"),
+    context,
+    PluginNormalizationMetadata(
+        name="example-plugin",
+        version="1.0.0",
+        description="A single-skill plugin.",
+    ),
+)
+if receipt.status == "blocked":
+    print(receipt.blocker.code)
+else:
+    print(receipt.plugin_validation.candidate.content_sha256)
+    assert receipt.release_ready is False
+```
+
+The metadata uses `plugin-normalization-metadata/v1`; the result uses
+`plugin-normalization/v1`. Neither is accepted by generic `parse_receipt`.
+Use the registered schemas for structural and semantic binding checks.
+Metadata admission enforces the canonical manifest's aggregate one-MiB UTF-8
+byte limit, including JSON escapes and both required text fields. Structural
+JSON Schema provides necessary per-field character bounds; only the model and
+`SchemaRegistry` enforce the combined encoded-byte budget.
+Prepared receipts require the exact canonical manifest digest, size and mode
+`0644`, no host-settings overlay, and exactly the admitted files beneath
+`skills/<source-name>/`. Structural schema checks do not enforce this file
+closure or authenticate hashes. Original standalone evidence does not record
+file modes or empty directories; the service checks their preservation through
+live captures, rather than claiming receipt-only proof of them.
+An unsupported or unsafe initial capture returns
+`standalone_source_capture_blocked`, not an assertion of observed drift.
+Before creating a destination, normalization also reserves capacity for the
+canonical manifest and `skills/<source-name>/` wrapper. Exceeding complete-output
+file, byte, resource or directory-depth limits returns
+`standalone_source_capacity_exceeded` with `candidate_created: false`.
+Unsafe destination resolution, including Python 3.12 symlink loops, returns
+`candidate_normalization_failed` without writing through the path.
+Containment also checks live directory identities and parent descriptors, so
+different case spellings cannot place output inside the source. These checks
+and later recaptures are point-in-time safeguards, not an atomic namespace lock.
+`source_changed` means an observed difference in captured source relative to
+admitted or pre-copy evidence, including later permission or directory drift.
+Correct the responsible input, retain the blocker, and use a fresh destination;
+changed source requires fresh intake and downstream evidence.
 
 The additive `skills_sdk.evaluation.check_local_quality` async service accepts
 a package path and a `LocalCheckRequestV2` or closed raw request. Keyword inputs

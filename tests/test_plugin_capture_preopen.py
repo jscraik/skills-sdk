@@ -188,3 +188,69 @@ def test_standalone_post_open_type_change_remains_rejected(tmp_path: Path, monke
 
     monkeypatch.setattr(skill_package.os, "fstat", real_fstat)
     assert validate_skill_package(root, source_revision=REVISION).status == "pass"
+
+
+@pytest.mark.parametrize("field", range(6))
+def test_capture_rechecks_file_metadata_after_traversal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: int
+) -> None:
+    """A later metadata observation must agree with the descriptor's read baseline."""
+    root = _fixture(tmp_path)
+    real_metadata = plugin_capture._metadata
+    observations = 0
+
+    def later_drift(descriptor: int) -> tuple[int, ...]:
+        """Model filesystem drift reported only by the final file observation."""
+        nonlocal observations
+        value = real_metadata(descriptor)
+        if stat.S_ISREG(value[2]):
+            observations += 1
+            if observations > 2:
+                changed = list(value)
+                changed[field] += 1
+                return tuple(changed)
+        return value
+
+    with monkeypatch.context() as patch:
+        patch.setattr(plugin_capture, "_metadata", later_drift)
+        with pytest.raises(ValueError, match="source changed during capture"):
+            capture_plugin_source(root)
+    assert observations == 3
+    assert validate_plugin_package(root, source_revision=REVISION).status == "pass"
+
+
+@pytest.mark.parametrize("file_type", FILE_TYPES, ids=FILE_TYPE_IDS)
+def test_final_recheck_rejects_known_nonregular_type_before_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, file_type: int
+) -> None:
+    """The final sweep preserves the initial known-special-file no-open boundary."""
+    root = _fixture(tmp_path)
+    real_stat, real_open = plugin_capture.os.stat, plugin_capture.os.open
+    real_supports_dir_fd = plugin_capture.os.supports_dir_fd
+    leaf_stats = 0
+    leaf_opens = 0
+
+    def later_type(path: str, *args: object, **kwargs: object) -> object:
+        """Report a prohibited type at the final pathname observation only."""
+        nonlocal leaf_stats
+        if path == "plugin.json":
+            leaf_stats += 1
+            if leaf_stats > 1:
+                return SimpleNamespace(st_mode=file_type | 0o600)
+        return real_stat(path, *args, **kwargs)
+
+    def count_open(path: str, flags: int, *args: object, **kwargs: object) -> int:
+        """Count regular leaf opens without changing filesystem contents."""
+        nonlocal leaf_opens
+        if path == "plugin.json":
+            leaf_opens += 1
+        return real_open(path, flags, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(plugin_capture.os, "stat", later_type)
+        patch.setattr(plugin_capture.os, "open", count_open)
+        patch.setattr(plugin_capture.os, "supports_dir_fd", {*real_supports_dir_fd, count_open})
+        with pytest.raises(ValueError, match="source changed during capture"):
+            capture_plugin_source(root)
+    assert leaf_stats == 2 and leaf_opens == 1
+    assert validate_plugin_package(root, source_revision=REVISION).status == "pass"

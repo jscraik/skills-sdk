@@ -1,0 +1,39 @@
+{
+  "$id": "https://schemas.skills-sdk.dev/plugin-normalization-metadata.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Caller-owned canonical root-manifest metadata for a new plugin candidate.",
+  "properties": {
+    "description": {
+      "maxLength": 1048576,
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "plugin-normalization-metadata/v1",
+      "default": "plugin-normalization-metadata/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "version": {
+      "maxLength": 1048576,
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "description"
+  ],
+  "title": "PluginNormalizationMetadata",
+  "type": "object"
+}

@@ -24,13 +24,15 @@ endpoint override. Recheck the chosen backend and host independently; a
 catalogue is not distribution, and runtime hooks may retain a CLI dependency
 after registry storage changes. This section records a target, not new APIs.
 
-## Presentation assessment increment
+## Accepted presentation assessment increment
 
-The unmerged S2 candidate adds four presentation v1 contracts and the
-`check_plugin_presentation` / `check-plugin-presentation` entrypoints. It does
-not reinterpret standalone receipts, default plugin inspection or release
-authority. Preserved implementation `0c6eea3` is reconciled against accepted
-`e9ad586`; historical validation does not prove these integrated bytes.
+Accepted PR #60 adds four presentation v1 contracts and the
+`check_plugin_presentation` / `check-plugin-presentation` entrypoints. The
+accepted integration baseline is `ed67328281fd8c7227ec806d42258337076d0c0e`;
+preserved implementation `0c6eea3` is historical branch evidence, not the
+accepted revision. Presentation assessment does not reinterpret standalone
+receipts, default plugin inspection or release authority. Historical validation
+does not substitute for proof on later changed bytes.
 
 The fixed OpenAI profile and optional Pillow decoder remain outside core models.
 Supplied rights, professional-quality and copy assertions are not independently
@@ -608,6 +610,61 @@ applied mutation with every journal entry applied. Generic parsing keeps a
 rolled-back outcome blocked because rollback is not an installed success.
 
 ## Workflow migration proof
+
+### Standalone normalization increment
+
+The additive `plugin-normalization-metadata/v1` and `plugin-normalization/v1`
+families serve callers that explicitly select `normalize-plugin` or
+`normalize_standalone_skill_package`. The operation preserves the standalone
+source and prepares a separate root-manifest plugin with one admitted child.
+Existing standalone intake, plugin capture and generic receipt dispatch retain
+their contracts; these new families use their models or `SchemaRegistry` and
+remain outside generic `parse_receipt` dispatch.
+
+The source mechanisms are the SDK-owned `intake_skill_package` admission route
+and `capture_plugin_source` no-follow capture, not a claim of executed parity
+with Agent-Skills or Tessl. Required source identity, provenance, rights and
+unchanged ownership must pass before copying. Rights and ownership are
+caller-supplied assertions; the service does not independently authenticate them.
+The separate destination receives
+canonical caller-supplied name, version and description in `plugin.json` and
+the exact admitted files under `skills/<skill-name>/`. Fresh complete-plugin
+validation binds that generated root and the retained child candidate; the
+standalone receipt alone cannot clear the assembled plugin.
+
+Deliberate differences from read-only intake and inspection are explicit
+destination creation, mandatory root metadata and a new complete-plugin
+identity. Existing destinations, unsafe paths, changed source and exhausted
+capture budgets block preparation. Candidate creation is recorded separately
+from successful validation, so a blocked result can retain a created candidate
+without claiming release authority. Source mutation, network use, execution
+and release readiness remain false. Within the normalization family, direct
+mapping, JSON, typed-instance and registry consumers reject non-boolean evidence
+flags, including retained intake and child-validation flags, before coercion.
+Frozen standalone intake and validation models retain their existing behavior
+when used independently. Packaged JSON Schema enforces the structural boolean
+types and false-only constants.
+Models and registry validation additionally enforce cross-object identity and
+canonical generated-manifest relationships. Neither lane proves observed source
+freshness without the service's capture.
+
+Normalization requires an exclusive writer beneath a caller-controlled
+destination parent. Another owner's parent and group- or other-writable
+parents block before creation. These checks do not authenticate ACL exclusivity
+or exclude same-user processes. Portable creation does not atomically return a
+directory descriptor, so the caller must exclude concurrent namespace writers.
+Capture rechecks retained file and directory metadata after traversal to detect
+observed drift. This remains sequential best-effort quiescence, consistent with
+the filesystem validation boundary above, rather than an atomic snapshot.
+
+Accepted, rejected and corrected public API and CLI cases live in
+[`test_plugin_normalization.py`](../tests/test_plugin_normalization.py).
+[`installed_plugin_intake_smoke.py`](../tests/installed_plugin_intake_smoke.py)
+exercises the installed wheel's API, packaged schema and CLI without sibling
+repositories. These tests cover separate destination creation, source and mode
+preservation, blocked admission and fresh whole-plugin evidence; no provider,
+registry publication or runtime installation is implied. Joined quality,
+presentation and release preparation remain separate workflow increments.
 
 ### Portable plugin capture increment
 
