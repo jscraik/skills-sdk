@@ -44,6 +44,7 @@ ROUTE_CAPABILITIES: Final[dict[str, RouteCapability]] = {
     "review-content": RouteCapability.IMPLEMENTED,
     "compare-copy": RouteCapability.IMPLEMENTED,
     "validate-plugin": RouteCapability.IMPLEMENTED,
+    "normalize-plugin": RouteCapability.IMPLEMENTED,
     "check-plugin-presentation": RouteCapability.IMPLEMENTED,
     "verify:recurring-findings": RouteCapability.IMPLEMENTED,
     "verify:pr-sweep-dirty-closeout": RouteCapability.IMPLEMENTED,

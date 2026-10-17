@@ -122,6 +122,7 @@ from skills_sdk.models.plugin import (
     PluginValidationPolicy,
     PortablePluginManifest,
 )
+from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata, PluginNormalizationReceipt
 from skills_sdk.models.plugin_presentation import (
     PluginImageApproval,
     PluginPresentationCheck,
@@ -287,6 +288,8 @@ __all__ = [
     "PluginCapturedFile",
     "PluginIdentity",
     "PluginImageApproval",
+    "PluginNormalizationMetadata",
+    "PluginNormalizationReceipt",
     "PluginPackageValidation",
     "PluginPreExecutionSafetyEvidence",
     "PluginPresentationCheck",

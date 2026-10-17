@@ -275,7 +275,7 @@ repository-evidence validators. Their proof remains separate from hosted PR
 readiness, provider execution and runtime installation. Use
 [CLI status](docs/cli.md) for the maintained command surface.
 
-The unmerged S2 presentation increment adds read-only
+Accepted PR #60 at `ed673282` adds read-only S2 presentation assessment through
 `check_plugin_presentation` and its CLI over fresh complete-plugin capture.
 Pure models bind supplied approval; optional raster decoding is lazy in the
 validation helper. No provider, registry or host dependency enters core.
@@ -293,7 +293,7 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/core/` | Shared typed errors, portable paths, generic receipt parsing, and packaged schema lookup/validation. | `ContractError`, `require_portable_relative_path`, `Receipt`, `SchemaRegistry` |
 | `src/skills_sdk/models/` | Frozen Pydantic contract families for identity, inventory, intake, evaluation, risk, security, validation, manifests, and receipts. | `PackageCandidateIdentity`, `SkillPackageValidation`, `PackageManifest`, `PackageReceipt` |
 | `src/skills_sdk/validation/` | Read-only skill and portable-plugin capture, closed-frontmatter parsing, safe no-follow traversal, deterministic file evidence, and typed findings. Plugin validation composes captured child bytes without changing standalone contracts. | `SkillIR`, `read_frontmatter`, `validate_skill_package`, `validate_plugin_package` |
-| `src/skills_sdk/intake/` | Composition of structural validation with caller-supplied source, ownership, rights, and admission evidence into a candidate-bound normalized package; no copying or Foundry admission. | `intake_skill_package` in `normalization.py` |
+| `src/skills_sdk/intake/` | Read-only standalone intake plus explicit create-only normalization into a separate plugin destination. Both preserve source and bind caller-supplied ownership, rights and admission evidence; neither performs Foundry admission or runtime installation. | `intake_skill_package` in `normalization.py`; `normalize_standalone_skill_package` in `plugin_normalization.py` |
 | `src/skills_sdk/packaging/` | Composition of validation into a deterministic manifest and candidate-bound build receipt, followed by read-only hardening over that receipt; no archive or source mutation. | `build_skill_package` in `manifest.py`, `harden_skill_package` in `hardening.py` |
 | `src/skills_sdk/evaluation/` | Definition/scorer checks, selected-case execution, observed calibration and bounded matched whole-plugin local/cloud evaluation with feedback/rerun over injected adapters; no provider discovery, credentials, or live-model authority. | `evaluate_scenario_set`, `assess_scenario_quality`, `execute_selected_case`, `execute_scorer_calibration`, `execute_matched_lane`, `prepare_matched_cloud_handoff` |
 | `src/skills_sdk/evaluation/quality.py` | Read-only, candidate-bound assessment of package-local scenario definitions; no scenario or provider execution. | `assess_scenario_quality` |
