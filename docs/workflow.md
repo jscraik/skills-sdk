@@ -9,7 +9,7 @@ coverage and [the task record](projects/sdk-workflow/tasks.md) for execution sta
 Accepted implementation baseline: [`ed67328`](https://github.com/jscraik/skills-sdk/commit/ed67328281fd8c7227ec806d42258337076d0c0e),
 verified on 2026-10-13. The diagram is the intended process, not a claim that
 every gate is executable. The table describes that accepted baseline and labels
-this PR's additions explicitly; branch prototypes and local test passes do not
+local, unmerged additions explicitly; branch prototypes and local test passes do not
 add capabilities to the baseline.
 
 PR #54 accepted the instruction-alignment documentation reconciliation.
@@ -30,7 +30,7 @@ Accepted PR #52 adds the bounded
 fresh source comparison through `--verify-evidence` for supplied validation,
 tracked
 in the [task record](projects/sdk-workflow/tasks.md). It binds complete files and
-immediate skill subtrees, not release approval. This PR adds the explicit
+immediate skill subtrees, not release approval. Accepted PR #62 adds the explicit
 `normalize_standalone_skill_package` / `normalize-plugin` route to create a
 separate one-skill plugin candidate from admitted standalone input without
 rewriting the source. Its receipt binds fresh whole-plugin validation but always
@@ -349,7 +349,7 @@ retain separate provenance and score interpretation.
 
 | Gate | Required outcome | Current SDK boundary |
 | --- | --- | --- |
-| Intent and intake | Explicit create, update, or external-check intent; source and owner evidence; baseline for updates; whole-plugin candidate before release-bound evidence. | Directory skill intake and `check-quality` implement intent-aware checking and baseline capture. This PR adds explicit standalone-to-plugin normalisation without source edits; it does not update an existing plugin, author source, or install. Complete authoring/adoption composition remains. |
+| Intent and intake | Explicit create, update, or external-check intent; source and owner evidence; baseline for updates; whole-plugin candidate before release-bound evidence. | Directory skill intake and `check-quality` implement intent-aware checking and baseline capture. Accepted PR #62 adds explicit standalone-to-plugin normalisation without source edits; it does not update an existing plugin, author source, or install. Complete authoring/adoption composition remains. |
 | Package and description | Safe structure, truthful trigger description, applicable metadata, and useful progressive disclosure. | Structural policy, build, candidate-bound content-review assessment and bounded offline reviewer execution exist. General semantic accuracy and live reviewer quality remain unproved. |
 | References | Relevant, accurate, discoverable guidance with identified omissions and duplicate or stale content. | Applicable syntax checks and content-review coverage bind captured references, dispositions and source evidence. Independent accuracy, freshness and exhaustive gap discovery remain review obligations. |
 | Icons and presentation | Approved icon, rights evidence, accurate metadata, safe references and packed resources; selected destination and host proof remain distinct. | PR #60 implements candidate-bound presentation assessment for captured image bytes, modes and supplied approval. Independent rights/visual approval, archive inclusion and observed host display remain separate. |

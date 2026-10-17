@@ -1,5 +1,30 @@
 # Python API
 
+The public API is the typed contract layer under `skills_sdk`. The top-level
+package exports the inventory, risk, evaluation, and provider execution
+contracts listed in its `__all__`. Import family-specific contracts such as
+`PackageCandidateIdentity`, `PackageManifest`, `PackageReceipt`,
+`PackageReceiptV2`, and
+`PackageHardeningReceipt` from
+`skills_sdk.models` (or their submodules), as shown below.
+
+Start with [read-only intake](#read-only-intake) or
+[schema validation](#schema-validation). These entries describe accepted SDK
+services, not a published release or live-provider clearance. Unmerged
+whole-plugin quality and native judge work remains in its owning candidate
+branch; its documentation must retain that delivery-state label until accepted.
+See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledger).
+
+Contents:
+
+- [Plugin presentation assessment](#plugin-presentation-assessment)
+- [Portable plugin validation](#portable-plugin-validation)
+- [Contract families](#contract-families)
+- [Matched whole-plugin evaluation](#matched-whole-plugin-evaluation)
+- [Read-only intake](#read-only-intake)
+- [Explicit standalone-skill plugin preparation](#explicit-standalone-skill-plugin-preparation)
+- [Schema validation](#schema-validation)
+
 ## Plugin presentation assessment
 
 Accepted PR #60 adds the bounded S2 presentation assessment
@@ -131,14 +156,6 @@ Capture rejects known non-regular files from no-follow metadata before opening
 them. Post-open checks remain necessary for races; capture is not an atomic snapshot.
 This verifier was accepted in PR #52. Its structural source comparison does not
 establish the separate matched evaluation or release gates described below.
-
-The public API is the typed contract layer under `skills_sdk`. The top-level
-package exports the inventory, risk, evaluation, and provider execution
-contracts listed in its `__all__`. Import family-specific contracts such as
-`PackageCandidateIdentity`, `PackageManifest`, `PackageReceipt`,
-`PackageReceiptV2`, and
-`PackageHardeningReceipt` from
-`skills_sdk.models` (or their submodules), as shown below.
 
 The [plugin-first, registry-independent target](workflow.md#managed-release-format)
 does not change the implemented APIs below. Standalone-skill validation remains
@@ -832,30 +849,62 @@ product acceptance, visual approval, archive proof, publication, installation,
 or runtime evidence. Updates to an existing managed plugin must retain and
 compare a known baseline in a separate update route.
 
+Run from the checkout root with the pinned Python environment. This complete
+synthetic example creates a candidate in a fresh temporary directory and removes
+that directory on exit. It does not modify the committed source fixture. The
+context assertions demonstrate the input contract; they are not verified rights
+or provenance evidence for a real package.
+
 ```python
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from skills_sdk.intake import normalize_standalone_skill_package
 from skills_sdk.models import PluginNormalizationMetadata, SkillPackageIntakeContext
 
-# Synthetic example only; production callers must supply verified evidence.
-context = SkillPackageIntakeContext.model_validate(context_payload)
-receipt = normalize_standalone_skill_package(
-    Path("./skills/example"),
-    Path("./example-plugin"),
-    context,
-    PluginNormalizationMetadata(
-        name="example-plugin",
-        version="1.0.0",
-        description="A single-skill plugin.",
-    ),
-)
-if receipt.status == "blocked":
-    print(receipt.blocker.code)
-else:
-    print(receipt.plugin_validation.candidate.content_sha256)
-    assert receipt.release_ready is False
+context = SkillPackageIntakeContext.model_validate({
+    "source_repository": "jscraik/skills-sdk",
+    "source_revision": "0" * 40,
+    "source_path": "tests/fixtures/synthetic-skill",
+    "source_kind": "git",
+    "owner": {
+        "owner": "sdk-tests",
+        "maintainer": "sdk-tests",
+        "ownership_state": "canonical",
+        "rights": {
+            "basis": "authored",
+            "license": "Apache-2.0",
+            "evidence_ref": "tests/fixtures/synthetic-skill/SKILL.md",
+        },
+    },
+    "checks": {
+        "identity": True, "provenance": True,
+        "rights": True, "owner_unchanged": True,
+    },
+})
+with TemporaryDirectory(prefix="sdk-normalization-example-") as folder:
+    receipt = normalize_standalone_skill_package(
+        Path(context.source_path),
+        Path(folder).resolve() / "example-plugin",
+        context,
+        PluginNormalizationMetadata(
+            name="example-plugin", version="1.0.0",
+            description="A synthetic single-skill plugin.",
+        ),
+    )
+    if receipt.status == "blocked":
+        print(receipt.blocker.code)
+    else:
+        print(receipt.status, receipt.plugin_validation.candidate.content_sha256)
+        assert receipt.release_ready is False
 ```
+
+Expected output starts with `prepared` followed by the captured plugin digest.
+For a blocker, inspect its code and `candidate_created` before retrying; a real
+caller must retain any partial output for inspection and select a fresh
+destination. The temporary-directory cleanup here is only for this synthetic
+example, not a general recovery procedure.
+
 
 The metadata uses `plugin-normalization-metadata/v1`; the result uses
 `plugin-normalization/v1`. Neither is accepted by generic `parse_receipt`.
@@ -893,6 +942,15 @@ It returns `LocalCheckResultV2` (`local-check/v2`) with ordered original service
 receipts and final source captures. Import request, policy, stage and result
 models from `skills_sdk.models`; validate serialized inputs and outputs through
 `SchemaRegistry` using `local-check-request.v2` and `local-check.v2`.
+Await this asynchronous service inside an existing async caller. This fragment
+requires a prepared package path, request and supplied content assessment:
+
+```python
+from skills_sdk.evaluation import check_local_quality
+
+result = await check_local_quality(package_root, request, assessment=assessment)
+```
+
 Supplied and observed content evidence cannot be substituted for each other.
 Declared intake context and coverage plan must match their stage receipts.
 This composition does not execute scenario/judge evaluation or authorise

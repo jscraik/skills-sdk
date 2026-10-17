@@ -9,6 +9,12 @@ owns legacy dispositions, proof, limitations, and remaining actions. Update
 these existing documents together at feature closeout; archive this record
 only after all scoped acceptance criteria pass.
 
+Current navigation: [current proof lanes and resume point](#proof-lanes-and-resume-point),
+[accepted deliveries](#accepted-delivery-ledger), and
+[remaining integration gaps](#explicit-integration-gaps). Dated observations
+below retain their original proof limits; local candidate results do not
+change the accepted ledger.
+
 ## Goal and constraints
 
 Deliver an independent, agent-accessible create/update/external-check workflow,

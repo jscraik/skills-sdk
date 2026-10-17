@@ -48,6 +48,11 @@ Start with reviewing changes to Skills SDK itself. Prove the review loop before
 adding package assessment features or new product interfaces. Reuse existing
 standards, checks, reviewer integrations, and readiness gates.
 
+Navigate to the [recorded final merge result](agentic-review-p1-results.md#final-pr-370-merge-17-october-2026),
+[P2 implementation and delivery history](#p2-local-implementation-checkpoint-17-october-2026),
+or [proposed P3](#p3-complete-one-real-pr-loop). The latest dated closeout
+supersedes earlier pending checkpoints only for the evidence it records.
+
 ## Outcome and boundary
 
 The pilot should produce actionable, evidence-backed findings for the exact SDK

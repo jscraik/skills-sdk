@@ -17,6 +17,11 @@ history replay has local fixture and independent proof in the linked plan.
 The dated P2 section below records its separate hosted delivery and remaining
 review conditions; no live-provider or installed-runtime clearance follows.
 
+Latest recorded closeout: [final PR 370 merge](#final-pr-370-merge-17-october-2026).
+For the SDK repair, see [final SDK closeout](#final-sdk-merge-and-review-closeout-17-october-2026).
+Earlier checkpoints remain dated history; these links do not refresh hosted
+checks or retrospectively clear an earlier merge.
+
 ## Source and authority
 
 The [P0 selection](agentic-review-p0-baseline.md) remains unchanged:
