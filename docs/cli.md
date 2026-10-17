@@ -313,14 +313,23 @@ description: Use when checking a disposable example of required reference valida
 
 Read `references/README.md` for the sample notes.
 EOF
-inventory() { (cd "$PKG" && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256); }
+inventory() {
+  (
+    cd "$PKG" || exit 1
+    find . -type f -exec shasum -a 256 {} + >"$WORK/inventory.raw" || exit 1
+    [ -s "$WORK/inventory.raw" ] || exit 1
+    sort "$WORK/inventory.raw" >"$WORK/inventory.sorted" || exit 1
+    shasum -a 256 <"$WORK/inventory.sorted"
+  )
+}
 run() {
   label="$1"; shift
-  before="$(inventory)"
+  before="$(inventory)" || { echo "$label INVENTORY FAILED"; return 1; }
   mise exec -- uv run --frozen skills-sdk validate "$PKG" --source-revision "$REV" \
     --require-file references/README.md "$@" --json >"$WORK/$label.out" 2>"$WORK/$label.err"
   echo "$label exit=$?"
-  [ "$before" = "$(inventory)" ] && echo "$label input unchanged" || echo "$label INPUT CHANGED"
+  after="$(inventory)" || { echo "$label INVENTORY FAILED"; return 1; }
+  [ "$before" = "$after" ] && echo "$label input unchanged" || echo "$label INPUT CHANGED"
 }
 run missing
 : > "$PKG/references/README.md"
@@ -353,7 +362,11 @@ Without `--check-reference-content`, the empty file would satisfy the
 `--require-file` presence check. Creating the empty file and then the nonempty
 file are the author's own repairs between calls. The unchanged inventory before
 and after each call shows that validation did not write into the package;
-each result also carries `mutation_performed`. Both flags are opt-in. A pass
+each result also carries `mutation_performed`. The inventory runs each stage
+as its own checked step, writes to files under `$WORK` rather than a pipeline,
+and sorts plain text lines, so it needs no `sort -z` option. If any stage fails
+or finds no files, the script prints `INVENTORY FAILED` and never claims the
+input is unchanged. Both flags are opt-in. A pass
 shows only that the required file exists and its bytes are nonempty UTF-8; it does
 not establish semantic accuracy, review execution, publication or release
 clearance.
