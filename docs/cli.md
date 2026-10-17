@@ -1187,8 +1187,10 @@ repositories. From the SDK checkout root, the proof runs the checkout-scoped
 stdout and stderr of each call. It recognizes the two expected refusals, so the
 proof exits `0` when it observes exactly the SDK exits `2`, `0`, `2`, `0`. A
 proof exit `0` does not mean that every SDK call passed. Any setup error,
-malformed output, wrong schema, kind, status, finding or path category, or
-changed file stops the proof with `1`, including under `PYTHONOPTIMIZE=1`.
+malformed output (including a missing findings list or a finding without exactly
+nonempty string `code` and `message`), wrong schema, kind, status, finding or
+path category, or changed file stops the proof with `1`, including under
+`PYTHONOPTIMIZE=1`.
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" python3 - <<'PY'
@@ -1256,7 +1258,14 @@ for name, root, extra, code, status, findings, dirty_state, ledgered, unledgered
         stop(f"{name}: stdout is not JSON")
     if not isinstance(result, dict):
         stop(f"{name}: result is not an object")
-    codes = [f.get("code") if isinstance(f, dict) else None for f in result.get("findings", [])]
+    found = result.get("findings")
+    if not isinstance(found, list):
+        stop(f"{name}: findings is not a list")
+    for item in found:
+        if not (isinstance(item, dict) and set(item) == {"code", "message"}
+                and all(isinstance(item[key], str) and item[key] for key in item)):
+            stop(f"{name}: finding is not an object with nonempty string code and message")
+    codes = [item["code"] for item in found]
     expected = {"schema_version": "pr-sweep-validation/v1", "kind": "dirty_closeout", "status": status,
                 "findings": findings, "dirty_state": dirty_state, "ledgered_paths": ledgered, "unledgered_paths": unledgered}
     if dict(result, findings=codes) != expected:
