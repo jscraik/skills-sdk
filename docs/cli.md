@@ -287,6 +287,96 @@ a wall-clock timeout.
 Neither policy is required by default. The existing `check-local/v1` composition
 does not expose these flags; do not infer full package-quality coverage from it.
 
+### Worked example: required reference recovery
+
+From the SDK checkout root, first export
+`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"`.
+With those variables set, run `mise install python uv ruff vale` and then
+`mise exec -- uv sync --frozen`, and only then run the example. The script creates a disposable synthetic package under the physical temporary
+path, so it also works on macOS.
+The revision is a concrete 40-character lowercase hexadecimal value. The script
+never executes package content; `inventory` hashes the package files before and
+after each validation call.
+
+```bash
+WORK="$(cd "$(mktemp -d)" && pwd -P)"
+PKG="$WORK/sample-skill"
+REV=0123456789abcdef0123456789abcdef01234567
+mkdir -p "$PKG/references"
+cat > "$PKG/SKILL.md" <<'EOF'
+---
+name: sample-skill
+description: Use when checking a disposable example of required reference validation.
+---
+
+# Sample skill
+
+Read `references/README.md` for the sample notes.
+EOF
+inventory() {
+  (
+    cd "$PKG" || exit 1
+    find . -type f -exec shasum -a 256 {} + >"$WORK/inventory.raw" || exit 1
+    [ -s "$WORK/inventory.raw" ] || exit 1
+    sort "$WORK/inventory.raw" >"$WORK/inventory.sorted" || exit 1
+    shasum -a 256 <"$WORK/inventory.sorted"
+  )
+}
+run() {
+  label="$1"; shift
+  before="$(inventory)" || { echo "$label INVENTORY FAILED"; return 1; }
+  mise exec -- uv run --frozen skills-sdk validate "$PKG" --source-revision "$REV" \
+    --require-file references/README.md "$@" --json >"$WORK/$label.out" 2>"$WORK/$label.err"
+  echo "$label exit=$?"
+  after="$(inventory)" || { echo "$label INVENTORY FAILED"; return 1; }
+  [ "$before" = "$after" ] && echo "$label input unchanged" || echo "$label INPUT CHANGED"
+}
+run missing
+: > "$PKG/references/README.md"
+run empty --check-reference-content
+printf '# Sample notes\n\nThese notes are intentionally short.\n' > "$PKG/references/README.md"
+run corrected --check-reference-content
+```
+
+The observed output of exactly these commands was:
+
+```text
+missing exit=2
+missing input unchanged
+empty exit=2
+empty input unchanged
+corrected exit=0
+corrected input unchanged
+```
+
+Each `$WORK/<label>.err` file was empty. Each `$WORK/<label>.out` file holds one
+`skill-package-validation/v1` result:
+
+| Step | Exit | Status | Finding code | Meaning |
+| --- | --- | --- | --- | --- |
+| `missing` | `2` | `blocked` | `required_file_missing` | The selected policy requires `references/README.md`, and no readable regular file exists there. |
+| `empty` | `2` | `blocked` | `empty_reference` | The file now exists, and `--check-reference-content` rejects it because a textual reference must contain content. The flag checks captured files under `references/` with a supported textual suffix (Markdown, `.txt`, `.json`, `.yaml`, `.yml`), so another malformed JSON or YAML reference would also block. Other suffixes, such as `.toml` or `.png`, are not content-checked. |
+| `corrected` | `0` | `pass` | none | The same selected policy accepts the nonempty UTF-8 reference. |
+
+Without `--check-reference-content`, the empty file would satisfy the
+`--require-file` presence check. Creating the empty file and then the nonempty
+file are the author's own repairs between calls. The unchanged inventory before
+and after each call shows that the paths and bytes of regular files did not
+change; it does not cover permissions, timestamps, symlinks or other metadata,
+so a `chmod` alone leaves it unchanged. Each result also carries
+`mutation_performed`. The inventory runs each stage
+as its own checked step, writes to files under `$WORK` rather than a pipeline,
+and sorts plain text lines, so it needs no `sort -z` option. If any stage fails
+or finds no files, the script prints `INVENTORY FAILED` and never claims the
+input is unchanged. Both flags are opt-in. A pass
+shows that the required file exists and, with the content flag, that each
+supported textual reference under `references/` is nonempty UTF-8 and, for JSON
+and YAML, parses. It also means the ordinary `validate` checks
+passed, including the package root, safe capture, frontmatter and identity, so
+a valid `references/README.md` beside a `SKILL.md` without frontmatter still
+returns exit `2` with `invalid_frontmatter`. A pass does not establish semantic
+accuracy, review execution, publication or release clearance.
+
 The CLI is non-interactive. Except for the explicit destination creation of
 `normalize-plugin` and `maintain-entrypoint --apply`, the listed operations are
 non-mutating. For an invocation that reaches a service, exit `0` means intake
