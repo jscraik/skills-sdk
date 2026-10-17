@@ -155,8 +155,10 @@ FLAGS=(--source-revision "$REV" --require-version --require-description)
 Define the helpers. `measure` prints each regular file's relative path, SHA-256
 digest and permission bits, and fails when any supplied path is missing, empty,
 unreadable or not a regular file, so one valid input cannot hide another. `run` keeps stdout, stderr and the exit code apart and fails when
-the exit code is not the expected one. `show` parses a result and checks that the
-authority flags are `false` and the requested policy was retained. `check`
+the exit code is not the expected one. `show` parses a result and checks the schema version, the expected status and
+exact finding codes, that the authority flags are `false` and that the requested
+policy was retained, so a different valid blocker such as `plugin_evidence_invalid`
+cannot stand in for the one expected. `check`
 measures the plugin files and the supplied evidence before and after one
 verification and fails on any difference, measurement failure or rejected result, even when the
 CLI exit code was the expected one:
@@ -194,12 +196,14 @@ run() {  # run NAME EXPECTED_EXIT STDOUT_FILE ARGS...
   echo "$name: exit=$got expected=$want stderr_bytes=$(wc -c < "$OUT/$name.err")"
   [ "$got" -eq "$want" ] || { echo "UNEXPECTED EXIT: $name" >&2; return 1; }
 }
-show() {
-  python3 - "$1" <<'EOF'
+show() {  # show RESULT_FILE EXPECTED_STATUS [EXPECTED_FINDING_CODE]
+  python3 - "$@" <<'EOF'
 import json, sys
 r = json.load(open(sys.argv[1]))
 codes = [f["code"] for f in r["findings"]]
 print(r["schema_version"], r["status"], codes, {k: r[k] for k in ("mutation_performed", "execution_authorized", "release_ready")}, r["policy"])
+assert r["schema_version"] == "plugin-package-validation/v1"
+assert r["status"] == sys.argv[2] and codes == sys.argv[3:4]
 assert not any(r[k] for k in ("mutation_performed", "execution_authorized", "release_ready"))
 assert r["policy"] == {"require_version": True, "require_description": True}
 EOF
@@ -209,7 +213,7 @@ check() {  # check NAME EXPECTED_EXIT EVIDENCE_FILE
   run "$1" "$2" "$OUT/$1.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot --verify-evidence "$3"; local rc=$?
   measure "$PLUGIN" "$3" > "$SNAP/$1.after" || { echo "measurement failed: $1" >&2; return 1; }
   cmp -s "$SNAP/$1.before" "$SNAP/$1.after" && echo "inputs unchanged: $1" || { echo "INPUTS CHANGED: $1" >&2; return 1; }
-  show "$OUT/$1.json" || { echo "RESULT REJECTED: $1" >&2; return 1; }; return $rc
+  if [ "$2" -eq 0 ]; then show "$OUT/$1.json" pass; else show "$OUT/$1.json" blocked plugin_evidence_mismatch; fi || { echo "RESULT REJECTED: $1" >&2; return 1; }; return $rc
 }
 ```
 
@@ -219,7 +223,7 @@ plugin against it with the same revision and policy. Expect exit `0` and the
 same passing result:
 
 ```bash
-run capture 0 "$EV/plugin-validation.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/plugin-validation.json" && show "$EV/plugin-validation.json"
+run capture 0 "$EV/plugin-validation.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/plugin-validation.json" && show "$EV/plugin-validation.json" pass
 check verify-unchanged 0 "$EV/plugin-validation.json"
 ```
 
@@ -244,8 +248,8 @@ check verify-reformatted 0 "$EV/plugin-validation.json"
 Make one valid, same-length source edit ("short" becomes "brief") without
 changing `REV`. The `diff` is the control: exactly the edited file changes and
 its neighbour `plugin.json` does not. The plugin is still structurally valid,
-but verification against the retained evidence is blocked. Expect exit `2` and
-finding `plugin_evidence_mismatch`. This is the expected rejection, not an
+but verification against the retained evidence is blocked. Expect exit `2`, status
+`blocked` and exactly the finding `plugin_evidence_mismatch`. This is the expected rejection, not an
 ordinary pass command. Keep the old evidence file:
 
 ```bash
@@ -260,7 +264,7 @@ Recover by capturing the edited plugin into a new evidence file, leaving the old
 one in place. Verification of the new file exits `0`:
 
 ```bash
-run recapture 0 "$EV/after-edit.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/after-edit.json" && show "$EV/after-edit.json"
+run recapture 0 "$EV/after-edit.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/after-edit.json" && show "$EV/after-edit.json" pass
 check verify-recaptured 0 "$EV/after-edit.json"
 ```
 
@@ -275,7 +279,7 @@ measure "$PLUGIN" > "$SNAP/mode.before"
 chmod 0755 "$PLUGIN/skills/demo-skill/SKILL.md"
 measure "$PLUGIN" > "$SNAP/mode.after"; diff "$SNAP/mode.before" "$SNAP/mode.after"
 check verify-mode-drift 2 "$EV/after-edit.json"
-run recapture-mode 0 "$EV/after-mode.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/after-mode.json" && show "$EV/after-mode.json"
+run recapture-mode 0 "$EV/after-mode.json" validate-plugin "$PLUGIN" "${FLAGS[@]}" --json --robot && chmod 0644 "$EV/after-mode.json" && show "$EV/after-mode.json" pass
 check verify-mode-recaptured 0 "$EV/after-mode.json"
 ```
 
