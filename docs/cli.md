@@ -137,7 +137,10 @@ digest, and writes a synthetic request bound to it. The helper never invents a
 binding hash. `measure` prints each regular file's relative path, SHA-256 digest
 and permission bits, and fails when a supplied path is missing, empty, unreadable
 or not a regular file. `run` keeps stdout, stderr and the exit code apart and
-fails on an unexpected exit code and records the raw CLI exit code in `RAW`. `show` checks the schema version
+fails on an unexpected exit code and records the raw CLI exit code in `RAW`. It also
+runs `leak` on every captured stdout and stderr file, so a capture that contains
+the marker fails before any request is bound. `leak` names the file and never
+prints its content. `show` checks the schema version
 `plugin-presentation-check/v1`, the status, the exact finding codes, all six
 authority and display flags (`mutation_performed`, `execution_authorized`,
 `release_ready`, `archive_verified`, `host_display_observed`,
@@ -146,7 +149,11 @@ from stdout and stderr. `assess` measures the plugin and the supplied request
 before and after one assessment and fails on any difference, measurement failure
 or rejected result, even when the CLI exit code was the expected one. When every
 check holds, `assess` returns the raw CLI exit code, so a verified blocked
-assessment returns `2`. Any helper failure returns `1`:
+assessment returns `2`. Any helper failure returns `1`. A helper returning `1`
+does not stop Bash by itself, and the example does not rely on `set -e`. Each
+top-level call below ends with an explicit guard that prints the failed step and
+stops the session with `return 1`, or `exit 1` when `return` is not allowed. Only
+the verified `2` from `assess stale-v1` continues:
 
 ```bash
 sdk() { MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk "$@"; }
@@ -175,12 +182,23 @@ for root in sys.argv[2:]:
 print("\n".join(sorted(rows)))
 PY
 }
+leak() {  # leak FILE...: fail, naming the file but not echoing it, when the marker appears
+  python3 - "$MARKER" "$@" <<'PY'
+import sys
+marker = sys.argv[1].encode()
+for path in sys.argv[2:]:
+    with open(path, "rb") as handle:
+        if marker in handle.read():
+            sys.exit("synthetic private copy found in " + path)
+PY
+}
 run() {  # run NAME EXPECTED_EXIT STDOUT_FILE ARGS...
   local name="$1" want="$2" dest="$3" got; shift 3
   sdk "$@" > "$dest" 2> "$OUT/$name.err"; got=$?
   echo "$name: exit=$got expected=$want stderr_bytes=$(wc -c < "$OUT/$name.err")"
   RAW="$got"
   [ "$got" -eq "$want" ] || { echo "UNEXPECTED EXIT: $name" >&2; return 1; }
+  leak "$dest" "$OUT/$name.err" || { echo "PRIVATE COPY FOUND: $name" >&2; return 1; }
 }
 bind() {  # bind CAPTURE_FILE REQUEST_FILE: write a synthetic request bound to the capture
   python3 - "$1" "$2" <<'PY'
@@ -247,8 +265,10 @@ outside the plugin. Assess it. Expect exit `0`, status `pass` and no findings:
 
 ```bash
 run capture-v1 0 "$OUT/capture-v1.json" validate-plugin "$PLUGIN" --source-revision "$REV" --json --robot \
-  && bind "$OUT/capture-v1.json" "$REQS/request-v1.json" && chmod 0644 "$REQS/request-v1.json"
-assess match-v1 0 "$REQS/request-v1.json"
+  && bind "$OUT/capture-v1.json" "$REQS/request-v1.json" && chmod 0644 "$REQS/request-v1.json" \
+  || { echo "capture-v1 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+assess match-v1 0 "$REQS/request-v1.json" \
+  || { echo "match-v1 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
 ```
 
 Make one valid SVG content edit, adding a fill, without changing `REV`. The
@@ -259,16 +279,23 @@ expected rejection, not an ordinary pass command. `assess` returns `2` here
 after it verifies that result, an intentional negative CLI result that is not a
 pass and does not count as a full SDK pass. After that verified
 expected `2`, continue recovery in the same Bash session. A return of `1` means
-the proof itself failed: stop and investigate before proceeding, and do not
-carry on after a failed measurement, malformed output or wrong reason. Keep the
-old request:
+the proof itself failed: the guard stops the session before recovery, so
+investigate before proceeding. Never carry on after a failed measurement,
+malformed output or wrong reason. Keep the old request. The `diff` exits `1` when
+the SVG changed, which is the expected result here, and `0` or `2` stops:
 
 ```bash
-measure "$PLUGIN" > "$SNAP/source.v1"
-sed -i.bak 's|<rect width="48" height="48"/>|<rect width="48" height="48" fill="#336699"/>|' "$PLUGIN/assets/icon.svg" && rm "$PLUGIN/assets/icon.svg.bak"
-chmod 0644 "$PLUGIN/assets/icon.svg"
-measure "$PLUGIN" > "$SNAP/source.v2"; diff "$SNAP/source.v1" "$SNAP/source.v2"
+measure "$PLUGIN" > "$SNAP/source.v1" \
+  || { echo "measurement failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+sed -i.bak 's|<rect width="48" height="48"/>|<rect width="48" height="48" fill="#336699"/>|' "$PLUGIN/assets/icon.svg" \
+  && rm "$PLUGIN/assets/icon.svg.bak" && chmod 0644 "$PLUGIN/assets/icon.svg" \
+  || { echo "edit failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+measure "$PLUGIN" > "$SNAP/source.v2" \
+  || { echo "measurement failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+diff "$SNAP/source.v1" "$SNAP/source.v2"
+[ "$?" -eq 1 ] || { echo "source did not change as expected; stop" >&2; return 1 2>/dev/null || exit 1; }
 assess stale-v1 2 "$REQS/request-v1.json"
+[ "$?" -eq 2 ] || { echo "stale-v1 proof failed; stop" >&2; return 1 2>/dev/null || exit 1; }
 ```
 
 Recovery needs a new request bound to fresh observations of the edited plugin,
@@ -280,9 +307,12 @@ digest:
 
 ```bash
 run capture-v2 0 "$OUT/capture-v2.json" validate-plugin "$PLUGIN" --source-revision "$REV" --json --robot \
-  && bind "$OUT/capture-v2.json" "$REQS/request-v2.json" && chmod 0644 "$REQS/request-v2.json"
-assess renewed-v2 0 "$REQS/request-v2.json"
-measure "$REQS/request-v1.json" "$REQS/request-v2.json"
+  && bind "$OUT/capture-v2.json" "$REQS/request-v2.json" && chmod 0644 "$REQS/request-v2.json" \
+  || { echo "capture-v2 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+assess renewed-v2 0 "$REQS/request-v2.json" \
+  || { echo "renewed-v2 failed; stop" >&2; return 1 2>/dev/null || exit 1; }
+measure "$REQS/request-v1.json" "$REQS/request-v2.json" \
+  || { echo "measurement failed; stop" >&2; return 1 2>/dev/null || exit 1; }
 ```
 
 Each `assess` compares regular-file paths, SHA-256 content digests and permission
