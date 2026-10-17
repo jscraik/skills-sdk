@@ -499,9 +499,11 @@ At closeout, unrelated SDK agent-instruction and integration-installation files
 appeared in the primary checkout. They were preserved and excluded from this
 task's owned report scope. That combined snapshot classified as full; an
 isolated prose check does not validate it. The initial two-report proof used
-accepted `0d4a39d8`. The current report delivery uses an isolated snapshot of
-accepted `0599ffe87bc2c0db3ea4cd7d53b50aead9deec96`; its prose wrapper passed
-all 12 documentation-dependent tests. Neither result accepts unrelated changes.
+accepted `0d4a39d8`. This report delivery began from isolated accepted
+`0599ffe87bc2c0db3ea4cd7d53b50aead9deec96`, then normally merged accepted
+`8e28b83b074d2f586a42b796646239a013079056` after main advanced with CLI prose.
+The final prose wrapper passed all 12 documentation-dependent tests. These
+results do not accept the unrelated primary-checkout changes.
 
 ### P3: Complete one real PR loop
 
