@@ -33,10 +33,14 @@ Exit `2` alone does not show that a versioned result exists. Check stdout and
 stderr separately. This example creates a disposable package named `demo-skill`
 in a temporary directory outside the checkout, then runs the `validate` route
 from the checkout root. The revision is a synthetic value with the required
-shape; it does not identify real source history:
+shape; it does not identify real source history. The `pwd -P` step resolves
+symlinked ancestors, such as the one in a default macOS `mktemp` path. The SDK
+refuses to traverse them and reports `unreadable_package_root` and
+`unreadable_skill_md` with exit `2` for an otherwise valid package. Passing the
+physical path keeps that no-follow check in force:
 
 ```bash
-DEMO="$(mktemp -d)"
+DEMO="$(cd "$(mktemp -d)" && pwd -P)"
 mkdir "$DEMO/demo-skill"
 printf -- '---\nname: demo-skill\ndescription: Demonstrates validate exit codes.\n---\n\n# Demo skill\n' > "$DEMO/demo-skill/SKILL.md"
 REV=0123456789abcdef0123456789abcdef01234567
