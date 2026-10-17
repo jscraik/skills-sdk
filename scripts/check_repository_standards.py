@@ -219,6 +219,7 @@ def _import_targets(node: ast.Import | ast.ImportFrom, relative: str) -> tuple[s
 
 
 def _forbidden_imports(relative: str) -> tuple[str, ...]:
+    """Return import namespaces forbidden in the source file's dependency layer."""
     # Keep this table aligned with ARCHITECTURE.md dependency direction.
     # Missing lanes (intake/distribution/lifecycle/host) previously let agents
     # wire forbidden edges that only prose forbade.

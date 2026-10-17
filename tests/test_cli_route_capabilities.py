@@ -11,6 +11,7 @@ from skills_sdk.cli.routes import DISCOVERY_ONLY_EXIT, ROUTE_CAPABILITIES, Route
 
 
 def _nested_choices(parser: argparse.ArgumentParser, dest: str) -> dict[str, argparse.ArgumentParser]:
+    """Return subcommand parsers registered under the given argument destination."""
     for action in parser._actions:
         if isinstance(action, argparse._SubParsersAction) and action.dest == dest:
             return dict(action.choices)
@@ -18,6 +19,7 @@ def _nested_choices(parser: argparse.ArgumentParser, dest: str) -> dict[str, arg
 
 
 def _parser_route_keys() -> set[str]:
+    """Collect registry keys for every invokable route in the CLI parser."""
     parser = build_parser()
     top = _nested_choices(parser, "command")
     keys: set[str] = set()
