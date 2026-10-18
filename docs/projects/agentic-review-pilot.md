@@ -616,14 +616,20 @@ or a completed P4 improvement. Synthetic fixtures do not count as occurrences.
    deliveries. Group by the same causal invariant, not shared words such as
    "review" or "evidence". Count independent tasks, not several bot comments
    about one defect or repeated attempts on the same head.
-2. Record repository/PR, original and repaired revision, finding URL, confirmed
-   reproduction, response, independent disposition and any linked recurrence
-   in a sanitised supplied ledger using the existing SDK schema. Preserve
-   source uncertainty; an unknown root cause does not qualify.
+2. Retain repository/PR, original and repaired revision, finding URL, confirmed
+   reproduction, response, independent disposition and linked recurrence in
+   sanitised case records alongside this report. The schema-valid ledger is an
+   index, not those detailed records: each occurrence contains only
+   `repository`, `pull_request` and `evidence_ref`. Use a supported safe local
+   reference to the case record, or its matching PR evidence URL, without
+   adding fields to the existing schema. Preserve source uncertainty; an
+   unknown root cause does not qualify.
 3. With three qualifying occurrences, select one smallest repair in its owning
    repository: an existing regression test, instruction correction or review
    criterion. Record the owner, positive defect case, valid neighbouring case,
-   bounded sibling search, replaced guidance and exact validation outcome.
+   bounded sibling search and replaced guidance. Record each exact validation
+   command and explicit `pass`, `fail` or `blocked` result, including the
+   concrete reason and nearest meaningful fallback for a blocked command.
    Keep shared readiness/parser work in Configs and portable contracts in SDK.
 4. Obtain independent review and use the existing `verify recurring-findings`
    route documented in [CLI verification](../cli.md#pr-sweep-verification).
@@ -645,8 +651,8 @@ for evidence collection; no effectiveness scores are assigned yet.
 | SDK PR 63 | Two reproduced defects, repairs and later clearance; preserve original and repaired heads. |
 | SDK PR 62 | Normalisation workflow comparison; establish its actual reference findings before scoring. |
 | SDK PR 65 | Small docstring change as a low-change control; an empty result alone cannot prove no missed defect. |
-| SDK PR 90 | Metadata correction, contradictory review summaries and merge before final qualifying clearance; retain the gap as an adverse process result. |
-| SDK PR 91 | Exact eligibility wording and pinned launcher findings, repair and current-head clearance; distinguish independent Mac proof from author-reported Linux proof. |
+| [SDK PR 90](https://github.com/jscraik/skills-sdk/pull/90) | Compare the [verified metadata correction](https://github.com/jscraik/skills-sdk/pull/90#discussion_r4304594986), [qualified clarification](https://github.com/jscraik/skills-sdk/pull/90#issuecomment-6241463473) and [rate-limited review](https://github.com/jscraik/skills-sdk/pull/90#issuecomment-6241538848). Reconstruct the merge/clearance chronology; no final pre-merge clearance is established by those sources. |
+| [SDK PR 91](https://github.com/jscraik/skills-sdk/pull/91) | Reconstruct the [eligibility](https://github.com/jscraik/skills-sdk/pull/91#discussion_r4304600727) and [pinned launcher](https://github.com/jscraik/skills-sdk/pull/91#discussion_r4304600730) findings, published repairs and [Codex completion](https://github.com/jscraik/skills-sdk/pull/91#issuecomment-6241290505). Pre-merge readiness and platform execution need their own retained evidence before scoring. |
 
 For each case, reconstruct the original diff, review-policy revision and
 available test/reference evidence before inspecting reviewer conclusions where
@@ -674,6 +680,9 @@ Record one row per finding and one per run in this report's eventual results:
 - Cost and delivery: actual charged/included amount where evidenced, otherwise
   unknown; exact reviewed head/scope, failed/skipped/incomplete outcome, later
   concerns and readiness result. No estimate is recorded as an actual charge.
+- Validation: each exact command and explicit `pass`, `fail` or `blocked`
+  outcome, with a concrete blocked reason and nearest meaningful fallback.
+  Keep schema/ledger consistency separate from proof that repair tests ran.
 
 P5 exit requires all five historical and three prospective records, independent
 dispositions, a check against every technical outcome above, and Jamie's
@@ -684,12 +693,14 @@ visible. Keep shadow mode until that decision; product rollout remains proposed.
 
 #### Reconciliation boundary
 
-PR 91 merged after a passing current-head receipt; PR 90 merged with its final
-CodeRabbit clearance still unproven. Neither alters PR 63's recorded P3 result.
+PRs 90 and 91 are merged, but the linked sources above do not by themselves
+establish complete pre-merge readiness. Preserve the reported PR 90 clearance
+gap and treat PR 91's operator-reported receipt and Mac proof as unverified
+until retained evidence is collected. Neither alters PR 63's recorded P3 result.
 These later cases are P5 inputs, not evidence that all pilot phases are done.
-This report reconciliation is local documentation work; it does not refresh
-the Spaces Page, publish a report PR, or adopt unrelated implementation and
-installation changes.
+Report publication and Spaces reconciliation are separate authorised delivery
+lanes, not additional pilot acceptance proof. Unrelated implementation and
+installation changes remain excluded.
 
 ## Product rollout after pilot acceptance
 
