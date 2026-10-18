@@ -362,3 +362,123 @@ def test_excess_assessment_keys_stop_before_materialization(tmp_path: Path, monk
     assert result.blocker.code == "plugin_quality_assessments_invalid"
     assert not result.children and result.presentation is None
     assert "unrequested-one" not in result.model_dump_json()
+
+
+@pytest.mark.parametrize("kind", ["image", "copy"])
+def test_presentation_references_are_public_safe(tmp_path: Path, kind: str, capsys: pytest.CaptureFixture[str]) -> None:
+    """An otherwise passing supplied presentation must not echo credential-shaped references."""
+    root, request, assessments, presentation = _plugin(tmp_path)
+    passed = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    marker = "sk-synthetic-review-reference"
+    approval = presentation["image_approvals"][0] if kind == "image" else presentation["copy_approval"]
+    approval["evidence_ref"] = marker
+    result = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert marker not in result.model_dump_json()
+    assert result.blocker.code == "plugin_quality_input_invalid"
+    from pydantic import ValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.models.plugin_quality import PluginQualityResult
+
+    raw = passed.model_dump(mode="json")
+    retained = raw["presentation"]["images"][0]["approval"] if kind == "image" else raw["presentation"]["copy_approval"]
+    retained["evidence_ref"] = marker
+    for value in (raw, passed.model_copy(update=raw)):
+        with pytest.raises(ValidationError):
+            PluginQualityResult.model_validate(value)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
+    paths = [tmp_path / name for name in ("request.json", "assessments.json", "presentation.json")]
+    for path, value in zip(paths, (request, assessments, presentation), strict=True):
+        path.write_text(json.dumps(value))
+    assert (
+        main(
+            [
+                "check-plugin-quality",
+                str(root),
+                "--request",
+                str(paths[0]),
+                "--assessments",
+                str(paths[1]),
+                "--presentation-request",
+                str(paths[2]),
+                "--json",
+            ]
+        )
+        == 2
+    )
+    assert marker not in capsys.readouterr().out
+
+
+def test_child_version_is_not_retained(tmp_path: Path) -> None:
+    """A source child version cannot escape through a retained root mismatch capture."""
+    root, request, _assessments, _presentation = _plugin(tmp_path)
+    child = root / request["children"][0]["path"] / "SKILL.md"
+    source = child.read_text()
+    marker = "api_key=synthetic-child-version"
+    child.write_text(source.replace("---\n", "---\nversion: " + marker + "\n", 1))
+    result = asyncio.run(service.check_plugin_quality(root, request))
+    assert marker not in result.model_dump_json()
+    assert result.blocker.code == "plugin_quality_input_invalid"
+
+
+def test_excess_child_count_stops_before_traversal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An oversized concrete child list is rejected without reading its members."""
+    root, request, _assessments, _presentation = _plugin(tmp_path)
+
+    from pydantic import ValidationError
+
+    from skills_sdk.models import quality_workflow
+    from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityResult
+
+    selected = PluginQualityRequest.model_validate(request)
+    original = quality_workflow._intake_evidence_data
+
+    def normalize(value: object, *args: object, **kwargs: object) -> object:
+        if isinstance(value, dict) and len(value.get("children", ())) > 128:
+            raise AssertionError("oversized child list reached recursive materialisation")
+        return original(value, *args, **kwargs)
+
+    request["children"] *= 129
+    monkeypatch.setattr(quality_workflow, "_intake_evidence_data", normalize)
+    result = asyncio.run(service.check_plugin_quality(root, request))
+    assert result.blocker.code == "plugin_quality_request_invalid"
+    assert result.request is None
+    copied = selected.model_copy(update={"children": selected.children * 129})
+    for value in (request, copied):
+        with pytest.raises(ValidationError, match="child count"):
+            PluginQualityRequest.model_validate(value)
+    envelope = result.model_copy(update={"request": copied})
+    raw_envelope = {**result.model_dump(mode="json"), "request": request}
+    for value in (envelope, raw_envelope):
+        with pytest.raises(ValidationError, match="child count"):
+            PluginQualityResult.model_validate(value)
+
+
+@pytest.mark.parametrize("where", ["initial_capture", "final_capture", "child_stage"])
+def test_supplied_child_versions_are_screened(tmp_path: Path, where: str) -> None:
+    """Root and child-stage retained identities share the same composition privacy boundary."""
+    from pydantic import ValidationError
+    from test_plugin_quality import _passed
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.models.plugin_quality import PluginQualityResult
+
+    _root, _request, passed = _passed(tmp_path)
+    raw = passed.model_dump(mode="json")
+    if where == "child_stage":
+        target = raw["children"][0]["stages"][0]["receipt"]["validation"]["identity"]
+    else:
+        target = raw[where]["skills"][0]["validation"]["identity"]
+    target["version"] = "api_key=synthetic-retained-child"
+    for value in (raw, passed.model_copy(update=raw)):
+        with pytest.raises(ValidationError):
+            PluginQualityResult.model_validate(value)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)

@@ -18,6 +18,8 @@ from skills_sdk.models.plugin_quality import (
     PluginQualityRequest,
     PluginQualityResult,
     _capture_metadata_is_safe,
+    _child_metadata_is_safe,
+    _presentation_metadata_is_safe,
     bounded_json_size,
     supported_quality_root,
 )
@@ -132,6 +134,8 @@ async def _check_plugin_quality(
     children: list[LocalCheckResultV2] = []
     for child in selected.children:
         result = await check_local_quality(plugin_root / child.path, child.request, assessment=supplied.get(child.path))
+        if not _child_metadata_is_safe(result):
+            return _block("plugin_quality_input_invalid")
         children.append(result)
         evidence["children"] = tuple(children)
         if result.status != "local_checks_passed":
@@ -141,6 +145,8 @@ async def _check_plugin_quality(
     presentation = check_plugin_presentation(
         plugin_root, request=presentation_request, source_revision=selected.candidate.source_revision
     )
+    if not _presentation_metadata_is_safe(presentation):
+        return _block("plugin_quality_input_invalid")
     evidence["presentation"] = presentation
     if presentation.status != "pass" or (
         presentation.candidate != selected.candidate

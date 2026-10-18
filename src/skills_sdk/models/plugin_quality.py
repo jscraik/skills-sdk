@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -14,6 +15,7 @@ from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding
 from skills_sdk.models.plugin_presentation import PluginPresentationCheck
 from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckResultV2
 from skills_sdk.models.safety import _public_text_is_redaction_safe
+from skills_sdk.models.validation import SkillPackageValidation
 
 PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES = 32 * 1_048_576
 """Aggregate supplied-assessment budget: four maximum-sized content-review assessments."""
@@ -144,6 +146,15 @@ class PluginQualityChild(_ContractModel):
         return self
 
 
+def _reject_excess_children(value: object) -> None:
+    """Read only container size before recursive request or result materialisation."""
+    data = value.__dict__ if isinstance(value, BaseModel) else value
+    if isinstance(data, Mapping):
+        children = data.get("children")
+        if isinstance(children, (list, tuple)) and len(children) > 128:
+            raise ValueError("plugin quality child count exceeds 128")
+
+
 class PluginQualityRequest(_ContractModel):
     """Expected complete content, modes and exact child requests."""
 
@@ -157,6 +168,7 @@ class PluginQualityRequest(_ContractModel):
     @classmethod
     def canonical_inputs(cls, value: object) -> object:
         """Reuse bounded revalidation of nested local-quality evidence."""
+        _reject_excess_children(value)
         normalized = LocalCheckRequestV2.inputs_are_revalidated(value)
         _reject_padded_identity(normalized)
         return normalized
@@ -174,12 +186,31 @@ class PluginQualityRequest(_ContractModel):
 
 def _capture_metadata_is_safe(capture: PluginPackageValidation) -> bool:
     """Keep retained free-form manifest fields within the public-text boundary."""
-    if capture.manifest is None:
-        return True
-    return all(
+    manifest_safe = capture.manifest is None or all(
         value is None or _public_text_is_redaction_safe(value)
         for value in (capture.manifest.description, capture.manifest.version)
     )
+    return manifest_safe and all(_skill_metadata_is_safe(child.validation) for child in capture.skills)
+
+
+def _skill_metadata_is_safe(capture: SkillPackageValidation | None) -> bool:
+    """Screen retained child identity metadata without changing standalone validation."""
+    return capture is None or capture.identity is None or _public_text_is_redaction_safe(capture.identity.version)
+
+
+def _child_metadata_is_safe(child: LocalCheckResultV2) -> bool:
+    """Cover initial stage, intake and final child captures in the retained result."""
+    captures = [child.final_capture, child.baseline_final_capture]
+    captures.extend(getattr(stage.receipt, "validation", stage.receipt) for stage in child.stages)
+    return all(_skill_metadata_is_safe(capture) for capture in captures if isinstance(capture, SkillPackageValidation))
+
+
+def _presentation_metadata_is_safe(presentation: PluginPresentationCheck) -> bool:
+    """Screen both image and copy approval reference text before composition retention."""
+    refs = [image.approval.evidence_ref for image in presentation.images]
+    if presentation.copy_approval is not None:
+        refs.append(presentation.copy_approval.evidence_ref)
+    return all(_public_text_is_redaction_safe(ref) for ref in refs)
 
 
 def supported_quality_root(request: PluginQualityRequest, capture: PluginPackageValidation) -> bool:
@@ -219,6 +250,10 @@ class PluginQualityResult(_ContractModel):
     @classmethod
     def canonical_inputs(cls, value: object) -> object:
         """Revalidate typed envelopes rather than trusting copied instances."""
+        _reject_excess_children(value)
+        data = value.__dict__ if isinstance(value, BaseModel) else value
+        if isinstance(data, Mapping):
+            _reject_excess_children(data.get("request"))
         normalized = LocalCheckRequestV2.inputs_are_revalidated(value)
         _reject_padded_identity(normalized)
         flags = ("mutation_performed", "evaluation_executed", "execution_authorized", "release_ready")
@@ -229,6 +264,10 @@ class PluginQualityResult(_ContractModel):
     @model_validator(mode="after")
     def binds_complete_plugin(self) -> Self:
         """Require complete root and child evidence for any successful result."""
+        if any(not _child_metadata_is_safe(child) for child in self.children) or (
+            self.presentation is not None and not _presentation_metadata_is_safe(self.presentation)
+        ):
+            raise ValueError("plugin quality retained child and presentation metadata must be redaction-safe")
         if any(
             capture is not None and not _capture_metadata_is_safe(capture)
             for capture in (self.initial_capture, self.final_capture)

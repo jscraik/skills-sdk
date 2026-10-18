@@ -97,11 +97,14 @@ The request binds the root candidate identity, mode manifest and one explicit
 source revision. Child-path uniqueness and ordering are semantic constraints
 enforced by the SDK models and `SchemaRegistry`, beyond structural JSON Schema.
 Schema-only validation does not prove these constraints.
-Captured manifest descriptions and versions must also pass the composition's existing
-public-text checks for credential-shaped text and machine paths. Unsafe initial
-or final metadata return `plugin_quality_input_invalid` without retaining
-the capture. These pattern checks do not guarantee detection of every secret;
-standalone plugin validation and its manifest contract remain unchanged.
+Captured manifest descriptions and versions, retained child identity versions,
+and presentation image or copy evidence references must pass the composition's
+existing public-text checks for credential-shaped text and machine paths.
+Unsafe retained metadata returns `plugin_quality_input_invalid` without retaining
+the evidence. These pattern checks do not guarantee detection of every secret;
+standalone plugin and presentation contracts remain unchanged. Raw or copied
+request and result envelopes reject child counts above 128 before recursive
+normalisation; structural field limits remain in place too.
 The service freshly captures the root, composes
 `check_local_quality` for each child in order, then `check_plugin_presentation`,
 and recaptures the root before success. It stops at the first blocker and retains
