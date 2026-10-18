@@ -175,3 +175,74 @@ def test_documented_cli_placeholders_are_shell_safe() -> None:
         for line in (REPOSITORY_ROOT / relative).read_text(encoding="utf-8").splitlines():
             if "skills-sdk" in line or "--source-revision" in line:
                 assert placeholder.search(line) is None, f"{relative}: unquoted shell placeholder: {line}"
+
+
+def _published_bash_function(name: str) -> str:
+    """Extract the named Bash function from the published CLI guide."""
+    document = (REPOSITORY_ROOT / "docs/cli.md").read_text(encoding="utf-8")
+    start = document.index(name + "() {")
+    return document[start : document.index("\n}", start) + 2]
+
+
+def _proof_shell(tmp_path: Path, script: str) -> subprocess.CompletedProcess[str]:
+    """Run a repository-owned proof snippet in the disposable test directory."""
+    return subprocess.run(
+        ["bash", "-c", script],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+
+def test_documented_check_propagates_result_rejection(tmp_path: Path) -> None:
+    """Require the published check helper to retain result-validation failures."""
+    helper = _published_bash_function("check")
+    for show_status in (1, 0):
+        script = (
+            'SNAP="$PWD"; OUT="$PWD"\n'
+            "measure() { echo stable; }\nrun() { return 0; }\n"
+            + f"show() {{ return {show_status}; }}\n"
+            + helper
+            + "\ncheck probe 0 evidence\n"
+        )
+        result = _proof_shell(tmp_path, script)
+        assert result.returncode == show_status, result.stdout + result.stderr
+
+
+def test_documented_inventory_rejects_failed_sort_and_detects_mutation(tmp_path: Path) -> None:
+    """Reject failed sorting while retaining real package-mutation detection."""
+    (tmp_path / "package").mkdir()
+    source = tmp_path / "package/source.txt"
+    source.write_text("before", encoding="utf-8")
+    setup = 'WORK="$PWD"; PKG="$PWD/package"\n' + _published_bash_function("inventory")
+    rejected = _proof_shell(tmp_path, setup + "\nsort() { return 19; }\ninventory\n")
+    assert rejected.returncode != 0, rejected.stdout + rejected.stderr
+    valid = _proof_shell(
+        tmp_path,
+        setup
+        + """
+before="$(inventory)" || exit 1
+printf changed > "$PKG/source.txt"
+after="$(inventory)" || exit 1
+[ "$before" != "$after" ] && echo MUTATION_DETECTED
+""",
+    )
+    assert valid.returncode == 0, valid.stderr
+    assert "MUTATION_DETECTED" in valid.stdout
+
+
+def test_documented_renewal_requires_expected_blocker(tmp_path: Path) -> None:
+    """Permit documented recovery only after the expected blocker exit status."""
+    document = (REPOSITORY_ROOT / "docs/cli.md").read_text(encoding="utf-8")
+    guard = re.search(r'^if assess stale-v1.*\n\[ "\$STALE_STATUS".*$', document, re.MULTILINE)
+    assert guard is not None, "renewal call boundary missing"
+    for errexit in ("", "set -e\n"):
+        for status in (0, 1, 2):
+            result = _proof_shell(
+                tmp_path,
+                errexit + f"assess() {{ return {status}; }}\n" + guard.group() + "\necho RECOVERY_REACHED\n",
+            )
+            assert result.returncode == (0 if status == 2 else 1), result.stderr
+            assert ("RECOVERY_REACHED" in result.stdout) == (status == 2)

@@ -6,8 +6,10 @@ validated and independently checked locally. The implementation and reports
 merged. Configs PR 369's separate docstring follow-up merged before its final
 readiness receipt. Configs PR 370's request-helper follow-up subsequently merged
 after a fresh passing readiness receipt and explicit merge authorisation.
-P3 is closed against the PR 63 evidence below. P4 remains pending recurrence
-qualification; P5 is planned but not executed. The pilot and later product
+P3 is closed against the PR 63 evidence below. P4 local acceptance is met:
+three independent documentation-proof failures qualify, maintained tests pass,
+independent execution passes and the findings ledger validates. This P4 change
+remains unmerged. P5 is planned but not executed. The pilot and later product
 rollout are not complete.
 This document authorizes no external installation, PR messaging, paid execution,
 publication, or merge.
@@ -608,9 +610,11 @@ review requests, paid execution, publication, installation or merges.
 
 #### P4: Qualify recurrence before selecting a repair
 
-Status: pending evidence qualification. P2 ordering/parser repairs and PR 91's
-worked example are possible inputs, not proof of three independent occurrences
-or a completed P4 improvement. Synthetic fixtures do not count as occurrences.
+Status: local P4 acceptance met on 18 October 2026 for the documentation-proof
+failure-propagation class below. Maintained regression tests, independent
+execution and recurring-findings ledger validation pass. The changes remain
+unmerged; local acceptance does not establish delivery readiness.
+P2 fixtures do not count as real occurrences.
 
 1. Inspect the existing findings and responses from PR 63 and the later helper
    deliveries. Group by the same causal invariant, not shared words such as
@@ -640,6 +644,193 @@ Exit: one qualifying, independently checked source improvement with actual
 validation and a consistent ledger. If fewer than three independent tasks
 qualify, explicitly defer P4 with the inspected evidence and reason. Do not
 manufacture recurrence to finish the phase.
+
+#### P4 qualification result, 18 October 2026
+
+One class meets the three-occurrence rule: **runnable proof code discards a
+failed inner verification before its outer completion or recovery decision**.
+Count one occurrence per independently delivered task, not per reviewer,
+comment, subcase or repair round. The three tasks address different SDK
+examples: required-reference validation, plugin-evidence verification and
+presentation renewal. They are not three reports of one unresolved defect.
+
+| Task and finding | Original revision and confirmed mechanism | Repair and accepted delivery |
+| --- | --- | --- |
+| [PR 76, issue 75](https://github.com/jscraik/skills-sdk/pull/76), [finding](https://github.com/jscraik/skills-sdk/pull/76#discussion_r4303273266) | `b9b613f8126ed1b68b84ad2655322388a11c648a`: an unchecked inventory pipeline masks a failed sort with a successful final digest, allowing a false unchanged-input result. | Repair `68a025ae7dc109bdc9a2bb3b0e897c55f8113a15` checks each stage; final head `b9d4dc7ab32a51d7452a164bae84b402d17cf637`, accepted as `e0dacc8f1bf06026d12a370ab16634c2299283b4`. |
+| [PR 80, issue 79](https://github.com/jscraik/skills-sdk/pull/80), [finding](https://github.com/jscraik/skills-sdk/pull/80#discussion_r4303933937) | `5c20005fe0cac4195e8a3dbc87990c220762b0f5`: `check` ignores a failed `show` and returns the earlier successful `run` status. | Repair `eb7ce156911d613d78ddc9fa406aa4a39ea4b879` propagates failure; final head `3428f30416a237e6e520a80677f017d52d90c1a7`, accepted as `bb9b33243378880ecd02ef05c5bc285bdccd357e`. |
+| [PR 82, issue 81](https://github.com/jscraik/skills-sdk/pull/82), [finding](https://github.com/jscraik/skills-sdk/pull/82#discussion_r4304158001) | `ea22b55f7b7d911542734fb99de0562220ef4f43`: ordinary Bash continues into recovery after `assess` returns proof-failure exit 1 because the outer example lacks a stop guard. | Repair `fa8d0d92346696d872944535cfda6f493a3f8086` adds outer guards; final head `a037d055465daa27d09cf303dd8e935cd072e5b8` preserves expected nonzero flow under errexit. Accepted as `8e28b83b074d2f586a42b796646239a013079056`. |
+
+The PR 76 portability claim was partly refuted: the maintainer observed
+`/usr/bin/sort -z` working on macOS. Only the independently reproducible failure
+masking counts. For PR 82, a verified blocker exit 2 must permit recovery;
+helper failure exit 1 must stop it. Neither is an SDK implementation defect.
+
+Fresh bounded controls compared those original snippets with accepted
+`fd43ff76d6f71337495e92043ef1f21115fd1b7c` documentation. They inject local
+failures rather than invoke providers, execute package content or rerun the
+complete examples. Nine controls passed:
+
+| Case | Original failure reproduced | Accepted rejection and valid neighbour |
+| --- | --- | --- |
+| PR 76 inventory | Failing sort plus a real fixture edit returns 0 and a false unchanged result. | Failing sort returns 1; a working inventory detects the real edit. |
+| PR 80 result check | Injected `show` failure is followed by wrapper exit 0. | Rejected result returns 1; a valid result returns 0. |
+| PR 82 recovery | Injected proof failure reaches recovery and ends with exit 0. | Proof failure stops with exit 1; the verified expected blocker permits recovery. |
+
+Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python .tmp/p4-qualification/probe.py`
+-> pass, nine controls. The ignored local probe retains the extracted snippets
+and actual output; it is qualification evidence, not a maintained regression.
+The immutable original revisions, finding links and mechanisms above preserve
+the public case identities. Hosted PR metadata and accepted commit history
+were read back; their merge state does not establish fresh review clearance.
+
+Independent read-only review inspected the original and accepted snippets,
+control code, all nine results and separate task history. It agreed that the
+narrow class qualifies. Its independent execution attempt was blocked by the
+execution hook's indirect-shell rule; inspected coordinator results are not
+reported as independently reproduced tests. No protection was bypassed.
+
+Other inspected findings were not pooled merely because they concern evidence:
+PR 63's namespace omission and missing subparser requirement are separate
+causes; P2 response-lifetime and case-folding defects each belong to one task;
+Configs 367/370 chronology and parser findings have different predicates or
+repeat within the same delivery. Duplicate comments in PRs 78 and 80 add no
+independent occurrence. Metadata-format failures lack enough common-cause
+evidence for a separate qualified class. PR 93 remains with Factory and was
+excluded from this qualification and all mutations.
+
+The maintained improvement belongs in SDK's existing documentation-proof
+tests: extract the relevant published helper or call boundary, inject an inner
+failure and require outer rejection, then preserve a valid neighbour and
+PR 82's intentional exit-2 recovery. Extend the documentation-dependent test
+surface, such as `tests/test_skill_validation_architecture.py`, rather than add
+a review service, skill or global rule. Existing contributing guidance already
+requires behavioural proof and neighbouring cases; this closes missing
+maintained coverage rather than replacing that guidance. SDK maintainers own
+the test and its validation wiring.
+
+The three regressions now execute the published `inventory` and `check`
+helpers and the renewal call boundary. Failed sorting and rejected result
+validation cannot report success; unexpected renewal exit 0 or proof-failure
+exit 1 stops recovery, while expected exit 2 permits it under ordinary Bash
+and `set -e`. The focused file passes all 10 tests. Independent review found
+no actionable defects and independently ran those 10 tests successfully.
+
+The [findings ledger](agentic-review-p4-ledger.json) passes the existing CLI
+validator with no findings. Its `merge_eligible: true` describes the validated
+class guardrail under `validate_recurring_findings`; it does not grant PR
+clearance. The schema requires a boolean, while the CLI validator enforces
+the relationship between guardrail validation and eligibility. The first
+validation rejected `false` under that semantic rule; correcting that
+declaration left the validator unchanged.
+
+A bounded sibling search of `docs/cli.md` covered `inventory`, `check`,
+`assess`, `show`, returned statuses and the renewal boundary. The related
+`assess` helper already rejects failed `show`; no sibling repair was required.
+Existing contributing guidance is retained. The original nine temporary
+controls establish historical reproduction; maintained tests now preserve the
+accepted failure and neighbour behaviour. Stubbed helpers do not establish
+complete provider execution. Local P4 acceptance is met, with publication and
+aggregate validation limits recorded separately. P5 remains unexecuted.
+
+#### P4 maintained regression validation
+
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_skill_validation_architecture.py -q`
+  -> pass, 10 tests, also independently executed with a disposable cache.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk verify recurring-findings docs/projects/agentic-review-p4-ledger.json --json --robot`
+  -> pass, `status: pass`, no findings. Ledger validity is not test execution.
+- Command: `bash scripts/validate-repository.sh`
+  -> blocked by the execution hook's protected indirect-shell rule. Direct
+  component checks are fallback evidence, not a passing wrapper receipt.
+- Command: `bash scripts/validate-installed.sh`
+  -> blocked by the same execution hook. Installed-wheel smoke proof was
+  unestablished at that stage; the later direct installed checks are recorded
+  in the delivery-validation section below.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen --extra images pytest -n 2 --dist load --durations=25 --durations-min=0.1`
+  -> blocked/incomplete, operator-interrupted with exit 130 before completion
+  after the scoped P4 acceptance checks passed. This optional wider run is not
+  full-suite proof. An earlier attempt could not download pinned Pillow due
+  to restricted DNS; approved network access allowed the later run to start.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv build`
+  -> pass, source distribution and wheel built.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check`
+  -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen ruff format --check .`
+  -> pass, 272 files formatted.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen ruff check .`
+  -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen mypy`
+  -> pass, both configured source files.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/check_repository_standards.py`
+  -> pass.
+- Command: `git ls-files -z -- '*.md' '*.mdx' '*.adoc' '*.rst' | xargs -0 env MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- vale --config .vale.ini`
+  -> pass, all 26 tracked prose files. An earlier
+  `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- vale --config .vale.ini .`
+  attempt included generated files and stopped because `rst2html` was absent;
+  the corrected tracked-file scope matches the codestyle wrapper's contract.
+- Command: `git diff --check` -> pass.
+
+Earlier qualification-only validation, retained as historical evidence:
+
+- Command: `bash scripts/validate-docs.sh --base fd43ff76d6f71337495e92043ef1f21115fd1b7c --head HEAD`
+  -> blocked by the execution hook's protected indirect-shell rule. The direct
+  components below are the nearest meaningful fallback, not an aggregate pass.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/validation_scope.py --base fd43ff76d6f71337495e92043ef1f21115fd1b7c --head HEAD`
+  -> pass, `docs`, after refreshing canonical `origin/main`. The first attempt
+  was blocked by the clone's older accepted-main reference; no classifier rule
+  changed.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/generate_schemas.py --check`
+  -> pass.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen ruff format --check .`
+  -> pass, 272 files already formatted.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen ruff check .`
+  -> pass.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen mypy`
+  -> pass, both configured source files.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python scripts/check_repository_standards.py`
+  -> pass, including documentation links.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- vale --config .vale.ini docs/projects/agentic-review-pilot.md`
+  -> pass, no errors, warnings or suggestions in the changed report.
+- Command: `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen pytest tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py --durations=10`
+  -> pass, 12 tests. This is documentation-dependent proof, not the full SDK suite.
+
+#### P4 delivery validation, 18 October 2026
+
+The delivery follow-up runs the complete source suite without selection
+exclusions and every installed-wheel lane from the repository wrapper. The
+local wrapper remains rejected before execution by the protected indirect-shell
+hook; direct component results do not constitute a passing wrapper receipt.
+Hosted CI and current-head reviewer clearance remain separate PR evidence.
+The candidate remains unmerged, and P5 remains unexecuted.
+
+This section records the publication checkpoint: direct installed proof is
+complete, while the unfiltered local source suite is still running. Jamie
+approved publishing the reviewed three-file candidate so hosted full validation
+can run in parallel. Neither full run nor final review is waived. The PR's
+validation and readiness sections retain the final outcomes for its exact head;
+this checkpoint does not claim clearance or authorise a merge.
+
+The following direct installed checks passed in a separate Python 3.12 wheel
+environment. Prepared inputs are synthetic and supplied offline; these checks
+do not establish live provider authenticity or managed runtime installation.
+
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv venv --python 3.12 .tmp/p4-installed-full` -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv pip install --python .tmp/p4-installed-full/bin/python dist/skills_sdk-0.1.0-py3-none-any.whl` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_pr_sweep_smoke.py` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_package_quality_smoke.py` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_plugin_intake_smoke.py` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_plugin_presentation_smoke.py --without-images` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_scenario_coverage_smoke.py` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_content_review_smoke.py` -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python tests/installed_quality_workflow_smoke.py --prepare .tmp/p4-installed-full/quality-inputs` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_quality_workflow_smoke.py --check .tmp/p4-installed-full/quality-inputs` -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python tests/installed_pre_execution_smoke.py --prepare .tmp/p4-installed-full/safety-inputs` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_pre_execution_smoke.py --check .tmp/p4-installed-full/safety-inputs` -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python tests/installed_observed_calibration_smoke.py --prepare .tmp/p4-installed-full/calibration-inputs` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_observed_calibration_smoke.py --check .tmp/p4-installed-full/calibration-inputs` -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python tests/installed_matched_smoke.py --prepare .tmp/p4-installed-full/matched-inputs` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_matched_smoke.py --check .tmp/p4-installed-full/matched-inputs` -> pass.
+- Command: `UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv pip install --python .tmp/p4-installed-full/bin/python "dist/skills_sdk-0.1.0-py3-none-any.whl[images]"` -> pass.
+- Command: `.tmp/p4-installed-full/bin/python tests/installed_plugin_presentation_smoke.py --with-images` -> pass.
 
 #### P5: Freeze the sample before measuring usefulness
 
