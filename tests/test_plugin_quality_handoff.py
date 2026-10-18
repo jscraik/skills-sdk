@@ -16,6 +16,90 @@ from skills_sdk.evaluation import plugin_quality as service
 from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES, ContentReviewAssessment
 
 
+@pytest.mark.parametrize("marker", ["api_key=synthetic-fixture-only", "/Users/fixture/private"])
+def test_manifest_description_is_not_emitted(tmp_path: Path, marker: str, capsys: pytest.CaptureFixture[str]) -> None:
+    """Unsafe captured metadata must stop without retaining it in API or CLI JSON."""
+    from test_plugin_quality import REVISION
+
+    from skills_sdk.models.plugin import PluginValidationPolicy
+    from skills_sdk.validation.plugin_package import validate_plugin_package
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+    path = root / "plugin.json"
+    manifest = json.loads(path.read_text())
+    manifest["description"] = marker
+    path.write_text(json.dumps(manifest))
+    capture = validate_plugin_package(
+        root, source_revision=REVISION, policy=PluginValidationPolicy(require_version=True, require_description=True)
+    )
+    request["candidate"] = capture.candidate.model_dump(mode="json")
+    request["mode_manifest_sha256"] = capture.mode_manifest_sha256
+    result = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert marker not in result.model_dump_json()
+    assert result.blocker.code == "plugin_quality_input_invalid" and result.initial_capture is None
+    request_file = tmp_path / "request.json"
+    request_file.write_text(json.dumps(request))
+    assert main(["check-plugin-quality", str(root), "--request", str(request_file), "--json"]) == 2
+    output = capsys.readouterr().out
+    assert marker not in output
+    assert json.loads(output)["blocker"]["code"] == "plugin_quality_input_invalid"
+
+
+@pytest.mark.parametrize("field", ["initial_capture", "final_capture"])
+def test_supplied_and_late_manifest_descriptions_fail_closed(
+    tmp_path: Path, field: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Revalidated receipts and a late real source change cannot retain unsafe text."""
+    from pydantic import ValidationError
+    from test_plugin_quality import REVISION
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.models.plugin_quality import PluginQualityResult
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+    passed = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    marker = "api_key=synthetic-late-fixture"
+    path = root / "plugin.json"
+    original = path.read_text()
+    manifest = json.loads(original)
+    manifest["description"] = marker
+    path.write_text(json.dumps(manifest))
+    capture = service.validate_plugin_package(root, source_revision=REVISION, policy=passed.initial_capture.policy)
+    raw = passed.model_dump(mode="json")
+    raw.update(status="blocked", blocker={"code": "plugin_quality_source_changed", "message": "Changed."})
+    if field == "initial_capture":
+        raw.update(children=[], presentation=None, final_capture=None)
+        raw["blocker"]["code"] = "plugin_quality_root_mismatch"
+    raw[field] = capture.model_dump(mode="json")
+    for value in (raw, passed.model_copy(update=raw)):
+        with pytest.raises(ValidationError, match="captured descriptions"):
+            PluginQualityResult.model_validate(value)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
+    path.write_text(original)
+    validate = service.validate_plugin_package
+    calls = 0
+
+    def change_at_final(path: Path, *, source_revision: str, policy: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            (path / "plugin.json").write_text(json.dumps(manifest))
+        return validate(path, source_revision=source_revision, policy=policy)
+
+    monkeypatch.setattr(service, "validate_plugin_package", change_at_final)
+    result = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert calls == 2 and result.blocker.code == "plugin_quality_input_invalid"
+    assert marker not in result.model_dump_json() and result.initial_capture is None
+
+
 @pytest.mark.parametrize("field", ["statement", "reason", "owner"])
 def test_unsafe_coverage_text_never_enters_a_plugin_receipt(
     tmp_path: Path, field: str, capsys: pytest.CaptureFixture[str]

@@ -15,6 +15,7 @@ from skills_sdk.models.plugin_quality import (
     PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES,
     PluginQualityRequest,
     PluginQualityResult,
+    _capture_description_is_safe,
     bounded_json_size,
     supported_quality_root,
 )
@@ -94,6 +95,8 @@ async def _check_plugin_quality(
         source_revision=selected.candidate.source_revision,
         policy=PluginValidationPolicy(require_version=True, require_description=True),
     )
+    if not _capture_description_is_safe(capture):
+        return _block("plugin_quality_input_invalid")
     evidence: dict[str, object] = {"request": selected, "initial_capture": capture}
     if not supported_quality_root(selected, capture):
         return _block("plugin_quality_root_mismatch", **evidence)
@@ -121,6 +124,8 @@ async def _check_plugin_quality(
     final = validate_plugin_package(
         plugin_root, source_revision=selected.candidate.source_revision, policy=capture.policy
     )
+    if not _capture_description_is_safe(final):
+        return _block("plugin_quality_input_invalid")
     if final.candidate is not None and (
         final.candidate.package_id != selected.candidate.package_id
         or final.candidate.source_revision != selected.candidate.source_revision
