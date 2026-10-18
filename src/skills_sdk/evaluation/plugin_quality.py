@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
@@ -26,6 +27,17 @@ from skills_sdk.validation.plugin_presentation import check_plugin_presentation
 
 _WORK_SLOTS = threading.BoundedSemaphore(2)
 _WORKERS = ThreadPoolExecutor(max_workers=2, thread_name_prefix="plugin-quality")
+
+
+def _reset_workers_after_fork() -> None:
+    """Replace inherited thread references and admission state in the forked child."""
+    global _WORK_SLOTS, _WORKERS
+    _WORK_SLOTS = threading.BoundedSemaphore(2)
+    _WORKERS = ThreadPoolExecutor(max_workers=2, thread_name_prefix="plugin-quality")
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_workers_after_fork)
 
 
 def _assessments_within_budget(supplied: object, selected: PluginQualityRequest) -> bool:

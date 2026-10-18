@@ -228,6 +228,13 @@ class PluginQualityResult(_ContractModel):
             raise ValueError("plugin quality captured descriptions must be redaction-safe")
         if (self.status == "blocked") != (self.blocker is not None):
             raise ValueError("plugin quality status requires its blocker")
+        if (
+            self.request is not None
+            and self.presentation is not None
+            and self.presentation.candidate is not None
+            and self.presentation.candidate.source_revision != self.request.candidate.source_revision
+        ):
+            raise ValueError("plugin presentation must retain the selected source revision")
         if self.children:
             if self.request is None or self.initial_capture is None:
                 raise ValueError("child results require request and capture")
@@ -347,6 +354,12 @@ class PluginQualityResult(_ContractModel):
         for index, result in enumerate(self.children):
             if result.request != expected[index].request:
                 raise ValueError("child quality must retain the selected request")
+            if any(
+                stage.receipt.candidate is not None
+                and stage.receipt.candidate.source_revision != expected[index].request.candidate.source_revision
+                for stage in result.stages
+            ):
+                raise ValueError("child stages must retain the selected source revision")
             if expected[index].request.candidate != capture.skills[index].validation.candidate:
                 raise ValueError("child quality must bind its captured subtree")
             if index < len(self.children) - 1 and result.status != "local_checks_passed":

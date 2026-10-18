@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -14,6 +17,47 @@ from skills_sdk.cli import plugin_quality as route
 from skills_sdk.cli.main import main
 from skills_sdk.evaluation import plugin_quality as service
 from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES, ContentReviewAssessment
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="POSIX fork boundary")
+def test_warmed_workers_recover_after_process_fork() -> None:
+    """A disposable subprocess proves child admission after both parent workers start."""
+    script = """
+import asyncio, os, select, signal, threading
+from pathlib import Path
+from skills_sdk.evaluation import plugin_quality as service
+barrier = threading.Barrier(2)
+original = service._run_plugin_quality
+def warm(*args):
+    barrier.wait(timeout=3)
+    return service._block('plugin_quality_request_invalid')
+service._run_plugin_quality = warm
+async def run():
+    await asyncio.gather(service.check_plugin_quality(Path('.'), {}),
+                         service.check_plugin_quality(Path('.'), {}))
+asyncio.run(run())
+service._run_plugin_quality = original
+read_fd, write_fd = os.pipe()
+pid = os.fork()
+if pid == 0:
+    os.close(read_fd)
+    result = asyncio.run(service.check_plugin_quality(Path('.'), {}))
+    os.write(write_fd, result.blocker.code.encode())
+    os._exit(0)
+os.close(write_fd)
+ready = select.select([read_fd], [], [], 3)[0]
+if not ready:
+    os.kill(pid, signal.SIGKILL)
+_, status = os.waitpid(pid, 0)
+message = os.read(read_fd, 1024).decode()
+os.close(read_fd)
+assert os.waitstatus_to_exitcode(status) == 0, 'forked worker stalled'
+assert message == 'plugin_quality_request_invalid'
+# The parent's executor and capacity remain usable too.
+assert asyncio.run(service.check_plugin_quality(Path('.'), {})).blocker.code == message
+"""
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=12, check=False)
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("marker", ["api_key=synthetic-fixture-only", "/Users/fixture/private"])

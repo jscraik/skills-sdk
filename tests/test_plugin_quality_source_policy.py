@@ -143,3 +143,36 @@ def test_bare_digest_and_blocker_code_padding_is_rejected(tmp_path: Path, field:
     for supplied in (raw, valid.model_copy(update=raw)):
         with pytest.raises(ValidationError):
             PluginQualityResult.model_validate(supplied)
+
+
+@pytest.mark.parametrize("kind", ["presentation", "child"])
+def test_blocked_stage_evidence_retains_selected_revision(tmp_path: Path, kind: str) -> None:
+    """A valid foreign receipt cannot justify a current invocation's typed first stop."""
+    from skills_sdk.models.plugin_presentation import PluginPresentationCheck
+    from skills_sdk.models.quality_workflow import LocalCheckResultV2
+
+    _root, _request, passed = _passed(tmp_path)
+    raw = passed.model_dump(mode="json")
+    raw.update(status="blocked", final_capture=None)
+    if kind == "presentation":
+        raw["presentation"] = json.loads(json.dumps(raw["presentation"]).replace(REVISION, "2" * 40))
+        PluginPresentationCheck.model_validate(raw["presentation"])
+        raw["blocker"] = {"code": "plugin_quality_presentation_blocked", "message": "Changed."}
+    else:
+        child = raw["children"][0]
+        child.update(status="blocked", blocked_stage="candidate_changed", final_capture=None)
+        child["blocker"] = {"code": "quality_candidate_changed", "message": "Changed."}
+        child["stages"] = child["stages"][:2]
+        assert child["stages"][-1]["name"] == "validate"
+        stage = child["stages"][-1]["receipt"]
+        # The validation manifest and candidate carry the same declared revision.
+        stage = json.loads(json.dumps(stage).replace(REVISION, "2" * 40))
+        child["stages"][-1]["receipt"] = stage
+        LocalCheckResultV2.model_validate(child)
+        raw.update(presentation=None)
+        raw["blocker"] = {"code": "plugin_quality_child_blocked", "message": "Changed."}
+    for value in (raw, passed.model_copy(update=raw)):
+        with pytest.raises(ValidationError):
+            PluginQualityResult.model_validate(value)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
