@@ -178,12 +178,14 @@ def test_documented_cli_placeholders_are_shell_safe() -> None:
 
 
 def _published_bash_function(name: str) -> str:
+    """Extract the named Bash function from the published CLI guide."""
     document = (REPOSITORY_ROOT / "docs/cli.md").read_text(encoding="utf-8")
     start = document.index(name + "() {")
     return document[start : document.index("\n}", start) + 2]
 
 
 def _proof_shell(tmp_path: Path, script: str) -> subprocess.CompletedProcess[str]:
+    """Run a repository-owned proof snippet in the disposable test directory."""
     return subprocess.run(
         ["bash", "-c", script],
         cwd=tmp_path,
@@ -195,6 +197,7 @@ def _proof_shell(tmp_path: Path, script: str) -> subprocess.CompletedProcess[str
 
 
 def test_documented_check_propagates_result_rejection(tmp_path: Path) -> None:
+    """Require the published check helper to retain result-validation failures."""
     helper = _published_bash_function("check")
     for show_status in (1, 0):
         script = (
@@ -209,6 +212,7 @@ def test_documented_check_propagates_result_rejection(tmp_path: Path) -> None:
 
 
 def test_documented_inventory_rejects_failed_sort_and_detects_mutation(tmp_path: Path) -> None:
+    """Reject failed sorting while retaining real package-mutation detection."""
     (tmp_path / "package").mkdir()
     source = tmp_path / "package/source.txt"
     source.write_text("before", encoding="utf-8")
@@ -230,6 +234,7 @@ after="$(inventory)" || exit 1
 
 
 def test_documented_renewal_requires_expected_blocker(tmp_path: Path) -> None:
+    """Permit documented recovery only after the expected blocker exit status."""
     document = (REPOSITORY_ROOT / "docs/cli.md").read_text(encoding="utf-8")
     guard = re.search(r'^if assess stale-v1.*\n\[ "\$STALE_STATUS".*$', document, re.MULTILINE)
     assert guard is not None, "renewal call boundary missing"
