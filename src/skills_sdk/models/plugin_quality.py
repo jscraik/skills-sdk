@@ -133,8 +133,12 @@ class PluginQualityChild(_ContractModel):
         if self.request.intent == "update" or self.request.content_review_mode != "supplied":
             raise ValueError("plugin quality requires create/external-check and supplied review")
         plan = self.request.coverage_plan
-        text = [claim.statement for claim in plan.claims]
-        text.extend(value for gap in plan.gaps for value in (gap.reason, gap.owner))
+        text = [plan.scenario_set_id]
+        text.extend(value for claim in plan.claims for value in (claim.id, claim.statement))
+        text.extend(value for gap in plan.gaps for value in (gap.id, gap.reason, gap.owner))
+        text.extend(
+            value for mapping in plan.mappings for value in (mapping.claim_id, *mapping.case_ids, *mapping.gap_ids)
+        )
         if any(not _public_text_is_redaction_safe(value) for value in text):
             raise ValueError("plugin quality coverage text must be redaction-safe")
         return self

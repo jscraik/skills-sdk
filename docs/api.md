@@ -85,8 +85,9 @@ without retaining input or submitting work; retry after an admitted operation
 finishes. Cancellation keeps a running worker's slot occupied until it finishes.
 This bound does not govern work in other processes or memory callers retain.
 
-Whole-plugin requests reject coverage claim statements and gap reasons or owners
-that fail the SDK's existing public-text redaction checks. Invalid requests
+Whole-plugin requests reject coverage identifiers, claim statements, and gap
+reasons or owners that fail the SDK's existing public-text redaction checks.
+Identifiers include scenario-set, claim, gap, and mapped case references. Invalid requests
 return `plugin_quality_request_invalid` without retaining that text in JSON.
 This is semantic model/service validation, beyond the structural JSON Schema;
 it detects supported credential and machine-path patterns, not every secret.

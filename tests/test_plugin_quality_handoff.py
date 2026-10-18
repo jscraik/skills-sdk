@@ -144,15 +144,34 @@ def test_supplied_and_late_manifest_descriptions_fail_closed(
     assert marker not in result.model_dump_json() and result.initial_capture is None
 
 
-@pytest.mark.parametrize("field", ["statement", "reason", "owner"])
+@pytest.mark.parametrize("field", ["statement", "reason", "owner", "scenario_set_id", "case_id", "claim_id", "gap_id"])
 def test_unsafe_coverage_text_never_enters_a_plugin_receipt(
     tmp_path: Path, field: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Reject synthetic sensitive text before retaining request or later blocker evidence."""
+    from pydantic import ValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+    from skills_sdk.models.plugin_quality import PluginQualityRequest
+
     root, request, assessments, presentation = _plugin(tmp_path)
+    valid = PluginQualityRequest.model_validate(request)
     plan = request["children"][0]["request"]["coverage_plan"]
     marker = "api_key=synthetic-fixture-only"
-    if field == "statement":
+    if field in {"claim_id", "gap_id"}:
+        marker = "sk-synthetic-fixture"
+    if field == "claim_id":
+        plan["claims"][0]["id"] = marker
+        plan["mappings"][0]["claim_id"] = marker
+    elif field == "gap_id":
+        plan["gaps"] = [{"id": marker, "reason": "Deferred fixture", "owner": "Fixture owner"}]
+        plan["mappings"][0]["gap_ids"] = [marker]
+    elif field == "scenario_set_id":
+        plan[field] = marker
+    elif field == "case_id":
+        plan["mappings"][0]["case_ids"] = [marker]
+    elif field == "statement":
         plan["claims"][0][field] = marker
     else:
         plan["gaps"] = [{"id": "gap-fixture", "reason": "Deferred fixture", "owner": "Fixture owner"}]
@@ -163,6 +182,11 @@ def test_unsafe_coverage_text_never_enters_a_plugin_receipt(
     )
     assert result.blocker.code == "plugin_quality_request_invalid"
     assert result.request is None and marker not in result.model_dump_json()
+    for value in (request, valid.model_copy(update=request)):
+        with pytest.raises(ValidationError):
+            PluginQualityRequest.model_validate(value)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality-request.v1", request)
     path = tmp_path / "request.json"
     path.write_text(json.dumps(request))
     assert main(["check-plugin-quality", str(root), "--request", str(path), "--json"]) == 2
