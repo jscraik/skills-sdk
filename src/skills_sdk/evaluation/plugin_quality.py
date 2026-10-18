@@ -15,11 +15,13 @@ from skills_sdk.models.content_review import ContentReviewAssessment
 from skills_sdk.models.plugin import PluginPackageValidation, PluginValidationPolicy
 from skills_sdk.models.plugin_quality import (
     PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES,
+    PLUGIN_QUALITY_REQUEST_MAX_BYTES,
     PluginQualityRequest,
     PluginQualityResult,
     _capture_metadata_is_safe,
     _child_metadata_is_safe,
     _presentation_metadata_is_safe,
+    _public_envelope_is_safe,
     bounded_json_size,
     supported_quality_root,
 )
@@ -87,16 +89,22 @@ def _assessments_within_budget(supplied: object, selected: PluginQualityRequest)
 
 def _block(code: str, **evidence: object) -> PluginQualityResult:
     """Retain portable first-stop evidence without host paths or private exceptions."""
-    return PluginQualityResult.model_validate(
-        {
-            **evidence,
-            "status": "blocked",
-            "blocker": {
-                "code": code,
-                "message": "Whole-plugin quality stopped; inspect retained evidence and correct the named gate.",
-            },
-        }
-    )
+    envelope = {
+        **evidence,
+        "status": "blocked",
+        "blocker": {
+            "code": code,
+            "message": "Whole-plugin quality stopped; inspect retained evidence and correct the named gate.",
+        },
+    }
+    if evidence and not _public_envelope_is_safe(envelope):
+        return _block("plugin_quality_input_invalid")
+    try:
+        return PluginQualityResult.model_validate(envelope)
+    except ValueError:
+        if not evidence:
+            raise
+        return _block("plugin_quality_input_invalid")
 
 
 async def _check_plugin_quality(
@@ -115,6 +123,10 @@ async def _check_plugin_quality(
     Updates and MCP transport assessment require separate orchestration.
     """
     try:
+        if presentation_request is not None:
+            bounded_json_size(presentation_request, PLUGIN_QUALITY_REQUEST_MAX_BYTES)
+            if not _public_envelope_is_safe(presentation_request):
+                return _block("plugin_quality_input_invalid")
         selected = PluginQualityRequest.model_validate(request)
     except (ValueError, TypeError, RecursionError):
         return _block("plugin_quality_request_invalid")
@@ -177,7 +189,13 @@ async def _check_plugin_quality(
     evidence["final_capture"] = final
     if final != capture:
         return _block("plugin_quality_source_changed", **evidence)
-    return PluginQualityResult.model_validate({**evidence, "status": "local_checks_passed"})
+    envelope = {**evidence, "status": "local_checks_passed"}
+    if not _public_envelope_is_safe(envelope):
+        return _block("plugin_quality_input_invalid")
+    try:
+        return PluginQualityResult.model_validate(envelope)
+    except ValueError:
+        return _block("plugin_quality_input_invalid")
 
 
 def _run_plugin_quality(

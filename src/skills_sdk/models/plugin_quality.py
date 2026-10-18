@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from enum import Enum
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -15,10 +16,12 @@ from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding
 from skills_sdk.models.plugin_presentation import PluginPresentationCheck
 from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckResultV2
 from skills_sdk.models.safety import _public_text_is_redaction_safe
-from skills_sdk.models.validation import SkillPackageValidation
 
 PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES = 32 * 1_048_576
 """Aggregate supplied-assessment budget: four maximum-sized content-review assessments."""
+
+PLUGIN_QUALITY_REQUEST_MAX_BYTES = 1_048_576
+PLUGIN_QUALITY_RESULT_MAX_BYTES = 64 * 1_048_576
 
 _IDENTITY_KEYS = frozenset(
     {"package_id", "source_revision", "content_sha256", "mode_manifest_sha256", "sha256", "code"}
@@ -70,7 +73,9 @@ def bounded_json_size(value: object, limit: int) -> int:
     def visit(item: object, depth: int) -> None:
         if depth > 64:
             raise ValueError("assessment nesting exceeds its bound")
-        if type(item) is dict:
+        if isinstance(item, Enum):
+            visit(item.value, depth + 1)
+        elif type(item) is dict:
             consume(2 + max(0, len(item) - 1) + len(item))
             for key, member in item.items():
                 if type(key) is not str:
@@ -94,6 +99,33 @@ def bounded_json_size(value: object, limit: int) -> int:
 
     visit(value, 0)
     return limit - remaining[0]
+
+
+def _public_envelope_is_safe(value: object) -> bool:
+    """Screen every retained JSON key and string, including nested receipt families.
+
+    Charge the bounded envelope before walking text; SDK models are inspected
+    without allocating a serialized copy. Standalone receipt contracts are unchanged.
+    """
+
+    def safe(item: object) -> bool:
+        if isinstance(item, str):
+            return _public_text_is_redaction_safe(item)
+        if isinstance(item, Enum):
+            return safe(item.value)
+        if isinstance(item, BaseModel):
+            return safe(item.__dict__)
+        if type(item) is dict:
+            return all(safe(key) and safe(member) for key, member in item.items())
+        if type(item) in (tuple, list):
+            return all(safe(member) for member in item)
+        return True
+
+    try:
+        bounded_json_size(value, PLUGIN_QUALITY_RESULT_MAX_BYTES)
+        return safe(value)
+    except (ValueError, TypeError, RecursionError):
+        return False
 
 
 def _reject_padded_identity(value: object) -> None:
@@ -134,15 +166,8 @@ class PluginQualityChild(_ContractModel):
         PluginSkillBinding.direct_skill(self.path)
         if self.request.intent == "update" or self.request.content_review_mode != "supplied":
             raise ValueError("plugin quality requires create/external-check and supplied review")
-        plan = self.request.coverage_plan
-        text = [plan.scenario_set_id]
-        text.extend(value for claim in plan.claims for value in (claim.id, claim.statement))
-        text.extend(value for gap in plan.gaps for value in (gap.id, gap.reason, gap.owner))
-        text.extend(
-            value for mapping in plan.mappings for value in (mapping.claim_id, *mapping.case_ids, *mapping.gap_ids)
-        )
-        if any(not _public_text_is_redaction_safe(value) for value in text):
-            raise ValueError("plugin quality coverage text must be redaction-safe")
+        if not _public_envelope_is_safe(self):
+            raise ValueError("plugin quality child request text must be redaction-safe")
         return self
 
 
@@ -169,6 +194,9 @@ class PluginQualityRequest(_ContractModel):
     def canonical_inputs(cls, value: object) -> object:
         """Reuse bounded revalidation of nested local-quality evidence."""
         _reject_excess_children(value)
+        bounded_json_size(value, PLUGIN_QUALITY_REQUEST_MAX_BYTES)
+        if not _public_envelope_is_safe(value):
+            raise ValueError("plugin quality request text must be redaction-safe")
         normalized = LocalCheckRequestV2.inputs_are_revalidated(value)
         _reject_padded_identity(normalized)
         return normalized
@@ -176,6 +204,7 @@ class PluginQualityRequest(_ContractModel):
     @model_validator(mode="after")
     def child_order(self) -> Self:
         """Reject duplicate, unordered or foreign-revision requests."""
+        bounded_json_size(self, PLUGIN_QUALITY_REQUEST_MAX_BYTES)
         paths = tuple(child.path for child in self.children)
         if paths != tuple(sorted(set(paths))):
             raise ValueError("plugin quality children must be sorted and unique")
@@ -186,31 +215,17 @@ class PluginQualityRequest(_ContractModel):
 
 def _capture_metadata_is_safe(capture: PluginPackageValidation) -> bool:
     """Keep retained free-form manifest fields within the public-text boundary."""
-    manifest_safe = capture.manifest is None or all(
-        value is None or _public_text_is_redaction_safe(value)
-        for value in (capture.manifest.description, capture.manifest.version)
-    )
-    return manifest_safe and all(_skill_metadata_is_safe(child.validation) for child in capture.skills)
-
-
-def _skill_metadata_is_safe(capture: SkillPackageValidation | None) -> bool:
-    """Screen retained child identity metadata without changing standalone validation."""
-    return capture is None or capture.identity is None or _public_text_is_redaction_safe(capture.identity.version)
+    return _public_envelope_is_safe(capture)
 
 
 def _child_metadata_is_safe(child: LocalCheckResultV2) -> bool:
     """Cover initial stage, intake and final child captures in the retained result."""
-    captures = [child.final_capture, child.baseline_final_capture]
-    captures.extend(getattr(stage.receipt, "validation", stage.receipt) for stage in child.stages)
-    return all(_skill_metadata_is_safe(capture) for capture in captures if isinstance(capture, SkillPackageValidation))
+    return _public_envelope_is_safe(child)
 
 
 def _presentation_metadata_is_safe(presentation: PluginPresentationCheck) -> bool:
     """Screen both image and copy approval reference text before composition retention."""
-    refs = [image.approval.evidence_ref for image in presentation.images]
-    if presentation.copy_approval is not None:
-        refs.append(presentation.copy_approval.evidence_ref)
-    return all(_public_text_is_redaction_safe(ref) for ref in refs)
+    return _public_envelope_is_safe(presentation)
 
 
 def supported_quality_root(request: PluginQualityRequest, capture: PluginPackageValidation) -> bool:
@@ -254,6 +269,8 @@ class PluginQualityResult(_ContractModel):
         data = value.__dict__ if isinstance(value, BaseModel) else value
         if isinstance(data, Mapping):
             _reject_excess_children(data.get("request"))
+        if not _public_envelope_is_safe(value):
+            raise ValueError("plugin quality retained text or envelope budget is unsafe")
         normalized = LocalCheckRequestV2.inputs_are_revalidated(value)
         _reject_padded_identity(normalized)
         flags = ("mutation_performed", "evaluation_executed", "execution_authorized", "release_ready")
@@ -264,6 +281,7 @@ class PluginQualityResult(_ContractModel):
     @model_validator(mode="after")
     def binds_complete_plugin(self) -> Self:
         """Require complete root and child evidence for any successful result."""
+        bounded_json_size(self, PLUGIN_QUALITY_RESULT_MAX_BYTES)
         if any(not _child_metadata_is_safe(child) for child in self.children) or (
             self.presentation is not None and not _presentation_metadata_is_safe(self.presentation)
         ):

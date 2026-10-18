@@ -19,6 +19,192 @@ from skills_sdk.evaluation import plugin_quality as service
 from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES, ContentReviewAssessment
 
 
+def test_unknown_manifest_key_is_not_retained(tmp_path: Path) -> None:
+    root, request, assessments, presentation = _plugin(tmp_path)
+    manifest_path = root / "plugin.json"
+    manifest = json.loads(manifest_path.read_text())
+    marker = "api_key=synthetic-unknown-field"
+    manifest[marker] = "ignored"
+    manifest_path.write_text(json.dumps(manifest))
+    result = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert marker not in result.model_dump_json()
+    assert result.blocker.code == "plugin_quality_input_invalid"
+
+
+def test_source_scenario_identifier_is_not_retained(tmp_path: Path) -> None:
+    import yaml
+    from test_plugin_quality import REVISION
+
+    from skills_sdk.models.plugin import PluginValidationPolicy
+    from skills_sdk.validation.plugin_package import validate_plugin_package
+
+    root, request, _assessments, _presentation = _plugin(tmp_path)
+    path = root / request["children"][0]["path"] / "references" / "evals.yaml"
+    source = yaml.safe_load(path.read_text())
+    marker = "api_key=synthetic-source-case"
+    source["cases"][0]["id"] = marker
+    source["release_scenario_sets"][0]["groups"]["regular"][0] = marker
+    path.write_text(yaml.safe_dump(source))
+    capture = validate_plugin_package(
+        root, source_revision=REVISION, policy=PluginValidationPolicy(require_version=True, require_description=True)
+    )
+    request["candidate"] = capture.candidate.model_dump(mode="json")
+    request["mode_manifest_sha256"] = capture.mode_manifest_sha256
+    child = request["children"][0]["request"]
+    child["candidate"] = capture.skills[0].validation.candidate.model_dump(mode="json")
+    child["coverage_plan"]["candidate"] = child["candidate"]
+    result = asyncio.run(service.check_plugin_quality(root, request))
+    assert marker not in result.model_dump_json()
+    assert result.blocker.code == "plugin_quality_input_invalid"
+    assert not result.children and result.request is None
+
+
+@pytest.mark.parametrize("field", ["source_path", "rights", "policy"])
+def test_request_public_text_inventory(tmp_path: Path, field: str) -> None:
+    from pydantic import ValidationError
+
+    from skills_sdk.models.plugin_quality import PluginQualityRequest
+
+    _root, request, _assessments, _presentation = _plugin(tmp_path)
+    child = request["children"][0]["request"]
+    marker = "api_key=synthetic-request-field"
+    if field == "source_path":
+        child["intake"]["source_path"] = marker
+    elif field == "rights":
+        child["intake"]["owner"]["rights"]["evidence_ref"] = marker
+    else:
+        child["policy"]["required_files"] = [marker]
+    with pytest.raises(ValidationError):
+        PluginQualityRequest.model_validate(request)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "active_case_ids",
+        "case_id",
+        "scorer_id",
+        "scorer_version_or_digest",
+        "prompt_version",
+        "model",
+        "message",
+        "evidence_refs",
+    ],
+)
+def test_retained_receipt_text_inventory(field: str) -> None:
+    from skills_sdk.models.plugin_quality import _public_envelope_is_safe
+
+    marker = "api_key=synthetic-receipt-field"
+    assert _public_envelope_is_safe({"stages": [{"receipt": {field: "portable-fixture"}}]})
+    assert not _public_envelope_is_safe({"stages": [{"receipt": {field: marker}}]})
+    assert not _public_envelope_is_safe({"stages": [{"receipt": {marker: "ignored"}}]})
+
+
+def test_combined_retention_budget_returns_typed_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from test_plugin_quality import _passed
+
+    from skills_sdk.models import plugin_quality as models
+
+    root, request, passed = _passed(tmp_path)
+    raw = passed.model_dump(mode="json")
+    components = (raw["request"], raw["initial_capture"], raw["final_capture"], raw["presentation"], *raw["children"])
+    limit = max(models.bounded_json_size(item, 64 * 1_048_576) for item in components) + 1024
+    assert models.bounded_json_size(raw, 64 * 1_048_576) > limit
+    monkeypatch.setattr(models, "PLUGIN_QUALITY_RESULT_MAX_BYTES", limit)
+    result = asyncio.run(
+        service.check_plugin_quality(
+            root,
+            request,
+            assessments={
+                child.path: child_result.stages[-1].receipt
+                for child, child_result in zip(passed.request.children, passed.children, strict=True)
+            },
+            presentation_request=None,
+        )
+    )
+    assert result.blocker is not None
+    # The stopped child or presentation path must also enforce combined evidence size.
+    assert result.blocker.code == "plugin_quality_input_invalid"
+    assert result.request is None
+
+
+def test_request_default_expansion_is_bounded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.models import plugin_quality as models
+
+    root, request, _assessments, _presentation = _plugin(tmp_path)
+    typed = models.PluginQualityRequest.model_validate(request)
+    raw_size = models.bounded_json_size(request, 1_048_576)
+    normalized_size = models.bounded_json_size(typed, 1_048_576)
+    assert normalized_size > raw_size
+    monkeypatch.setattr(models, "PLUGIN_QUALITY_REQUEST_MAX_BYTES", raw_size)
+    result = asyncio.run(service.check_plugin_quality(root, request))
+    assert result.blocker.code == "plugin_quality_request_invalid" and result.request is None
+    monkeypatch.setattr(models, "PLUGIN_QUALITY_REQUEST_MAX_BYTES", normalized_size)
+    assert models.PluginQualityRequest.model_validate(request) == typed
+    assert models.PluginQualityRequest.model_validate(typed) == typed
+
+
+@pytest.mark.parametrize(
+    "stage_name,field",
+    [
+        ("scorer-quality", "scorer_id"),
+        ("scorer-calibration", "prompt_version"),
+        ("scorer-calibration", "scorer_version_or_digest"),
+    ],
+)
+def test_actual_child_receipts_are_screened(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage_name: str, field: str
+) -> None:
+    from test_plugin_quality import _passed
+
+    root, request, passed = _passed(tmp_path)
+    child = passed.children[0]
+    marker = "api_key=synthetic-scorer-metadata"
+    stages = tuple(
+        stage.model_copy(update={"receipt": stage.receipt.model_copy(update={field: marker})})
+        if stage.name == stage_name
+        else stage
+        for stage in child.stages
+    )
+
+    async def supplied_child(*_args: object, **_kwargs: object) -> object:
+        return child.model_copy(update={"stages": stages})
+
+    monkeypatch.setattr(service, "check_local_quality", supplied_child)
+    result = asyncio.run(service.check_plugin_quality(root, request))
+    assert result.blocker.code == "plugin_quality_input_invalid"
+    assert marker not in result.model_dump_json()
+    assert not result.children and result.request is None
+
+
+@pytest.mark.parametrize("route_name", ["request", "presentation"])
+def test_raw_budget_precedes_materialisation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, route_name: str) -> None:
+    from skills_sdk.models.quality_workflow import LocalCheckRequestV2
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+
+    original = LocalCheckRequestV2.inputs_are_revalidated
+
+    def forbidden(_value: object) -> object:
+        if isinstance(_value, dict) and _value.get("status") == "blocked":
+            return original(_value)
+        raise AssertionError("recursive materialisation reached")
+
+    monkeypatch.setattr(LocalCheckRequestV2, "inputs_are_revalidated", forbidden)
+    oversized = {"unexpected": "x" * 1_048_576}
+    result = asyncio.run(
+        service.check_plugin_quality(
+            root,
+            oversized if route_name == "request" else request,
+            assessments=assessments,
+            presentation_request=oversized if route_name == "presentation" else presentation,
+        )
+    )
+    assert result.blocker.code == "plugin_quality_request_invalid"
+
+
 @pytest.mark.skipif(not hasattr(os, "fork"), reason="POSIX fork boundary")
 def test_warmed_workers_recover_after_process_fork() -> None:
     """A disposable subprocess proves child admission after both parent workers start."""
@@ -125,7 +311,7 @@ def test_supplied_and_late_manifest_descriptions_fail_closed(
         raw["blocker"]["code"] = "plugin_quality_root_mismatch"
     raw[field] = capture.model_dump(mode="json")
     for value in (raw, passed.model_copy(update=raw)):
-        with pytest.raises(ValidationError, match="captured metadata"):
+        with pytest.raises(ValidationError, match="retained text or envelope budget"):
             PluginQualityResult.model_validate(value)
     with pytest.raises(ContractError):
         SchemaRegistry().validate("plugin-quality.v1", raw)

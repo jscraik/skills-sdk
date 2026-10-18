@@ -85,12 +85,24 @@ without retaining input or submitting work; retry after an admitted operation
 finishes. Cancellation keeps a running worker's slot occupied until it finishes.
 This bound does not govern work in other processes or memory callers retain.
 
-Whole-plugin requests reject coverage identifiers, claim statements, and gap
-reasons or owners that fail the SDK's existing public-text redaction checks.
-Identifiers include scenario-set, claim, gap, and mapped case references. Invalid requests
+Whole-plugin envelopes check every retained JSON key and string with the SDK's
+existing public-text redaction checks. This includes request intake and policy
+paths, coverage identifiers and prose, capture findings, scenario case identifiers,
+scorer and calibration metadata, and presentation evidence. Invalid requests
 return `plugin_quality_request_invalid` without retaining that text in JSON.
 This is semantic model/service validation, beyond the structural JSON Schema;
 it detects supported credential and machine-path patterns, not every secret.
+
+Raw API requests and presentation requests each have a 1 MiB compact UTF-8 JSON
+budget, checked before recursive normalisation or downstream services. This
+matches the CLI's input-file ceiling; whitespace in CLI files still counts
+towards its file limit. Supplied result envelopes have a 64 MiB compact JSON
+budget. These composition limits reject oversized inputs, including otherwise
+valid standalone receipts, without changing those standalone contracts. The
+budget walker charges container sizes and visits strings in bounded chunks;
+it rejects noncanonical values and nesting beyond 64 levels without serialising
+the entire envelope. Unsafe or oversized captured evidence returns an empty
+`plugin_quality_input_invalid` blocker rather than retaining rejected text.
 
 The request binds the root candidate identity, mode manifest and one explicit
 `LocalCheckRequestV2` per direct child skill, sorted and unique, all at the root
