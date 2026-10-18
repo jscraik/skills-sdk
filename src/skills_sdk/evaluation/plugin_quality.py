@@ -21,17 +21,16 @@ from skills_sdk.validation.plugin_presentation import check_plugin_presentation
 def _assessments_within_budget(supplied: object, selected: PluginQualityRequest) -> bool:
     """Accept only a concrete dict of requested children within the aggregate evidence budget.
 
-    Each supplied value is measured through bounded, container-limited JSON
-    encoding so that no oversized or cyclic evidence is retained or revalidated.
+    The complete mapping, including paths and separators, is measured through
+    bounded, container-limited compact JSON encoding so that no oversized or
+    cyclic evidence is retained or revalidated.
     """
     if type(supplied) is not dict or not set(supplied).issubset(child.path for child in selected.children):
         return False
-    remaining = PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES
-    for value in supplied.values():
-        try:
-            remaining -= _bounded_size(value, remaining)
-        except (ValueError, TypeError, RecursionError):
-            return False
+    try:
+        _bounded_size(supplied, PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES)
+    except (ValueError, TypeError, RecursionError):
+        return False
     return True
 
 

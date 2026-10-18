@@ -395,6 +395,35 @@ def test_aggregate_assessment_budget_blocks_before_children_and_recovers(
     assert recovered.status == "local_checks_passed"
 
 
+def test_aggregate_assessment_budget_counts_the_enclosing_mapping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Values that fit alone but not inside the compact mapping block; the exact boundary passes."""
+    from skills_sdk.evaluation import plugin_quality
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+    ((key, value),) = assessments.items()
+    value_size = plugin_quality._bounded_size(value, 10**9)
+    full_size = len(json.dumps(assessments, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode())
+    assert full_size > value_size
+    for budget, code in (
+        (value_size, "plugin_quality_assessments_invalid"),
+        (full_size - 1, "plugin_quality_assessments_invalid"),
+    ):
+        monkeypatch.setattr(plugin_quality, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", budget)
+        blocked = asyncio.run(
+            check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+        )
+        assert blocked.blocker.code == code and blocked.children == ()
+    monkeypatch.setattr(plugin_quality, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", full_size)
+    accepted = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert accepted.status == "local_checks_passed"
+    monkeypatch.undo()
+    assert key in assessments
+
+
 def test_cyclic_and_non_dict_assessments_are_rejected(tmp_path: Path) -> None:
     """Concrete dict is the documented boundary; cycles and read-only mappings block."""
     from types import MappingProxyType

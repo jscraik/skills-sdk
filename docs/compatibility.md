@@ -60,8 +60,10 @@ and modes. Installed public API/schema/CLI proof covers retained approval after
 valid asset/mode drift, rejected inputs and corrected recovery without sibling
 repositories. Synthetic approval is not artwork approval, archive inclusion or
 observed display. Whole-plugin quality composition bounds supplied assessments to 32 MiB in
-aggregate and checks presentation images by path, digest and size, not by
-derivation from settings. Explicit normalisation and
+aggregate. The fresh composition service derives every declared image reference
+from the captured settings and requires approvals to cover exactly that set, then
+retains byte bindings. Static retained receipts check only path, digest and size
+consistency, not settings derivation. Explicit normalisation and
 release preparation remain separate gaps; see the [API boundary](api.md#plugin-presentation-assessment).
 
 ## Selected-case safety admission

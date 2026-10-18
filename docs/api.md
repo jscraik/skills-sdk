@@ -81,13 +81,20 @@ unrequested assessments, and a missing presentation request block.
 
 The supported profile is skill-only, create or external check, with supplied
 content review. Update intent and `mcp.json` are rejected. Other ordinary plugin
-files and directories are captured in the root candidate but receive no quality
-assessment beyond the presentation images that settings reference.
+files are captured in the root candidate, with their bytes and modes retained, but
+receive no quality assessment beyond the presentation images that settings
+reference. Directories are checked only transiently during each capture; an
+empty directory's presence or mode is not retained candidate identity.
 `assessments` must be a concrete `dict`, not another `Mapping`, keyed by requested
 child path. Its combined supplied evidence is bounded by
-`PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB, an approximate JSON-size
-bound checked before any child runs); an oversized, cyclic or non-dict bundle
-returns `plugin_quality_assessments_invalid`.
+`PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB of compact UTF-8 JSON for the
+whole mapping, including paths and separators, checked before any child runs); an
+oversized, cyclic or non-dict bundle returns `plugin_quality_assessments_invalid`.
+A successful run recaptures the root several times through the accepted validation
+and presentation services to bind source stability and image bytes. For a
+maximum-size plugin that is a proportionate input cost, not a measured latency or
+memory figure. Sharing one capture needs a snapshot API in those services and is
+follow-up scope.
 `mutation_performed`, `evaluation_executed`, `execution_authorized` and
 `release_ready` are always `false`. A pass is local composition evidence only: it
 is not independent artwork approval, release clearance, installation or
