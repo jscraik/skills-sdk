@@ -79,3 +79,28 @@ def test_source_drift_cannot_change_capture_policy(tmp_path: Path, field: str, s
             PluginQualityResult.model_validate(value)
     with pytest.raises(ContractError):
         SchemaRegistry().validate("plugin-quality.v1", forged)
+
+
+@pytest.mark.parametrize("field", ["sha256", "code"])
+def test_bare_digest_and_blocker_code_padding_is_rejected(tmp_path: Path, field: str) -> None:
+    """Keep raw and copied result validation aligned with packaged schema rejection."""
+    _root, _request, passed = _passed(tmp_path)
+    raw = passed.model_dump(mode="json")
+    if field == "sha256":
+        target = next(
+            stage["receipt"]["assessment"]["evidence"][0]
+            for stage in raw["children"][0]["stages"]
+            if stage["name"] == "content-review"
+        )
+    else:
+        raw.update(status="blocked", presentation=None, final_capture=None)
+        raw["blocker"] = {"code": "plugin_quality_presentation_missing", "message": "Missing supplied evidence."}
+        target = raw["blocker"]
+    valid = PluginQualityResult.model_validate(raw)
+    SchemaRegistry().validate("plugin-quality.v1", raw)
+    target[field] += " "
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
+    for supplied in (raw, valid.model_copy(update=raw)):
+        with pytest.raises(ValidationError):
+            PluginQualityResult.model_validate(supplied)

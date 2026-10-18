@@ -17,7 +17,9 @@ from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckRe
 PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES = 32 * 1_048_576
 """Aggregate supplied-assessment budget: four maximum-sized content-review assessments."""
 
-_IDENTITY_KEYS = frozenset({"package_id", "source_revision", "content_sha256", "mode_manifest_sha256"})
+_IDENTITY_KEYS = frozenset(
+    {"package_id", "source_revision", "content_sha256", "mode_manifest_sha256", "sha256", "code"}
+)
 _BLOCKER_CODES = frozenset(
     {
         "plugin_quality_input_invalid",
@@ -94,7 +96,7 @@ def _reject_padded_identity(value: object) -> None:
     """Reject whitespace-padded identity and digest strings before Pydantic strips them.
 
     Walks only already-normalized, depth-bounded and cycle-checked containers.
-    Only `package_id`, `source_revision` and `*_sha256` members are inspected.
+    Identity, digest and blocker-code members are inspected before normalization.
     Assessment byte budgets remain enforced without an unrelated scalar limit.
     """
     pending = [value]
@@ -108,7 +110,7 @@ def _reject_padded_identity(value: object) -> None:
                     and isinstance(member, str)
                     and member != member.strip()
                 ):
-                    raise ValueError("plugin quality identities and digests must not be padded")
+                    raise ValueError("plugin quality identities, digests and codes must not be padded")
                 if isinstance(member, (dict, list, tuple)):
                     pending.append(member)
         elif isinstance(item, (list, tuple)):
