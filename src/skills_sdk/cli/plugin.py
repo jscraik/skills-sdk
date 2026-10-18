@@ -12,14 +12,20 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from skills_sdk.models.plugin import PluginPackageValidation
 
+PLUGIN_COMMANDS = frozenset(
+    {"validate-plugin", "normalize-plugin", "check-plugin-presentation", "check-plugin-quality"}
+)
+
 
 def add_plugin_parsers(commands: Any) -> None:
     """Keep plugin-only route registration outside standalone dispatch."""
     from skills_sdk.cli.plugin_presentation import add_parser
+    from skills_sdk.cli.plugin_quality import add_parser as add_quality_parser
 
     add_plugin_parser(commands)
     add_plugin_normalization_parser(commands)
     add_parser(commands)
+    add_quality_parser(commands)
 
 
 def add_plugin_parser(commands: Any) -> None:
@@ -98,6 +104,10 @@ def run_plugin_command(
         from skills_sdk.cli.plugin_presentation import run
 
         return run(arguments, read_input)
+    if arguments.command == "check-plugin-quality":
+        from skills_sdk.cli.plugin_quality import run as run_quality
+
+        return run_quality(arguments, read_input, pairs)
     if arguments.command == "normalize-plugin":
         return _run_plugin_normalization(arguments, read_input, pairs)
     return run_plugin_validation(arguments, lambda path: read_input(path, max_bytes=16 * 1024 * 1024), pairs)

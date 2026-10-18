@@ -11,7 +11,7 @@ from typing import Any, cast
 
 from skills_sdk import __version__
 from skills_sdk.cli import COMMAND_HELP
-from skills_sdk.cli.plugin import add_plugin_parsers, run_plugin_command
+from skills_sdk.cli.plugin import PLUGIN_COMMANDS, add_plugin_parsers, run_plugin_command
 from skills_sdk.cli.routes import DISCOVERY_ONLY_EXIT, reject_discovery_only
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
 
@@ -706,7 +706,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _local_check(arguments, parser)
     if arguments.command == "verify":
         return _verify(arguments)
-    if arguments.command in {"validate-plugin", "normalize-plugin", "check-plugin-presentation"}:
+    if arguments.command in PLUGIN_COMMANDS:
         return run_plugin_command(arguments, _read_intake_context, _reject_duplicate_members)
     if arguments.command == "maintain-entrypoint":
         return _maintain_entrypoint(arguments)

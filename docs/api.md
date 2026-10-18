@@ -18,6 +18,7 @@ See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledge
 Contents:
 
 - [Plugin presentation assessment](#plugin-presentation-assessment)
+- [Whole-plugin quality composition](#whole-plugin-quality-composition)
 - [Portable plugin validation](#portable-plugin-validation)
 - [Contract families](#contract-families)
 - [Matched whole-plugin evaluation](#matched-whole-plugin-evaluation)
@@ -61,6 +62,29 @@ Rights, visual judgement and copy accuracy remain supplied claims, not independe
 review. Mutation, execution, release, archive, publication and host-display
 authority remain false. A pass neither normalises standalone input nor prepares
 a release archive. Delivery state is in the [task record](projects/sdk-workflow/tasks.md).
+
+## Whole-plugin quality composition
+
+Unmerged PR candidate for issue #92: `check_plugin_quality(plugin_root, request, *,
+assessments, presentation_request)` in `skills_sdk.evaluation` returns
+`PluginQualityResult`. Two additive families carry the contract:
+`plugin-quality-request/v1` and `plugin-quality/v1`.
+
+The request binds the root candidate identity, mode manifest and one explicit
+`LocalCheckRequestV2` per direct child skill, sorted and unique, all at the root
+source revision. The service freshly captures the root, composes
+`check_local_quality` for each child in order, then `check_plugin_presentation`,
+and recaptures the root before success. It stops at the first blocker and retains
+the partial evidence. Changed bytes, modes, settings or images, missing or
+unrequested assessments, and a missing presentation request block.
+
+The supported profile is skill-only, create or external check, with supplied
+content review. Update intent, `mcp.json` and other components are rejected.
+`mutation_performed`, `evaluation_executed`, `execution_authorized` and
+`release_ready` are always `false`. A pass is local composition evidence only: it
+is not independent artwork approval, release clearance, installation or
+runtime proof. Models and schemas check supplied consistency; only the service
+recaptures source.
 
 ## Portable plugin validation
 

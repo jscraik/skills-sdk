@@ -32,6 +32,7 @@ __all__ = [
     "assess_scorer_calibration",
     "assess_scorer_quality",
     "check_local_quality",
+    "check_plugin_quality",
     "evaluate_scenario_set",
     "evaluate_scenario_set_v2",
     "execute_content_review",
@@ -57,6 +58,10 @@ def __getattr__(name: str) -> object:
         from skills_sdk.evaluation import matched_plugin_context
 
         return getattr(matched_plugin_context, name)
+    if name == "check_plugin_quality":
+        from skills_sdk.evaluation.plugin_quality import check_plugin_quality
+
+        return check_plugin_quality
     if name in {"assess_plugin_pre_execution_safety", "screen_plugin_security"}:
         from skills_sdk.evaluation import plugin_safety
 

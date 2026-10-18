@@ -32,3 +32,5 @@ mise exec -- uv run --frozen python tests/installed_matched_smoke.py --prepare "
 "$smoke_venv_dir/bin/python" tests/installed_matched_smoke.py --check "$smoke_venv_dir/matched-inputs"
 mise exec -- uv pip install --python "$smoke_venv_dir/bin/python" "${sdk_built_wheels[0]}[images]"
 "$smoke_venv_dir/bin/python" tests/installed_plugin_presentation_smoke.py --with-images
+mise exec -- uv run --frozen --extra images python tests/installed_plugin_quality_smoke.py --prepare "$smoke_venv_dir/plugin-quality-inputs"
+"$smoke_venv_dir/bin/python" tests/installed_plugin_quality_smoke.py --check "$smoke_venv_dir/plugin-quality-inputs"
