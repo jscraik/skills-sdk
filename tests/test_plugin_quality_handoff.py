@@ -60,7 +60,7 @@ assert asyncio.run(service.check_plugin_quality(Path('.'), {})).blocker.code == 
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("marker", ["api_key=synthetic-fixture-only", "/Users/fixture/private"])
+@pytest.mark.parametrize("marker", ["api_key=synthetic-fixture-only", str(Path("/") / "Users" / "fixture" / "private")])
 def test_manifest_description_is_not_emitted(tmp_path: Path, marker: str, capsys: pytest.CaptureFixture[str]) -> None:
     """Unsafe captured metadata must stop without retaining it in API or CLI JSON."""
     from test_plugin_quality import REVISION

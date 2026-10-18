@@ -7,6 +7,7 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from skills_sdk.evaluation.quality_workflow import check_local_quality
@@ -25,15 +26,25 @@ from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation.plugin_package import validate_plugin_package
 from skills_sdk.validation.plugin_presentation import check_plugin_presentation
 
-_WORK_SLOTS = threading.BoundedSemaphore(2)
-_WORKERS = ThreadPoolExecutor(max_workers=2, thread_name_prefix="plugin-quality")
+
+@dataclass
+class _WorkerState:
+    """Own the process-local executor and its matching admission capacity."""
+
+    slots: threading.BoundedSemaphore = field(default_factory=lambda: threading.BoundedSemaphore(2))
+    executor: ThreadPoolExecutor = field(
+        default_factory=lambda: ThreadPoolExecutor(max_workers=2, thread_name_prefix="plugin-quality")
+    )
+
+
+_WORK_STATE = _WorkerState()
 
 
 def _reset_workers_after_fork() -> None:
     """Replace inherited thread references and admission state in the forked child."""
-    global _WORK_SLOTS, _WORKERS
-    _WORK_SLOTS = threading.BoundedSemaphore(2)
-    _WORKERS = ThreadPoolExecutor(max_workers=2, thread_name_prefix="plugin-quality")
+    fresh = _WorkerState()
+    _WORK_STATE.slots = fresh.slots
+    _WORK_STATE.executor = fresh.executor
 
 
 if hasattr(os, "register_at_fork"):
@@ -182,16 +193,17 @@ async def check_plugin_quality(
     Cancellation releases the caller; the bounded read-only worker may finish.
     The supplied-only profile admits no provider callbacks or release actions.
     """
-    if not _WORK_SLOTS.acquire(blocking=False):
+    slots, executor = _WORK_STATE.slots, _WORK_STATE.executor
+    if not slots.acquire(blocking=False):
         return _block("plugin_quality_capacity_exceeded")
     try:
-        future = _WORKERS.submit(
+        future = executor.submit(
             copy_context().run, _run_plugin_quality, plugin_root, request, assessments, presentation_request
         )
     except RuntimeError:
-        _WORK_SLOTS.release()
+        slots.release()
         raise
-    future.add_done_callback(lambda _completed: _WORK_SLOTS.release())
+    future.add_done_callback(lambda _completed: slots.release())
     return await asyncio.wrap_future(future)
 
 
