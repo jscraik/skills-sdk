@@ -93,7 +93,10 @@ it detects supported credential and machine-path patterns, not every secret.
 
 The request binds the root candidate identity, mode manifest and one explicit
 `LocalCheckRequestV2` per direct child skill, sorted and unique, all at the root
-source revision. The service freshly captures the root, composes
+source revision. Child-path uniqueness and ordering are semantic constraints
+enforced by the SDK models and `SchemaRegistry`, beyond structural JSON Schema.
+Schema-only validation does not prove these constraints.
+The service freshly captures the root, composes
 `check_local_quality` for each child in order, then `check_plugin_presentation`,
 and recaptures the root before success. It stops at the first blocker and retains
 the partial evidence. Changed bytes, modes, settings or images, missing or
@@ -101,7 +104,8 @@ unrequested assessments, and a missing presentation request block.
 
 The supported profile is skill-only, create or external check, with supplied
 content review. Update intent and `mcp.json` are rejected. Other ordinary plugin
-files are captured in the root candidate, with their bytes and modes retained, but
+files are captured in the root candidate, retaining paths, content digests,
+byte sizes and modes rather than raw file contents, but
 receive no quality assessment beyond the presentation images that settings
 reference. Directories are checked only transiently during each capture; an
 empty directory's presence or mode is not retained candidate identity.
