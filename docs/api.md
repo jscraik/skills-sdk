@@ -90,6 +90,18 @@ child path. Its combined supplied evidence is bounded by
 `PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB of compact UTF-8 JSON for the
 whole mapping, including paths and separators, checked before any child runs); an
 oversized, cyclic or non-dict bundle returns `plugin_quality_assessments_invalid`.
+The service also checks the complete normalized mapping of valid assessments,
+including model defaults, before child execution. Malformed individual evidence
+still stops at its existing child review stage rather than escaping as an exception.
+The same budget is reapplied to the normalized assessments retained in a supplied
+`plugin-quality/v1` result, so a forged envelope cannot exceed what the service
+admits. Whitespace-padded `package_id`, `source_revision` and digest strings are
+rejected before normalization in both requests and results. A
+`plugin_quality_source_changed` result may retain an unresolved blocked recapture
+or one that differs in content or modes, but a resolved recapture must keep the
+selected `package_id` and `source_revision`.
+Its retained passed presentation must remain consistent with the initial capture's
+settings and image bytes even when the final capture changes.
 A successful run recaptures the root several times through the accepted validation
 and presentation services to bind source stability and image bytes. For a
 maximum-size plugin that is a proportionate input cost, not a measured latency or

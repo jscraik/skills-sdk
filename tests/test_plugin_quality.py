@@ -19,7 +19,11 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import check_plugin_quality
 from skills_sdk.models.plugin import PluginValidationPolicy
-from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityResult
+from skills_sdk.models.plugin_quality import (
+    PluginQualityRequest,
+    PluginQualityResult,
+    bounded_json_size,
+)
 from skills_sdk.models.quality_workflow import LocalCheckResultV2
 from skills_sdk.validation.plugin_package import validate_plugin_package
 
@@ -185,11 +189,14 @@ def test_result_cannot_bypass_skill_only_profile(tmp_path: Path) -> None:
         SchemaRegistry().validate("plugin-quality.v1", result)
 
 
-def test_multiple_children_stop_before_second_review(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A failing first child prevents invocation for the remaining root subtree."""
+@pytest.mark.parametrize("supplied_first", [False, True])
+def test_multiple_children_stop_before_second_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, supplied_first: bool
+) -> None:
+    """The first blocked child stops composition and preserves the bounded passing prefix."""
     from skills_sdk.evaluation import plugin_quality
 
-    root, request, _assessments, _presentation = _plugin(tmp_path)
+    root, request, assessments, _presentation = _plugin(tmp_path)
     source = root / request["children"][0]["path"]
     extra = root / "skills" / "zz-extra"
     shutil.copytree(source, extra)
@@ -215,9 +222,19 @@ def test_multiple_children_stop_before_second_review(tmp_path: Path, monkeypatch
         return await actual(path, selected, **kwargs)
 
     monkeypatch.setattr(plugin_quality, "check_local_quality", observe)
-    result = asyncio.run(check_plugin_quality(root, request))
-    assert len(result.children) == len(calls) == 1
-    assert result.children[0].blocked_stage == "content-review"
+    result = asyncio.run(check_plugin_quality(root, request, assessments=assessments if supplied_first else None))
+    assert len(result.children) == len(calls) == (2 if supplied_first else 1)
+    assert result.children[-1].blocked_stage == ("scenario-coverage" if supplied_first else "content-review")
+    if supplied_first:
+        from skills_sdk.models import plugin_quality as model
+
+        assessment = result.children[0].stages[-1].receipt.assessment.model_dump(mode="json")
+        size = bounded_json_size({request["children"][0]["path"]: assessment}, 10**9)
+        monkeypatch.setattr(model, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", size - 1)
+        with pytest.raises(ValidationError, match="aggregate"):
+            PluginQualityResult.model_validate(result)
+        monkeypatch.setattr(model, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", size)
+        assert PluginQualityResult.model_validate(result) == result
 
 
 def _tree_state(root: Path) -> dict[str, tuple[int, bytes]]:
@@ -400,10 +417,14 @@ def test_aggregate_assessment_budget_counts_the_enclosing_mapping(
 ) -> None:
     """Values that fit alone but not inside the compact mapping block; the exact boundary passes."""
     from skills_sdk.evaluation import plugin_quality
+    from skills_sdk.models.content_review import ContentReviewAssessment
 
     root, request, assessments, presentation = _plugin(tmp_path)
+    assessments = {
+        key: ContentReviewAssessment.model_validate(value).model_dump(mode="json") for key, value in assessments.items()
+    }
     ((key, value),) = assessments.items()
-    value_size = plugin_quality._bounded_size(value, 10**9)
+    value_size = bounded_json_size(value, 10**9)
     full_size = len(json.dumps(assessments, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode())
     assert full_size > value_size
     for budget, code in (
@@ -440,12 +461,10 @@ def test_cyclic_and_non_dict_assessments_are_rejected(tmp_path: Path) -> None:
 @pytest.mark.parametrize("value", [{"text": '\u0000\n"\\é' * 1000}, [12345678901234567890, -1.25e100, True, None], {}])
 def test_assessment_budget_counts_actual_json_bytes(value: object) -> None:
     """Escapes and large numbers cannot undercount the aggregate admission boundary."""
-    from skills_sdk.evaluation.plugin_quality import _bounded_size
-
     size = len(json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8"))
-    assert _bounded_size(value, size) == size
+    assert bounded_json_size(value, size) == size
     with pytest.raises(ValueError):
-        _bounded_size(value, size - 1)
+        bounded_json_size(value, size - 1)
 
 
 def test_cli_reads_assessment_bundle_with_contract_budget(tmp_path: Path) -> None:
@@ -474,3 +493,258 @@ def test_cli_reads_assessment_bundle_with_contract_budget(tmp_path: Path) -> Non
         "assessments.json": PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES,
         "presentation.json": None,
     }
+
+
+def _passed(tmp_path: Path) -> tuple[Path, dict[str, object], PluginQualityResult]:
+    """Run the real passing composition once for forged-envelope fixtures."""
+    root, request, assessments, presentation = _plugin(tmp_path)
+    result = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert result.status == "local_checks_passed"
+    return root, request, result
+
+
+def _padded(request: dict[str, object], defect: str) -> dict[str, object]:
+    """Return a copy of a raw request with one identity or digest padded."""
+    forged = json.loads(json.dumps(request))
+    child = forged["children"][0]["request"]["candidate"]
+    if defect == "mode":
+        forged["mode_manifest_sha256"] = " " + forged["mode_manifest_sha256"]
+    elif defect.startswith("child."):
+        child[defect.split(".")[1]] += " "
+    else:
+        forged["candidate"][defect] += " "
+    return forged
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "package_id",
+        "source_revision",
+        "content_sha256",
+        "mode",
+        "child.package_id",
+        "child.source_revision",
+        "child.content_sha256",
+    ],
+)
+def test_padded_request_identity_is_rejected_by_every_boundary(
+    tmp_path: Path, defect: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Padding fails the model, schema, copied typed request and fresh service alike."""
+    root, request, assessments, presentation = _plugin(tmp_path)
+    forged = _padded(request, defect)
+    with pytest.raises(ValidationError):
+        PluginQualityRequest.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality-request.v1", forged)
+    blocked = asyncio.run(
+        check_plugin_quality(root, forged, assessments=assessments, presentation_request=presentation)
+    )
+    assert blocked.blocker.code == "plugin_quality_request_invalid" and blocked.children == ()
+    assert str(root) not in blocked.blocker.message
+    typed = PluginQualityRequest.model_validate(request)
+    if defect == "mode":
+        copied = typed.model_copy(update={"mode_manifest_sha256": forged["mode_manifest_sha256"]})
+    elif defect.startswith("child."):
+        key = defect.split(".")[1]
+        child = typed.children[0]
+        candidate = child.request.candidate.model_copy(update={key: forged["children"][0]["request"]["candidate"][key]})
+        changed = child.model_copy(update={"request": child.request.model_copy(update={"candidate": candidate})})
+        copied = typed.model_copy(update={"children": (changed,)})
+    else:
+        candidate = typed.candidate.model_copy(update={defect: forged["candidate"][defect]})
+        copied = typed.model_copy(update={"candidate": candidate})
+    for invalid in (copied, PluginQualityRequest.model_construct(**forged)):
+        with pytest.raises(ValidationError):
+            PluginQualityRequest.model_validate(invalid)
+    request_path = tmp_path / "padded-request.json"
+    request_path.write_text(json.dumps(forged))
+    assert main(["check-plugin-quality", str(root), "--request", str(request_path), "--json"]) == 2
+    assert json.loads(capsys.readouterr().out)["blocker"]["code"] == "plugin_quality_request_invalid"
+    recovered = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert recovered.status == "local_checks_passed"
+
+
+def test_padded_result_identity_is_rejected(tmp_path: Path) -> None:
+    """A retained envelope cannot smuggle padded identity past the stripping model config."""
+    _root, _request, passed = _passed(tmp_path)
+    raw = passed.model_dump(mode="json")
+    raw["request"]["mode_manifest_sha256"] = raw["request"]["mode_manifest_sha256"] + " "
+    with pytest.raises(ValidationError):
+        PluginQualityResult.model_validate(raw)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
+
+
+def _foreign(root: Path, defect: str) -> dict[str, object]:
+    """Capture a genuinely valid tree for another plugin name or source revision."""
+    policy = PluginValidationPolicy(require_version=True, require_description=True)
+    revision = "2" * 40 if defect == "revision" else REVISION
+    if defect == "package":
+        other = root.parent / "other-plugin"
+        shutil.copytree(root, other)
+        manifest = json.loads((other / "plugin.json").read_text())
+        manifest["name"] = "other-plugin"
+        (other / "plugin.json").write_text(json.dumps(manifest))
+        root = other
+    capture = validate_plugin_package(root, source_revision=revision, policy=policy)
+    assert capture.status == "pass" and capture.candidate is not None
+    return capture.model_dump(mode="json")
+
+
+@pytest.mark.parametrize("defect", ["package", "revision"])
+def test_source_changed_requires_the_selected_package_and_revision(tmp_path: Path, defect: str) -> None:
+    """Foreign valid recaptures are rejected while content, mode and unresolved changes stay valid."""
+    root, _request, passed = _passed(tmp_path)
+    raw = passed.model_dump(mode="json")
+    blocker = {"code": "plugin_quality_source_changed", "message": "changed"}
+    (root / "assets" / "late.txt").write_text("late")
+    from skills_sdk.validation.plugin_package import validate_plugin_package as capture_again
+
+    changed = capture_again(
+        root,
+        source_revision=REVISION,
+        policy=PluginValidationPolicy(require_version=True, require_description=True),
+    ).model_dump(mode="json")
+    valid = {**raw, "status": "blocked", "final_capture": changed, "blocker": blocker}
+    assert PluginQualityResult.model_validate(valid).blocker.code == "plugin_quality_source_changed"
+    SchemaRegistry().validate("plugin-quality.v1", valid)
+    foreign = {**valid, "final_capture": _foreign(root, defect)}
+    typed = PluginQualityResult.model_validate(valid)
+    assert foreign["final_capture"]["candidate"] != changed["candidate"]
+    for forged in (foreign, typed.model_copy(update={"final_capture": foreign["final_capture"]})):
+        with pytest.raises(ValidationError):
+            PluginQualityResult.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", foreign)
+    (root / "linked").symlink_to(root / "plugin.json")
+    blocked_capture = capture_again(
+        root,
+        source_revision=REVISION,
+        policy=PluginValidationPolicy(require_version=True, require_description=True),
+    )
+    assert blocked_capture.status == "blocked" and blocked_capture.candidate is None
+    unresolved = {**valid, "final_capture": blocked_capture.model_dump(mode="json")}
+    accepted = PluginQualityResult.model_validate(unresolved)
+    assert accepted.final_capture.candidate is None
+
+
+def test_retained_assessment_aggregate_is_reapplied_to_supplied_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A lowered budget rejects forged pass and partial envelopes; the exact boundary recovers."""
+    from skills_sdk.models import plugin_quality as model
+
+    _root, _request, passed = _passed(tmp_path)
+    retained = {
+        child.path: stage.receipt.assessment.model_dump(mode="json")
+        for child, result in zip(passed.request.children, passed.children, strict=True)
+        for stage in result.stages
+        if stage.name == "content-review"
+    }
+    size = bounded_json_size(retained, 10**9)
+    raw = passed.model_dump(mode="json")
+    partial = {**raw, "status": "blocked", "final_capture": None, "presentation": None}
+    partial["blocker"] = {"code": "plugin_quality_presentation_missing", "message": "missing"}
+    monkeypatch.setattr(model, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", size - 1)
+    for forged in (raw, partial, passed.model_copy(update={"status": "local_checks_passed"})):
+        with pytest.raises(ValidationError, match="aggregate"):
+            PluginQualityResult.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
+    monkeypatch.setattr(model, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", size)
+    assert PluginQualityResult.model_validate(raw) == passed
+    assert PluginQualityResult.model_validate(partial).blocker.code == "plugin_quality_presentation_missing"
+    SchemaRegistry().validate("plugin-quality.v1", raw)
+
+
+def test_service_blocks_approvals_that_omit_a_declared_image_and_recovers(tmp_path: Path) -> None:
+    """The fresh service derives declared images from captured settings; hash-only receipts cannot."""
+    root, request, assessments, _presentation = _plugin(tmp_path)
+    _image(root / "assets" / "dark.png")
+    manifest = json.loads((root / "plugin.json").read_text())
+    settings = manifest["extensions"]["com.openai"]["interface"]
+    settings["logoDark"] = "./assets/dark.png"
+    (root / "plugin.json").write_text(json.dumps(manifest))
+    capture = validate_plugin_package(
+        root, source_revision=REVISION, policy=PluginValidationPolicy(require_version=True, require_description=True)
+    )
+    request.update(
+        candidate=capture.candidate.model_dump(mode="json"), mode_manifest_sha256=capture.mode_manifest_sha256
+    )
+    incomplete = presentation_request(root)
+    assert len(incomplete["image_approvals"]) == 1
+    blocked = asyncio.run(check_plugin_quality(root, request, assessments=assessments, presentation_request=incomplete))
+    assert blocked.blocker.code == "plugin_quality_presentation_blocked"
+    assert blocked.presentation.status == "blocked" and blocked.presentation.images == ()
+    assert str(root) not in blocked.model_dump_json()
+    complete = json.loads(json.dumps(incomplete))
+    dark = json.loads(json.dumps(complete["image_approvals"][0]))
+    dark["image_path"] = "assets/dark.png"
+    dark["image_sha256"] = __import__("hashlib").sha256((root / "assets" / "dark.png").read_bytes()).hexdigest()
+    complete["image_approvals"].append(dark)
+    passed = asyncio.run(check_plugin_quality(root, request, assessments=assessments, presentation_request=complete))
+    assert passed.status == "local_checks_passed"
+    assert {image.path for image in passed.presentation.images} == {"assets/icon.png", "assets/dark.png"}
+
+
+@pytest.mark.parametrize("field", ["settings", "image"])
+def test_source_changed_retains_presentation_bound_to_initial_capture(tmp_path: Path, field: str) -> None:
+    """A passed presentation remains consistent with the initial capture after later drift."""
+    root, _request, passed = _passed(tmp_path)
+    (root / "assets" / "icon.png").chmod(0o755)
+    changed = validate_plugin_package(
+        root, source_revision=REVISION, policy=PluginValidationPolicy(require_version=True, require_description=True)
+    )
+    raw = passed.model_dump(mode="json")
+    raw.update(status="blocked", final_capture=changed.model_dump(mode="json"))
+    raw["blocker"] = {"code": "plugin_quality_source_changed", "message": "mode drift"}
+    valid = PluginQualityResult.model_validate(raw)
+    SchemaRegistry().validate("plugin-quality.v1", raw)
+    selected = raw["presentation"]
+    if field == "settings":
+        selected["openai_settings_sha256"] = "f" * 64
+        selected["copy_approval"]["openai_settings_sha256"] = "f" * 64
+    else:
+        selected["images"][0]["sha256"] = "f" * 64
+        selected["images"][0]["approval"]["image_sha256"] = "f" * 64
+    for forged in (raw, valid.model_copy(update={"presentation": selected})):
+        with pytest.raises(ValidationError, match="captured"):
+            PluginQualityResult.model_validate(forged)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
+
+
+def test_normalized_assessment_budget_stops_before_child_checks_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Raw defaults cannot make retained evidence overflow and escape as an exception."""
+    from skills_sdk.evaluation import plugin_quality as service
+    from skills_sdk.models import plugin_quality as model
+    from skills_sdk.models.content_review import ContentReviewAssessment
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+    normalized = {
+        key: ContentReviewAssessment.model_validate(value).model_dump(mode="json") for key, value in assessments.items()
+    }
+    raw_size = bounded_json_size(assessments, 10**9)
+    size = bounded_json_size(normalized, 10**9)
+    assert size > raw_size
+    for module in (service, model):
+        monkeypatch.setattr(module, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", raw_size)
+    for supplied_presentation in (None, presentation):
+        blocked = asyncio.run(
+            check_plugin_quality(root, request, assessments=assessments, presentation_request=supplied_presentation)
+        )
+        assert blocked.blocker.code == "plugin_quality_assessments_invalid" and blocked.children == ()
+    for module in (service, model):
+        monkeypatch.setattr(module, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", size)
+    recovered = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert recovered.status == "local_checks_passed"
