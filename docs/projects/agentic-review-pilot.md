@@ -717,9 +717,11 @@ no actionable defects and independently ran those 10 tests successfully.
 
 The [findings ledger](agentic-review-p4-ledger.json) passes the existing CLI
 validator with no findings. Its `merge_eligible: true` describes the validated
-class guardrail under that schema; it does not grant PR clearance. The first
-validation rejected `false`, which contradicts the schema's validated-guardrail
-semantics; correcting that declaration left the validator unchanged.
+class guardrail under `validate_recurring_findings`; it does not grant PR
+clearance. The schema requires a boolean, while the CLI validator enforces
+the relationship between guardrail validation and eligibility. The first
+validation rejected `false` under that semantic rule; correcting that
+declaration left the validator unchanged.
 
 A bounded sibling search of `docs/cli.md` covered `inventory`, `check`,
 `assess`, `show`, returned statuses and the renewal boundary. The related

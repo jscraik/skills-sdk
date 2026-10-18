@@ -13,7 +13,7 @@
       ],
       "guardrail": {
         "status": "validated",
-        "artifact_ref": "tests/test_skill_validation_architecture.py:179",
+        "artifact_ref": "tests/test_skill_validation_architecture.py:197",
         "validation_commands": [{
           "command": "UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS=\"$PWD/..\" MISE_TRUSTED_CONFIG_PATHS=\"$PWD/.mise.toml\" mise exec -- uv run --frozen pytest tests/test_skill_validation_architecture.py -q",
           "status": "pass"
