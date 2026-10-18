@@ -12,8 +12,47 @@ from test_plugin_quality import REVISION, _passed, _plugin
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.models.plugin import PluginValidationPolicy
 from skills_sdk.models.plugin_quality import PluginQualityResult
 from skills_sdk.validation.plugin_package import validate_plugin_package
+
+
+@pytest.mark.parametrize("defect", ["revision", "require_version", "require_description"])
+def test_root_mismatch_retains_selected_invocation(tmp_path: Path, defect: str) -> None:
+    """Foreign invocation parameters cannot masquerade as source-root mismatch."""
+    root, request, passed = _passed(tmp_path)
+    (root / "assets" / "late.txt").write_text("changed source")
+    legitimate = validate_plugin_package(root, source_revision=REVISION, policy=passed.initial_capture.policy)
+    neighbour = {
+        "status": "blocked",
+        "request": request,
+        "initial_capture": legitimate.model_dump(mode="json"),
+        "blocker": {"code": "plugin_quality_root_mismatch", "message": "Root mismatch."},
+    }
+    PluginQualityResult.model_validate(neighbour)
+    SchemaRegistry().validate("plugin-quality.v1", neighbour)
+    policy = {"require_version": True, "require_description": True}
+    if defect != "revision":
+        policy[defect] = False
+    capture = validate_plugin_package(
+        root,
+        source_revision="2" * 40 if defect == "revision" else REVISION,
+        policy=PluginValidationPolicy(**policy),
+    )
+    raw = {
+        "status": "blocked",
+        "request": request,
+        "initial_capture": capture.model_dump(mode="json"),
+        "blocker": {"code": "plugin_quality_root_mismatch", "message": "Root mismatch."},
+    }
+    typed = passed.model_copy(
+        update={**raw, "initial_capture": capture, "children": (), "presentation": None, "final_capture": None}
+    )
+    for supplied in (raw, typed):
+        with pytest.raises(ValidationError):
+            PluginQualityResult.model_validate(supplied)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
 
 
 def test_identity_drift_returns_an_unbound_blocker_and_restoration_recovers(

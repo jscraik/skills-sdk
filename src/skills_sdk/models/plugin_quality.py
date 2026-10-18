@@ -260,8 +260,16 @@ class PluginQualityResult(_ContractModel):
         elif self.request is None or self.initial_capture is None:
             valid = False
         elif code == "plugin_quality_root_mismatch":
-            valid = retained == {"request", "initial_capture"} and not supported_quality_root(
-                self.request, self.initial_capture
+            capture = self.initial_capture
+            valid = (
+                retained == {"request", "initial_capture"}
+                and capture.policy.require_version
+                and capture.policy.require_description
+                and (
+                    capture.candidate is None
+                    or capture.candidate.source_revision == self.request.candidate.source_revision
+                )
+                and not supported_quality_root(self.request, capture)
             )
         elif not supported_quality_root(self.request, self.initial_capture):
             valid = False
