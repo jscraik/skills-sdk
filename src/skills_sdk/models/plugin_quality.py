@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -12,6 +12,38 @@ from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding
 from skills_sdk.models.plugin_presentation import PluginPresentationCheck
 from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckResultV2
+
+PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES = 32 * 1_048_576
+"""Aggregate supplied-assessment budget: four maximum-sized content-review assessments."""
+
+_BLOCKER_CODES = frozenset(
+    {
+        "plugin_quality_input_invalid",
+        "plugin_quality_request_invalid",
+        "plugin_quality_root_mismatch",
+        "plugin_quality_assessments_invalid",
+        "plugin_quality_child_blocked",
+        "plugin_quality_presentation_missing",
+        "plugin_quality_presentation_blocked",
+        "plugin_quality_source_changed",
+    }
+)
+_SUCCESS_EVIDENCE = ("request", "initial_capture", "children", "presentation", "final_capture")
+_RESULT_SCHEMA_EXTRA: dict[str, Any] = {
+    "if": {"properties": {"status": {"const": "local_checks_passed"}}, "required": ["status"]},
+    "then": {
+        "required": [*_SUCCESS_EVIDENCE],
+        "properties": {
+            "request": {"type": "object"},
+            "initial_capture": {"type": "object"},
+            "final_capture": {"type": "object"},
+            "presentation": {"type": "object"},
+            "children": {"minItems": 1},
+            "blocker": {"type": "null"},
+        },
+    },
+    "else": {"required": ["blocker"], "properties": {"blocker": {"type": "object"}}},
+}
 
 
 class PluginQualityChild(_ContractModel):
@@ -73,7 +105,9 @@ def supported_quality_root(request: PluginQualityRequest, capture: PluginPackage
 class PluginQualityResult(_ContractModel):
     """Local composition evidence; never an independent approval or release."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, revalidate_instances="always")
+    model_config = ConfigDict(
+        extra="forbid", frozen=True, revalidate_instances="always", json_schema_extra=_RESULT_SCHEMA_EXTRA
+    )
     schema_version: Literal["plugin-quality/v1"] = "plugin-quality/v1"
     status: Literal["local_checks_passed", "blocked"]
     request: PluginQualityRequest | None = None
@@ -108,7 +142,67 @@ class PluginQualityResult(_ContractModel):
             self._bind_children()
         if self.status == "local_checks_passed":
             self._require_success()
+        else:
+            self._require_blocker_stage()
         return self
+
+    def _children_complete(self) -> bool:
+        """Report whether every requested child was retained and passed."""
+        return (
+            self.request is not None
+            and len(self.children) == len(self.request.children)
+            and all(child.status == "local_checks_passed" for child in self.children)
+        )
+
+    def _presentation_bound(self) -> bool:
+        """Report whether a retained presentation passed for the requested root."""
+        presentation, request = self.presentation, self.request
+        return (
+            presentation is not None
+            and request is not None
+            and presentation.status == "pass"
+            and presentation.candidate == request.candidate
+            and presentation.mode_manifest_sha256 == request.mode_manifest_sha256
+        )
+
+    def _require_blocker_stage(self) -> None:
+        """Bind each typed first-stop code to the evidence that stage actually retains."""
+        assert self.blocker is not None
+        code = self.blocker.code
+        if code not in _BLOCKER_CODES:
+            raise ValueError("plugin quality blocker code is not part of this contract")
+        retained = {name for name in _SUCCESS_EVIDENCE if getattr(self, name)}
+        early = {"plugin_quality_input_invalid", "plugin_quality_request_invalid"}
+        if code in early:
+            valid = not retained
+        elif self.request is None or self.initial_capture is None:
+            valid = False
+        elif code == "plugin_quality_root_mismatch":
+            valid = retained == {"request", "initial_capture"} and not supported_quality_root(
+                self.request, self.initial_capture
+            )
+        elif not supported_quality_root(self.request, self.initial_capture):
+            valid = False
+        elif code == "plugin_quality_assessments_invalid":
+            valid = retained == {"request", "initial_capture"}
+        elif code == "plugin_quality_child_blocked":
+            valid = retained == {"request", "initial_capture", "children"} and self.children[-1].status == "blocked"
+        elif not self._children_complete():
+            valid = False
+        elif code == "plugin_quality_presentation_missing":
+            valid = retained == {"request", "initial_capture", "children"}
+        elif code == "plugin_quality_presentation_blocked":
+            valid = retained == {"request", "initial_capture", "children", "presentation"} and (
+                not self._presentation_bound()
+            )
+        else:
+            valid = (
+                self._presentation_bound()
+                and self.final_capture is not None
+                and self.final_capture != self.initial_capture
+            )
+        if not valid:
+            raise ValueError("plugin quality blocker code must match its retained stage evidence")
 
     def _bind_children(self) -> None:
         """Bind every retained local result to its actual root subtree."""
@@ -158,9 +252,14 @@ class PluginQualityResult(_ContractModel):
             or self.presentation.openai_settings_sha256 != manifest.openai_settings_sha256
         ):
             raise ValueError("presentation must bind the captured settings")
-        files = {item.path: item.sha256 for item in self.initial_capture.files}
-        if any(files.get(image.path) != image.sha256 for image in self.presentation.images):
+        files = {item.path: (item.sha256, item.size_bytes) for item in self.initial_capture.files}
+        if any(files.get(image.path) != (image.sha256, image.size_bytes) for image in self.presentation.images):
             raise ValueError("presentation must bind the captured image bytes")
 
 
-__all__ = ["PluginQualityChild", "PluginQualityRequest", "PluginQualityResult"]
+__all__ = [
+    "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES",
+    "PluginQualityChild",
+    "PluginQualityRequest",
+    "PluginQualityResult",
+]

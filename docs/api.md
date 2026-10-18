@@ -65,9 +65,10 @@ a release archive. Delivery state is in the [task record](projects/sdk-workflow/
 
 ## Whole-plugin quality composition
 
-Unmerged PR candidate for issue #92: `check_plugin_quality(plugin_root, request, *,
-assessments, presentation_request)` in `skills_sdk.evaluation` returns
-`PluginQualityResult`. Two additive families carry the contract:
+Unmerged PR candidate for issue #92: the asynchronous
+`await check_plugin_quality(plugin_root, request, *, assessments, presentation_request)`
+in `skills_sdk.evaluation` resolves to `PluginQualityResult`; calling it without
+`await` returns a coroutine, not a receipt. Two additive families carry the contract:
 `plugin-quality-request/v1` and `plugin-quality/v1`.
 
 The request binds the root candidate identity, mode manifest and one explicit
@@ -79,12 +80,24 @@ the partial evidence. Changed bytes, modes, settings or images, missing or
 unrequested assessments, and a missing presentation request block.
 
 The supported profile is skill-only, create or external check, with supplied
-content review. Update intent, `mcp.json` and other components are rejected.
+content review. Update intent and `mcp.json` are rejected. Other ordinary plugin
+files and directories are captured in the root candidate but receive no quality
+assessment beyond the presentation images that settings reference.
+`assessments` must be a concrete `dict`, not another `Mapping`, keyed by requested
+child path. Its combined supplied evidence is bounded by
+`PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB, an approximate JSON-size
+bound checked before any child runs); an oversized, cyclic or non-dict bundle
+returns `plugin_quality_assessments_invalid`.
 `mutation_performed`, `evaluation_executed`, `execution_authorized` and
 `release_ready` are always `false`. A pass is local composition evidence only: it
 is not independent artwork approval, release clearance, installation or
 runtime proof. Models and schemas check supplied consistency; only the service
-recaptures source.
+recaptures source and derives presentation image references from the captured
+settings. The model retains no raw settings, so it cannot prove that a supplied
+image set equals the declared references; it checks retained image paths, digests
+and sizes against the initial capture. The packaged success schema requires every
+evidence member and at least one child; blocker codes, retained stages and the
+cross-object comparisons stay model and registry checks.
 
 ## Portable plugin validation
 

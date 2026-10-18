@@ -3075,6 +3075,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Local composition evidence; never an independent approval or release.",
+  "else": {
+    "properties": {
+      "blocker": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "blocker"
+    ]
+  },
+  "if": {
+    "properties": {
+      "status": {
+        "const": "local_checks_passed"
+      }
+    },
+    "required": [
+      "status"
+    ]
+  },
   "properties": {
     "blocker": {
       "anyOf": [
@@ -3182,6 +3202,35 @@
   "required": [
     "status"
   ],
+  "then": {
+    "properties": {
+      "blocker": {
+        "type": "null"
+      },
+      "children": {
+        "minItems": 1
+      },
+      "final_capture": {
+        "type": "object"
+      },
+      "initial_capture": {
+        "type": "object"
+      },
+      "presentation": {
+        "type": "object"
+      },
+      "request": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "request",
+      "initial_capture",
+      "children",
+      "presentation",
+      "final_capture"
+    ]
+  },
   "title": "PluginQualityResult",
   "type": "object"
 }

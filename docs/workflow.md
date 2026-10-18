@@ -27,8 +27,9 @@ host display.
 
 Unmerged PR candidate for issue #92 adds bounded whole-plugin quality
 composition through `check_plugin_quality` / `check-plugin-quality`. It composes
-the existing child quality and presentation services over one fresh root capture
-for skill-only create or external-check candidates. It grants no execution,
+the existing child quality and presentation services between an initial binding
+root capture and a final recapture that must be unchanged before a pass, for
+skill-only create or external-check candidates. It grants no execution,
 independent artwork approval or release clearance.
 
 Accepted PR #52 adds the bounded

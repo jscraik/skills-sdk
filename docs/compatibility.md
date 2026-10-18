@@ -59,7 +59,9 @@ authenticated. Models/schemas check consistency; the service recaptures bytes
 and modes. Installed public API/schema/CLI proof covers retained approval after
 valid asset/mode drift, rejected inputs and corrected recovery without sibling
 repositories. Synthetic approval is not artwork approval, archive inclusion or
-observed display. Explicit normalisation, whole-plugin quality composition and
+observed display. Whole-plugin quality composition bounds supplied assessments to 32 MiB in
+aggregate and checks presentation images by path, digest and size, not by
+derivation from settings. Explicit normalisation and
 release preparation remain separate gaps; see the [API boundary](api.md#plugin-presentation-assessment).
 
 ## Selected-case safety admission

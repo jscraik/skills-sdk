@@ -334,3 +334,114 @@ def test_authority_flags_require_literal_false_for_raw_and_copied_results(tmp_pa
     for forged in (raw, result.model_copy(update={flag: 0})):
         with pytest.raises(ValidationError):
             PluginQualityResult.model_validate(forged)
+
+
+def test_success_schema_requires_evidence_while_neighbours_validate(tmp_path: Path) -> None:
+    """The packaged schema rejects evidence-free success and keeps real results valid."""
+    schema = json.loads(Path("src/skills_sdk/schemas/plugin-quality.v1.schema.json").read_text())
+    validator = Draft202012Validator(schema)
+    root, request, assessments, presentation = _plugin(tmp_path)
+    passed = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    blocked = asyncio.run(check_plugin_quality(root, request, assessments=assessments))
+    for result in (passed, blocked):
+        assert not list(validator.iter_errors(result.model_dump(mode="json")))
+    assert list(validator.iter_errors({"schema_version": "plugin-quality/v1", "status": "local_checks_passed"}))
+    partial = {**passed.model_dump(mode="json"), "final_capture": None}
+    assert list(validator.iter_errors(partial))
+    assert list(validator.iter_errors({"schema_version": "plugin-quality/v1", "status": "blocked"}))
+
+
+def test_blocker_codes_must_match_retained_stage_evidence(tmp_path: Path) -> None:
+    """A passing envelope cannot be relabelled and source_changed needs a differing final capture."""
+    root, request, assessments, presentation = _plugin(tmp_path)
+    passed = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    blocker = {"code": "plugin_quality_root_mismatch", "message": "forged"}
+    raw = {**passed.model_dump(mode="json"), "status": "blocked", "blocker": blocker}
+    with pytest.raises(ValidationError):
+        PluginQualityResult.model_validate(raw)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality.v1", raw)
+    changed = {**raw, "blocker": {**blocker, "code": "plugin_quality_source_changed"}}
+    with pytest.raises(ValidationError):
+        PluginQualityResult.model_validate(changed)
+    unknown = {**raw, "blocker": {**blocker, "code": "plugin_quality_unknown"}}
+    with pytest.raises(ValidationError):
+        PluginQualityResult.model_validate(unknown)
+    live = asyncio.run(check_plugin_quality(root, request, assessments=assessments))
+    assert live.blocker.code == "plugin_quality_presentation_missing"
+    assert PluginQualityResult.model_validate(live.model_dump(mode="json")) == live
+
+
+def test_aggregate_assessment_budget_blocks_before_children_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A small patched budget proves the bound without allocating bulk evidence."""
+    from skills_sdk.evaluation import plugin_quality
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+    monkeypatch.setattr(plugin_quality, "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES", 64)
+    result = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert result.blocker.code == "plugin_quality_assessments_invalid" and result.children == ()
+    monkeypatch.undo()
+    recovered = asyncio.run(
+        check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert recovered.status == "local_checks_passed"
+
+
+def test_cyclic_and_non_dict_assessments_are_rejected(tmp_path: Path) -> None:
+    """Concrete dict is the documented boundary; cycles and read-only mappings block."""
+    from types import MappingProxyType
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+    key = next(iter(assessments))
+    cycle: dict[str, object] = {}
+    cycle["self"] = cycle
+    for bad in (MappingProxyType(assessments), {key: cycle}):
+        result = asyncio.run(check_plugin_quality(root, request, assessments=bad, presentation_request=presentation))
+        assert result.blocker.code == "plugin_quality_assessments_invalid"
+
+
+@pytest.mark.parametrize("value", [{"text": '\u0000\n"\\é' * 1000}, [12345678901234567890, -1.25e100, True, None], {}])
+def test_assessment_budget_counts_actual_json_bytes(value: object) -> None:
+    """Escapes and large numbers cannot undercount the aggregate admission boundary."""
+    from skills_sdk.evaluation.plugin_quality import _bounded_size
+
+    size = len(json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8"))
+    assert _bounded_size(value, size) == size
+    with pytest.raises(ValueError):
+        _bounded_size(value, size - 1)
+
+
+def test_cli_reads_assessment_bundle_with_contract_budget(tmp_path: Path) -> None:
+    """Only the assessment bundle receives the larger no-follow read limit."""
+    from types import SimpleNamespace
+
+    from skills_sdk.cli.plugin_quality import run
+    from skills_sdk.models.plugin_quality import PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES
+
+    limits: dict[str, object] = {}
+
+    def read(path: Path, **kwargs: object) -> bytes:
+        limits[path.name] = kwargs.get("max_bytes")
+        return b"{}"
+
+    arguments = SimpleNamespace(
+        plugin_root=tmp_path,
+        request=Path("request.json"),
+        assessments=Path("assessments.json"),
+        presentation_request=Path("presentation.json"),
+        json_output=True,
+    )
+    run(arguments, read, lambda pairs: dict(pairs))
+    assert limits == {
+        "request.json": None,
+        "assessments.json": PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES,
+        "presentation.json": None,
+    }

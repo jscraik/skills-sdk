@@ -24,15 +24,15 @@ def add_parser(commands: Any) -> None:
 def run(arguments: argparse.Namespace, read_input: Callable[..., bytes], pairs: Callable[..., object]) -> int:
     """Reject unsafe input files and preserve typed first-stop receipts."""
     from skills_sdk.evaluation.plugin_quality import check_plugin_quality
-    from skills_sdk.models.plugin_quality import PluginQualityResult
+    from skills_sdk.models.plugin_quality import PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES, PluginQualityResult
 
     try:
         inputs = {
-            name: json.loads(read_input(path).decode("utf-8"), object_pairs_hook=pairs) if path else None
-            for name, path in (
-                ("request", arguments.request),
-                ("assessments", arguments.assessments),
-                ("presentation_request", arguments.presentation_request),
+            name: json.loads(read_input(path, **limit).decode("utf-8"), object_pairs_hook=pairs) if path else None
+            for name, path, limit in (
+                ("request", arguments.request, {}),
+                ("assessments", arguments.assessments, {"max_bytes": PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES}),
+                ("presentation_request", arguments.presentation_request, {}),
             )
         }
     except (OSError, ValueError, RecursionError):
