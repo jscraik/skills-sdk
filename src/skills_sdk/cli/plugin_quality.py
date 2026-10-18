@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 _MAX_JSON_DEPTH = 64
-_MAX_JSON_NODES = 1_000_000
+_MAX_JSON_NODES = 4_194_304
 
 
 def _scan_json_structure(text: str) -> None:

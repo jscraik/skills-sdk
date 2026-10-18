@@ -18,7 +18,6 @@ PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES = 32 * 1_048_576
 """Aggregate supplied-assessment budget: four maximum-sized content-review assessments."""
 
 _IDENTITY_KEYS = frozenset({"package_id", "source_revision", "content_sha256", "mode_manifest_sha256"})
-_PADDING_NODE_LIMIT = 262_144
 _BLOCKER_CODES = frozenset(
     {
         "plugin_quality_input_invalid",
@@ -94,15 +93,13 @@ def bounded_json_size(value: object, limit: int) -> int:
 def _reject_padded_identity(value: object) -> None:
     """Reject whitespace-padded identity and digest strings before Pydantic strips them.
 
-    Walks the already-normalized, cycle-checked containers with a node bound.
+    Walks only already-normalized, depth-bounded and cycle-checked containers.
     Only `package_id`, `source_revision` and `*_sha256` members are inspected.
+    Assessment byte budgets remain enforced without an unrelated scalar limit.
     """
-    pending, seen = [value], 0
+    pending = [value]
     while pending:
         item = pending.pop()
-        seen += 1
-        if seen > _PADDING_NODE_LIMIT:
-            raise ValueError("plugin quality input exceeds its traversal bound")
         if isinstance(item, dict):
             for key, member in item.items():
                 if (
@@ -112,9 +109,10 @@ def _reject_padded_identity(value: object) -> None:
                     and member != member.strip()
                 ):
                     raise ValueError("plugin quality identities and digests must not be padded")
-                pending.append(member)
+                if isinstance(member, (dict, list, tuple)):
+                    pending.append(member)
         elif isinstance(item, (list, tuple)):
-            pending.extend(item)
+            pending.extend(member for member in item if isinstance(member, (dict, list, tuple)))
 
 
 class PluginQualityChild(_ContractModel):

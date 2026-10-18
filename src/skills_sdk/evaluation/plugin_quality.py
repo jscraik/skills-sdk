@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from skills_sdk.evaluation.quality_workflow import check_local_quality
@@ -62,7 +63,7 @@ def _block(code: str, **evidence: object) -> PluginQualityResult:
     )
 
 
-async def check_plugin_quality(
+async def _check_plugin_quality(
     plugin_root: Path,
     request: object,
     *,
@@ -117,6 +118,31 @@ async def check_plugin_quality(
     if final != capture:
         return _block("plugin_quality_source_changed", **evidence)
     return PluginQualityResult.model_validate({**evidence, "status": "local_checks_passed"})
+
+
+def _run_plugin_quality(
+    plugin_root: Path, request: object, assessments: dict[str, object] | None, presentation_request: object
+) -> PluginQualityResult:
+    """Own the sequential supplied-only workflow and its event loop in one worker."""
+    return asyncio.run(
+        _check_plugin_quality(plugin_root, request, assessments=assessments, presentation_request=presentation_request)
+    )
+
+
+async def check_plugin_quality(
+    plugin_root: Path,
+    request: object,
+    *,
+    assessments: dict[str, object] | None = None,
+    presentation_request: object = None,
+) -> PluginQualityResult:
+    """Compose read-only supplied checks without blocking the caller's event loop.
+
+    One worker retains sequential first-stop semantics and source recapture.
+    Cancellation releases the caller; the bounded read-only worker may finish.
+    The supplied-only profile admits no provider callbacks or release actions.
+    """
+    return await asyncio.to_thread(_run_plugin_quality, plugin_root, request, assessments, presentation_request)
 
 
 __all__ = ["check_plugin_quality"]

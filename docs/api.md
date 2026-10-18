@@ -68,9 +68,17 @@ a release archive. Delivery state is in the [task record](projects/sdk-workflow/
 Unmerged PR candidate for issue #92: the asynchronous
 `await check_plugin_quality(plugin_root, request, *, assessments=None, presentation_request=None)`
 in `skills_sdk.evaluation` resolves to `PluginQualityResult`; calling it without
-`await` returns a coroutine, not a receipt. Omitting either optional input returns
-the existing typed blocker for missing assessments or a missing presentation request. Two additive families carry the contract:
+`await` returns a coroutine, not a receipt. Omitting assessments uses an empty
+mapping and retains first-stop child semantics. If the earlier child gates pass,
+missing supplied content review produces `plugin_quality_child_blocked`.
+With passing children, an omitted presentation
+request produces `plugin_quality_presentation_missing`. Two additive families carry the contract:
 `plugin-quality-request/v1` and `plugin-quality/v1`.
+
+The supplied-only workflow runs sequentially in one worker, keeping filesystem
+scans and child composition off the caller's event loop. Cancellation releases
+the caller, but cannot forcibly stop the bounded read-only worker. It may finish
+its checks; cancellation grants no mutation, provider or release authority.
 
 The request binds the root candidate identity, mode manifest and one explicit
 `LocalCheckRequestV2` per direct child skill, sorted and unique, all at the root
@@ -91,6 +99,11 @@ child path. Its combined supplied evidence is bounded by
 `PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB of compact UTF-8 JSON for the
 whole mapping, including paths and separators, checked before any child runs); an
 oversized, cyclic or non-dict bundle returns `plugin_quality_assessments_invalid`.
+CLI JSON decoding also checks nesting at 64 levels and a 4,194,304-node
+structural budget before materialisation. This retains admission of the tested
+four-child compact assessment bundle below 32 MiB; long strings use constant
+scanner state. These resource checks do not replace complete JSON grammar,
+duplicate-member rejection or the per-assessment eight-MiB contract.
 The service also checks the complete normalized mapping of valid assessments,
 including model defaults, before child execution. Malformed individual evidence
 still stops at its existing child review stage rather than escaping as an exception.

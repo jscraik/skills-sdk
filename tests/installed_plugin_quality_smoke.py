@@ -11,6 +11,7 @@ from pathlib import Path
 import skills_sdk
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import check_plugin_quality
+from skills_sdk.models import PluginQualityRequest, PluginQualityResult
 
 
 def prepare(root: Path) -> None:
@@ -27,6 +28,7 @@ def check(root: Path) -> None:
     """Run public installed services without importing checkout fixtures or pytest."""
     assert "site-packages" in str(Path(skills_sdk.__file__).resolve())
     assert "pytest" not in sys.modules
+    assert PluginQualityRequest.__module__ == PluginQualityResult.__module__ == "skills_sdk.models.plugin_quality"
     request = json.loads((root / "request.json").read_text())
     assessments = json.loads((root / "assessments.json").read_text())
     presentation = json.loads((root / "presentation.json").read_text())
