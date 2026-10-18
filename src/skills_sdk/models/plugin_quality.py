@@ -275,6 +275,7 @@ class PluginQualityResult(_ContractModel):
             valid = (
                 self._presentation_bound()
                 and final is not None
+                and final.policy == self.initial_capture.policy
                 and final != self.initial_capture
                 and (
                     final.candidate is None
