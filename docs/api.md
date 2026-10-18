@@ -66,9 +66,10 @@ a release archive. Delivery state is in the [task record](projects/sdk-workflow/
 ## Whole-plugin quality composition
 
 Unmerged PR candidate for issue #92: the asynchronous
-`await check_plugin_quality(plugin_root, request, *, assessments, presentation_request)`
+`await check_plugin_quality(plugin_root, request, *, assessments=None, presentation_request=None)`
 in `skills_sdk.evaluation` resolves to `PluginQualityResult`; calling it without
-`await` returns a coroutine, not a receipt. Two additive families carry the contract:
+`await` returns a coroutine, not a receipt. Omitting either optional input returns
+the existing typed blocker for missing assessments or a missing presentation request. Two additive families carry the contract:
 `plugin-quality-request/v1` and `plugin-quality/v1`.
 
 The request binds the root candidate identity, mode manifest and one explicit

@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from argparse import Namespace
 from pathlib import Path
+from typing import Any
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -14,10 +16,12 @@ from test_plugin_presentation import _image, _manifest
 from test_plugin_presentation import _request as presentation_request
 from test_quality_workflow import _assessment, _package_path, _request
 
+from skills_sdk.cli import plugin_quality as route
 from skills_sdk.cli.main import main
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import check_plugin_quality
+from skills_sdk.evaluation import plugin_quality as service_module
 from skills_sdk.models.plugin import PluginValidationPolicy
 from skills_sdk.models.plugin_quality import (
     PluginQualityRequest,
@@ -748,3 +752,49 @@ def test_normalized_assessment_budget_stops_before_child_checks_and_recovers(
         check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
     )
     assert recovered.status == "local_checks_passed"
+
+
+@pytest.mark.parametrize("payload", [b"[[[[[]]]]]", b"[1,2,3,4,5,6]", b'"x', b"[1]]", b"\xff"])
+def test_cli_structural_scan_rejects_before_materialization(
+    tmp_path: Path, payload: bytes, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Lowered limits and malformed JSON block before json.loads or the service runs."""
+    monkeypatch.setattr(route, "_MAX_JSON_DEPTH", 4)
+    monkeypatch.setattr(route, "_MAX_JSON_NODES", 5)
+    reached: list[str] = []
+    real_loads = json.loads
+    monkeypatch.setattr(route.json, "loads", lambda *a, **k: reached.append("loads"))
+    monkeypatch.setattr(service_module, "check_plugin_quality", lambda *a, **k: reached.append("service"))
+    arguments = {"plugin_root": tmp_path, "request": Path("r"), "assessments": None, "presentation_request": None}
+    route.run(Namespace(**arguments, json_output=True), lambda path, **kw: payload, dict)
+    assert reached == []
+    assert real_loads(capsys.readouterr().out)["blocker"]["code"] == "plugin_quality_input_invalid"
+
+
+def test_cli_structural_scan_admits_valid_neighbours() -> None:
+    """Large strings and escaped delimiters stay accepted."""
+    route._scan_json_structure(json.dumps({"a": "x" * 2_000_000, "s": 'q } ] "', "b": [1, None, {"c": 1.5}]}))
+
+
+def _child_errors(name: str, child: object) -> list[object]:
+    schema = SchemaRegistry().load(name)
+    node = schema["$defs"]["PluginQualityChild"] | {"$defs": schema["$defs"]}
+    return list(Draft202012Validator(node).iter_errors(child))
+
+
+@pytest.mark.parametrize("path", ["", " ", "../escape", "skills/a/b", "/skills/a", "skills\\a", "skills/a\nb", "a/b"])
+def test_child_selector_rejects_invalid_and_accepts_direct_paths(tmp_path: Path, path: str) -> None:
+    """Model, packaged schemas, registry and public service require a direct skills/<name>."""
+    root, payload, found, shown = _plugin(tmp_path)
+    children: Any = payload["children"]
+    forged = {**payload, "children": [{**children[0], "path": path}]}
+    with pytest.raises(ValidationError):
+        PluginQualityRequest.model_validate(forged)
+    assert all(_child_errors(n, forged["children"][0]) for n in ("plugin-quality-request.v1", "plugin-quality.v1"))
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("plugin-quality-request.v1", forged)
+    blocked = asyncio.run(check_plugin_quality(root, forged, assessments=found, presentation_request=shown))
+    assert blocked.blocker is not None and blocked.blocker.code == "plugin_quality_request_invalid"
+    for direct in ("skills/ordinary", "skills/café-技能"):
+        for n in ("plugin-quality-request.v1", "plugin-quality.v1"):
+            assert not _child_errors(n, {**children[0], "path": direct})

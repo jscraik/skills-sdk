@@ -9,6 +9,59 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+_MAX_JSON_DEPTH = 64
+_MAX_JSON_NODES = 1_000_000
+
+
+def _scan_json_structure(text: str) -> None:
+    """Bound resources with constant scan state; `json.loads` validates JSON grammar."""
+    depth, nodes = 0, 0
+    quoted, escaped, scalar = False, False, False
+    for character in text:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+            continue
+        if character in " \t\r\n:,":
+            scalar = False
+            continue
+        if character in "]}":
+            depth -= 1
+            scalar = False
+            if depth < 0:
+                raise ValueError("unbalanced JSON container")
+            continue
+        if character in "[{":
+            depth += 1
+            scalar = False
+            if depth > _MAX_JSON_DEPTH:
+                raise ValueError("JSON nesting exceeds the structural limit")
+        elif character == '"':
+            quoted = True
+            scalar = False
+        elif scalar:
+            continue
+        else:
+            scalar = True
+        nodes += 1
+        if nodes > _MAX_JSON_NODES:
+            raise ValueError("JSON node count exceeds the structural limit")
+    if quoted or depth:
+        raise ValueError("unterminated JSON string or container")
+
+
+def _load_json(
+    read_input: Callable[..., bytes], path: Path, pairs: Callable[..., object], limit: dict[str, int]
+) -> Any:
+    """Read no-follow bytes, scan structure, then materialize with duplicate-member rejection."""
+    text = read_input(path, **limit).decode("utf-8")
+    _scan_json_structure(text)
+    return json.loads(text, object_pairs_hook=pairs)
+
 
 def add_parser(commands: Any) -> None:
     """Register an additive route without changing standalone quality behavior."""
@@ -28,7 +81,7 @@ def run(arguments: argparse.Namespace, read_input: Callable[..., bytes], pairs: 
 
     try:
         inputs = {
-            name: json.loads(read_input(path, **limit).decode("utf-8"), object_pairs_hook=pairs) if path else None
+            name: _load_json(read_input, path, pairs, limit) if path else None
             for name, path, limit in (
                 ("request", arguments.request, {}),
                 ("assessments", arguments.assessments, {"max_bytes": PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES}),

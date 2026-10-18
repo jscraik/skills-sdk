@@ -7,7 +7,7 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from skills_sdk.models.inventory import Sha256, _ContractModel
+from skills_sdk.models.inventory import PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding
@@ -121,7 +121,7 @@ class PluginQualityChild(_ContractModel):
     """One explicit skill request in root-capture order."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, revalidate_instances="always")
-    path: str
+    path: PortablePath = Field(json_schema_extra={"allOf": [{"pattern": "^skills/[^/]+$"}]})
     request: LocalCheckRequestV2
 
     @model_validator(mode="after")

@@ -1730,6 +1730,13 @@
       "description": "One explicit skill request in root-capture order.",
       "properties": {
         "path": {
+          "allOf": [
+            {
+              "pattern": "^skills/[^/]+$"
+            }
+          ],
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
           "title": "Path",
           "type": "string"
         },
