@@ -2,16 +2,57 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from test_plugin_quality import REVISION, _passed
+from test_plugin_quality import REVISION, _passed, _plugin
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.plugin_quality import PluginQualityResult
 from skills_sdk.validation.plugin_package import validate_plugin_package
+
+
+def test_identity_drift_returns_an_unbound_blocker_and_restoration_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A real renamed root cannot leak a foreign capture or raise instead of blocking."""
+    from skills_sdk.evaluation import plugin_quality as service
+
+    root, request, assessments, presentation = _plugin(tmp_path)
+    manifest_path = root / "plugin.json"
+    original = manifest_path.read_text()
+    capture = service.validate_plugin_package
+    calls = 0
+
+    def observe(path: Path, *, source_revision: str, policy: object) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            manifest = json.loads(original)
+            manifest["name"] = "renamed-plugin"
+            manifest_path.write_text(json.dumps(manifest))
+        return capture(path, source_revision=source_revision, policy=policy)
+
+    monkeypatch.setattr(service, "validate_plugin_package", observe)
+    result = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert calls == 2 and result.blocker.code == "plugin_quality_source_changed"
+    assert result.final_capture.status == "blocked" and result.final_capture.candidate is None
+    assert result.final_capture.policy == result.initial_capture.policy
+    assert result.children and result.presentation.status == "pass"
+    SchemaRegistry().validate("plugin-quality.v1", result.model_dump(mode="json"))
+    assert result.release_ready is result.execution_authorized is result.mutation_performed is False
+    manifest_path.write_text(original)
+    monkeypatch.setattr(service, "validate_plugin_package", capture)
+    recovered = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert recovered.status == "local_checks_passed"
 
 
 @pytest.mark.parametrize("field", ["require_version", "require_description"])

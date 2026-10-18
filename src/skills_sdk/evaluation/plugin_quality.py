@@ -7,7 +7,7 @@ from pathlib import Path
 
 from skills_sdk.evaluation.quality_workflow import check_local_quality
 from skills_sdk.models.content_review import ContentReviewAssessment
-from skills_sdk.models.plugin import PluginValidationPolicy
+from skills_sdk.models.plugin import PluginPackageValidation, PluginValidationPolicy
 from skills_sdk.models.plugin_quality import (
     PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES,
     PluginQualityRequest,
@@ -16,6 +16,7 @@ from skills_sdk.models.plugin_quality import (
     supported_quality_root,
 )
 from skills_sdk.models.quality_workflow import LocalCheckResultV2
+from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation.plugin_package import validate_plugin_package
 from skills_sdk.validation.plugin_presentation import check_plugin_presentation
 
@@ -114,6 +115,22 @@ async def _check_plugin_quality(
     final = validate_plugin_package(
         plugin_root, source_revision=selected.candidate.source_revision, policy=capture.policy
     )
+    if final.candidate is not None and (
+        final.candidate.package_id != selected.candidate.package_id
+        or final.candidate.source_revision != selected.candidate.source_revision
+    ):
+        final = PluginPackageValidation(
+            status="blocked",
+            policy=capture.policy,
+            findings=(
+                SkillPackageFinding(
+                    code="plugin_quality_source_changed",
+                    severity=ValidationSeverity.BLOCKER,
+                    message="Final source capture no longer resolves the selected plugin identity.",
+                    evidence_refs=("plugin.json",),
+                ),
+            ),
+        )
     evidence["final_capture"] = final
     if final != capture:
         return _block("plugin_quality_source_changed", **evidence)
