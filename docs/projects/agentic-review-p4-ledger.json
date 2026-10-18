@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "classes": [
+    {
+      "finding_class_id": "finding_inner_proof_failure",
+      "fingerprint_sha256": "c1b293a7f36a453ee093e5d264d5c0368117a69e4c4fada1707ee5d9b81ff767",
+      "normalized_invariant": "inner proof failure must prevent outer success or recovery",
+      "root_cause": "Runnable documentation discards failed inner verification before its outer completion or recovery decision.",
+      "occurrences": [
+        {"repository": "jscraik/skills-sdk", "pull_request": 76, "evidence_ref": "https://github.com/jscraik/skills-sdk/pull/76"},
+        {"repository": "jscraik/skills-sdk", "pull_request": 80, "evidence_ref": "https://github.com/jscraik/skills-sdk/pull/80"},
+        {"repository": "jscraik/skills-sdk", "pull_request": 82, "evidence_ref": "https://github.com/jscraik/skills-sdk/pull/82"}
+      ],
+      "guardrail": {
+        "status": "validated",
+        "artifact_ref": "tests/test_skill_validation_architecture.py:179",
+        "validation_commands": [{
+          "command": "UV_CACHE_DIR=.tmp/uv-cache MISE_CEILING_PATHS=\"$PWD/..\" MISE_TRUSTED_CONFIG_PATHS=\"$PWD/.mise.toml\" mise exec -- uv run --frozen pytest tests/test_skill_validation_architecture.py -q",
+          "status": "pass"
+        }]
+      },
+      "merge_eligible": true
+    }
+  ]
+}
