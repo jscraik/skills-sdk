@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from pathlib import Path
 
 from skills_sdk.evaluation.quality_workflow import check_local_quality
@@ -19,6 +22,9 @@ from skills_sdk.models.quality_workflow import LocalCheckResultV2
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation.plugin_package import validate_plugin_package
 from skills_sdk.validation.plugin_presentation import check_plugin_presentation
+
+_WORK_SLOTS = threading.BoundedSemaphore(2)
+_WORKERS = ThreadPoolExecutor(max_workers=2, thread_name_prefix="plugin-quality")
 
 
 def _assessments_within_budget(supplied: object, selected: PluginQualityRequest) -> bool:
@@ -155,11 +161,21 @@ async def check_plugin_quality(
 ) -> PluginQualityResult:
     """Compose read-only supplied checks without blocking the caller's event loop.
 
-    One worker retains sequential first-stop semantics and source recapture.
+    At most two process-wide workers retain sequential first-stop semantics.
     Cancellation releases the caller; the bounded read-only worker may finish.
     The supplied-only profile admits no provider callbacks or release actions.
     """
-    return await asyncio.to_thread(_run_plugin_quality, plugin_root, request, assessments, presentation_request)
+    if not _WORK_SLOTS.acquire(blocking=False):
+        return _block("plugin_quality_capacity_exceeded")
+    try:
+        future = _WORKERS.submit(
+            copy_context().run, _run_plugin_quality, plugin_root, request, assessments, presentation_request
+        )
+    except RuntimeError:
+        _WORK_SLOTS.release()
+        raise
+    future.add_done_callback(lambda _completed: _WORK_SLOTS.release())
+    return await asyncio.wrap_future(future)
 
 
 __all__ = ["check_plugin_quality"]

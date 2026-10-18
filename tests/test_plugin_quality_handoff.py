@@ -11,8 +11,79 @@ import pytest
 from test_plugin_quality import _plugin
 
 from skills_sdk.cli import plugin_quality as route
+from skills_sdk.cli.main import main
 from skills_sdk.evaluation import plugin_quality as service
 from skills_sdk.models.content_review import CONTENT_REVIEW_ASSESSMENT_MAX_BYTES, ContentReviewAssessment
+
+
+@pytest.mark.parametrize("field", ["statement", "reason", "owner"])
+def test_unsafe_coverage_text_never_enters_a_plugin_receipt(
+    tmp_path: Path, field: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Reject synthetic sensitive text before retaining request or later blocker evidence."""
+    root, request, assessments, presentation = _plugin(tmp_path)
+    plan = request["children"][0]["request"]["coverage_plan"]
+    marker = "api_key=synthetic-fixture-only"
+    if field == "statement":
+        plan["claims"][0][field] = marker
+    else:
+        plan["gaps"] = [{"id": "gap-fixture", "reason": "Deferred fixture", "owner": "Fixture owner"}]
+        plan["mappings"][0]["gap_ids"] = ["gap-fixture"]
+        plan["gaps"][0][field] = marker
+    result = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert result.blocker.code == "plugin_quality_request_invalid"
+    assert result.request is None and marker not in result.model_dump_json()
+    path = tmp_path / "request.json"
+    path.write_text(json.dumps(request))
+    assert main(["check-plugin-quality", str(root), "--request", str(path), "--json"]) == 2
+    output = capsys.readouterr().out
+    assert marker not in output
+    assert json.loads(output)["blocker"]["code"] == "plugin_quality_request_invalid"
+
+
+def test_concurrent_admission_is_bounded_until_cancelled_workers_finish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Overflow never submits work; cancellation cannot release an active worker slot."""
+    root, request, assessments, presentation = _plugin(tmp_path)
+    entered = threading.Barrier(3)
+    release = threading.Event()
+    finished = threading.Barrier(3)
+
+    def work(*args: object) -> object:
+        entered.wait(timeout=5)
+        assert release.wait(timeout=5)
+        finished.wait(timeout=5)
+        return service._block("plugin_quality_request_invalid")
+
+    monkeypatch.setattr(service, "_run_plugin_quality", work)
+
+    async def run() -> None:
+        first = asyncio.create_task(service.check_plugin_quality(root, request, assessments=assessments))
+        second = asyncio.create_task(service.check_plugin_quality(root, request, assessments=assessments))
+        try:
+            await asyncio.to_thread(entered.wait, 5)
+            overflow = await service.check_plugin_quality(root, request)
+            assert overflow.blocker.code == "plugin_quality_capacity_exceeded"
+            first.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await first
+            assert (
+                await service.check_plugin_quality(root, request)
+            ).blocker.code == "plugin_quality_capacity_exceeded"
+        finally:
+            release.set()
+            await asyncio.to_thread(finished.wait, 5)
+            await second
+
+    asyncio.run(run())
+    monkeypatch.undo()
+    recovered = asyncio.run(
+        service.check_plugin_quality(root, request, assessments=assessments, presentation_request=presentation)
+    )
+    assert recovered.status == "local_checks_passed"
 
 
 def test_contract_sized_many_record_assessment_returns_a_result(tmp_path: Path) -> None:

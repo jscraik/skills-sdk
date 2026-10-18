@@ -75,10 +75,21 @@ With passing children, an omitted presentation
 request produces `plugin_quality_presentation_missing`. Two additive families carry the contract:
 `plugin-quality-request/v1` and `plugin-quality/v1`.
 
-The supplied-only workflow runs sequentially in one worker, keeping filesystem
+Each supplied-only workflow runs sequentially in one worker, keeping filesystem
 scans and child composition off the caller's event loop. Cancellation releases
 the caller, but cannot forcibly stop the bounded read-only worker. It may finish
 its checks; cancellation grants no mutation, provider or release authority.
+Across event loops and callers, at most two plugin-quality operations are
+admitted per process. Excess calls return `plugin_quality_capacity_exceeded`
+without retaining input or submitting work; retry after an admitted operation
+finishes. Cancellation keeps a running worker's slot occupied until it finishes.
+This bound does not govern work in other processes or memory callers retain.
+
+Whole-plugin requests reject coverage claim statements and gap reasons or owners
+that fail the SDK's existing public-text redaction checks. Invalid requests
+return `plugin_quality_request_invalid` without retaining that text in JSON.
+This is semantic model/service validation, beyond the structural JSON Schema;
+it detects supported credential and machine-path patterns, not every secret.
 
 The request binds the root candidate identity, mode manifest and one explicit
 `LocalCheckRequestV2` per direct child skill, sorted and unique, all at the root

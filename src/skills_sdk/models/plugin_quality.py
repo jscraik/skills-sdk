@@ -13,6 +13,7 @@ from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding
 from skills_sdk.models.plugin_presentation import PluginPresentationCheck
 from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckResultV2
+from skills_sdk.models.safety import _public_text_is_redaction_safe
 
 PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES = 32 * 1_048_576
 """Aggregate supplied-assessment budget: four maximum-sized content-review assessments."""
@@ -24,6 +25,7 @@ _BLOCKER_CODES = frozenset(
     {
         "plugin_quality_input_invalid",
         "plugin_quality_request_invalid",
+        "plugin_quality_capacity_exceeded",
         "plugin_quality_root_mismatch",
         "plugin_quality_assessments_invalid",
         "plugin_quality_child_blocked",
@@ -130,6 +132,11 @@ class PluginQualityChild(_ContractModel):
         PluginSkillBinding.direct_skill(self.path)
         if self.request.intent == "update" or self.request.content_review_mode != "supplied":
             raise ValueError("plugin quality requires create/external-check and supplied review")
+        plan = self.request.coverage_plan
+        text = [claim.statement for claim in plan.claims]
+        text.extend(value for gap in plan.gaps for value in (gap.reason, gap.owner))
+        if any(not _public_text_is_redaction_safe(value) for value in text):
+            raise ValueError("plugin quality coverage text must be redaction-safe")
         return self
 
 
@@ -247,7 +254,7 @@ class PluginQualityResult(_ContractModel):
         if code not in _BLOCKER_CODES:
             raise ValueError("plugin quality blocker code is not part of this contract")
         retained = {name for name in _SUCCESS_EVIDENCE if getattr(self, name)}
-        early = {"plugin_quality_input_invalid", "plugin_quality_request_invalid"}
+        early = {"plugin_quality_input_invalid", "plugin_quality_request_invalid", "plugin_quality_capacity_exceeded"}
         if code in early:
             valid = not retained
         elif self.request is None or self.initial_capture is None:
