@@ -18,6 +18,7 @@ See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledge
 Contents:
 
 - [Plugin presentation assessment](#plugin-presentation-assessment)
+- [Whole-plugin quality composition](#whole-plugin-quality-composition)
 - [Portable plugin validation](#portable-plugin-validation)
 - [Contract families](#contract-families)
 - [Matched whole-plugin evaluation](#matched-whole-plugin-evaluation)
@@ -61,6 +62,111 @@ Rights, visual judgement and copy accuracy remain supplied claims, not independe
 review. Mutation, execution, release, archive, publication and host-display
 authority remain false. A pass neither normalises standalone input nor prepares
 a release archive. Delivery state is in the [task record](projects/sdk-workflow/tasks.md).
+
+## Whole-plugin quality composition
+
+Unmerged PR candidate for issue #92: the asynchronous
+`await check_plugin_quality(plugin_root, request, *, assessments=None, presentation_request=None)`
+in `skills_sdk.evaluation` resolves to `PluginQualityResult`; calling it without
+`await` returns a coroutine, not a receipt. Omitting assessments uses an empty
+mapping and retains first-stop child semantics. If the earlier child gates pass,
+missing supplied content review produces `plugin_quality_child_blocked`.
+With passing children, an omitted presentation
+request produces `plugin_quality_presentation_missing`. Two additive families carry the contract:
+`plugin-quality-request/v1` and `plugin-quality/v1`.
+
+Each supplied-only workflow runs sequentially in one worker, keeping filesystem
+scans and child composition off the caller's event loop. Cancellation releases
+the caller, but cannot forcibly stop the bounded read-only worker. It may finish
+its checks; cancellation grants no mutation, provider or release authority.
+Across event loops and callers, at most two plugin-quality operations are
+admitted per process. Excess calls return `plugin_quality_capacity_exceeded`
+without retaining input or submitting work; retry after an admitted operation
+finishes. Cancellation keeps a running worker's slot occupied until it finishes.
+This bound does not govern work in other processes or memory callers retain.
+
+Whole-plugin envelopes check every retained JSON key and string with the SDK's
+existing public-text redaction checks. This includes request intake and policy
+paths, coverage identifiers and prose, capture findings, scenario case identifiers,
+scorer and calibration metadata, and presentation evidence. Invalid requests
+return `plugin_quality_request_invalid` without retaining that text in JSON.
+This is semantic model/service validation, beyond the structural JSON Schema;
+it detects supported credential and machine-path patterns, not every secret.
+
+Raw API requests and presentation requests each have a 1 MiB compact UTF-8 JSON
+budget, checked before recursive normalisation or downstream services. This
+matches the CLI's input-file ceiling; whitespace in CLI files still counts
+towards its file limit. Supplied result envelopes have a 64 MiB compact JSON
+budget. These composition limits reject oversized inputs, including otherwise
+valid standalone receipts, without changing those standalone contracts. The
+budget walker charges container sizes and visits strings in bounded chunks;
+it rejects noncanonical values and nesting beyond 64 levels without serialising
+the entire envelope. Unsafe or oversized captured evidence returns an empty
+`plugin_quality_input_invalid` blocker rather than retaining rejected text.
+
+The request binds the root candidate identity, mode manifest and one explicit
+`LocalCheckRequestV2` per direct child skill, sorted and unique, all at the root
+source revision. Child-path uniqueness and ordering are semantic constraints
+enforced by the SDK models and `SchemaRegistry`, beyond structural JSON Schema.
+Schema-only validation does not prove these constraints.
+Captured manifest descriptions and versions, retained child identity versions,
+and presentation image or copy evidence references must pass the composition's
+existing public-text checks for credential-shaped text and machine paths.
+Unsafe retained metadata returns `plugin_quality_input_invalid` without retaining
+the evidence. These pattern checks do not guarantee detection of every secret;
+standalone plugin and presentation contracts remain unchanged. Raw or copied
+request and result envelopes reject child counts above 128 before recursive
+normalisation; structural field limits remain in place too.
+The service freshly captures the root, composes
+`check_local_quality` for each child in order, then `check_plugin_presentation`,
+and recaptures the root before success. It stops at the first blocker and retains
+the partial evidence. Changed bytes, modes, settings or images, missing or
+unrequested assessments, and a missing presentation request block.
+
+The supported profile is skill-only, create or external check, with supplied
+content review. Update intent and `mcp.json` are rejected. Other ordinary plugin
+files are captured in the root candidate, retaining paths, content digests,
+byte sizes and modes rather than raw file contents, but
+receive no quality assessment beyond the presentation images that settings
+reference. Directories are checked only transiently during each capture; an
+empty directory's presence or mode is not retained candidate identity.
+`assessments` must be a concrete `dict`, not another `Mapping`, keyed by requested
+child path. Its combined supplied evidence is bounded by
+`PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB of compact UTF-8 JSON for the
+whole mapping, including paths and separators, checked before any child runs); an
+oversized, cyclic or non-dict bundle returns `plugin_quality_assessments_invalid`.
+CLI JSON decoding also checks nesting at 64 levels and a 4,194,304-node
+structural budget before materialisation. This retains admission of the tested
+four-child compact assessment bundle below 32 MiB; long strings use constant
+scanner state. These resource checks do not replace complete JSON grammar,
+duplicate-member rejection or the per-assessment eight-MiB contract.
+The service also checks the complete normalized mapping of valid assessments,
+including model defaults, before child execution. Malformed individual evidence
+still stops at its existing child review stage rather than escaping as an exception.
+The same budget is reapplied to the normalized assessments retained in a supplied
+`plugin-quality/v1` result, so a forged envelope cannot exceed what the service
+admits. Whitespace-padded `package_id`, `source_revision` and digest strings are
+rejected before normalization in both requests and results. A
+`plugin_quality_source_changed` result may retain an unresolved blocked recapture
+or one that differs in content or modes, but a resolved recapture must keep the
+selected `package_id` and `source_revision`.
+Its retained passed presentation must remain consistent with the initial capture's
+settings and image bytes even when the final capture changes.
+A successful run recaptures the root several times through the accepted validation
+and presentation services to bind source stability and image bytes. For a
+maximum-size plugin that is a proportionate input cost, not a measured latency or
+memory figure. Sharing one capture needs a snapshot API in those services and is
+follow-up scope.
+`mutation_performed`, `evaluation_executed`, `execution_authorized` and
+`release_ready` are always `false`. A pass is local composition evidence only: it
+is not independent artwork approval, release clearance, installation or
+runtime proof. Models and schemas check supplied consistency; only the service
+recaptures source and derives presentation image references from the captured
+settings. The model retains no raw settings, so it cannot prove that a supplied
+image set equals the declared references; it checks retained image paths, digests
+and sizes against the initial capture. The packaged success schema requires every
+evidence member and at least one child; blocker codes, retained stages and the
+cross-object comparisons stay model and registry checks.
 
 ## Portable plugin validation
 

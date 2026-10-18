@@ -166,6 +166,10 @@ was still running and the local update receipt had not passed; merge topology
 does not retroactively establish those lanes. This is historical merge evidence,
 not an active instruction to repeat PR #53 work.
 
+Issue #92, unmerged: bounded whole-plugin quality composition reconciled onto
+accepted main `39c01bb` from a hashed seven-file handoff. It stays labelled
+unmerged until a PR is accepted, and it closes none of S2, S3, S4 or S5.
+
 Parked work remains root-owned, with no ownership transfer: the presentation
 branch `codex/sdk-plugin-presentation-integration` at signed `0c6eea3` is retained
 historical work; PR #60 accepted its bounded presentation assessment at

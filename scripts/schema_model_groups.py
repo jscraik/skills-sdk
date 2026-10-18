@@ -45,6 +45,7 @@ from skills_sdk.models.plugin_presentation import (
     PluginPresentationCopyApproval,
     PluginPresentationRequest,
 )
+from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityResult
 from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
 from skills_sdk.models.provider_call import ProviderCallPublicResult, TextProviderAdapterDescriptor
@@ -132,6 +133,8 @@ def intake_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (PluginPresentationCopyApproval, "plugin-presentation-copy-approval.v1.schema.json"),
         (PluginPresentationRequest, "plugin-presentation-request.v1.schema.json"),
         (PluginPresentationCheck, "plugin-presentation-check.v1.schema.json"),
+        (PluginQualityRequest, "plugin-quality-request.v1.schema.json"),
+        (PluginQualityResult, "plugin-quality.v1.schema.json"),
         (SkillPackageIntakeContext, "skill-package-intake-context.v1.schema.json"),
         (SkillPackageIntakeReceipt, "skill-package-intake.v1.schema.json"),
         (PluginNormalizationMetadata, "plugin-normalization-metadata.v1.schema.json"),

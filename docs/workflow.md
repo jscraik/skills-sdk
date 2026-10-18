@@ -25,6 +25,13 @@ image bytes, modes and supplied approval to the complete plugin. It does not
 establish independent rights or visual approval, archive inclusion or observed
 host display.
 
+Unmerged PR candidate for issue #92 adds bounded whole-plugin quality
+composition through `check_plugin_quality` / `check-plugin-quality`. It composes
+the existing child quality and presentation services between an initial binding
+root capture and a final recapture that must be unchanged before a pass, for
+skill-only create or external-check candidates. It grants no execution,
+independent artwork approval or release clearance.
+
 Accepted PR #52 adds the bounded
 [`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including
 fresh source comparison through `--verify-evidence` for supplied validation,

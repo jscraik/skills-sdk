@@ -97,6 +97,8 @@ SCHEMA_NAMES = frozenset(
         "plugin-presentation-copy-approval.v1",
         "plugin-presentation-request.v1",
         "plugin-presentation-check.v1",
+        "plugin-quality-request.v1",
+        "plugin-quality.v1",
         "skill-package-intake.v1",
         "skill-package-intake-context.v1",
         "plugin-normalization-metadata.v1",
@@ -553,6 +555,10 @@ class SchemaRegistry:
                 "plugin-presentation-request.v1": PluginPresentationRequest,
                 "plugin-presentation-check.v1": PluginPresentationCheck,
             }[name]
+        elif name in {"plugin-quality-request.v1", "plugin-quality.v1"}:
+            from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityResult
+
+            model = PluginQualityRequest if name == "plugin-quality-request.v1" else PluginQualityResult
         elif name == "skill-package-validation.v1":
             from skills_sdk.models.validation import SkillPackageValidation
 

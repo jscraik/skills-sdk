@@ -20,7 +20,7 @@ update, external-intake, registry delivery, or host installation workflow:
 ```text
 inventory   intake   check-local   check-quality   validate   build   review-content   eval   package   project   verify
 tessl prepare   tessl verify
-compare-copy   maintain-entrypoint   validate-plugin   normalize-plugin   check-plugin-presentation
+compare-copy   maintain-entrypoint   validate-plugin   normalize-plugin   check-plugin-presentation   check-plugin-quality
 ```
 
 A missing command, including `skills-sdk tessl` without a subcommand, is a
@@ -71,6 +71,18 @@ routes can format diagnostics differently, so branch on the exit status first.
 Then parse stdout only when the invocation reached a service, and check its
 `schema_version` and `status`. Never run skill or plugin content to diagnose a
 result.
+
+### Whole-plugin quality composition
+
+Unmerged PR candidate for issue #92:
+`skills-sdk check-plugin-quality ./my-plugin --request ./request.json --assessments ./assessments.json --presentation-request ./presentation.json --json --robot`.
+Keep all three inputs outside plugin source as bounded no-follow JSON. The
+`--assessments` bundle may reach 32 MiB; the other inputs keep the shared 1 MiB limit. Exit `0`
+means every child and the presentation check passed on unchanged source; `2`
+returns a typed `plugin-quality/v1` blocker. The route is read-only and its pass
+is not release, execution or installation clearance. Raster inspection requires
+the SDK `images` extra; an unavailable decoder blocks presentation. See the
+[API profile](api.md#whole-plugin-quality-composition).
 
 ### Plugin presentation assessment
 

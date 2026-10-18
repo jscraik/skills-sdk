@@ -59,7 +59,14 @@ authenticated. Models/schemas check consistency; the service recaptures bytes
 and modes. Installed public API/schema/CLI proof covers retained approval after
 valid asset/mode drift, rejected inputs and corrected recovery without sibling
 repositories. Synthetic approval is not artwork approval, archive inclusion or
-observed display. Explicit normalisation, whole-plugin quality composition and
+observed display.
+
+Unmerged issue #92 / PR #93 candidate, not part of the accepted PR #60 presentation
+contract: whole-plugin quality composition bounds supplied assessments to 32 MiB in
+aggregate. The fresh composition service derives every declared image reference
+from the captured settings and requires approvals to cover exactly that set, then
+retains byte bindings. Static retained receipts check only path, digest and size
+consistency, not settings derivation. Explicit normalisation and
 release preparation remain separate gaps; see the [API boundary](api.md#plugin-presentation-assessment).
 
 ## Selected-case safety admission

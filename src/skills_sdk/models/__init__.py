@@ -130,6 +130,7 @@ from skills_sdk.models.plugin_presentation import (
     PluginPresentationImage,
     PluginPresentationRequest,
 )
+from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityResult
 from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
@@ -296,6 +297,8 @@ __all__ = [
     "PluginPresentationCopyApproval",
     "PluginPresentationImage",
     "PluginPresentationRequest",
+    "PluginQualityRequest",
+    "PluginQualityResult",
     "PluginSkillBinding",
     "PluginValidationPolicy",
     "PortablePluginManifest",
