@@ -60,8 +60,11 @@ assert asyncio.run(service.check_plugin_quality(Path('.'), {})).blocker.code == 
     assert result.returncode == 0, result.stderr
 
 
+@pytest.mark.parametrize("field", ["description", "version"])
 @pytest.mark.parametrize("marker", ["api_key=synthetic-fixture-only", str(Path("/") / "Users" / "fixture" / "private")])
-def test_manifest_description_is_not_emitted(tmp_path: Path, marker: str, capsys: pytest.CaptureFixture[str]) -> None:
+def test_manifest_description_is_not_emitted(
+    tmp_path: Path, field: str, marker: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Unsafe captured metadata must stop without retaining it in API or CLI JSON."""
     from test_plugin_quality import REVISION
 
@@ -71,7 +74,7 @@ def test_manifest_description_is_not_emitted(tmp_path: Path, marker: str, capsys
     root, request, assessments, presentation = _plugin(tmp_path)
     path = root / "plugin.json"
     manifest = json.loads(path.read_text())
-    manifest["description"] = marker
+    manifest[field] = marker
     path.write_text(json.dumps(manifest))
     capture = validate_plugin_package(
         root, source_revision=REVISION, policy=PluginValidationPolicy(require_version=True, require_description=True)
@@ -91,9 +94,10 @@ def test_manifest_description_is_not_emitted(tmp_path: Path, marker: str, capsys
     assert json.loads(output)["blocker"]["code"] == "plugin_quality_input_invalid"
 
 
+@pytest.mark.parametrize("metadata_field", ["description", "version"])
 @pytest.mark.parametrize("field", ["initial_capture", "final_capture"])
 def test_supplied_and_late_manifest_descriptions_fail_closed(
-    tmp_path: Path, field: str, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, field: str, metadata_field: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Revalidated receipts and a late real source change cannot retain unsafe text."""
     from pydantic import ValidationError
@@ -111,7 +115,7 @@ def test_supplied_and_late_manifest_descriptions_fail_closed(
     path = root / "plugin.json"
     original = path.read_text()
     manifest = json.loads(original)
-    manifest["description"] = marker
+    manifest[metadata_field] = marker
     path.write_text(json.dumps(manifest))
     capture = service.validate_plugin_package(root, source_revision=REVISION, policy=passed.initial_capture.policy)
     raw = passed.model_dump(mode="json")
@@ -121,7 +125,7 @@ def test_supplied_and_late_manifest_descriptions_fail_closed(
         raw["blocker"]["code"] = "plugin_quality_root_mismatch"
     raw[field] = capture.model_dump(mode="json")
     for value in (raw, passed.model_copy(update=raw)):
-        with pytest.raises(ValidationError, match="captured descriptions"):
+        with pytest.raises(ValidationError, match="captured metadata"):
             PluginQualityResult.model_validate(value)
     with pytest.raises(ContractError):
         SchemaRegistry().validate("plugin-quality.v1", raw)
@@ -343,3 +347,18 @@ def test_documented_optional_inputs_retain_actual_first_stop_codes(tmp_path: Pat
     assert len(no_assessments.children) == 1 and no_assessments.children[0].status == "blocked"
     no_presentation = asyncio.run(service.check_plugin_quality(root, request, assessments=assessments))
     assert no_presentation.blocker.code == "plugin_quality_presentation_missing"
+
+
+def test_excess_assessment_keys_stop_before_materialization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reject excessive keys before attempting a duplicate hash-table allocation."""
+    root, request, _assessments, _presentation = _plugin(tmp_path)
+
+    def materialize_keys(*args: object) -> object:
+        raise AssertionError("excess keys were copied before count rejection")
+
+    monkeypatch.setattr(service, "set", materialize_keys, raising=False)
+    supplied = {"unrequested-one": {}, "unrequested-two": {}}
+    result = asyncio.run(service.check_plugin_quality(root, request, assessments=supplied))
+    assert result.blocker.code == "plugin_quality_assessments_invalid"
+    assert not result.children and result.presentation is None
+    assert "unrequested-one" not in result.model_dump_json()

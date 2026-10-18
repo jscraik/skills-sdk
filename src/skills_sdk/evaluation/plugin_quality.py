@@ -17,7 +17,7 @@ from skills_sdk.models.plugin_quality import (
     PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES,
     PluginQualityRequest,
     PluginQualityResult,
-    _capture_description_is_safe,
+    _capture_metadata_is_safe,
     bounded_json_size,
     supported_quality_root,
 )
@@ -58,7 +58,10 @@ def _assessments_within_budget(supplied: object, selected: PluginQualityRequest)
     bounded, container-limited compact JSON encoding so that no oversized or
     cyclic evidence is retained or revalidated.
     """
-    if type(supplied) is not dict or not set(supplied).issubset(child.path for child in selected.children):
+    if type(supplied) is not dict or len(supplied) > len(selected.children):
+        return False
+    selected_paths = {child.path for child in selected.children}
+    if any(path not in selected_paths for path in supplied):
         return False
     try:
         bounded_json_size(supplied, PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES)
@@ -118,7 +121,7 @@ async def _check_plugin_quality(
         source_revision=selected.candidate.source_revision,
         policy=PluginValidationPolicy(require_version=True, require_description=True),
     )
-    if not _capture_description_is_safe(capture):
+    if not _capture_metadata_is_safe(capture):
         return _block("plugin_quality_input_invalid")
     evidence: dict[str, object] = {"request": selected, "initial_capture": capture}
     if not supported_quality_root(selected, capture):
@@ -147,7 +150,7 @@ async def _check_plugin_quality(
     final = validate_plugin_package(
         plugin_root, source_revision=selected.candidate.source_revision, policy=capture.policy
     )
-    if not _capture_description_is_safe(final):
+    if not _capture_metadata_is_safe(final):
         return _block("plugin_quality_input_invalid")
     if final.candidate is not None and (
         final.candidate.package_id != selected.candidate.package_id

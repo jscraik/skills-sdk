@@ -172,10 +172,14 @@ class PluginQualityRequest(_ContractModel):
         return self
 
 
-def _capture_description_is_safe(capture: PluginPackageValidation) -> bool:
-    """Keep retained manifest descriptions within the composition public-text boundary."""
-    description = capture.manifest.description if capture.manifest is not None else None
-    return description is None or _public_text_is_redaction_safe(description)
+def _capture_metadata_is_safe(capture: PluginPackageValidation) -> bool:
+    """Keep retained free-form manifest fields within the public-text boundary."""
+    if capture.manifest is None:
+        return True
+    return all(
+        value is None or _public_text_is_redaction_safe(value)
+        for value in (capture.manifest.description, capture.manifest.version)
+    )
 
 
 def supported_quality_root(request: PluginQualityRequest, capture: PluginPackageValidation) -> bool:
@@ -226,10 +230,10 @@ class PluginQualityResult(_ContractModel):
     def binds_complete_plugin(self) -> Self:
         """Require complete root and child evidence for any successful result."""
         if any(
-            capture is not None and not _capture_description_is_safe(capture)
+            capture is not None and not _capture_metadata_is_safe(capture)
             for capture in (self.initial_capture, self.final_capture)
         ):
-            raise ValueError("plugin quality captured descriptions must be redaction-safe")
+            raise ValueError("plugin quality captured metadata must be redaction-safe")
         if (self.status == "blocked") != (self.blocker is not None):
             raise ValueError("plugin quality status requires its blocker")
         if (
