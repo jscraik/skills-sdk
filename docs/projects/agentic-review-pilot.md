@@ -6,7 +6,9 @@ validated and independently checked locally. The implementation and reports
 merged. Configs PR 369's separate docstring follow-up merged before its final
 readiness receipt. Configs PR 370's request-helper follow-up subsequently merged
 after a fresh passing readiness receipt and explicit merge authorisation.
-Later product implementation phases are proposed.
+P3 is closed against the PR 63 evidence below. P4 remains pending recurrence
+qualification; P5 is planned but not executed. The pilot and later product
+rollout are not complete.
 This document authorizes no external installation, PR messaging, paid execution,
 publication, or merge.
 
@@ -50,7 +52,8 @@ standards, checks, reviewer integrations, and readiness gates.
 
 Navigate to the [recorded final merge result](agentic-review-p1-results.md#final-pr-370-merge-17-october-2026),
 [P2 implementation and delivery history](#p2-local-implementation-checkpoint-17-october-2026),
-or [proposed P3](#p3-complete-one-real-pr-loop). The latest dated closeout
+or [P3 acceptance](#p3-complete-one-real-pr-loop) and the
+[P4/P5 evidence plan](#p4p5-evidence-plan-18-october-2026). The latest dated closeout
 supersedes earlier pending checkpoints only for the evidence it records.
 
 ## Outcome and boundary
@@ -522,6 +525,24 @@ results do not accept the unrelated primary-checkout changes.
 
 Owner: SDK maintainer and independent reviewer. Depends on P2.
 
+Status: closed on 18 October 2026 using the recorded PR 63 real loop and the
+subsequently delivered P2 regressions. This is acceptance of an existing
+bounded result, not a new hosted review or a retrospective readiness receipt.
+
+| Acceptance criterion | Evidence and disposition |
+| --- | --- |
+| Selected PR and exact revisions | [PR 63](https://github.com/jscraik/skills-sdk/pull/63): base `d1cd2958122bbc67fbbfd96b3294700f2dc97560`, original head `91ab3cfd39024d34d9ab8cf64fd3d25f27ca497d`, repaired head `7f1c4b1489b7545c2d162fbf1144533c19486d49`. GitHub identity and merge were read back on 18 October. |
+| Original failure and author response | [P1 reproductions](agentic-review-p1-results.md#finding-1-dependency-namespace-gap) confirmed both the host-adapter namespace omission and silent incomplete CLI invocation. Both were accepted for repair, with before/after cases recorded. |
+| Repair and fresh proof | Explicit namespace checks and required subparsers were repaired. The [P1 report](agentic-review-p1-results.md) records focused regressions, valid neighbouring cases, full local validation and hosted tests/build/installed proof separately. No test was rerun merely to close this phase. |
+| Independent coverage and current-head re-review | The recorded complete-diff review, later metadata repair verification and [final CodeRabbit verdict](https://github.com/jscraik/skills-sdk/pull/63#issuecomment-6225973413) join the recorded Codex code/security results at the repaired head. Later concerns were handled rather than hidden by the earlier clean result. |
+| Hosted checks, threads and readiness | The [final SDK closeout](agentic-review-p1-results.md#final-sdk-merge-and-review-closeout-17-october-2026) records all five checks, both required reviewers and zero unresolved threads in the 16 October 22:49:15 UTC receipt. This is historical evidence, not a claim about checks running now. |
+| Final disposition and remaining limits | GitHub confirms merge at 16 October 22:49:36 UTC as `e480d429adaf400f3ae0ab78c4a4bacb0fbeae60`. The recorded accepted tree matches the cleared candidate. One successful loop does not establish broad review usefulness, package release, runtime installation or product rollout. |
+
+P3 used the P1 live case; it does not claim a second prospective run after P2.
+P2's seven supplied-history regressions provide the separate repeatability
+evidence. P5 must still test prospective use rather than count this historical
+case again as a new observation.
+
 Run the selected SDK PR through existing validation, actual review, author
 response, repair, and current-head re-review. Confirm hosted check results and
 review-thread state through the existing readiness process. A pilot completion
@@ -576,6 +597,99 @@ Required technical outcomes:
 Continue only if the reviews add useful findings or materially reduce review
 effort. Tune the existing lens or adapter before adding another reviewer.
 Persistent disagreement or excessive noise is a reason to retain shadow mode.
+
+### P4/P5 evidence plan, 18 October 2026
+
+This plan uses this report and the linked P1 record. It adds no service,
+validator, public contract or automated memory writer. The SDK maintainer owns
+collection, an independent reviewer checks dispositions, and Jamie owns the
+expansion decision. Those roles do not assign a new agent or authorise external
+review requests, paid execution, publication, installation or merges.
+
+#### P4: Qualify recurrence before selecting a repair
+
+Status: pending evidence qualification. P2 ordering/parser repairs and PR 91's
+worked example are possible inputs, not proof of three independent occurrences
+or a completed P4 improvement. Synthetic fixtures do not count as occurrences.
+
+1. Inspect the existing findings and responses from PR 63 and the later helper
+   deliveries. Group by the same causal invariant, not shared words such as
+   "review" or "evidence". Count independent tasks, not several bot comments
+   about one defect or repeated attempts on the same head.
+2. Record repository/PR, original and repaired revision, finding URL, confirmed
+   reproduction, response, independent disposition and any linked recurrence
+   in a sanitised supplied ledger using the existing SDK schema. Preserve
+   source uncertainty; an unknown root cause does not qualify.
+3. With three qualifying occurrences, select one smallest repair in its owning
+   repository: an existing regression test, instruction correction or review
+   criterion. Record the owner, positive defect case, valid neighbouring case,
+   bounded sibling search, replaced guidance and exact validation outcome.
+   Keep shared readiness/parser work in Configs and portable contracts in SDK.
+4. Obtain independent review and use the existing `verify recurring-findings`
+   route documented in [CLI verification](../cli.md#pr-sweep-verification).
+   A consistent ledger validates supplied declarations; it does not prove the
+   linked tests ran or grant readiness. Retain that execution proof separately.
+
+Exit: one qualifying, independently checked source improvement with actual
+validation and a consistent ledger. If fewer than three independent tasks
+qualify, explicitly defer P4 with the inspected evidence and reason. Do not
+manufacture recurrence to finish the phase.
+
+#### P5: Freeze the sample before measuring usefulness
+
+Status: not started. The following five historical comparisons are selected
+for evidence collection; no effectiveness scores are assigned yet.
+
+| Historical case | Comparison purpose and limit |
+| --- | --- |
+| SDK PR 63 | Two reproduced defects, repairs and later clearance; preserve original and repaired heads. |
+| SDK PR 62 | Normalisation workflow comparison; establish its actual reference findings before scoring. |
+| SDK PR 65 | Small docstring change as a low-change control; an empty result alone cannot prove no missed defect. |
+| SDK PR 90 | Metadata correction, contradictory review summaries and merge before final qualifying clearance; retain the gap as an adverse process result. |
+| SDK PR 91 | Exact eligibility wording and pinned launcher findings, repair and current-head clearance; distinguish independent Mac proof from author-reported Linux proof. |
+
+For each case, reconstruct the original diff, review-policy revision and
+available test/reference evidence before inspecting reviewer conclusions where
+practical. If prior exposure prevents a blind comparison, label it unblinded.
+Use existing records first; a new provider replay needs its own authority and
+cost decision. Missing original evidence remains unknown rather than a pass.
+
+Select the next three eligible SDK PRs prospectively after this plan is
+accepted, before their review outcomes are known. Record PR/base/head, scope,
+selection reason and policy revision before evaluation. Include different
+change types where available; do not seed defects or select only successful
+reviews. Document exclusions before replacing a case. Historical PRs 90 and 91
+cannot also count as prospective cases.
+
+Record one row per finding and one per run in this report's eventual results:
+
+- Finding: source URL, reviewer, location, causal invariant, required/advisory
+  classification, evidence, author response and independent disposition.
+- Outcome: confirmed useful finding, independently refuted false positive,
+  duplicate, or unverified. Count a missed reference finding only when an
+  independent reference establishes it; absence of comments is not recall proof.
+- Effort and latency: author triage/repair minutes, measurement method, request
+  time, actual review start/completion and clearance time. Separate queue and
+  quota waits from inspection time; keep unmeasured effort unknown.
+- Cost and delivery: actual charged/included amount where evidenced, otherwise
+  unknown; exact reviewed head/scope, failed/skipped/incomplete outcome, later
+  concerns and readiness result. No estimate is recorded as an actual charge.
+
+P5 exit requires all five historical and three prospective records, independent
+dispositions, a check against every technical outcome above, and Jamie's
+recorded expand/tune/retain-shadow decision. Report raw counts and per-case
+limits; eight cases do not establish general accuracy or causal time savings.
+Unresolved blocking findings, unknown coverage or missing receipts remain
+visible. Keep shadow mode until that decision; product rollout remains proposed.
+
+#### Reconciliation boundary
+
+PR 91 merged after a passing current-head receipt; PR 90 merged with its final
+CodeRabbit clearance still unproven. Neither alters PR 63's recorded P3 result.
+These later cases are P5 inputs, not evidence that all pilot phases are done.
+This report reconciliation is local documentation work; it does not refresh
+the Spaces Page, publish a report PR, or adopt unrelated implementation and
+installation changes.
 
 ## Product rollout after pilot acceptance
 
