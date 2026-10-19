@@ -166,9 +166,17 @@ was still running and the local update receipt had not passed; merge topology
 does not retroactively establish those lanes. This is historical merge evidence,
 not an active instruction to repeat PR #53 work.
 
-Issue #92, unmerged: bounded whole-plugin quality composition reconciled onto
-accepted main `39c01bb` from a hashed seven-file handoff. It stays labelled
-unmerged until a PR is accepted, and it closes none of S2, S3, S4 or S5.
+Issue #92: PR #93 merged at `93526d6`, accepting bounded whole-plugin local
+quality composition reconciled from the hashed seven-file handoff. Final source
+head `91aac09` recorded these hosted aggregate validation outcomes:
+`bash scripts/validate-repository.sh quality` — pass;
+`bash scripts/validate-repository.sh tests` — pass (full tests);
+`bash scripts/validate-repository.sh build` — pass;
+`bash scripts/validate-repository.sh installed` — pass (installed API/CLI proof);
+`bash scripts/validate-repository.sh diff` — pass.
+Jamie merged externally; this does not retrospectively
+establish the agent's independent-review readiness clearance. This bounded route
+closes none of S2, S3, S4 or S5, and proves no live provider or registry execution.
 
 Parked work remains root-owned, with no ownership transfer: the presentation
 branch `codex/sdk-plugin-presentation-integration` at signed `0c6eea3` is retained

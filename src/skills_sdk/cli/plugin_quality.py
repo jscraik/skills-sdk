@@ -59,6 +59,9 @@ def _load_json(
 ) -> Any:
     """Read no-follow bytes, scan structure, then materialize with duplicate-member rejection."""
     text = read_input(path, **limit).decode("utf-8")
+    first_token = next((character for character in text if character not in " \t\r\n"), None)
+    if first_token != "{":
+        raise ValueError("JSON input must be an object")
     _scan_json_structure(text)
     return json.loads(text, object_pairs_hook=pairs)
 

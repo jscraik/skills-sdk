@@ -10,9 +10,10 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 Start with [read-only intake](#read-only-intake) or
 [schema validation](#schema-validation). These entries describe accepted SDK
-services, not a published release or live-provider clearance. Unmerged
-whole-plugin quality and native judge work remains in its owning candidate
-branch; its documentation must retain that delivery-state label until accepted.
+services, not a published release or live-provider clearance. Issue #92's
+whole-plugin quality composition merged via PR #93 at `93526d6`; unmerged
+native judge work remains in its owning candidate branch and its documentation
+must retain that delivery-state label until accepted.
 See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledger).
 
 Contents:
@@ -65,7 +66,7 @@ a release archive. Delivery state is in the [task record](projects/sdk-workflow/
 
 ## Whole-plugin quality composition
 
-Unmerged PR candidate for issue #92: the asynchronous
+Issue #92: PR #93 merged at `93526d6`; the asynchronous
 `await check_plugin_quality(plugin_root, request, *, assessments=None, presentation_request=None)`
 in `skills_sdk.evaluation` resolves to `PluginQualityResult`; calling it without
 `await` returns a coroutine, not a receipt. Omitting assessments uses an empty
@@ -135,6 +136,12 @@ child path. Its combined supplied evidence is bounded by
 `PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB of compact UTF-8 JSON for the
 whole mapping, including paths and separators, checked before any child runs); an
 oversized, cyclic or non-dict bundle returns `plugin_quality_assessments_invalid`.
+CLI request, assessment and presentation files require an object root. Other
+roots and empty inputs return `plugin_quality_input_invalid` with exit status 2
+before JSON decoding or service execution. Leading JSON whitespace is accepted;
+valid objects retain nested arrays and ordinary grammar/duplicate-member checks.
+This avoids decoding an already invalid root, not the bounded input-text read or
+every allocation within an admitted object. Direct API blocker codes are unchanged.
 CLI JSON decoding also checks nesting at 64 levels and a 4,194,304-node
 structural budget before materialisation. This retains admission of the tested
 four-child compact assessment bundle below 32 MiB; long strings use constant

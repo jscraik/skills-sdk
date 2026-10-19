@@ -74,7 +74,7 @@ result.
 
 ### Whole-plugin quality composition
 
-Unmerged PR candidate for issue #92:
+Issue #92: PR #93 merged at `93526d6`:
 `skills-sdk check-plugin-quality ./my-plugin --request ./request.json --assessments ./assessments.json --presentation-request ./presentation.json --json --robot`.
 Keep all three inputs outside plugin source as bounded no-follow JSON. The
 `--assessments` bundle may reach 32 MiB; the other inputs keep the shared 1 MiB limit. Exit `0`

@@ -25,7 +25,7 @@ image bytes, modes and supplied approval to the complete plugin. It does not
 establish independent rights or visual approval, archive inclusion or observed
 host display.
 
-Unmerged PR candidate for issue #92 adds bounded whole-plugin quality
+Issue #92: PR #93 merged at `93526d6`, adding bounded whole-plugin quality
 composition through `check_plugin_quality` / `check-plugin-quality`. It composes
 the existing child quality and presentation services between an initial binding
 root capture and a final recapture that must be unchanged before a pass, for
