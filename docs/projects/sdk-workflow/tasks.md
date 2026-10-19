@@ -168,8 +168,13 @@ not an active instruction to repeat PR #53 work.
 
 Issue #92: PR #93 merged at `93526d6`, accepting bounded whole-plugin local
 quality composition reconciled from the hashed seven-file handoff. Final source
-head `91aac09` passed hosted aggregate validation, including full tests and
-installed API/CLI proof. Jamie merged externally; this does not retrospectively
+head `91aac09` recorded these hosted aggregate validation outcomes:
+`bash scripts/validate-repository.sh quality` — pass;
+`bash scripts/validate-repository.sh tests` — pass (full tests);
+`bash scripts/validate-repository.sh build` — pass;
+`bash scripts/validate-repository.sh installed` — pass (installed API/CLI proof);
+`bash scripts/validate-repository.sh diff` — pass.
+Jamie merged externally; this does not retrospectively
 establish the agent's independent-review readiness clearance. This bounded route
 closes none of S2, S3, S4 or S5, and proves no live provider or registry execution.
 
