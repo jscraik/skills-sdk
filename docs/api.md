@@ -135,6 +135,12 @@ child path. Its combined supplied evidence is bounded by
 `PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES` (32 MiB of compact UTF-8 JSON for the
 whole mapping, including paths and separators, checked before any child runs); an
 oversized, cyclic or non-dict bundle returns `plugin_quality_assessments_invalid`.
+CLI request, assessment and presentation files require an object root. Other
+roots and empty inputs return `plugin_quality_input_invalid` with exit status 2
+before JSON decoding or service execution. Leading JSON whitespace is accepted;
+valid objects retain nested arrays and ordinary grammar/duplicate-member checks.
+This avoids decoding an already invalid root, not the bounded input-text read or
+every allocation within an admitted object. Direct API blocker codes are unchanged.
 CLI JSON decoding also checks nesting at 64 levels and a 4,194,304-node
 structural budget before materialisation. This retains admission of the tested
 four-child compact assessment bundle below 32 MiB; long strings use constant
