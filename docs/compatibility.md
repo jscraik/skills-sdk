@@ -1,8 +1,9 @@
 # Compatibility
 
-This reference describes accepted contracts and their evidence limits. Local,
-unmerged native judge and whole-plugin quality additions remain separately
-labelled in their candidate branch; they are not accepted or published APIs.
+This reference describes accepted contracts and their evidence limits. Issue
+#92's whole-plugin quality additions merged via PR #93 at `93526d6`; local,
+unmerged native judge additions remain separately labelled in their candidate
+branch and are not accepted or published APIs.
 
 Contents:
 
@@ -61,7 +62,7 @@ valid asset/mode drift, rejected inputs and corrected recovery without sibling
 repositories. Synthetic approval is not artwork approval, archive inclusion or
 observed display.
 
-Unmerged issue #92 / PR #93 candidate, not part of the accepted PR #60 presentation
+Issue #92: PR #93 merged at `93526d6`, not part of the accepted PR #60 presentation
 contract: whole-plugin quality composition bounds supplied assessments to 32 MiB in
 aggregate. The fresh composition service derives every declared image reference
 from the captured settings and requires approvals to cover exactly that set, then

@@ -28,11 +28,13 @@ def test_non_object_inputs_stop_before_decoder(
     calls: list[str] = []
 
     def bounded_decode(text: str, **kwargs: object) -> object:
+        """Record and decode only the sentinel object literal, never the raw non-object payload."""
         assert text == "{}", "non-object input reached decoder"
         calls.append(text)
         return decode(text, **kwargs)
 
     def unexpected_service(*args: object, **kwargs: object) -> None:
+        """Fail the test if the quality service is reached with a non-object input."""
         raise AssertionError("non-object input reached service")
 
     monkeypatch.setattr(route.json, "loads", bounded_decode)

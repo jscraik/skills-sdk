@@ -31,7 +31,7 @@ supplied approval; [focused proof](../tests/test_plugin_presentation.py) and
 rejection/recovery. It is not independent visual/rights review, archive inclusion,
 normalisation or whole-plugin release clearance. Those remain separate S2/S5 actions;
 no bounded child capability closes its parent acceptance criteria.
-Unmerged issue #92 candidate: `check_plugin_quality` / `check-plugin-quality`
+Issue #92: PR #93 merged at `93526d6`: `check_plugin_quality` / `check-plugin-quality`
 compose child quality and presentation for skill-only roots;
 [focused proof](../tests/test_plugin_quality.py) and
 [installed proof](../tests/installed_plugin_quality_smoke.py) cover rejection and

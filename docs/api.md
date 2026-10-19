@@ -10,9 +10,10 @@ contracts listed in its `__all__`. Import family-specific contracts such as
 
 Start with [read-only intake](#read-only-intake) or
 [schema validation](#schema-validation). These entries describe accepted SDK
-services, not a published release or live-provider clearance. Unmerged
-whole-plugin quality and native judge work remains in its owning candidate
-branch; its documentation must retain that delivery-state label until accepted.
+services, not a published release or live-provider clearance. Issue #92's
+whole-plugin quality composition merged via PR #93 at `93526d6`; unmerged
+native judge work remains in its owning candidate branch and its documentation
+must retain that delivery-state label until accepted.
 See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledger).
 
 Contents:
@@ -65,7 +66,7 @@ a release archive. Delivery state is in the [task record](projects/sdk-workflow/
 
 ## Whole-plugin quality composition
 
-Unmerged PR candidate for issue #92: the asynchronous
+Issue #92: PR #93 merged at `93526d6`; the asynchronous
 `await check_plugin_quality(plugin_root, request, *, assessments=None, presentation_request=None)`
 in `skills_sdk.evaluation` resolves to `PluginQualityResult`; calling it without
 `await` returns a coroutine, not a receipt. Omitting assessments uses an empty
