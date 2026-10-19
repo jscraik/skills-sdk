@@ -12,8 +12,9 @@ Start with [read-only intake](#read-only-intake) or
 [schema validation](#schema-validation). These entries describe accepted SDK
 services, not a published release or live-provider clearance. Issue #92's
 whole-plugin quality composition merged via PR #93 at `93526d6`; unmerged
-native judge work remains in its owning candidate branch and its documentation
-must retain that delivery-state label until accepted.
+native calibration, matched and quality work remains in its owning preserved
+branch. The optional judge adapter below is a separate delivery candidate until
+its PR is merged; it does not admit those broader families.
 See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledger).
 
 Contents:
@@ -586,6 +587,33 @@ or completed reviewer execution.
   Cancellation remains cancellation after bounded cleanup. This service does
   not discover adapters, read credentials, contact a network, evaluate output,
   or establish external provider truth.
+- **Optional Codex CLI judge (delivery candidate):** Import `CodexJudgeAdapter`
+  and `CodexJudgeSettings` from `skills_sdk.providers.codex_judge`. Supply a
+  trusted executable, isolated temporary-work parent, frozen rubric, explicit
+  model/CLI version and every ambient MCP server name to disable. The host must
+  authorise invocation; constructing an adapter grants no authority or budget.
+  `assess(task, response, assertions)` returns a numeric observation and digests;
+  `judge(inputs)` implements the existing selected-case judge protocol and
+  emits `SelectedCaseJudgeEvidence` bound to the candidate, output and assertion
+  contract. The host retains any referenced evidence artifact.
+  Requested shell/web/apps/plugins restrictions, read-only sandbox, ephemeral
+  working directory, input/output limits and deadlines are applied as CLI
+  arguments. Configuration, global instructions, hooks, rules and authentication
+  remain inherited. Tool-event rejection is retrospective and cannot prevent
+  an available tool from acting; the host must verify isolation for its data.
+  The adapter supports POSIX process-group cleanup, not Windows. Failed,
+  incomplete, malformed, tool-bearing and foreign-assertion output cannot
+  become evidence. Unknown or duplicate JSON members and post-completion
+  events produce typed `ContractError` blockers without raw output disclosure.
+  Nonzero exits retain only safe category, exit-code, byte-count and digest
+  diagnostics in `last_failure`; successful observations are not backend
+  identity or sampling attestation. No live provider acceptance is claimed by
+  the controlled subprocess tests.
+  `CodexNativeJudgeParameters` is available from `skills_sdk.models` with
+  generated schema `codex-native-judge-parameters.v1`. These frozen requested
+  settings explicitly record unavailable temperature control; they cannot
+  satisfy existing temperature-bound calibration. No native calibration,
+  matched-family or whole-plugin quality integration is included.
 - **Selected-case behavioral orchestration:**
   `load_selected_case` validates one case from package-local
   `references/evals.yaml`, including exact mode eligibility, and projects its

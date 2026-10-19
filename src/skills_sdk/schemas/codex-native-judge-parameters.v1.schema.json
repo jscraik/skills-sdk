@@ -1,0 +1,108 @@
+{
+  "$id": "https://schemas.skills-sdk.dev/codex-native-judge-parameters.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Frozen requested CLI controls; temperature is explicitly unavailable.",
+  "properties": {
+    "apps": {
+      "const": false,
+      "default": false,
+      "title": "Apps",
+      "type": "boolean"
+    },
+    "cli_version": {
+      "minLength": 1,
+      "title": "Cli Version",
+      "type": "string"
+    },
+    "disabled_mcp_servers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Disabled Mcp Servers",
+      "type": "array"
+    },
+    "ephemeral": {
+      "const": true,
+      "default": true,
+      "title": "Ephemeral",
+      "type": "boolean"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "plugins": {
+      "const": false,
+      "default": false,
+      "title": "Plugins",
+      "type": "boolean"
+    },
+    "reasoning_effort": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Reasoning Effort",
+      "type": "string"
+    },
+    "sandbox": {
+      "const": "read-only",
+      "default": "read-only",
+      "title": "Sandbox",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "codex-native-judge-parameters/v1",
+      "default": "codex-native-judge-parameters/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "shell_tool": {
+      "const": false,
+      "default": false,
+      "title": "Shell Tool",
+      "type": "boolean"
+    },
+    "temperature": {
+      "default": null,
+      "title": "Temperature",
+      "type": "null"
+    },
+    "temperature_control": {
+      "const": "not_exposed_by_codex_cli",
+      "default": "not_exposed_by_codex_cli",
+      "title": "Temperature Control",
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "maximum": 300,
+      "minimum": 1,
+      "title": "Timeout Seconds",
+      "type": "integer"
+    },
+    "trial_count": {
+      "const": 1,
+      "default": 1,
+      "title": "Trial Count",
+      "type": "integer"
+    },
+    "web_search": {
+      "const": "disabled",
+      "default": "disabled",
+      "title": "Web Search",
+      "type": "string"
+    }
+  },
+  "required": [
+    "model",
+    "cli_version",
+    "reasoning_effort",
+    "timeout_seconds",
+    "disabled_mcp_servers"
+  ],
+  "title": "CodexNativeJudgeParameters",
+  "type": "object"
+}

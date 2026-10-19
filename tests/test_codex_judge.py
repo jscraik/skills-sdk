@@ -1,0 +1,328 @@
+"""Real subprocess boundaries for the optional Codex judge integration."""
+
+import asyncio
+import hashlib
+import json
+import os
+import sys
+from pathlib import Path
+
+import pytest
+
+from skills_sdk.core.errors import ContractError
+from skills_sdk.evaluation.live_selected_case import SelectedCaseJudgeInput
+from skills_sdk.providers.codex_judge import CodexJudgeAdapter, CodexJudgeSettings, _discard_to_eof, _run
+
+
+def _executable(root: Path, behavior: str) -> Path:
+    executable = root / "codex-fixture"
+    executable.write_text(
+        f"#!{sys.executable}\nimport sys,json,time\n"
+        "if '--version' in sys.argv:\n print('codex-cli 0.153.4'); sys.exit(0)\n"
+        "data=json.load(sys.stdin)\n" + behavior + "\n"
+    )
+    executable.chmod(0o755)
+    return executable
+
+
+def _events(score: float = 0.9, ids: tuple[str, ...] = ("scope",)) -> str:
+    verdict = {"score": score, "satisfied_assertion_ids": list(ids), "rationale": "Specific fixture evidence."}
+    return "\n".join(
+        json.dumps(event)
+        for event in (
+            {"type": "thread.started", "thread_id": "fixture"},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(verdict)}},
+            {"type": "turn.completed", "usage": {}},
+        )
+    )
+
+
+def test_real_subprocess_judgment_binds_prompt_and_cleans_scratch(tmp_path: Path) -> None:
+    """The production path sends no labels and consumes actual process output."""
+    checks = (
+        "assert 'expected_label' not in str(data)\n"
+        "assert '--sandbox' in sys.argv and 'read-only' in sys.argv\n"
+        "assert 'mcp_servers.docs.enabled=false' in sys.argv\n"
+        "assert 'features.shell_tool=false' in sys.argv\n"
+        "assert 'gpt-6.1-sol' in sys.argv\n"
+    )
+    executable = _executable(tmp_path, checks + "print(" + repr(_events()) + ")")
+    settings = CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ("docs",))
+    adapter = CodexJudgeAdapter(executable, tmp_path, settings, "Frozen rubric")
+    result = asyncio.run(adapter.assess("Task facts", "Review response", (("scope", "Retain scope"),)))
+    assert result.score == 0.9 and result.satisfied_assertion_ids == ("scope",)
+    assert len(result.prompt_sha256) == len(result.event_sha256) == 64
+    assert not list(tmp_path.glob("sdk-judge-*"))
+    assert settings.public_settings()["temperature"] is None
+    assert adapter.parameters == settings.calibration_parameters()
+    assert adapter.parameters.temperature is None
+    asyncio.run(adapter.cleanup())
+    with pytest.raises(ContractError, match="closed"):
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        ("sys.exit(3)", "codex_judge_process_failed"),
+        ("print(" + repr(_events(ids=("foreign",))) + ")", "codex_judge_assertions"),
+        ("print(" + repr(_events(ids=("scope", "scope"))) + ")", "codex_judge_assertions"),
+        ("print('{}')", "codex_judge_protocol_invalid"),
+        ("print(json.dumps({'type':'thread.started'}))", "codex_judge_incomplete"),
+        ("print(json.dumps({'type':'turn.failed'}))", "codex_judge_turn_failed"),
+        ("print(json.dumps({'type':'item.completed','item':{'type':'command_execution'}}))", "codex_judge_tool_use"),
+        ("sys.stderr.write('x'*70000)", "codex_judge_output_limit"),
+        ("sys.stdout.write('x'*3000000)", "codex_judge_output_limit"),
+    ],
+)
+def test_failed_or_foreign_output_never_becomes_judge_evidence(tmp_path: Path, body: str, code: str) -> None:
+    """Process, resource, protocol and assertion failures retain their boundary."""
+    executable = _executable(tmp_path, body)
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == code
+    assert adapter.last_observation is None
+    assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+def test_version_drift_rejects_before_model_invocation(tmp_path: Path) -> None:
+    executable = _executable(tmp_path, "raise AssertionError('must not invoke')")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.3", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_version_drift"
+
+
+def test_nonexecutable_and_removed_programs_return_typed_startup_failure(tmp_path: Path) -> None:
+    """An unusable trusted program cannot leak an OSError or its host path."""
+    executable = _executable(tmp_path, "raise AssertionError('must not invoke')")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    for removed in (False, True):
+        if removed:
+            executable.unlink()
+        else:
+            executable.chmod(0o644)
+        with pytest.raises(ContractError) as raised:
+            asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+        assert raised.value.code == "codex_judge_start_failed"
+        assert str(tmp_path) not in str(raised.value)
+        assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+def test_invalid_version_bytes_are_a_typed_drift_blocker(tmp_path: Path) -> None:
+    """Version comparison is exact bytes; incompatible output is never decoded."""
+    executable = tmp_path / "invalid-version"
+    executable.write_text(f"#!{sys.executable}\nimport sys\nsys.stdout.buffer.write(bytes([255]))\n")
+    executable.chmod(0o755)
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_version_drift"
+
+
+def test_external_cancellation_reaps_process_and_cleans_scratch(tmp_path: Path) -> None:
+    """Caller cancellation remains cancellation after owned process cleanup."""
+    executable = _executable(
+        tmp_path,
+        "from pathlib import Path; import os; "
+        "Path(sys.argv[0]).with_suffix('.pid').write_text(str(os.getpid())); time.sleep(30)",
+    )
+    marker = executable.with_suffix(".pid")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+
+    async def cancel_running() -> None:
+        task = asyncio.create_task(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+        try:
+            for _ in range(500):
+                if marker.exists():
+                    break
+                await asyncio.sleep(0.01)
+            assert marker.exists(), "fixture did not start"
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+    asyncio.run(cancel_running())
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(marker.read_text()), 0)
+    assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+def test_primary_process_failure_survives_cleanup_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cleanup diagnostics supplement rather than replace the original failure."""
+    from skills_sdk.providers import codex_judge
+
+    async def failed_drain(stream: asyncio.StreamReader) -> None:
+        raise OSError("fixture drain failure")
+
+    monkeypatch.setattr(codex_judge, "_discard_to_eof", failed_drain)
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(_run((sys.executable, "-c", "raise SystemExit(7)"), tmp_path, b"", 5))
+    assert raised.value.code == "codex_judge_process_failed"
+    assert raised.value.details[0].exit_code == 7
+    assert raised.value.details[1].code == "codex_judge_cleanup_failed"
+
+
+def test_cleanup_deadline_returns_a_typed_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A cleanup deadline must not leak a raw timeout across the adapter boundary."""
+
+    async def expired(awaitable: object, timeout: float) -> object:
+        assert timeout == 5
+        awaitable.cancel()
+        await asyncio.gather(awaitable, return_exceptions=True)
+        raise TimeoutError
+
+    executable = _executable(tmp_path, "raise AssertionError('not reached')")
+    monkeypatch.setattr(asyncio, "wait_for", expired)
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_cleanup_timeout"
+
+
+def test_timeout_reaps_child_and_cleans_work_directory(tmp_path: Path) -> None:
+    executable = _executable(tmp_path, "time.sleep(20)")
+    settings = CodexJudgeSettings("gpt-6.1-sol", "0.153.4", (), timeout_seconds=1)
+    adapter = CodexJudgeAdapter(executable, tmp_path, settings, "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_timeout"
+    assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+def test_startup_diagnostics_are_drained_before_stdin(tmp_path: Path) -> None:
+    """A noisy child must read a large prompt without a false pipe deadlock."""
+    script = (
+        "import sys; sys.stderr.write('x'*60000); sys.stderr.flush(); data=sys.stdin.buffer.read(); print(len(data))"
+    )
+    output = asyncio.run(_run((sys.executable, "-c", script), tmp_path, b"x" * 65536, 5))
+    assert output.strip() == b"65536"
+
+
+def test_timeout_cleans_launcher_descendants_that_keep_output_pipes_open(tmp_path: Path) -> None:
+    """A successful launcher exit must not leave its native child running."""
+    script = "import subprocess,sys; subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'])"
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(_run((sys.executable, "-c", script), tmp_path, b"", 1))
+    assert raised.value.code == "codex_judge_timeout"
+
+
+def test_cleanup_discards_large_residual_pipe_without_retaining_output() -> None:
+    """Cleanup must consume residual diagnostics rather than hit a second cap."""
+
+    async def drain() -> None:
+        stream = asyncio.StreamReader()
+        stream.feed_data(b"x" * 300000)
+        stream.feed_eof()
+        await _discard_to_eof(stream)
+        assert stream.at_eof()
+
+    asyncio.run(drain())
+
+
+def test_invalid_controls_and_oversized_input_do_not_start_process(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ("name.enabled=true",))
+    executable = _executable(tmp_path, "raise AssertionError('must not invoke')")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("x" * 65537, "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_input_limit"
+
+
+def test_settings_snapshot_rejects_forgery_and_preserves_applied_identity(tmp_path: Path) -> None:
+    """Reported parameters must describe the frozen arguments, not mutable caller state."""
+    for model, names in ((" padded ", ()), ("model", ("docs", "docs"))):
+        with pytest.raises(ValueError):
+            CodexJudgeSettings(model, "0.153.4", names)
+    settings = CodexJudgeSettings("fixture-model", "0.153.4", ())
+    executable = _executable(tmp_path, "print(" + repr(_events()) + ")")
+    adapter = CodexJudgeAdapter(executable, tmp_path, settings, "Rubric")
+    object.__setattr__(settings, "model", "changed-model")
+    assert adapter.identity.model_id == "fixture-model"
+    assert adapter.parameters.model == "fixture-model"
+    object.__setattr__(settings, "timeout_seconds", True)
+    with pytest.raises(ValueError):
+        CodexJudgeAdapter(executable, tmp_path, settings, "Rubric")
+
+
+def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Path) -> None:
+    """The live integration emits the existing public selected-case evidence."""
+    from test_live_selected_case import _setup
+
+    package = tmp_path / "candidate"
+    package.mkdir()
+    definition, _payload, request, _events_seen = _setup(package)
+    executable = _executable(tmp_path, "print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()), "Rubric")
+    response = "Actual controlled response"
+    inputs = SelectedCaseJudgeInput(
+        request,
+        response,
+        hashlib.sha256(response.encode()).hexdigest(),
+        definition.assertion_contract_sha256,
+        definition.semantic_assertions,
+    )
+    evidence = asyncio.run(adapter.judge(inputs))
+    assert evidence.candidate == request.candidate
+    assert evidence.output_sha256 == inputs.output_sha256
+    assert evidence.assertion_contract_sha256 == definition.assertion_contract_sha256
+    assert evidence.satisfied_assertion_ids == definition.semantic_signal_ids
+    assert evidence.judge == adapter.identity
+    assert evidence.evidence_refs == ("judge-results/" + evidence.judge_result_sha256,)
+
+
+def test_early_exit_preserves_safe_diagnostic_without_leaking_stderr(tmp_path: Path) -> None:
+    """A child rejecting startup before reading stdin retains cause and exit code."""
+    script = (
+        "import sys; sys.stderr.write('failed to initialize in-process app-server client: '"
+        "'secret-token=fixture-sensitive-value'); sys.exit(7)"
+    )
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(_run((sys.executable, "-c", script), tmp_path, b"x" * 65536, 5))
+    error = raised.value
+    assert error.code == "codex_judge_process_failed"
+    diagnostic = error.details[0]
+    assert diagnostic.exit_code == 7
+    assert diagnostic.category == "app_server_initialization"
+    assert diagnostic.stderr_bytes > 0 and len(diagnostic.stderr_sha256) == 64
+    assert "secret-token" not in repr(error.details) and "fixture-sensitive-value" not in repr(error.details)
+
+
+def test_adapter_retains_failed_invocation_diagnostic_and_cleans_scratch(tmp_path: Path) -> None:
+    executable = _executable(tmp_path, "sys.stderr.write('private model failure'); sys.exit(9)")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError):
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert adapter.last_failure.exit_code == 9
+    assert adapter.last_failure.category == "unknown_process_failure"
+    assert adapter.last_observation is None
+    assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "not JSON",
+        "[]",
+        '{"type":"item.completed","item":null}',
+        '{"type":"item.completed","item":{"type":"agent_message"}}',
+        '{"type":"item.completed","item":{"type":"agent_message","text":7}}',
+        json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": "{}"}})
+        + '\n{"type":"turn.completed"}',
+        '{"type":"turn.completed","type":"thread.started"}',
+        '{"type":"unknown.tool.event"}\n' + _events(),
+        _events() + '\n{"type":"thread.started"}',
+    ],
+)
+def test_malformed_events_are_typed_protocol_blockers(tmp_path: Path, raw: str) -> None:
+    """Untrusted output cannot leak parser exceptions or raw private payloads."""
+    executable = _executable(tmp_path, "print(" + repr(raw) + ")")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_protocol_invalid"
+    assert adapter.last_observation is None
+    assert not list(tmp_path.glob("sdk-judge-*"))

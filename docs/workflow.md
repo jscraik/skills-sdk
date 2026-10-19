@@ -32,6 +32,14 @@ root capture and a final recapture that must be unchanged before a pass, for
 skill-only create or external-check candidates. It grants no execution,
 independent artwork approval or release clearance.
 
+The optional Codex CLI judge is a separate delivery candidate recovered from
+preserved work. It implements the existing selected-case judge seam and records
+native requested settings, without admitting the parked native calibration,
+matched or quality families. Controlled executable tests prove bounded process
+handling and evidence binding; no live provider, quality, calibration or release
+acceptance follows. Host authority and inherited-configuration limits are in
+the [API reference](api.md).
+
 Accepted PR #52 adds the bounded
 [`validate-plugin` inspection route](cli.md#portable-plugin-inspection), including
 fresh source comparison through `--verify-evidence` for supplied validation,

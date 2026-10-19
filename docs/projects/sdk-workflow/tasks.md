@@ -65,6 +65,30 @@ is authorised by this task record. Implement portable boundaries and controlled
 adapter proof first; live operations require their applicable authority.
 Normal signed delivery remains governed by CONTRIBUTING.md and user authority.
 
+## Preserved-work review, 19 October 2026
+
+Review baseline: `4beebae`, including PRs #93 and #96. The preserved source
+remains based on `0d4a39d`; it is evidence for selection, not a replacement for
+current main. Installation metadata is excluded from implementation delivery.
+
+| Preserved group | Current disposition | Remaining proof or action |
+| --- | --- | --- |
+| Whole-plugin quality model, service, schema and CLI | Already merged in PR #93; PR #96 adds early object-root rejection. | Retain current main and its newer fixes; do not copy older files or remove accepted exports. |
+| Pilot report and maintained P4 regressions | Already merged in PRs #94–95. | Historical report edits in the preserved copy are not implementation candidates. |
+| Optional Codex judge and native requested settings | Selected delivery candidate, not yet merged. | Fix malformed external output, preserve existing selected-case evidence binding, add schema/registry and controlled executable proof, then complete normal PR gates. |
+| Native calibration runner and calibration families | Deferred, still unmerged. | Review frozen legacy-model refactors, authority/dispatch ownership and authentic held-out calibration; the optional adapter does not supply this proof. |
+| Native matched execution, handoff, feedback and quality joins | Deferred, still unmerged. | Review complete candidate/settings/calibration joins and legacy ingress compatibility before admitting these additive families. |
+| Installation metadata and links | Retained separately in the preservation checkout and verified backup. | No reinstall, metadata copying, package upload or runtime changes in this implementation PR. |
+| Historical portable-export work | Not present in the preserved 99-entry source inventory. | Reconcile its separate historical source before choosing an S5 implementation; do not invent or reconstruct accepted bytes here. |
+
+Independent review confirmed that copying the preserved model export file would
+remove merged plugin-quality exports. Delivery therefore uses minimal additive
+wiring against main. It also reproduced malformed judge event output escaping
+as raw Python exceptions; the selected candidate returns a non-disclosing typed
+protocol blocker and rejects conflicting/unknown events instead. Live provider
+execution, provider spending and authentication use are outside this recovery.
+S2–S5 and parent programme acceptance remain partial.
+
 ## Ordered checklist
 
 | Slice | Work | Completion proof | State |

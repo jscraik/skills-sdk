@@ -80,6 +80,7 @@ from skills_sdk.models.matched_policy import (
     MatchedRunBudget,
     MatchedSelectionPolicy,
 )
+from skills_sdk.models.native_judge import CodexNativeJudgeParameters
 from skills_sdk.models.observed_calibration import (
     CalibrationJudgeVerdict,
     HeldOutCalibrationProbe,
@@ -203,6 +204,7 @@ __all__ = [
     "CalibrationJudgeVerdict",
     "CapabilitySafetyReview",
     "ClaimCoverage",
+    "CodexNativeJudgeParameters",
     "ContentReviewAssessment",
     "ContentReviewExecutionResult",
     "ContentReviewItem",

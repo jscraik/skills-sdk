@@ -42,6 +42,14 @@ explicit local/cloud profile binding and controlled settings delivery through
 the [public adapter seam](api.md#explicit-codex-profiles). Real-provider settings
 application and quality remain separate gaps in the evaluation rows.
 
+The preserved-work recovery selects an optional Codex CLI judge and separate
+native requested-settings contract as a delivery candidate. Controlled process
+and selected-case evidence tests are its proof lane; it does not complete
+`review_handoff`, `evals`, `ab_judge_score` or `sandbox`. Native calibration,
+matched/quality integrations and installation metadata remain parked. See the
+[preserved-work assessment](projects/sdk-workflow/tasks.md#preserved-work-review-19-october-2026)
+and [API limits](api.md).
+
 Accepted PR #52 affects `package_identity`, `skill_intake`
 and `sdk_plugin_lifecycle`: `validate_plugin_package` / `validate-plugin` add
 root-manifest inspection, whole-file/mode binding, immediate skill findings and
