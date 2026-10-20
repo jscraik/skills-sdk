@@ -21,6 +21,8 @@ from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.models.native_judge import CodexNativeJudgeParameters
 from skills_sdk.models.provider import ProviderIdentityV2
+from skills_sdk.models.provider_execution import _identity_is_public
+from skills_sdk.models.safety import _public_text_is_redaction_safe
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 
 if TYPE_CHECKING:
@@ -495,12 +497,20 @@ class CodexJudgeAdapter:
             validated = TypeAdapter(tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...]).validate_python(
                 inputs.assertions, strict=True
             )
-            if not validated or any(
-                not item[0].strip()
-                or item[1] not in {"discovery_question", "expected_signal", "semantic_requirements"}
-                or not (*item[2], *item[3])
-                or any(not term.strip() for term in (*item[2], *item[3]))
-                for item in validated
+            if (
+                not validated
+                or len({item[0] for item in validated}) != len(validated)
+                or any(
+                    not item[0].strip()
+                    or item[0] != item[0].strip()
+                    or not _identity_is_public(item[0])
+                    or not _public_text_is_redaction_safe(item[0])
+                    or item[1] not in {"discovery_question", "expected_signal", "semantic_requirements"}
+                    or not (*item[2], *item[3])
+                    or any(not term.strip() for term in (*item[2], *item[3]))
+                    or (item[1] != "semantic_requirements" and (len(item[2]) != 1 or item[3]))
+                    for item in validated
+                )
             ):
                 raise ValueError("invalid assertion shape")
             contract = [{"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in validated]
