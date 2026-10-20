@@ -169,3 +169,54 @@ def test_cleanup_awaits_active_operation(tmp_path: Path, monkeypatch: pytest.Mon
             await asyncio.gather(task, return_exceptions=True)
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("primary", ["success", "process", "timeout"])
+@pytest.mark.parametrize("previous", [None, "codex_judge_cleanup_timeout"])
+@pytest.mark.parametrize("failure", ["failed", "timeout"])
+def test_cleanup_remembers_non_cancelled_teardown_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, primary: str, previous: str | None, failure: str
+) -> None:
+    """A later cleanup must retain the first failure from real process teardown."""
+    from skills_sdk.providers import codex_judge
+
+    executable = tmp_path / "controlled-codex"
+    action = {"success": "print('codex-cli 0.153.4')", "process": "sys.exit(7)", "timeout": "time.sleep(30)"}
+    executable.write_text(f"#!{sys.executable}\nimport sys,time\n{action[primary]}\n")
+    executable.chmod(0o755)
+    adapter = CodexJudgeAdapter(
+        executable, tmp_path, CodexJudgeSettings("model", "0.153.4", (), timeout_seconds=1), "Rubric"
+    )
+    adapter._cleanup_error = previous
+    original = codex_judge._discard_to_eof
+
+    async def failed_drain(stream: asyncio.StreamReader) -> None:
+        await original(stream)
+        raise OSError("private fixture teardown failure")
+
+    monkeypatch.setattr(codex_judge, "_discard_to_eof", failed_drain)
+    if failure == "timeout":
+
+        async def expired(awaitable: object, timeout: float) -> object:
+            await awaitable
+            raise TimeoutError
+
+        monkeypatch.setattr(asyncio, "wait_for", expired)
+
+    async def exercise() -> None:
+        with pytest.raises(ContractError) as raised:
+            await adapter.assess("Task", "Response", (("scope", "Scope"),))
+        expected = {"success": "cleanup_" + failure, "process": "process_failed", "timeout": "timeout"}
+        assert raised.value.code == "codex_judge_" + expected[primary]
+        if primary != "success":
+            assert any(
+                isinstance(item, ContractError) and item.code == "codex_judge_cleanup_" + failure
+                for item in raised.value.details
+            )
+        for _ in range(2):
+            with pytest.raises(ContractError) as cleanup:
+                await adapter.cleanup()
+            assert cleanup.value.code == (previous or "codex_judge_cleanup_" + failure)
+
+    asyncio.run(exercise())
+    assert not list(tmp_path.glob("sdk-judge-*"))

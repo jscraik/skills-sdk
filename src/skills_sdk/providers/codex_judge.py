@@ -438,6 +438,21 @@ class CodexJudgeAdapter:
         except ContractError as exc:
             if exc.details and type(exc.details[0]) is CodexJudgeProcessDiagnostic:
                 self.last_failure = exc.details[0]
+            cleanup_codes = {"codex_judge_cleanup_failed", "codex_judge_cleanup_timeout"}
+            teardown = (
+                exc.code
+                if exc.code in cleanup_codes
+                else next(
+                    (
+                        item.code
+                        for item in exc.details
+                        if isinstance(item, ContractError) and item.code in cleanup_codes
+                    ),
+                    None,
+                )
+            )
+            if self._cleanup_error is None and teardown is not None:
+                self._cleanup_error = teardown
             raise
 
     async def _assess(self, task: str, response: str, assertions: tuple[tuple[str, str], ...]) -> CodexJudgeObservation:
