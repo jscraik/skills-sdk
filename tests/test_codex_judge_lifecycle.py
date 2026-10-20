@@ -13,9 +13,9 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.providers.codex_judge import CodexJudgeAdapter, CodexJudgeSettings, _run
 
 
-@pytest.mark.parametrize("external_cancel", [False, True])
+@pytest.mark.parametrize("external_cancel,startup_delay", [(False, 0), (True, 0), (True, 0.03)])
 def test_process_creation_wait_obeys_timeout_and_caller_cancellation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, external_cancel: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, external_cancel: bool, startup_delay: float
 ) -> None:
     """A cancellable factory stall cannot evade the budget or invent a PID."""
     exited: list[bool] = []
@@ -35,10 +35,22 @@ def test_process_creation_wait_obeys_timeout_and_caller_cancellation(
     monkeypatch.setattr(os, "killpg", forbidden_signal)
 
     async def invoke() -> None:
-        operation = asyncio.create_task(_run((sys.executable, "-c", "pass"), tmp_path, b"", 0.02))
+        loop = asyncio.get_running_loop()
+        original_connect = loop.connect_read_pipe
+
+        async def delayed_connect(*args: object, **kwargs: object) -> object:
+            await asyncio.sleep(startup_delay)
+            return await original_connect(*args, **kwargs)
+
+        monkeypatch.setattr(loop, "connect_read_pipe", delayed_connect)
+        budget = 3 if external_cancel else 0.02
+        operation = asyncio.create_task(_run((sys.executable, "-c", "pass"), tmp_path, b"", budget))
         if external_cancel:
-            await entered.wait()
-            operation.cancel()
+            try:
+                await asyncio.wait_for(entered.wait(), 1)
+            finally:
+                operation.cancel()
+                await asyncio.gather(operation, return_exceptions=True)
             with pytest.raises(asyncio.CancelledError):
                 await operation
         else:
