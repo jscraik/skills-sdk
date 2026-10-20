@@ -14,6 +14,16 @@ real-provider, registry and host integrations and the complete workflow remain
 SDK-owned work, not responsibilities left to Agent-Skills or Foundry. Explicit
 profile adapters already bind supplied inputs and deliver compiled settings to
 controlled offline drivers; they do not establish those external integrations.
+The optional `providers/codex_judge.py` delivery candidate invokes an explicitly
+authorised, caller-selected Codex CLI through the selected-case judge seam.
+Its controlled process proof does not establish live model acceptance. It sits
+outside the portable core and inherits host configuration and authentication;
+see the [API limits](docs/api.md).
+Private provider-owned supervisor and channel modules preserve process-group
+ownership through teardown. Only the live isolated supervisor signals its own
+group; the parent uses bounded status and control pipes instead of cached
+numeric group identifiers. This does not supervise synchronous SDK filesystem
+work or establish hardened host containment.
 
 ## brAInwav product family
 
@@ -301,7 +311,8 @@ docstrings and the linked API or CLI guides.
 | `src/skills_sdk/distribution/` | Deterministic, local preparation of a private-registry receipt over immutable package and hardening receipts; no credentials, network access, upload, or publication. | `prepare_private_registry_candidate` in `private_registry.py` |
 | `src/skills_sdk/models/safety.py` | Candidate-bound package-safety evidence states, typed findings/blockers, and digest-bound evidence references; no scanner, rights, admission, or runtime behavior. | `PackageSafetyEvidenceReceipt` |
 | `src/skills_sdk/models/provider_execution.py` | Secret-free request metadata and adapter-supplied observations of external provider outcomes; no provider client, credentials, network action, billing, or generic receipt dispatch. | `ProviderExecutionRequest`, `ProviderExecutionResult` |
-| `src/skills_sdk/providers/` | Bounded offline complete and pull-stream orchestration; explicit profile capture/compilation in the outer `codex_profiles` adapter delivers bound settings to caller-supplied drivers. No home discovery, credential resolution, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter`, `describe_codex_profile`, `compile_codex_profile`; [profile contract](docs/api.md#explicit-codex-profiles) |
+| `src/skills_sdk/providers/call.py` and `codex_profiles` | Bounded offline complete and pull-stream orchestration; explicit profile capture/compilation delivers bound settings to caller-supplied drivers. No home discovery, credential resolution, network transport, retries, or provider authorization. | `execute_provider_call`, `TextProviderAdapter`, `describe_codex_profile`, `compile_codex_profile`; [profile contract](docs/api.md#explicit-codex-profiles) |
+| `src/skills_sdk/providers/codex_judge.py` | Optional POSIX CLI judge delivery candidate; explicit host authority, version/settings binding, bounded process/output handling and selected-case evidence. Inherited host configuration/authentication and retrospective tool rejection do not establish complete isolation or backend truth. | `CodexJudgeAdapter`, `CodexJudgeSettings`; [API limits](docs/api.md) |
 | `src/skills_sdk/models/runtime_evidence.py` | Candidate-bound adapter observations for installation, rollback, discovery, activation, and runtime outcome; no host path resolution, filesystem mutation, activation, or runtime invocation. | `InstallationResult`, `RuntimeOutcomeReceipt` |
 | `src/skills_sdk/cli/` | Argument parsing, route discovery, JSON/human rendering, and stable exit behavior at the process boundary. | `build_parser`, `main`, `_print_result` |
 | `src/skills_sdk/host/` | Explicit, digest-bound maintenance of an existing entrypoint with retained backups; no package installation or workflow execution. | `EntrypointRequest`, `check_entrypoint`, `repair_entrypoint` |

@@ -1,9 +1,20 @@
 # Compatibility
 
 This reference describes accepted contracts and their evidence limits. Issue
-#92's whole-plugin quality additions merged via PR #93 at `93526d6`; local,
-unmerged native judge additions remain separately labelled in their candidate
-branch and are not accepted or published APIs.
+#92's whole-plugin quality additions merged via PR #93 at `93526d6`.
+The optional native judge/settings increment is a separately labelled delivery
+candidate until merged. Broader native calibration/matched additions remain
+preserved and are not accepted or published APIs.
+
+The candidate adds `codex-native-judge-parameters/v1` without reinterpreting
+`ScorerJudgeParameters`, observed-calibration, matched or quality contracts.
+Native requested settings do not invent temperature or grant calibration,
+provider authenticity, installation or promotion clearance. Existing plugin
+quality exports remain intact. The optional executable adapter supports POSIX
+process-group ownership only and requires explicit host authority; the portable
+contracts remain independent of a Codex installation.
+Its packaged settings schema and semantic model belong to the integration
+layer and are not registered in portable core's `SchemaRegistry`.
 
 Contents:
 

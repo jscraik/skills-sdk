@@ -12,8 +12,9 @@ Start with [read-only intake](#read-only-intake) or
 [schema validation](#schema-validation). These entries describe accepted SDK
 services, not a published release or live-provider clearance. Issue #92's
 whole-plugin quality composition merged via PR #93 at `93526d6`; unmerged
-native judge work remains in its owning candidate branch and its documentation
-must retain that delivery-state label until accepted.
+native calibration, matched and quality work remains in its owning preserved
+branch. The optional judge adapter below is a separate delivery candidate until
+its PR is merged; it does not admit those broader families.
 See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledger).
 
 Contents:
@@ -586,6 +587,104 @@ or completed reviewer execution.
   Cancellation remains cancellation after bounded cleanup. This service does
   not discover adapters, read credentials, contact a network, evaluate output,
   or establish external provider truth.
+- **Optional Codex CLI judge (delivery candidate):** Import `CodexJudgeAdapter`
+  and `CodexJudgeSettings` from `skills_sdk.providers.codex_judge`. Supply a
+  trusted executable, isolated temporary-work parent, frozen rubric, explicit
+  model/CLI version and every ambient MCP server name to disable. The host must
+  authorise invocation; constructing an adapter grants no authority or budget.
+  The host must authorise the actual data and provider destination. Task,
+  response, rubric and assertion operands are private prompt fields sent intact
+  to that authorised judge, including text that resembles a path or credential.
+  Public-metadata redaction protects identities, diagnostics and evidence
+  references; it is not prompt sanitisation or permission to send real secrets.
+  `assess(task, response, assertions)` returns a numeric observation and digests;
+  its rationale and canonical result bytes are private provider output, omitted
+  from the observation representation and unsuitable for public logging.
+  `judge(inputs)` implements the existing selected-case judge protocol and
+  emits `SelectedCaseJudgeEvidence` bound to the candidate, output and assertion
+  contract. For `judge`, pass an async `retain_result(ref, bytes)` callback
+  that stores the supplied canonical verdict bytes under the supplied portable
+  reference and returns `None`. Evidence is emitted only after that callback
+  succeeds; the trusted host owns actual retention and access control. The
+  callback may be an async function or an object with async `__call__`. It
+  must use non-blocking storage awaits and propagate cancellation;
+  synchronous callbacks are rejected. Blocking code inside trusted async host
+  code is outside the adapter isolation guarantee. Direct
+  `assess` also returns those bytes as private `result_json` for host retention.
+  The public judge identity binds both native settings and a digest of the
+  exact frozen rubric. Identical verdict bytes may share a result reference,
+  but different rubrics produce different judge identities. The authorised
+  host must retain its rubric privately to reproduce a judgment.
+  One adapter supports one active assessment; overlapping calls are rejected.
+  Requested shell/web/apps/plugins restrictions, read-only sandbox and ephemeral
+  operation are passed as CLI arguments. MCP overrides are limited to 64 unique
+  names of at most 64 ASCII characters each, before argument construction.
+  Input/output limits are enforced by the adapter. Subprocess-wait deadlines
+  are cooperative async limits. Supported scratch storage requires a responsive
+  local filesystem: allocation, schema writing and removal run synchronously
+  on the caller's event-loop thread. A stalled filesystem can block that loop
+  and overrun both native and enclosing orchestration timers. This adapter has
+  no hard end-to-end wall-clock bound under filesystem stalls; stronger
+  filesystem isolation requires external supervision and is not implemented here.
+  Direct `assess` shares one requested native execution
+  budget between its version probe and execution. The probe is capped at ten
+  seconds and the remaining budget; execution receives only what remains.
+  Each subprocess creation await and its pipe exchange share one absolute
+  deadline. Expiry before a process handle is returned relies on Python's
+  native transport cancellation and direct-child cleanup; it does not establish
+  ownership or containment of arbitrary pre-handle descendants. Async timers
+  cannot pre-empt synchronous OS spawning or an unresponsive native cleanup.
+  An SDK-owned isolated Python supervisor anchors each POSIX process group.
+  Its target inherits the data pipes, but not the private control/status
+  descriptors. The parent closes control to request teardown; only the live
+  supervisor signals its own group, with target creation and stop serialized.
+  The parent never signals a saved numeric PID or process-group identifier.
+  Bounded versioned status frames distinguish target completion, startup
+  failure and supervisor stop. Unexpected supervisor exit or missing stop
+  evidence produces a typed blocker. This manages trusted executable lifetimes;
+  it is not hardened containment against deliberate group escape, credential
+  changes or external interference with the supervisor.
+  Each owned process has a separate cleanup bound of five seconds, which may
+  extend wall time beyond the execution budget. `cleanup()` closes the adapter,
+  cancels active work and waits up to six seconds for owned teardown; it does
+  not report success while that work remains active. Cancelling the cleanup
+  waiter does not cancel resource teardown again. Caller cancellation remains
+  cancellation when teardown fails, with a safe cleanup-code note; the cleanup
+  hook reports the typed teardown blocker. Selected-case orchestration
+  applies its 30-second overall judge timer, including startup, and one-second
+  cleanup timer when the event loop can run. It may cancel an invocation before
+  a larger native timeout. This adapter does not extend those shared engine
+  budgets or make them pre-empt synchronous filesystem work.
+  Configuration, global instructions, hooks, rules and authentication
+  remain inherited. Tool-event rejection is retrospective and cannot prevent
+  an available tool from acting; the host must verify isolation for its data.
+  The adapter supports POSIX process-group cleanup, not Windows. If the
+  operating system denies group termination, a process may remain alive.
+  A typed cleanup blocker does not prove reaping or containment; the host must
+  handle that condition within its own process-management authority. Typed
+  failures preserve the first termination cause and retain later cleanup
+  failures as typed details; cancellation retains a safe cleanup-code note. Failed,
+  incomplete, malformed, tool-bearing and foreign-assertion output cannot
+  become evidence. Unknown event types, duplicate JSON members, invalid verdict
+  fields and post-completion events produce typed `ContractError` blockers
+  without raw output disclosure. Additional ordinary event metadata is allowed.
+  Nonzero exits retain only safe category, exit-code, byte-count and digest
+  diagnostics in `last_failure`; successful observations are not backend
+  identity or sampling attestation. No live provider acceptance is claimed by
+  the controlled subprocess tests, including CLI/backend output-schema
+  compatibility. A backend schema rejection remains a typed process failure,
+  with an `output_schema_rejected` diagnostic when recognised, not evidence.
+  `CodexNativeJudgeParameters` is available from `skills_sdk.models` with
+  generated schema `codex-native-judge-parameters.v1`. These frozen requested
+  settings have structural JSON Schema checks plus integration-model semantic
+  checks for portable identities and unique simple ASCII MCP names. Consumers load
+  the packaged resource with Draft 2020-12 and `FormatChecker`, then call
+  `CodexNativeJudgeParameters.model_validate` for semantic acceptance. This
+  provider-specific family is deliberately absent from portable core's
+  `SchemaRegistry`; the adapter validates its own settings in the integration layer.
+  They explicitly record unavailable temperature control; they cannot
+  satisfy existing temperature-bound calibration. No native calibration,
+  matched-family or whole-plugin quality integration is included.
 - **Selected-case behavioral orchestration:**
   `load_selected_case` validates one case from package-local
   `references/evals.yaml`, including exact mode eligibility, and projects its

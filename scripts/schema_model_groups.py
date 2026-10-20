@@ -29,6 +29,7 @@ from skills_sdk.models.matched_execution import MatchedExecutionReceipt
 from skills_sdk.models.matched_feedback import MatchedCloudRegressionReceipt, MatchedRegressionReceipt
 from skills_sdk.models.matched_handoff import MatchedCloudExecutionReceipt, MatchedCloudHandoff
 from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrationBundle
+from skills_sdk.models.native_judge import CodexNativeJudgeParameters
 from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 from skills_sdk.models.packaging import (
     PackageArchiveVerificationReceipt,
@@ -108,6 +109,7 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
     """Return provider execution schemas in request-before-result order."""
 
     return (
+        (CodexNativeJudgeParameters, "codex-native-judge-parameters.v1.schema.json"),
         (ProviderExecutionRequest, "provider-execution-request.v1.schema.json"),
         (ProviderExecutionResult, "provider-execution-result.v1.schema.json"),
         (PreExecutionSafetyEvidence, "pre-execution-safety-evidence.v1.schema.json"),
