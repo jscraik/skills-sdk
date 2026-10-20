@@ -610,7 +610,12 @@ or completed reviewer execution.
   budget between its version probe and execution. The probe is capped at ten
   seconds and the remaining budget; execution receives only what remains.
   Each owned process has a separate cleanup bound of five seconds, which may
-  extend wall time beyond the execution budget. Selected-case orchestration
+  extend wall time beyond the execution budget. `cleanup()` closes the adapter,
+  cancels active work and waits up to six seconds for owned teardown; it does
+  not report success while that work remains active. Cancelling the cleanup
+  waiter does not cancel resource teardown again. Caller cancellation remains
+  cancellation when teardown fails, with a safe cleanup-code note; the cleanup
+  hook reports the typed teardown blocker. Selected-case orchestration
   retains its authoritative 30-second overall judge deadline, including startup,
   and one-second cleanup deadline; it may cancel an invocation before a larger
   native timeout. This adapter does not extend those shared engine budgets.

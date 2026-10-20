@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
@@ -209,14 +209,14 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
             raise ContractError("codex_judge_process_failed", "Codex judge returned a non-zero exit", (diagnostic,))
         return stdout
 
-    primary_failure: ContractError | None = None
+    primary_failure: ContractError | asyncio.CancelledError | None = None
     try:
         async with asyncio.timeout(seconds):
             return await exchange()
     except TimeoutError:
         primary_failure = ContractError("codex_judge_timeout", "Codex judge exceeded its deadline")
         raise primary_failure from None
-    except ContractError as error:
+    except (ContractError, asyncio.CancelledError) as error:
         primary_failure = error
         raise
     finally:
@@ -240,6 +240,9 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
                 task.cancel()
             await asyncio.gather(*cleanup, return_exceptions=True)
         if cleanup_failure is not None:
+            if isinstance(primary_failure, asyncio.CancelledError):
+                primary_failure.add_note(cleanup_failure.code)
+                raise primary_failure
             if primary_failure is not None:
                 raise ContractError(
                     primary_failure.code,
@@ -340,6 +343,9 @@ class CodexJudgeAdapter:
         self._rubric = rubric
         self._closed = False
         self._busy = False
+        self._assessment_task: asyncio.Task[object] | None = None
+        self._judge_task: asyncio.Task[object] | None = None
+        self._cleanup_error: str | None = None
         self._retain_result = retain_result
         if retain_result is not None and not inspect.iscoroutinefunction(retain_result):
             raise ValueError("result retention requires an async host callback")
@@ -369,12 +375,24 @@ class CodexJudgeAdapter:
         """Execute one fresh judgment without accepting expected labels or scores."""
         if self._closed:
             raise ContractError("codex_judge_closed", "Allocate a new judge after cleanup")
-        if self._busy:
+        if self._busy or (self._judge_task is not None and self._judge_task is not asyncio.current_task()):
             raise ContractError("codex_judge_busy", "Use a separate adapter for overlapping judgments")
         self._busy = True
+        self._assessment_task = asyncio.current_task()
         try:
             return await self._assess(task, response, assertions)
+        except asyncio.CancelledError as error:
+            self._cleanup_error = next(
+                (
+                    note
+                    for note in getattr(error, "__notes__", ())
+                    if note in {"codex_judge_cleanup_failed", "codex_judge_cleanup_timeout"}
+                ),
+                None,
+            )
+            raise
         finally:
+            self._assessment_task = None
             self._busy = False
 
     async def _invoke(self, argv: tuple[str, ...], root: Path, payload: bytes, seconds: float) -> bytes:
@@ -457,24 +475,43 @@ class CodexJudgeAdapter:
 
     async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
         """Implement the existing selected-case judge protocol with bound evidence."""
+        if self._closed:
+            raise ContractError("codex_judge_closed", "Allocate a new judge after cleanup")
+        if self._judge_task is not None:
+            raise ContractError("codex_judge_busy", "Use a separate adapter for overlapping judgments")
+        self._judge_task = asyncio.current_task()
+        try:
+            return await self._judge(inputs)
+        finally:
+            self._judge_task = None
+
+    async def _judge(self, inputs: SelectedCaseJudgeInput) -> object:
+        """Bind inputs and retain evidence within the owned judge operation."""
         if self._retain_result is None:
             raise ContractError("codex_judge_retention_required", "Selected-case evidence requires host retention")
         if hashlib.sha256(inputs.output_text.encode()).hexdigest() != inputs.output_sha256:
             raise ContractError("codex_judge_output_drift", "Judge output identity does not match bytes")
         try:
-            if type(inputs.assertions) is not tuple or any(
-                type(item) is not tuple or len(item) != 4 for item in inputs.assertions
+            validated = TypeAdapter(tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...]).validate_python(
+                inputs.assertions, strict=True
+            )
+            if not validated or any(
+                not item[0].strip()
+                or item[1] not in {"discovery_question", "expected_signal", "semantic_requirements"}
+                or not (*item[2], *item[3])
+                or any(not term.strip() for term in (*item[2], *item[3]))
+                for item in validated
             ):
                 raise ValueError("invalid assertion shape")
             contract = [
-                {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in inputs.assertions
+                {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in validated
             ]
             contract_digest = canonical_json_sha256(contract)
         except (TypeError, ValueError, IndexError):
             raise ContractError("codex_judge_assertion_contract_drift", "Judge assertion contract is invalid") from None
         if contract_digest != inputs.assertion_contract_sha256:
             raise ContractError("codex_judge_assertion_contract_drift", "Judge assertion digest does not match inputs")
-        assertions = tuple((item[0], json.dumps(item[1:])) for item in inputs.assertions)
+        assertions = tuple((item[0], json.dumps(item[1:])) for item in validated)
         observed = await self.assess(
             "Assess the response against every supplied assertion.", inputs.output_text, assertions
         )
@@ -505,3 +542,17 @@ class CodexJudgeAdapter:
     async def cleanup(self) -> None:
         """Close this single-use capability; subprocesses and scratch are scoped."""
         self._closed = True
+        tasks = {task for task in (self._assessment_task, self._judge_task) if task is not None and not task.done()}
+        if asyncio.current_task() in tasks:
+            raise ContractError("codex_judge_cleanup_reentrant", "Cleanup must run outside the active judgment")
+        for task in tasks:
+            if not task.cancelling():
+                task.cancel()
+        if tasks:
+            _done, pending = await asyncio.wait(tasks, timeout=6)
+            if pending:
+                raise ContractError("codex_judge_cleanup_timeout", "Active judgment cleanup did not complete")
+            if any(not task.cancelled() and task.exception() is not None for task in tasks):
+                raise ContractError("codex_judge_cleanup_failed", "Active judgment failed during cleanup")
+        if self._cleanup_error is not None:
+            raise ContractError(self._cleanup_error, "Active judgment process cleanup failed")
