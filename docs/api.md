@@ -592,6 +592,11 @@ or completed reviewer execution.
   trusted executable, isolated temporary-work parent, frozen rubric, explicit
   model/CLI version and every ambient MCP server name to disable. The host must
   authorise invocation; constructing an adapter grants no authority or budget.
+  The host must authorise the actual data and provider destination. Task,
+  response, rubric and assertion operands are private prompt fields sent intact
+  to that authorised judge, including text that resembles a path or credential.
+  Public-metadata redaction protects identities, diagnostics and evidence
+  references; it is not prompt sanitisation or permission to send real secrets.
   `assess(task, response, assertions)` returns a numeric observation and digests;
   `judge(inputs)` implements the existing selected-case judge protocol and
   emits `SelectedCaseJudgeEvidence` bound to the candidate, output and assertion
