@@ -598,6 +598,8 @@ or completed reviewer execution.
   Public-metadata redaction protects identities, diagnostics and evidence
   references; it is not prompt sanitisation or permission to send real secrets.
   `assess(task, response, assertions)` returns a numeric observation and digests;
+  its rationale and canonical result bytes are private provider output, omitted
+  from the observation representation and unsuitable for public logging.
   `judge(inputs)` implements the existing selected-case judge protocol and
   emits `SelectedCaseJudgeEvidence` bound to the candidate, output and assertion
   contract. For `judge`, pass an async `retain_result(ref, bytes)` callback

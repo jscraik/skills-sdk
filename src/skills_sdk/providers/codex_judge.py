@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
@@ -34,6 +34,14 @@ class _Verdict(BaseModel):
     score: float = Field(strict=True, ge=0, le=1, allow_inf_nan=False)
     satisfied_assertion_ids: list[str]
     rationale: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("rationale")
+    @classmethod
+    def nonblank_rationale(cls, value: str) -> str:
+        """Require an explanation while preserving exact verdict text for hashing."""
+        if not value.strip():
+            raise ValueError("judge rationale must contain non-whitespace text")
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +109,7 @@ class CodexJudgeObservation:
 
     score: float
     satisfied_assertion_ids: tuple[str, ...]
-    rationale: str
+    rationale: str = field(repr=False)
     result_sha256: str
     prompt_sha256: str
     settings_sha256: str
@@ -326,6 +334,14 @@ def _validated_events(payload: bytes, assertion_ids: tuple[str, ...]) -> _Verdic
     return result
 
 
+def _resolve_trusted_path(path: Path) -> Path:
+    """Reject unavailable host paths without disclosing their absolute values."""
+    try:
+        return path.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise ValueError("judge executable and work directory must be available") from None
+
+
 class CodexJudgeAdapter:
     """Live, complete-only judge with a frozen model, rubric and native settings.
 
@@ -344,8 +360,8 @@ class CodexJudgeAdapter:
         *,
         retain_result: Callable[[str, bytes], Awaitable[None]] | None = None,
     ) -> None:
-        self._executable = executable.resolve(strict=True)
-        self._parent = work_parent.resolve(strict=True)
+        self._executable = _resolve_trusted_path(executable)
+        self._parent = _resolve_trusted_path(work_parent)
         if type(settings) is not CodexJudgeSettings:
             raise ValueError("judge settings must be an exact validated settings object")
         self._settings = CodexJudgeSettings(
@@ -400,7 +416,7 @@ class CodexJudgeAdapter:
         try:
             return await self._assess(task, response, assertions)
         except asyncio.CancelledError as error:
-            self._cleanup_error = next(
+            cleanup_note = next(
                 (
                     note
                     for note in getattr(error, "__notes__", ())
@@ -408,6 +424,8 @@ class CodexJudgeAdapter:
                 ),
                 None,
             )
+            if self._cleanup_error is None and cleanup_note is not None:
+                self._cleanup_error = cleanup_note
             raise
         finally:
             self._assessment_task = None

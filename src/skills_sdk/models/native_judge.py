@@ -9,6 +9,7 @@ from pydantic import ConfigDict, Field, field_validator
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.inventory import NonEmptyText, _ContractModel
+from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import _identity_is_public
 
 
@@ -45,10 +46,20 @@ class CodexNativeJudgeParameters(_ContractModel):
             raise ValueError("capability controls require booleans")
         return value
 
-    @field_validator("model", "cli_version")
+    @field_validator("model", "cli_version", mode="before")
     @classmethod
-    def public_identity(cls, value: str) -> str:
-        """Keep local paths and secret-shaped values out of portable parameters."""
+    def public_identity(cls, value: object, info: object) -> str:
+        """Require the same canonical public identities as the executable adapter."""
+        if type(value) is not str:
+            raise ValueError("native identities must be strings")
+        ProviderIdentityV2(
+            provider_id="codex",
+            provider_kind="agent",
+            model_id=value if info.field_name == "model" else "model",
+            version_or_digest=value if info.field_name == "cli_version" else "v1",
+            adapter_id="codex-cli-judge",
+            adapter_version_or_digest="v1",
+        )
         if (
             not _identity_is_public(value)
             or PurePosixPath(value).is_absolute()

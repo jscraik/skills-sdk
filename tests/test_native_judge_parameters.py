@@ -65,6 +65,11 @@ def test_public_native_tags_remain_valid_and_forged_paths_fail_revalidation() ->
         ("cli_version", "/absolute/version"),
         ("model", "C:\\local\\model"),
         ("model", "~/local-model"),
+        ("model", "café"),
+        ("model", "m" * 129),
+        ("model", " model "),
+        ("cli_version", " version "),
+        ("cli_version", "v" * 129),
         ("schema_version", "codex-native-judge-parameters/v2"),
     ],
 )

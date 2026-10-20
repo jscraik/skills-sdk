@@ -112,6 +112,35 @@ def test_cancellation_survives_cleanup_failure(tmp_path: Path, monkeypatch: pyte
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize("later_note", [None, "codex_judge_cleanup_failed"])
+def test_cleanup_preserves_first_failure_across_cancellations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, later_note: str | None
+) -> None:
+    """Later cancellation must not erase or replace an unrecovered teardown failure."""
+    executable = _executable(tmp_path, "raise AssertionError('not reached')")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    notes = iter(("codex_judge_cleanup_timeout", later_note))
+
+    async def cancelled(*args: object) -> object:
+        error = asyncio.CancelledError()
+        note = next(notes)
+        if note is not None:
+            error.add_note(note)
+        raise error
+
+    monkeypatch.setattr(adapter, "_assess", cancelled)
+
+    async def exercise() -> None:
+        for _ in range(2):
+            with pytest.raises(asyncio.CancelledError):
+                await adapter.assess("Task", "Response", (("scope", "Scope"),))
+        with pytest.raises(ContractError) as raised:
+            await adapter.cleanup()
+        assert raised.value.code == "codex_judge_cleanup_timeout"
+
+    asyncio.run(exercise())
+
+
 def test_cleanup_awaits_active_operation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Successful adapter cleanup must wait for owned assessment teardown."""
     executable = _executable(tmp_path, "raise AssertionError('not reached')")

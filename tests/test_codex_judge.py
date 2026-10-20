@@ -94,6 +94,43 @@ async def _retain_noop(ref: str, data: bytes) -> None:
     return None
 
 
+def test_observation_repr_does_not_disclose_private_rationale(tmp_path: Path) -> None:
+    """Model explanations may repeat private inputs and must stay out of repr."""
+    private = "private-fixture-rationale"
+    events = _events().replace("Specific fixture evidence.", private)
+    executable = _executable(tmp_path, f"print({events!r})")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    observation = asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert observation.rationale == private
+    assert private not in repr(observation)
+
+
+@pytest.mark.parametrize("missing", ["executable", "parent"])
+def test_missing_trusted_paths_have_safe_constructor_errors(tmp_path: Path, missing: str) -> None:
+    """Missing host configuration must not disclose absolute paths in diagnostics."""
+    executable = _executable(tmp_path, "raise AssertionError('not reached')")
+    absent = tmp_path / "private-missing-path"
+    with pytest.raises(ValueError) as raised:
+        CodexJudgeAdapter(
+            absent if missing == "executable" else executable,
+            absent if missing == "parent" else tmp_path,
+            CodexJudgeSettings("model", "0.153.4", ()),
+            "Rubric",
+        )
+    assert str(tmp_path) not in str(raised.value)
+    assert raised.value.__cause__ is None
+
+
+def test_blank_rationale_is_rejected_before_observation(tmp_path: Path) -> None:
+    """A whitespace-only explanation cannot become retained judge evidence."""
+    events = _events().replace("Specific fixture evidence.", "   ")
+    executable = _executable(tmp_path, f"print({events!r})")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError):
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert adapter.last_observation is None
+
+
 def test_real_subprocess_judgment_binds_prompt_and_cleans_scratch(tmp_path: Path) -> None:
     """The production path sends no labels and consumes actual process output."""
     checks = (
@@ -247,6 +284,11 @@ def test_timeout_cleans_launcher_descendants_that_keep_output_pipes_open(tmp_pat
                 os.kill(pid, 0)
             except ProcessLookupError:
                 break
+            if sys.platform == "linux":
+                with suppress(FileNotFoundError):
+                    state = Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()[0]
+                    if state == "Z":
+                        break
             time.sleep(0.01)
         else:
             pytest.fail("launcher descendant survived cleanup")
