@@ -44,6 +44,22 @@ def test_public_native_tags_remain_valid_and_forged_paths_fail_revalidation() ->
         CodexNativeJudgeParameters.model_validate(forged)
 
 
+def test_mcp_names_preserve_raw_binding_and_reject_forged_whitespace() -> None:
+    """Accepted names bind unchanged; typed forgery must not hide normalization."""
+    payload = CodexJudgeSettings("fixture-model", "0.153.4", ("docs", "search_api-v2")).public_settings()
+    parameters = CodexNativeJudgeParameters.model_validate(payload)
+    assert parameters.disabled_mcp_servers == ("docs", "search_api-v2")
+    assert (
+        parameters.settings_sha256()
+        == CodexJudgeSettings("fixture-model", "0.153.4", parameters.disabled_mcp_servers)
+        .calibration_parameters()
+        .settings_sha256()
+    )
+    forged = CodexNativeJudgeParameters.model_construct(**{**payload, "disabled_mcp_servers": (" docs ",)})
+    with pytest.raises(ValidationError):
+        CodexNativeJudgeParameters.model_validate(forged)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -61,6 +77,9 @@ def test_public_native_tags_remain_valid_and_forged_paths_fail_revalidation() ->
         ("disabled_mcp_servers", ["docs.enabled=true"]),
         ("disabled_mcp_servers", ["café"]),
         ("disabled_mcp_servers", ["文档"]),
+        ("disabled_mcp_servers", [" docs "]),
+        ("disabled_mcp_servers", ["\tdocs"]),
+        ("disabled_mcp_servers", ["docs\n"]),
         ("model", "/absolute/local-model"),
         ("cli_version", "/absolute/version"),
         ("model", "C:\\local\\model"),

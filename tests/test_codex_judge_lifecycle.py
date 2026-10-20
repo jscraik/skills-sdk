@@ -1,6 +1,7 @@
 """Controlled-process lifecycle and cancellation regression proof."""
 
 import asyncio
+import json
 import os
 import signal
 import sys
@@ -12,6 +13,41 @@ from test_codex_judge import _events, _executable
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.providers.codex_judge import CodexJudgeAdapter, CodexJudgeSettings, _run
+
+
+def test_valid_unicode_rationale_remains_accepted(tmp_path: Path) -> None:
+    """UTF-8 provider text remains valid beside rejected unpaired surrogates."""
+    events = [json.loads(line) for line in _events().splitlines()]
+    verdict = json.loads(events[1]["item"]["text"])
+    verdict["rationale"] = "Café evidence: 文档 ✅"
+    events[1]["item"]["text"] = json.dumps(verdict)
+    raw = "\n".join(json.dumps(event) for event in events)
+    executable = _executable(tmp_path, "print(" + repr(raw) + ")")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    observation = asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert observation.rationale == verdict["rationale"]
+    assert observation.rationale.encode("utf-8")
+
+
+@pytest.mark.parametrize("invalid", ["high_surrogate", "low_surrogate", "nan", "infinity", "negative_infinity"])
+def test_invalid_external_text_and_json_are_typed_blockers(tmp_path: Path, invalid: str) -> None:
+    """Malformed provider text and nonstandard metadata cannot become evidence."""
+    events = [json.loads(line) for line in _events().splitlines()]
+    if invalid.endswith("surrogate"):
+        verdict = json.loads(events[1]["item"]["text"])
+        verdict["rationale"] = chr(0xD800 if invalid == "high_surrogate" else 0xDFFF)
+        events[1]["item"]["text"] = json.dumps(verdict)
+    else:
+        value = {"nan": float("nan"), "infinity": float("inf"), "negative_infinity": float("-inf")}[invalid]
+        events[-1]["usage"] = {"tokens": value}
+    raw = "\n".join(json.dumps(event) for event in events)
+    executable = _executable(tmp_path, "print(" + repr(raw) + ")")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_protocol_invalid"
+    assert adapter.last_observation is None
+    assert not list(tmp_path.glob("sdk-judge-*"))
 
 
 @pytest.mark.parametrize("primary", ["success", "process", "cancelled"])

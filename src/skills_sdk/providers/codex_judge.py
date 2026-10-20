@@ -351,12 +351,17 @@ def _unique_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
+def _reject_json_constant(value: str) -> object:
+    """Accept JSON numbers only, including metadata outside the verdict fields."""
+    raise ValueError("nonstandard JSON constant")
+
+
 def _validated_events(payload: bytes, assertion_ids: tuple[str, ...]) -> _Verdict:
     """Require one complete result and reject tool-bearing event records."""
     messages: list[str] = []
     completed = 0
     for line in payload.splitlines():
-        event = json.loads(line, object_pairs_hook=_unique_members)
+        event = json.loads(line, object_pairs_hook=_unique_members, parse_constant=_reject_json_constant)
         if type(event) is not dict or not isinstance(event.get("type"), str):
             raise ValueError("event must be a typed object")
         kind = event.get("type")
@@ -382,7 +387,9 @@ def _validated_events(payload: bytes, assertion_ids: tuple[str, ...]) -> _Verdic
             raise ValueError("unsupported event type")
     if completed != 1 or len(messages) != 1:
         raise ContractError("codex_judge_incomplete", "Judge requires exactly one completed final result")
-    result = _Verdict.model_validate(json.loads(messages[0], object_pairs_hook=_unique_members))
+    result = _Verdict.model_validate(
+        json.loads(messages[0], object_pairs_hook=_unique_members, parse_constant=_reject_json_constant)
+    )
     selected = result.satisfied_assertion_ids
     if len(selected) != len(set(selected)) or not set(selected) <= set(assertion_ids):
         raise ContractError("codex_judge_assertions", "Judge returned unknown or repeated assertions")

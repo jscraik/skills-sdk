@@ -69,12 +69,19 @@ class CodexNativeJudgeParameters(_ContractModel):
             raise ValueError("native identities must be public and portable")
         return value
 
-    @field_validator("disabled_mcp_servers")
+    @field_validator("disabled_mcp_servers", mode="before")
     @classmethod
-    def simple_unique_names(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+    def simple_unique_names(cls, value: object) -> object:
         """Bind an explicit, unique list of configuration keys."""
-        if len(set(value)) != len(value) or any(
-            not name or not all(char.isascii() and (char.isalnum() or char in "_-") for char in name) for name in value
+        if (
+            not isinstance(value, (list, tuple))
+            or any(
+                type(name) is not str
+                or not name
+                or not all(char.isascii() and (char.isalnum() or char in "_-") for char in name)
+                for name in value
+            )
+            or len(set(value)) != len(value)
         ):
             raise ValueError("MCP names must be unique simple keys")
         return value
