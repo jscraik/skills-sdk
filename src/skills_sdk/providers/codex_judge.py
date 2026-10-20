@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import inspect
 import json
+import math
 import os
 import signal
 import tempfile
@@ -151,7 +152,7 @@ class CodexJudgeObservation:
     """Observed CLI execution, not backend model or sampling attestation."""
 
     score: float
-    satisfied_assertion_ids: tuple[str, ...]
+    satisfied_assertion_ids: tuple[str, ...] = field(repr=False)
     rationale: str = field(repr=False)
     result_sha256: str
     prompt_sha256: str
@@ -392,12 +393,25 @@ def _reject_json_constant(value: str) -> object:
     raise ValueError("nonstandard JSON constant")
 
 
+def _finite_json_float(value: str) -> float:
+    """Reject numeric overflow as well as explicit nonstandard constants."""
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("nonfinite JSON number")
+    return parsed
+
+
 def _validated_events(payload: bytes, assertion_ids: tuple[str, ...]) -> _Verdict:
     """Require one complete result and reject tool-bearing event records."""
     messages: list[str] = []
     completed = 0
     for line in payload.splitlines():
-        event = json.loads(line, object_pairs_hook=_unique_members, parse_constant=_reject_json_constant)
+        event = json.loads(
+            line,
+            object_pairs_hook=_unique_members,
+            parse_constant=_reject_json_constant,
+            parse_float=_finite_json_float,
+        )
         json.dumps(event, ensure_ascii=False).encode("utf-8")
         if type(event) is not dict or not isinstance(event.get("type"), str):
             raise ValueError("event must be a typed object")
@@ -425,7 +439,12 @@ def _validated_events(payload: bytes, assertion_ids: tuple[str, ...]) -> _Verdic
     if completed != 1 or len(messages) != 1:
         raise ContractError("codex_judge_incomplete", "Judge requires exactly one completed final result")
     result = _Verdict.model_validate(
-        json.loads(messages[0], object_pairs_hook=_unique_members, parse_constant=_reject_json_constant)
+        json.loads(
+            messages[0],
+            object_pairs_hook=_unique_members,
+            parse_constant=_reject_json_constant,
+            parse_float=_finite_json_float,
+        )
     )
     selected = result.satisfied_assertion_ids
     if len(selected) != len(set(selected)) or not set(selected) <= set(assertion_ids):
@@ -575,9 +594,14 @@ class CodexJudgeAdapter:
         self.last_observation = None
         self.last_failure = None
         prompt = compile_codex_judge_prompt(task, response, self._rubric, assertions)
+        if any(
+            type(item) is not tuple or len(item) != 2 or any(type(value) is not str for value in item)
+            for item in assertions
+        ):
+            raise ContractError("codex_judge_input_invalid", "Judge assertions require string pairs")
         ids = tuple(item[0] for item in assertions)
         if len(ids) != len(set(ids)) or not assertions:
-            raise ValueError("judge assertions must be nonempty and unique")
+            raise ContractError("codex_judge_input_invalid", "Judge assertions must be nonempty and unique")
         with _JudgeWorkspace(self) as folder:
             root = Path(folder)
             version = await self._invoke((str(self._executable), "--version"), root, b"", remaining(10))
@@ -679,6 +703,9 @@ class CodexJudgeAdapter:
                 )
             ):
                 raise ValueError("invalid assertion shape")
+            for item in validated:
+                for term in (*item[2], *item[3]):
+                    term.encode("utf-8")
             contract = [{"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in validated]
             contract_digest = canonical_json_sha256(contract)
         except (TypeError, ValueError, IndexError):
