@@ -629,6 +629,11 @@ or completed reviewer execution.
   Direct `assess` shares one requested native execution
   budget between its version probe and execution. The probe is capped at ten
   seconds and the remaining budget; execution receives only what remains.
+  Each subprocess creation await and its pipe exchange share one absolute
+  deadline. Expiry before a process handle is returned relies on Python's
+  native transport cancellation and direct-child cleanup; it does not establish
+  ownership or containment of arbitrary pre-handle descendants. Async timers
+  cannot pre-empt synchronous OS spawning or an unresponsive native cleanup.
   Each owned process has a separate cleanup bound of five seconds, which may
   extend wall time beyond the execution budget. `cleanup()` closes the adapter,
   cancels active work and waits up to six seconds for owned teardown; it does

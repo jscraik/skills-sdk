@@ -15,6 +15,55 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.providers.codex_judge import CodexJudgeAdapter, CodexJudgeSettings, _run
 
 
+@pytest.mark.parametrize("external_cancel", [False, True])
+def test_process_creation_wait_obeys_timeout_and_caller_cancellation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, external_cancel: bool
+) -> None:
+    """A cancellable factory stall cannot evade the budget or invent a PID."""
+    exited: list[bool] = []
+
+    async def stalled(*args: object, **kwargs: object) -> object:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            exited.append(True)
+
+    def forbidden_signal(*args: object) -> None:
+        pytest.fail("creation never returned an owned process group")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", stalled)
+    monkeypatch.setattr(os, "killpg", forbidden_signal)
+
+    async def invoke() -> None:
+        operation = asyncio.create_task(_run((sys.executable, "-c", "pass"), tmp_path, b"", 0.02))
+        if external_cancel:
+            await asyncio.sleep(0)
+            operation.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await operation
+        else:
+            with pytest.raises(ContractError) as raised:
+                await asyncio.wait_for(operation, 0.5)
+            assert raised.value.code == "codex_judge_timeout"
+
+    asyncio.run(invoke())
+    assert exited == [True]
+
+
+def test_process_creation_consumes_the_shared_exchange_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Creation time cannot be added on top of the configured pipe budget."""
+    original = asyncio.create_subprocess_exec
+
+    async def delayed(*args: object, **kwargs: object) -> asyncio.subprocess.Process:
+        await asyncio.sleep(0.15)
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", delayed)
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(_run((sys.executable, "-c", "import time;time.sleep(0.2);print('done')"), tmp_path, b"", 0.25))
+    assert raised.value.code == "codex_judge_timeout"
+
+
 def test_valid_unicode_rationale_remains_accepted(tmp_path: Path) -> None:
     """UTF-8 provider text remains valid beside rejected unpaired surrogates."""
     events = [json.loads(line) for line in _events().splitlines()]
