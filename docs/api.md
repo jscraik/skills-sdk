@@ -611,10 +611,22 @@ or completed reviewer execution.
   synchronous callbacks are rejected. Blocking code inside trusted async host
   code is outside the adapter isolation guarantee. Direct
   `assess` also returns those bytes as private `result_json` for host retention.
+  The public judge identity binds both native settings and a digest of the
+  exact frozen rubric. Identical verdict bytes may share a result reference,
+  but different rubrics produce different judge identities. The authorised
+  host must retain its rubric privately to reproduce a judgment.
   One adapter supports one active assessment; overlapping calls are rejected.
   Requested shell/web/apps/plugins restrictions, read-only sandbox and ephemeral
-  operation are passed as CLI arguments. Input/output limits and deadlines are
-  enforced by the adapter. Direct `assess` shares one requested native execution
+  operation are passed as CLI arguments. MCP overrides are limited to 64 unique
+  names of at most 64 ASCII characters each, before argument construction.
+  Input/output limits are enforced by the adapter. Subprocess-wait deadlines
+  are cooperative async limits. Supported scratch storage requires a responsive
+  local filesystem: allocation, schema writing and removal run synchronously
+  on the caller's event-loop thread. A stalled filesystem can block that loop
+  and overrun both native and enclosing orchestration timers. This adapter has
+  no hard end-to-end wall-clock bound under filesystem stalls; stronger
+  isolation requires external process supervision and is not implemented here.
+  Direct `assess` shares one requested native execution
   budget between its version probe and execution. The probe is capped at ten
   seconds and the remaining budget; execution receives only what remains.
   Each owned process has a separate cleanup bound of five seconds, which may
@@ -624,9 +636,10 @@ or completed reviewer execution.
   waiter does not cancel resource teardown again. Caller cancellation remains
   cancellation when teardown fails, with a safe cleanup-code note; the cleanup
   hook reports the typed teardown blocker. Selected-case orchestration
-  retains its authoritative 30-second overall judge deadline, including startup,
-  and one-second cleanup deadline; it may cancel an invocation before a larger
-  native timeout. This adapter does not extend those shared engine budgets.
+  applies its 30-second overall judge timer, including startup, and one-second
+  cleanup timer when the event loop can run. It may cancel an invocation before
+  a larger native timeout. This adapter does not extend those shared engine
+  budgets or make them pre-empt synchronous filesystem work.
   Configuration, global instructions, hooks, rules and authentication
   remain inherited. Tool-event rejection is retrospective and cannot prevent
   an available tool from acting; the host must verify isolation for its data.

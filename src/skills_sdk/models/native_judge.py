@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import PurePosixPath, PureWindowsPath
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, field_validator
 
@@ -11,6 +11,9 @@ from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.inventory import NonEmptyText, _ContractModel
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import _identity_is_public
+
+_MCP_NAME_LIMIT = 64
+_MCP_SERVER_LIMIT = 64
 
 
 class CodexNativeJudgeParameters(_ContractModel):
@@ -31,7 +34,9 @@ class CodexNativeJudgeParameters(_ContractModel):
     apps: Literal[False] = False
     plugins: Literal[False] = False
     ephemeral: Literal[True] = True
-    disabled_mcp_servers: tuple[str, ...]
+    disabled_mcp_servers: tuple[Annotated[str, Field(min_length=1, max_length=_MCP_NAME_LIMIT)], ...] = Field(
+        max_length=_MCP_SERVER_LIMIT
+    )
 
     @field_validator("trial_count", "shell_tool", "apps", "plugins", "ephemeral", mode="before")
     @classmethod
@@ -75,9 +80,11 @@ class CodexNativeJudgeParameters(_ContractModel):
         """Bind an explicit, unique list of configuration keys."""
         if (
             not isinstance(value, (list, tuple))
+            or len(value) > _MCP_SERVER_LIMIT
             or any(
                 type(name) is not str
                 or not name
+                or len(name) > _MCP_NAME_LIMIT
                 or not all(char.isascii() and (char.isalnum() or char in "_-") for char in name)
                 for name in value
             )

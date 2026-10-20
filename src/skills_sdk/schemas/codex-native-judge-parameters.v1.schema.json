@@ -17,8 +17,11 @@
     },
     "disabled_mcp_servers": {
       "items": {
+        "maxLength": 64,
+        "minLength": 1,
         "type": "string"
       },
+      "maxItems": 64,
       "title": "Disabled Mcp Servers",
       "type": "array"
     },

@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
-from skills_sdk.models.native_judge import CodexNativeJudgeParameters
+from skills_sdk.models.native_judge import _MCP_NAME_LIMIT, _MCP_SERVER_LIMIT, CodexNativeJudgeParameters
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import _identity_is_public
 from skills_sdk.models.safety import _public_text_is_redaction_safe
@@ -106,11 +106,16 @@ class CodexJudgeSettings:
             raise ValueError("unsupported reasoning effort")
         if type(self.timeout_seconds) is not int or not 1 <= self.timeout_seconds <= 300:
             raise ValueError("judge timeout must be between 1 and 300 seconds")
-        if type(self.mcp_server_names) is not tuple or any(
-            type(name) is not str
-            or not name
-            or not all(char.isascii() and (char.isalnum() or char in "_-") for char in name)
-            for name in self.mcp_server_names
+        if (
+            type(self.mcp_server_names) is not tuple
+            or len(self.mcp_server_names) > _MCP_SERVER_LIMIT
+            or any(
+                type(name) is not str
+                or not name
+                or len(name) > _MCP_NAME_LIMIT
+                or not all(char.isascii() and (char.isalnum() or char in "_-") for char in name)
+                for name in self.mcp_server_names
+            )
         ):
             raise ValueError("explicit MCP names must be simple configuration keys")
         parameters = self.calibration_parameters()
@@ -362,6 +367,7 @@ def _validated_events(payload: bytes, assertion_ids: tuple[str, ...]) -> _Verdic
     completed = 0
     for line in payload.splitlines():
         event = json.loads(line, object_pairs_hook=_unique_members, parse_constant=_reject_json_constant)
+        json.dumps(event, ensure_ascii=False).encode("utf-8")
         if type(event) is not dict or not isinstance(event.get("type"), str):
             raise ValueError("event must be a typed object")
         kind = event.get("type")
@@ -464,7 +470,12 @@ class CodexJudgeAdapter:
             model_id=self._settings.model,
             version_or_digest=self._settings.cli_version,
             adapter_id="codex-cli-judge",
-            adapter_version_or_digest=canonical_json_sha256(self._settings.public_settings()),
+            adapter_version_or_digest=canonical_json_sha256(
+                {
+                    "settings": self._settings.public_settings(),
+                    "rubric_sha256": hashlib.sha256(_utf8(self._rubric)).hexdigest(),
+                }
+            ),
         )
 
     async def assess(self, task: str, response: str, assertions: tuple[tuple[str, str], ...]) -> CodexJudgeObservation:

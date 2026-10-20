@@ -21,6 +21,7 @@ def test_valid_unicode_rationale_remains_accepted(tmp_path: Path) -> None:
     verdict = json.loads(events[1]["item"]["text"])
     verdict["rationale"] = "Café evidence: 文档 ✅"
     events[1]["item"]["text"] = json.dumps(verdict)
+    events[-1]["usage"] = {"labels": ["Café 文档 ✅"]}
     raw = "\n".join(json.dumps(event) for event in events)
     executable = _executable(tmp_path, "print(" + repr(raw) + ")")
     adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
@@ -29,7 +30,19 @@ def test_valid_unicode_rationale_remains_accepted(tmp_path: Path) -> None:
     assert observation.rationale.encode("utf-8")
 
 
-@pytest.mark.parametrize("invalid", ["high_surrogate", "low_surrogate", "nan", "infinity", "negative_infinity"])
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "high_surrogate",
+        "low_surrogate",
+        "metadata_high",
+        "metadata_low",
+        "metadata_key",
+        "nan",
+        "infinity",
+        "negative_infinity",
+    ],
+)
 def test_invalid_external_text_and_json_are_typed_blockers(tmp_path: Path, invalid: str) -> None:
     """Malformed provider text and nonstandard metadata cannot become evidence."""
     events = [json.loads(line) for line in _events().splitlines()]
@@ -37,6 +50,9 @@ def test_invalid_external_text_and_json_are_typed_blockers(tmp_path: Path, inval
         verdict = json.loads(events[1]["item"]["text"])
         verdict["rationale"] = chr(0xD800 if invalid == "high_surrogate" else 0xDFFF)
         events[1]["item"]["text"] = json.dumps(verdict)
+    elif invalid.startswith("metadata"):
+        surrogate = chr(0xDFFF if invalid == "metadata_low" else 0xD800)
+        events[-1]["usage"] = {surrogate: "label"} if invalid == "metadata_key" else {"labels": [surrogate]}
     else:
         value = {"nan": float("nan"), "infinity": float("inf"), "negative_infinity": float("-inf")}[invalid]
         events[-1]["usage"] = {"tokens": value}

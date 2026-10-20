@@ -13,11 +13,39 @@ from skills_sdk.models import CodexNativeJudgeParameters, PluginQualityRequest, 
 from skills_sdk.providers.codex_judge import CodexJudgeSettings
 
 
+@pytest.mark.parametrize("names", [("a" * 65,), tuple(f"server_{index}" for index in range(65))])
+def test_mcp_override_limits_reject_before_argument_construction(names: tuple[str, ...]) -> None:
+    """Raw, typed and structural settings cannot admit oversized overrides."""
+    payload = CodexJudgeSettings("fixture-model", "0.153.4", ()).public_settings()
+    payload["disabled_mcp_servers"] = names
+    with pytest.raises(ValueError):
+        CodexJudgeSettings("fixture-model", "0.153.4", names)
+    with pytest.raises(ValidationError):
+        CodexNativeJudgeParameters.model_validate(payload)
+    schema = CodexNativeJudgeParameters.model_json_schema()
+    assert list(Draft202012Validator(schema).iter_errors({**payload, "disabled_mcp_servers": list(names)}))
+
+
 def test_native_schema_is_not_a_portable_core_contract() -> None:
     """Provider-specific settings are accepted by their integration model only."""
     with pytest.raises(ContractError) as raised:
         SchemaRegistry().load("codex-native-judge-parameters.v1")
     assert raised.value.code == "unknown_schema"
+
+
+def test_mcp_override_limits_preserve_boundary_keys_and_reject_typed_forgery() -> None:
+    """Maximum supported overrides round-trip, while forged instances revalidate."""
+    names = tuple(f"server{index:02d}" + "x" * 56 for index in range(64))
+    settings = CodexJudgeSettings("fixture-model", "0.153.4", names)
+    parameters = settings.calibration_parameters()
+    assert parameters.disabled_mcp_servers == names
+    schema = CodexNativeJudgeParameters.model_json_schema()
+    Draft202012Validator(schema).validate(json.loads(parameters.model_dump_json()))
+    forged = CodexNativeJudgeParameters.model_construct(
+        **{**settings.public_settings(), "disabled_mcp_servers": (*names, "extra")}
+    )
+    with pytest.raises(ValidationError):
+        CodexNativeJudgeParameters.model_validate(forged)
 
 
 def test_native_requested_settings_round_trip_and_existing_exports() -> None:

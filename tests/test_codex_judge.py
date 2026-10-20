@@ -320,6 +320,16 @@ def test_invalid_controls_and_oversized_input_do_not_start_process(tmp_path: Pat
     assert raised.value.code == "codex_judge_input_limit"
 
 
+def test_judge_identity_binds_the_exact_frozen_rubric(tmp_path: Path) -> None:
+    """Equal verdicts cannot hide a change to the policy used to produce them."""
+    executable = _executable(tmp_path, "print(" + repr(_events()) + ")")
+    settings = CodexJudgeSettings("fixture-model", "0.153.4", ())
+    first = CodexJudgeAdapter(executable, tmp_path, settings, "Rubric one")
+    second = CodexJudgeAdapter(executable, tmp_path, settings, "Rubric two")
+    assert first.identity != second.identity
+    assert first.identity == CodexJudgeAdapter(executable, tmp_path, settings, "Rubric one").identity
+
+
 def test_settings_snapshot_rejects_forgery_and_preserves_applied_identity(tmp_path: Path) -> None:
     """Reported parameters must describe the frozen arguments, not mutable caller state."""
     for model, names in ((" padded ", ()), ("model", ("docs", "docs"))):
@@ -379,6 +389,14 @@ def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Pat
     artifact = retained[evidence.evidence_refs[0]]
     assert hashlib.sha256(artifact).hexdigest() == evidence.judge_result_sha256
     assert json.loads(artifact)["rationale"] == "Specific fixture evidence."
+    alternate = CodexJudgeAdapter(
+        executable, tmp_path, adapter._settings, "A different frozen rubric", retain_result=retain
+    )
+    changed = asyncio.run(alternate.judge(inputs))
+    assert changed.judge != evidence.judge
+    assert changed.judge_result_sha256 == evidence.judge_result_sha256
+    assert changed.evidence_refs == evidence.evidence_refs
+    asyncio.run(alternate.cleanup())
     asyncio.run(adapter.cleanup())
     assert not list(tmp_path.glob("sdk-judge-*")) and retained[evidence.evidence_refs[0]] == artifact
 
