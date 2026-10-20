@@ -6,10 +6,48 @@ import sys
 from pathlib import Path
 
 import pytest
-from test_codex_judge import _executable
+from test_codex_judge import _events, _executable
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.providers.codex_judge import CodexJudgeAdapter, CodexJudgeSettings, _run
+
+
+@pytest.mark.parametrize("failure", ["missing_parent", "allocation_denied", "schema_write_denied"])
+def test_scratch_setup_failure_is_typed_and_private(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    """Changed scratch availability must fail safely and permit a later retry."""
+    from skills_sdk.providers import codex_judge
+
+    executable = _executable(tmp_path, "print(" + repr(_events()) + ")")
+    parent = tmp_path / "private-host-workspace"
+    parent.mkdir()
+    adapter = CodexJudgeAdapter(executable, parent, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    with monkeypatch.context() as patch:
+        if failure == "missing_parent":
+            parent.rmdir()
+        elif failure == "allocation_denied":
+
+            def denied_allocation(*args: object, **kwargs: object) -> str:
+                raise PermissionError(str(parent))
+
+            patch.setattr(codex_judge.tempfile, "mkdtemp", denied_allocation)
+        else:
+
+            def denied_write(*args: object, **kwargs: object) -> int:
+                raise PermissionError(str(parent))
+
+            patch.setattr(Path, "write_text", denied_write)
+        with pytest.raises(ContractError) as raised:
+            asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_workspace_unavailable"
+    assert str(parent) not in str(raised.value)
+    assert str(parent) not in repr(raised.value.details)
+    assert raised.value.__suppress_context__
+    assert adapter.last_observation is None
+    assert not list(parent.glob("sdk-judge-*"))
+    parent.mkdir(exist_ok=True)
+    assert asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),))).score == 0.9
 
 
 @pytest.mark.parametrize("mode", ["caller", "cleanup", "cancelled_cleanup_waiter", "cleanup_failure"])

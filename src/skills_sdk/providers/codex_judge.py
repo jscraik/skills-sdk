@@ -415,6 +415,10 @@ class CodexJudgeAdapter:
         self._assessment_task = asyncio.current_task()
         try:
             return await self._assess(task, response, assertions)
+        except OSError:
+            raise ContractError(
+                "codex_judge_workspace_unavailable", "Codex judge scratch workspace is unavailable"
+            ) from None
         except asyncio.CancelledError as error:
             cleanup_note = next(
                 (
