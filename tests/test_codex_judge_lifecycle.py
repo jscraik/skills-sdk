@@ -68,7 +68,10 @@ def test_transport_oserror_is_a_private_process_failure(tmp_path: Path, monkeypa
     assert raised.value.__suppress_context__
 
 
-def test_termination_oserror_is_retained_as_cleanup_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("later", ["none", "drain", "timeout"])
+def test_termination_oserror_is_retained_as_cleanup_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, later: str
+) -> None:
     """A post-start termination error cannot masquerade as scratch unavailability."""
     from skills_sdk.providers import codex_judge
 
@@ -81,10 +84,30 @@ def test_termination_oserror_is_retained_as_cleanup_failure(tmp_path: Path, monk
         raise PermissionError(str(tmp_path))
 
     monkeypatch.setattr(codex_judge.os, "killpg", failed_termination)
+    if later == "drain":
+        original_drain = codex_judge._discard_to_eof
+
+        async def failed_drain(stream: asyncio.StreamReader) -> None:
+            await original_drain(stream)
+            raise OSError("private drain failure")
+
+        monkeypatch.setattr(codex_judge, "_discard_to_eof", failed_drain)
+    elif later == "timeout":
+
+        async def expired(awaitable: object, timeout: float) -> object:
+            await awaitable
+            raise TimeoutError
+
+        monkeypatch.setattr(asyncio, "wait_for", expired)
     adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
     with pytest.raises(ContractError) as raised:
         asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
     assert raised.value.code == "codex_judge_cleanup_failed"
+    assert raised.value.message == "Judge termination could not complete"
+    if later != "none":
+        assert len(raised.value.details) == 1
+        expected = "codex_judge_cleanup_timeout" if later == "timeout" else "codex_judge_cleanup_failed"
+        assert raised.value.details[0].code == expected
     assert str(tmp_path) not in str(raised.value)
     with pytest.raises(ContractError) as repeated:
         asyncio.run(adapter.cleanup())

@@ -225,6 +225,13 @@ async def _discard_to_eof(stream: asyncio.StreamReader) -> None:
         pass
 
 
+def _join_cleanup_failure(previous: ContractError | None, current: ContractError) -> ContractError:
+    """Keep the first cleanup cause authoritative without dropping later failures."""
+    if previous is None:
+        return current
+    return ContractError(previous.code, previous.message, (*previous.details, current))
+
+
 async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float) -> bytes:
     if os.name != "posix":
         raise ContractError("codex_judge_platform_unsupported", "This judge requires POSIX process-group cleanup")
@@ -298,9 +305,13 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
         try:
             outcomes = await asyncio.wait_for(asyncio.gather(*cleanup, return_exceptions=True), 5)
             if any(isinstance(item, BaseException) for item in outcomes):
-                cleanup_failure = ContractError("codex_judge_cleanup_failed", "Judge cleanup could not complete")
+                cleanup_failure = _join_cleanup_failure(
+                    cleanup_failure, ContractError("codex_judge_cleanup_failed", "Judge cleanup could not complete")
+                )
         except TimeoutError:
-            cleanup_failure = ContractError("codex_judge_cleanup_timeout", "Judge cleanup exceeded its deadline")
+            cleanup_failure = _join_cleanup_failure(
+                cleanup_failure, ContractError("codex_judge_cleanup_timeout", "Judge cleanup exceeded its deadline")
+            )
         finally:
             for task in cleanup:
                 task.cancel()

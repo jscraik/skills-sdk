@@ -630,7 +630,12 @@ or completed reviewer execution.
   Configuration, global instructions, hooks, rules and authentication
   remain inherited. Tool-event rejection is retrospective and cannot prevent
   an available tool from acting; the host must verify isolation for its data.
-  The adapter supports POSIX process-group cleanup, not Windows. Failed,
+  The adapter supports POSIX process-group cleanup, not Windows. If the
+  operating system denies group termination, a process may remain alive.
+  A typed cleanup blocker does not prove reaping or containment; the host must
+  handle that condition within its own process-management authority. Typed
+  failures preserve the first termination cause and retain later cleanup
+  failures as typed details; cancellation retains a safe cleanup-code note. Failed,
   incomplete, malformed, tool-bearing and foreign-assertion output cannot
   become evidence. Unknown event types, duplicate JSON members, invalid verdict
   fields and post-completion events produce typed `ContractError` blockers
