@@ -503,9 +503,7 @@ class CodexJudgeAdapter:
                 for item in validated
             ):
                 raise ValueError("invalid assertion shape")
-            contract = [
-                {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in validated
-            ]
+            contract = [{"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in validated]
             contract_digest = canonical_json_sha256(contract)
         except (TypeError, ValueError, IndexError):
             raise ContractError("codex_judge_assertion_contract_drift", "Judge assertion contract is invalid") from None
