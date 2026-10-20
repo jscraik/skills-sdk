@@ -19,6 +19,11 @@ authorised, caller-selected Codex CLI through the selected-case judge seam.
 Its controlled process proof does not establish live model acceptance. It sits
 outside the portable core and inherits host configuration and authentication;
 see the [API limits](docs/api.md).
+Private provider-owned supervisor and channel modules preserve process-group
+ownership through teardown. Only the live isolated supervisor signals its own
+group; the parent uses bounded status and control pipes instead of cached
+numeric group identifiers. This does not supervise synchronous SDK filesystem
+work or establish hardened host containment.
 
 ## brAInwav product family
 

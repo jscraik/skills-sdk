@@ -11,7 +11,6 @@ import os
 import signal
 import tempfile
 from collections.abc import Awaitable, Callable
-from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
@@ -26,6 +25,7 @@ from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import _identity_is_public
 from skills_sdk.models.safety import _public_text_is_redaction_safe
 from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
+from skills_sdk.providers._codex_judge_channel import JudgeSupervisor
 
 if TYPE_CHECKING:
     from skills_sdk.evaluation.live_selected_case import SelectedCaseJudgeInput
@@ -269,16 +269,10 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
     if os.name != "posix":
         raise ContractError("codex_judge_platform_unsupported", "This judge requires POSIX process-group cleanup")
     deadline = asyncio.get_running_loop().time() + seconds
+    supervisor = JudgeSupervisor()
     try:
         async with asyncio.timeout_at(deadline):
-            process = await asyncio.create_subprocess_exec(
-                *argv,
-                cwd=cwd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                start_new_session=True,
-            )
+            process = await supervisor.launch(argv, cwd)
     except TimeoutError:
         raise ContractError("codex_judge_timeout", "Codex judge exceeded its deadline") from None
     except OSError:
@@ -299,7 +293,7 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
         tasks = [
             asyncio.create_task(_read_bounded(process.stdout, 1024 * 1024)),
             asyncio.create_task(_read_bounded(process.stderr, 65536)),
-            asyncio.create_task(process.wait()),
+            asyncio.create_task(supervisor.exit_code()),
             asyncio.create_task(send()),
         ]
         try:
@@ -327,23 +321,27 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
         primary_failure = error
         raise
     finally:
-        # A completed group is already absent; otherwise terminate its descendants.
+        # Only the live anchor may signal its own group; no saved PGID is used.
         cleanup_failure = None
         try:
-            with suppress(ProcessLookupError):
-                os.killpg(process.pid, signal.SIGKILL)
+            supervisor.stop()
         except OSError:
             cleanup_failure = ContractError("codex_judge_cleanup_failed", "Judge termination could not complete")
         cleanup = [
             asyncio.create_task(_discard_to_eof(process.stdout)),
             asyncio.create_task(_discard_to_eof(process.stderr)),
             asyncio.create_task(process.wait()),
+            asyncio.create_task(supervisor.verify_stop()),
         ]
         try:
             outcomes = await asyncio.wait_for(asyncio.gather(*cleanup, return_exceptions=True), 5)
             if any(isinstance(item, BaseException) for item in outcomes):
                 cleanup_failure = _join_cleanup_failure(
                     cleanup_failure, ContractError("codex_judge_cleanup_failed", "Judge cleanup could not complete")
+                )
+            if process.returncode != -signal.SIGKILL:
+                cleanup_failure = _join_cleanup_failure(
+                    cleanup_failure, ContractError("codex_judge_cleanup_failed", "Judge supervisor exited unexpectedly")
                 )
         except TimeoutError:
             cleanup_failure = _join_cleanup_failure(
@@ -353,6 +351,7 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
             for task in cleanup:
                 task.cancel()
             await asyncio.gather(*cleanup, return_exceptions=True)
+            supervisor.close()
         if cleanup_failure is not None:
             if isinstance(primary_failure, asyncio.CancelledError):
                 primary_failure.add_note(cleanup_failure.code)

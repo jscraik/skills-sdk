@@ -3,9 +3,7 @@
 import asyncio
 import json
 import os
-import signal
 import sys
-from contextlib import suppress
 from pathlib import Path
 
 import pytest
@@ -21,9 +19,11 @@ def test_process_creation_wait_obeys_timeout_and_caller_cancellation(
 ) -> None:
     """A cancellable factory stall cannot evade the budget or invent a PID."""
     exited: list[bool] = []
+    entered = asyncio.Event()
 
     async def stalled(*args: object, **kwargs: object) -> object:
         try:
+            entered.set()
             await asyncio.Event().wait()
         finally:
             exited.append(True)
@@ -37,7 +37,7 @@ def test_process_creation_wait_obeys_timeout_and_caller_cancellation(
     async def invoke() -> None:
         operation = asyncio.create_task(_run((sys.executable, "-c", "pass"), tmp_path, b"", 0.02))
         if external_cancel:
-            await asyncio.sleep(0)
+            await entered.wait()
             operation.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await operation
@@ -177,14 +177,13 @@ def test_termination_oserror_is_retained_as_cleanup_failure(
     from skills_sdk.providers import codex_judge
 
     executable = _executable(tmp_path, "print(" + repr(_events()) + ")")
-    original = os.killpg
+    original = codex_judge.JudgeSupervisor.stop
 
-    def failed_termination(pid: int, sig: int) -> None:
-        with suppress(ProcessLookupError):
-            original(pid, signal.SIGKILL)
+    def failed_termination(supervisor: codex_judge.JudgeSupervisor) -> None:
+        original(supervisor)
         raise PermissionError(str(tmp_path))
 
-    monkeypatch.setattr(codex_judge.os, "killpg", failed_termination)
+    monkeypatch.setattr(codex_judge.JudgeSupervisor, "stop", failed_termination)
     if later == "drain":
         original_drain = codex_judge._discard_to_eof
 

@@ -625,7 +625,7 @@ or completed reviewer execution.
   on the caller's event-loop thread. A stalled filesystem can block that loop
   and overrun both native and enclosing orchestration timers. This adapter has
   no hard end-to-end wall-clock bound under filesystem stalls; stronger
-  isolation requires external process supervision and is not implemented here.
+  filesystem isolation requires external supervision and is not implemented here.
   Direct `assess` shares one requested native execution
   budget between its version probe and execution. The probe is capped at ten
   seconds and the remaining budget; execution receives only what remains.
@@ -634,6 +634,16 @@ or completed reviewer execution.
   native transport cancellation and direct-child cleanup; it does not establish
   ownership or containment of arbitrary pre-handle descendants. Async timers
   cannot pre-empt synchronous OS spawning or an unresponsive native cleanup.
+  An SDK-owned isolated Python supervisor anchors each POSIX process group.
+  Its target inherits the data pipes, but not the private control/status
+  descriptors. The parent closes control to request teardown; only the live
+  supervisor signals its own group, with target creation and stop serialized.
+  The parent never signals a saved numeric PID or process-group identifier.
+  Bounded versioned status frames distinguish target completion, startup
+  failure and supervisor stop. Unexpected supervisor exit or missing stop
+  evidence produces a typed blocker. This manages trusted executable lifetimes;
+  it is not hardened containment against deliberate group escape, credential
+  changes or external interference with the supervisor.
   Each owned process has a separate cleanup bound of five seconds, which may
   extend wall time beyond the execution budget. `cleanup()` closes the adapter,
   cancels active work and waits up to six seconds for owned teardown; it does
