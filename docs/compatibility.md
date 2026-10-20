@@ -13,6 +13,8 @@ provider authenticity, installation or promotion clearance. Existing plugin
 quality exports remain intact. The optional executable adapter supports POSIX
 process-group ownership only and requires explicit host authority; the portable
 contracts remain independent of a Codex installation.
+Its packaged settings schema and semantic model belong to the integration
+layer and are not registered in portable core's `SchemaRegistry`.
 
 Contents:
 

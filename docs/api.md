@@ -595,23 +595,45 @@ or completed reviewer execution.
   `assess(task, response, assertions)` returns a numeric observation and digests;
   `judge(inputs)` implements the existing selected-case judge protocol and
   emits `SelectedCaseJudgeEvidence` bound to the candidate, output and assertion
-  contract. The host retains any referenced evidence artifact.
-  Requested shell/web/apps/plugins restrictions, read-only sandbox, ephemeral
-  working directory, input/output limits and deadlines are applied as CLI
-  arguments. Configuration, global instructions, hooks, rules and authentication
+  contract. For `judge`, pass a synchronous `retain_result(ref, bytes)` callback
+  that stores the supplied canonical verdict bytes under the supplied portable
+  reference and returns `None`. Evidence is emitted only after that callback
+  succeeds; the trusted host owns actual retention and access control. Direct
+  `assess` also returns those bytes as private `result_json` for host retention.
+  One adapter supports one active assessment; overlapping calls are rejected.
+  Requested shell/web/apps/plugins restrictions, read-only sandbox and ephemeral
+  operation are passed as CLI arguments. Input/output limits and deadlines are
+  enforced by the adapter. Direct `assess` shares one requested native execution
+  budget between its version probe and execution. The probe is capped at ten
+  seconds and the remaining budget; execution receives only what remains.
+  Each owned process has a separate cleanup bound of five seconds, which may
+  extend wall time beyond the execution budget. Selected-case orchestration
+  retains its authoritative 30-second overall judge deadline, including startup,
+  and one-second cleanup deadline; it may cancel an invocation before a larger
+  native timeout. This adapter does not extend those shared engine budgets.
+  Configuration, global instructions, hooks, rules and authentication
   remain inherited. Tool-event rejection is retrospective and cannot prevent
   an available tool from acting; the host must verify isolation for its data.
   The adapter supports POSIX process-group cleanup, not Windows. Failed,
   incomplete, malformed, tool-bearing and foreign-assertion output cannot
-  become evidence. Unknown or duplicate JSON members and post-completion
-  events produce typed `ContractError` blockers without raw output disclosure.
+  become evidence. Unknown event types, duplicate JSON members, invalid verdict
+  fields and post-completion events produce typed `ContractError` blockers
+  without raw output disclosure. Additional ordinary event metadata is allowed.
   Nonzero exits retain only safe category, exit-code, byte-count and digest
   diagnostics in `last_failure`; successful observations are not backend
   identity or sampling attestation. No live provider acceptance is claimed by
-  the controlled subprocess tests.
+  the controlled subprocess tests, including CLI/backend output-schema
+  compatibility. A backend schema rejection remains a typed process failure,
+  with an `output_schema_rejected` diagnostic when recognised, not evidence.
   `CodexNativeJudgeParameters` is available from `skills_sdk.models` with
   generated schema `codex-native-judge-parameters.v1`. These frozen requested
-  settings explicitly record unavailable temperature control; they cannot
+  settings have structural JSON Schema checks plus integration-model semantic
+  checks for portable identities and unique simple MCP names. Consumers load
+  the packaged resource with Draft 2020-12 and `FormatChecker`, then call
+  `CodexNativeJudgeParameters.model_validate` for semantic acceptance. This
+  provider-specific family is deliberately absent from portable core's
+  `SchemaRegistry`; the adapter validates its own settings in the integration layer.
+  They explicitly record unavailable temperature control; they cannot
   satisfy existing temperature-bound calibration. No native calibration,
   matched-family or whole-plugin quality integration is included.
 - **Selected-case behavioral orchestration:**

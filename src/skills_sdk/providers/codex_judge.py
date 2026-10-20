@@ -8,8 +8,9 @@ import json
 import os
 import signal
 import tempfile
+from collections.abc import Callable
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -99,6 +100,7 @@ class CodexJudgeObservation:
     prompt_sha256: str
     settings_sha256: str
     event_sha256: str
+    result_json: bytes = field(repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,7 +164,7 @@ async def _discard_to_eof(stream: asyncio.StreamReader) -> None:
         pass
 
 
-async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: int) -> bytes:
+async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float) -> bytes:
     if os.name != "posix":
         raise ContractError("codex_judge_platform_unsupported", "This judge requires POSIX process-group cleanup")
     try:
@@ -314,7 +316,15 @@ class CodexJudgeAdapter:
     No v1 ScorerJudgeParameters property is exposed: temperature is unavailable.
     """
 
-    def __init__(self, executable: Path, work_parent: Path, settings: CodexJudgeSettings, rubric: str) -> None:
+    def __init__(
+        self,
+        executable: Path,
+        work_parent: Path,
+        settings: CodexJudgeSettings,
+        rubric: str,
+        *,
+        retain_result: Callable[[str, bytes], None] | None = None,
+    ) -> None:
         self._executable = executable.resolve(strict=True)
         self._parent = work_parent.resolve(strict=True)
         if type(settings) is not CodexJudgeSettings:
@@ -328,6 +338,10 @@ class CodexJudgeAdapter:
         )
         self._rubric = rubric
         self._closed = False
+        self._busy = False
+        self._retain_result = retain_result
+        if retain_result is not None and not callable(retain_result):
+            raise ValueError("result retention requires a synchronous host callback")
         self.last_observation: CodexJudgeObservation | None = None
         self.last_failure: CodexJudgeProcessDiagnostic | None = None
         if not self._executable.is_file() or not self._parent.is_dir() or not 1 <= len(rubric.encode()) <= 32000:
@@ -354,6 +368,34 @@ class CodexJudgeAdapter:
         """Execute one fresh judgment without accepting expected labels or scores."""
         if self._closed:
             raise ContractError("codex_judge_closed", "Allocate a new judge after cleanup")
+        if self._busy:
+            raise ContractError("codex_judge_busy", "Use a separate adapter for overlapping judgments")
+        self._busy = True
+        try:
+            return await self._assess(task, response, assertions)
+        finally:
+            self._busy = False
+
+    async def _invoke(self, argv: tuple[str, ...], root: Path, payload: bytes, seconds: float) -> bytes:
+        """Retain safe process diagnostics for startup and judgment alike."""
+        try:
+            return await _run(argv, root, payload, seconds)
+        except ContractError as exc:
+            if exc.details and type(exc.details[0]) is CodexJudgeProcessDiagnostic:
+                self.last_failure = exc.details[0]
+            raise
+
+    async def _assess(self, task: str, response: str, assertions: tuple[tuple[str, str], ...]) -> CodexJudgeObservation:
+        """Own the non-overlapping invocation and its diagnostic state."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._settings.timeout_seconds
+
+        def remaining(cap: float) -> float:
+            seconds = min(cap, deadline - loop.time())
+            if seconds <= 0:
+                raise ContractError("codex_judge_timeout", "Codex judge exceeded its deadline")
+            return seconds
+
         self.last_observation = None
         self.last_failure = None
         ids = tuple(item[0] for item in assertions)
@@ -362,7 +404,7 @@ class CodexJudgeAdapter:
         prompt = compile_codex_judge_prompt(task, response, self._rubric, assertions)
         with tempfile.TemporaryDirectory(prefix="sdk-judge-", dir=self._parent) as folder:
             root = Path(folder)
-            version = await _run((str(self._executable), "--version"), root, b"", 10)
+            version = await self._invoke((str(self._executable), "--version"), root, b"", remaining(10))
             if version.strip() != ("codex-cli " + self._settings.cli_version).encode():
                 raise ContractError("codex_judge_version_drift", "Rebind the installed Codex CLI version")
             schema = root / "verdict.schema.json"
@@ -396,13 +438,9 @@ class CodexJudgeAdapter:
                 "--json",
                 "-",
             )
-            try:
-                raw = await _run(argv, root, prompt, self._settings.timeout_seconds)
-            except ContractError as exc:
-                if exc.details and type(exc.details[0]) is CodexJudgeProcessDiagnostic:
-                    self.last_failure = exc.details[0]
-                raise
+            raw = await self._invoke(argv, root, prompt, remaining(self._settings.timeout_seconds))
         verdict = _decode_events(raw, ids)
+        result_json = json.dumps(verdict.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()
         observed = CodexJudgeObservation(
             verdict.score,
             tuple(verdict.satisfied_assertion_ids),
@@ -411,19 +449,41 @@ class CodexJudgeAdapter:
             hashlib.sha256(prompt).hexdigest(),
             canonical_json_sha256(self._settings.public_settings()),
             hashlib.sha256(raw).hexdigest(),
+            result_json,
         )
         self.last_observation = observed
         return observed
 
     async def judge(self, inputs: SelectedCaseJudgeInput) -> object:
         """Implement the existing selected-case judge protocol with bound evidence."""
+        if self._retain_result is None:
+            raise ContractError("codex_judge_retention_required", "Selected-case evidence requires host retention")
         if hashlib.sha256(inputs.output_text.encode()).hexdigest() != inputs.output_sha256:
             raise ContractError("codex_judge_output_drift", "Judge output identity does not match bytes")
+        try:
+            contract = [
+                {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in inputs.assertions
+            ]
+            contract_digest = canonical_json_sha256(contract)
+        except (TypeError, ValueError, IndexError):
+            raise ContractError("codex_judge_assertion_contract_drift", "Judge assertion contract is invalid") from None
+        if contract_digest != inputs.assertion_contract_sha256:
+            raise ContractError("codex_judge_assertion_contract_drift", "Judge assertion digest does not match inputs")
         assertions = tuple((item[0], json.dumps(item[1:])) for item in inputs.assertions)
         observed = await self.assess(
             "Assess the response against every supplied assertion.", inputs.output_text, assertions
         )
         request = inputs.request
+        result_ref = "judge-results/" + observed.result_sha256
+
+        async def retain() -> object:
+            return self._retain_result(result_ref, observed.result_json)
+
+        retained = (await asyncio.gather(retain(), return_exceptions=True))[0]
+        if isinstance(retained, asyncio.CancelledError):
+            raise retained
+        if retained is not None:
+            raise ContractError("codex_judge_retention_failed", "Host could not retain judge evidence")
         return SelectedCaseJudgeEvidence(
             candidate=request.candidate,
             scenario_set_id=request.scenario_set_id,
@@ -434,7 +494,7 @@ class CodexJudgeAdapter:
             judge=self.identity,
             satisfied_assertion_ids=observed.satisfied_assertion_ids,
             judge_result_sha256=observed.result_sha256,
-            evidence_refs=("judge-results/" + observed.result_sha256,),
+            evidence_refs=(result_ref,),
         )
 
     async def cleanup(self) -> None:

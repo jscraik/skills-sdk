@@ -5,6 +5,9 @@ import hashlib
 import json
 import os
 import sys
+import time
+from contextlib import suppress
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -203,10 +206,28 @@ def test_startup_diagnostics_are_drained_before_stdin(tmp_path: Path) -> None:
 
 def test_timeout_cleans_launcher_descendants_that_keep_output_pipes_open(tmp_path: Path) -> None:
     """A successful launcher exit must not leave its native child running."""
-    script = "import subprocess,sys; subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'])"
+    marker = tmp_path / "grandchild.pid"
+    script = (
+        "import subprocess,sys,pathlib; "
+        "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)']); "
+        f"pathlib.Path({str(marker)!r}).write_text(str(p.pid))"
+    )
     with pytest.raises(ContractError) as raised:
         asyncio.run(_run((sys.executable, "-c", script), tmp_path, b"", 1))
     assert raised.value.code == "codex_judge_timeout"
+    pid = int(marker.read_text())
+    try:
+        for _ in range(200):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.01)
+        else:
+            pytest.fail("launcher descendant survived cleanup")
+    finally:
+        with suppress(ProcessLookupError):
+            os.kill(pid, 9)
 
 
 def test_cleanup_discards_large_residual_pipe_without_retaining_output() -> None:
@@ -256,7 +277,14 @@ def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Pat
     package.mkdir()
     definition, _payload, request, _events_seen = _setup(package)
     executable = _executable(tmp_path, "print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")")
-    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()), "Rubric")
+    retained: dict[str, bytes] = {}
+    adapter = CodexJudgeAdapter(
+        executable,
+        tmp_path,
+        CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()),
+        "Rubric",
+        retain_result=lambda ref, data: retained.update({ref: data}),
+    )
     response = "Actual controlled response"
     inputs = SelectedCaseJudgeInput(
         request,
@@ -272,6 +300,234 @@ def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Pat
     assert evidence.satisfied_assertion_ids == definition.semantic_signal_ids
     assert evidence.judge == adapter.identity
     assert evidence.evidence_refs == ("judge-results/" + evidence.judge_result_sha256,)
+    artifact = retained[evidence.evidence_refs[0]]
+    assert hashlib.sha256(artifact).hexdigest() == evidence.judge_result_sha256
+    assert json.loads(artifact)["rationale"] == "Specific fixture evidence."
+    asyncio.run(adapter.cleanup())
+    assert not list(tmp_path.glob("sdk-judge-*")) and retained[evidence.evidence_refs[0]] == artifact
+
+
+def test_assertion_digest_mismatch_rejects_before_any_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from test_live_selected_case import _setup
+
+    from skills_sdk.providers import codex_judge
+
+    package = tmp_path / "candidate"
+    package.mkdir()
+    definition, _payload, request, _events_seen = _setup(package)
+    response = "Actual response"
+    inputs = SelectedCaseJudgeInput(
+        request,
+        response,
+        hashlib.sha256(response.encode()).hexdigest(),
+        definition.assertion_contract_sha256,
+        definition.semantic_assertions,
+    )
+    executable = _executable(tmp_path, "raise AssertionError('must not invoke')")
+    adapter = CodexJudgeAdapter(
+        executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric", retain_result=lambda ref, data: None
+    )
+
+    async def forbidden(*args: object) -> bytes:
+        pytest.fail("assertion mismatch reached executable")
+
+    monkeypatch.setattr(codex_judge, "_run", forbidden)
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.judge(replace(inputs, assertions=inputs.assertions[:1])))
+    assert raised.value.code == "codex_judge_assertion_contract_drift"
+
+
+def test_selected_case_requires_successful_host_retention(tmp_path: Path) -> None:
+    from test_live_selected_case import _setup
+
+    package = tmp_path / "candidate"
+    package.mkdir()
+    definition, _payload, request, _events_seen = _setup(package)
+    response = "Actual response"
+    inputs = SelectedCaseJudgeInput(
+        request,
+        response,
+        hashlib.sha256(response.encode()).hexdigest(),
+        definition.assertion_contract_sha256,
+        definition.semantic_assertions,
+    )
+    executable = _executable(tmp_path, "print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")")
+    settings = CodexJudgeSettings("model", "0.153.4", ())
+    with pytest.raises(ContractError) as missing:
+        asyncio.run(CodexJudgeAdapter(executable, tmp_path, settings, "Rubric").judge(inputs))
+    assert missing.value.code == "codex_judge_retention_required"
+
+    def failed(ref: str, data: bytes) -> None:
+        raise OSError("private host storage failure")
+
+    with pytest.raises(ContractError) as failure:
+        asyncio.run(CodexJudgeAdapter(executable, tmp_path, settings, "Rubric", retain_result=failed).judge(inputs))
+    assert failure.value.code == "codex_judge_retention_failed"
+    assert "private host" not in str(failure.value)
+
+
+def test_version_failure_retains_safe_diagnostic(tmp_path: Path) -> None:
+    executable = tmp_path / "bad-version"
+    executable.write_text(f"#!{sys.executable}\nimport sys\nsys.stderr.write('private startup'); sys.exit(7)\n")
+    executable.chmod(0o755)
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError):
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert adapter.last_failure is not None and adapter.last_failure.exit_code == 7
+
+
+def test_version_probe_and_execution_share_the_requested_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Startup cannot exceed or reset a short requested native execution budget."""
+    from skills_sdk.providers import codex_judge
+
+    calls: list[float] = []
+
+    async def controlled(argv: tuple[str, ...], root: Path, payload: bytes, seconds: float) -> bytes:
+        calls.append(seconds)
+        assert 0 < seconds <= 1
+        if "--version" in argv:
+            await asyncio.sleep(0.02)
+            return b"codex-cli 0.153.4"
+        assert seconds < calls[0]
+        return _events().encode()
+
+    monkeypatch.setattr(codex_judge, "_run", controlled)
+    executable = _executable(tmp_path, "raise AssertionError('controlled path only')")
+    adapter = CodexJudgeAdapter(
+        executable, tmp_path, CodexJudgeSettings("model", "0.153.4", (), timeout_seconds=1), "Rubric"
+    )
+    result = asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert result.score == 0.9 and len(calls) == 2
+
+
+def test_hanging_version_probe_respects_short_native_budget(tmp_path: Path) -> None:
+    """A stalled startup cannot silently use the separate ten-second cap."""
+    executable = tmp_path / "hanging-version"
+    executable.write_text(f"#!{sys.executable}\nimport time\ntime.sleep(30)\n")
+    executable.chmod(0o755)
+    adapter = CodexJudgeAdapter(
+        executable, tmp_path, CodexJudgeSettings("model", "0.153.4", (), timeout_seconds=1), "Rubric"
+    )
+    started = time.monotonic()
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_timeout"
+    assert time.monotonic() - started < 4
+    assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+def test_exhausted_startup_budget_prevents_execution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Successful startup cleanup can exhaust the budget before any second process."""
+    from skills_sdk.providers import codex_judge
+
+    calls: list[tuple[str, ...]] = []
+
+    async def startup_with_slow_cleanup(argv: tuple[str, ...], root: Path, payload: bytes, seconds: float) -> bytes:
+        calls.append(argv)
+        assert "--version" in argv, "exhausted budget reached model execution"
+        await asyncio.sleep(1.01)
+        return b"codex-cli 0.153.4"
+
+    monkeypatch.setattr(codex_judge, "_run", startup_with_slow_cleanup)
+    executable = _executable(tmp_path, "raise AssertionError('controlled path only')")
+    adapter = CodexJudgeAdapter(
+        executable, tmp_path, CodexJudgeSettings("model", "0.153.4", (), timeout_seconds=1), "Rubric"
+    )
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_timeout" and len(calls) == 1
+
+
+def test_overlapping_assessment_is_rejected_without_replacing_active_state(tmp_path: Path) -> None:
+    executable = _executable(tmp_path, "time.sleep(0.2); print(" + repr(_events()) + ")")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+
+    async def overlap() -> None:
+        first = asyncio.create_task(adapter.assess("First", "Response", (("scope", "Scope"),)))
+        await asyncio.sleep(0)
+        with pytest.raises(ContractError) as raised:
+            await adapter.assess("Second", "Response", (("scope", "Scope"),))
+        assert raised.value.code == "codex_judge_busy"
+        observed = await first
+        assert adapter.last_observation == observed
+
+    asyncio.run(overlap())
+
+
+def test_selected_case_outer_deadline_remains_authoritative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A native120s upper bound never relaxes the engine's tighter overall budget."""
+    from test_live_selected_case import _Provider, _safety_for, _setup
+
+    from skills_sdk.evaluation import live_selected_case
+    from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
+
+    package = tmp_path / "candidate"
+    package.mkdir()
+    definition, payload, request, events = _setup(package)
+    executable = _executable(
+        tmp_path, "time.sleep(2); print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")"
+    )
+    adapter = CodexJudgeAdapter(
+        executable,
+        tmp_path,
+        CodexJudgeSettings("model", "0.153.4", ()),
+        "Rubric",
+        retain_result=lambda ref, data: pytest.fail("timed-out result retained"),
+    )
+    assert live_selected_case.DEFAULT_PROVIDER_CALL_LIMITS.overall_seconds == 30
+    monkeypatch.setattr(
+        live_selected_case,
+        "DEFAULT_PROVIDER_CALL_LIMITS",
+        replace(live_selected_case.DEFAULT_PROVIDER_CALL_LIMITS, overall_seconds=0.05),
+    )
+    receipt = asyncio.run(
+        live_selected_case.execute_selected_case_with_judge(
+            definition,
+            request,
+            SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+            _Provider(request, events),
+            adapter,
+        )
+    )
+    assert receipt.status == "blocked"
+    assert receipt.case_results[0].blocker.code == "judge_timeout"
+    assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+def test_selected_case_service_retains_auditable_result(tmp_path: Path) -> None:
+    """The actual provider-then-judge seam returns passing, retained evidence."""
+    from test_live_selected_case import _Provider, _safety_for, _setup
+
+    from skills_sdk.evaluation.live_selected_case import execute_selected_case_with_judge
+    from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
+
+    package = tmp_path / "candidate"
+    package.mkdir()
+    definition, payload, request, events = _setup(package)
+    executable = _executable(tmp_path, "print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")")
+    retained: dict[str, bytes] = {}
+    adapter = CodexJudgeAdapter(
+        executable,
+        tmp_path,
+        CodexJudgeSettings("model", "0.153.4", ()),
+        "Rubric",
+        retain_result=lambda ref, data: retained.update({ref: data}),
+    )
+    receipt = asyncio.run(
+        execute_selected_case_with_judge(
+            definition,
+            request,
+            SelectedCaseExecutionInput(payload, _safety_for(definition, request)),
+            _Provider(request, events),
+            adapter,
+        )
+    )
+    assert receipt.status == "pass" and len(retained) == 1
+    ref, data = next(iter(retained.items()))
+    assert ref == "judge-results/" + hashlib.sha256(data).hexdigest()
+    assert not list(tmp_path.glob("sdk-judge-*"))
 
 
 def test_early_exit_preserves_safe_diagnostic_without_leaking_stderr(tmp_path: Path) -> None:
@@ -300,6 +556,17 @@ def test_adapter_retains_failed_invocation_diagnostic_and_cleans_scratch(tmp_pat
     assert adapter.last_failure.category == "unknown_process_failure"
     assert adapter.last_observation is None
     assert not list(tmp_path.glob("sdk-judge-*"))
+
+
+def test_backend_schema_rejection_remains_a_typed_unaccepted_result(tmp_path: Path) -> None:
+    """Controlled proof does not assume backend schema acceptance."""
+    executable = _executable(tmp_path, "sys.stderr.write('invalid schema'); sys.exit(3)")
+    adapter = CodexJudgeAdapter(executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric")
+    with pytest.raises(ContractError) as raised:
+        asyncio.run(adapter.assess("Task", "Response", (("scope", "Scope"),)))
+    assert raised.value.code == "codex_judge_process_failed"
+    assert adapter.last_failure.category == "output_schema_rejected"
+    assert adapter.last_observation is None
 
 
 @pytest.mark.parametrize(

@@ -71,7 +71,6 @@ SCHEMA_NAMES = frozenset(
         "scorer-calibration.v1",
         "observed-calibration-plan.v1",
         "observed-calibration.v1",
-        "codex-native-judge-parameters.v1",
         "matched-comparison-plan.v1",
         "matched-pair-assessment.v1",
         "matched-calibration.v1",
@@ -465,10 +464,6 @@ class SchemaRegistry:
                 "matched-regression.v1": MatchedRegressionReceipt,
                 "matched-cloud-regression.v1": MatchedCloudRegressionReceipt,
             }[name]
-        elif name == "codex-native-judge-parameters.v1":
-            from skills_sdk.models.native_judge import CodexNativeJudgeParameters
-
-            model = CodexNativeJudgeParameters
         elif name in {"observed-calibration-plan.v1", "observed-calibration.v1"}:
             from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 

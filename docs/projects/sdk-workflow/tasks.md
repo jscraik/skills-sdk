@@ -75,7 +75,7 @@ current main. Installation metadata is excluded from implementation delivery.
 | --- | --- | --- |
 | Whole-plugin quality model, service, schema and CLI | Already merged in PR #93; PR #96 adds early object-root rejection. | Retain current main and its newer fixes; do not copy older files or remove accepted exports. |
 | Pilot report and maintained P4 regressions | Already merged in PRs #94–95. | Historical report edits in the preserved copy are not implementation candidates. |
-| Optional Codex judge and native requested settings | Selected delivery candidate, not yet merged. | Fix malformed external output, preserve existing selected-case evidence binding, add schema/registry and controlled executable proof, then complete normal PR gates. |
+| Optional Codex judge and native requested settings | Selected delivery candidate, not yet merged. | Fix malformed external output, preserve existing selected-case evidence binding, add packaged-schema/integration-model and controlled executable proof, then complete normal PR gates. |
 | Native calibration runner and calibration families | Deferred, still unmerged. | Review frozen legacy-model refactors, authority/dispatch ownership and authentic held-out calibration; the optional adapter does not supply this proof. |
 | Native matched execution, handoff, feedback and quality joins | Deferred, still unmerged. | Review complete candidate/settings/calibration joins and legacy ingress compatibility before admitting these additive families. |
 | Installation metadata and links | Retained separately in the preservation checkout and verified backup. | No reinstall, metadata copying, package upload or runtime changes in this implementation PR. |
