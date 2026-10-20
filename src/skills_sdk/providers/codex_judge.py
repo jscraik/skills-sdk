@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import os
 import signal
 import tempfile
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -323,7 +324,7 @@ class CodexJudgeAdapter:
         settings: CodexJudgeSettings,
         rubric: str,
         *,
-        retain_result: Callable[[str, bytes], None] | None = None,
+        retain_result: Callable[[str, bytes], Awaitable[None]] | None = None,
     ) -> None:
         self._executable = executable.resolve(strict=True)
         self._parent = work_parent.resolve(strict=True)
@@ -340,8 +341,8 @@ class CodexJudgeAdapter:
         self._closed = False
         self._busy = False
         self._retain_result = retain_result
-        if retain_result is not None and not callable(retain_result):
-            raise ValueError("result retention requires a synchronous host callback")
+        if retain_result is not None and not inspect.iscoroutinefunction(retain_result):
+            raise ValueError("result retention requires an async host callback")
         self.last_observation: CodexJudgeObservation | None = None
         self.last_failure: CodexJudgeProcessDiagnostic | None = None
         if not self._executable.is_file() or not self._parent.is_dir() or not 1 <= len(rubric.encode()) <= 32000:
@@ -461,6 +462,10 @@ class CodexJudgeAdapter:
         if hashlib.sha256(inputs.output_text.encode()).hexdigest() != inputs.output_sha256:
             raise ContractError("codex_judge_output_drift", "Judge output identity does not match bytes")
         try:
+            if type(inputs.assertions) is not tuple or any(
+                type(item) is not tuple or len(item) != 4 for item in inputs.assertions
+            ):
+                raise ValueError("invalid assertion shape")
             contract = [
                 {"id": item[0], "type": item[1], "all_of": item[2], "any_of": item[3]} for item in inputs.assertions
             ]
@@ -477,7 +482,7 @@ class CodexJudgeAdapter:
         result_ref = "judge-results/" + observed.result_sha256
 
         async def retain() -> object:
-            return self._retain_result(result_ref, observed.result_json)
+            return await self._retain_result(result_ref, observed.result_json)
 
         retained = (await asyncio.gather(retain(), return_exceptions=True))[0]
         if isinstance(retained, asyncio.CancelledError):

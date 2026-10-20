@@ -595,10 +595,13 @@ or completed reviewer execution.
   `assess(task, response, assertions)` returns a numeric observation and digests;
   `judge(inputs)` implements the existing selected-case judge protocol and
   emits `SelectedCaseJudgeEvidence` bound to the candidate, output and assertion
-  contract. For `judge`, pass a synchronous `retain_result(ref, bytes)` callback
+  contract. For `judge`, pass an async `retain_result(ref, bytes)` callback
   that stores the supplied canonical verdict bytes under the supplied portable
   reference and returns `None`. Evidence is emitted only after that callback
-  succeeds; the trusted host owns actual retention and access control. Direct
+  succeeds; the trusted host owns actual retention and access control. The
+  callback must use non-blocking storage awaits and propagate cancellation;
+  synchronous callbacks are rejected. Blocking code inside trusted async host
+  code is outside the adapter isolation guarantee. Direct
   `assess` also returns those bytes as private `result_json` for host retention.
   One adapter supports one active assessment; overlapping calls are rejected.
   Requested shell/web/apps/plugins restrictions, read-only sandbox and ephemeral

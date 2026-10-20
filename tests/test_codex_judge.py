@@ -40,6 +40,10 @@ def _events(score: float = 0.9, ids: tuple[str, ...] = ("scope",)) -> str:
     )
 
 
+async def _retain_noop(ref: str, data: bytes) -> None:
+    return None
+
+
 def test_real_subprocess_judgment_binds_prompt_and_cleans_scratch(tmp_path: Path) -> None:
     """The production path sends no labels and consumes actual process output."""
     checks = (
@@ -278,12 +282,16 @@ def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Pat
     definition, _payload, request, _events_seen = _setup(package)
     executable = _executable(tmp_path, "print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")")
     retained: dict[str, bytes] = {}
+
+    async def retain(ref: str, data: bytes) -> None:
+        retained[ref] = data
+
     adapter = CodexJudgeAdapter(
         executable,
         tmp_path,
         CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()),
         "Rubric",
-        retain_result=lambda ref, data: retained.update({ref: data}),
+        retain_result=retain,
     )
     response = "Actual controlled response"
     inputs = SelectedCaseJudgeInput(
@@ -307,7 +315,10 @@ def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Pat
     assert not list(tmp_path.glob("sdk-judge-*")) and retained[evidence.evidence_refs[0]] == artifact
 
 
-def test_assertion_digest_mismatch_rejects_before_any_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("malformed", ["weaker", "extra_field"])
+def test_assertion_digest_mismatch_rejects_before_any_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, malformed: str
+) -> None:
     from test_live_selected_case import _setup
 
     from skills_sdk.providers import codex_judge
@@ -325,7 +336,7 @@ def test_assertion_digest_mismatch_rejects_before_any_process(tmp_path: Path, mo
     )
     executable = _executable(tmp_path, "raise AssertionError('must not invoke')")
     adapter = CodexJudgeAdapter(
-        executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric", retain_result=lambda ref, data: None
+        executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric", retain_result=_retain_noop
     )
 
     async def forbidden(*args: object) -> bytes:
@@ -333,7 +344,12 @@ def test_assertion_digest_mismatch_rejects_before_any_process(tmp_path: Path, mo
 
     monkeypatch.setattr(codex_judge, "_run", forbidden)
     with pytest.raises(ContractError) as raised:
-        asyncio.run(adapter.judge(replace(inputs, assertions=inputs.assertions[:1])))
+        changed = (
+            inputs.assertions[:1]
+            if malformed == "weaker"
+            else tuple((*item, "unbound instruction") for item in inputs.assertions)
+        )
+        asyncio.run(adapter.judge(replace(inputs, assertions=changed)))
     assert raised.value.code == "codex_judge_assertion_contract_drift"
 
 
@@ -357,13 +373,65 @@ def test_selected_case_requires_successful_host_retention(tmp_path: Path) -> Non
         asyncio.run(CodexJudgeAdapter(executable, tmp_path, settings, "Rubric").judge(inputs))
     assert missing.value.code == "codex_judge_retention_required"
 
-    def failed(ref: str, data: bytes) -> None:
+    async def failed(ref: str, data: bytes) -> None:
         raise OSError("private host storage failure")
 
     with pytest.raises(ContractError) as failure:
         asyncio.run(CodexJudgeAdapter(executable, tmp_path, settings, "Rubric", retain_result=failed).judge(inputs))
     assert failure.value.code == "codex_judge_retention_failed"
     assert "private host" not in str(failure.value)
+
+
+def test_retention_is_async_and_obeys_enclosing_deadline(tmp_path: Path) -> None:
+    """A waiting host store must not stall cancellation or emit evidence."""
+    from test_live_selected_case import _setup
+
+    package = tmp_path / "candidate"
+    package.mkdir()
+    definition, _payload, request, _events_seen = _setup(package)
+    response = "Actual response"
+    inputs = SelectedCaseJudgeInput(
+        request,
+        response,
+        hashlib.sha256(response.encode()).hexdigest(),
+        definition.assertion_contract_sha256,
+        definition.semantic_assertions,
+    )
+    executable = _executable(tmp_path, "print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")")
+    with pytest.raises(ValueError, match="async host callback"):
+        CodexJudgeAdapter(
+            executable,
+            tmp_path,
+            CodexJudgeSettings("model", "0.153.4", ()),
+            "Rubric",
+            retain_result=lambda ref, data: None,
+        )
+
+    async def exercise() -> None:
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def retain(ref: str, data: bytes) -> None:
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        adapter = CodexJudgeAdapter(
+            executable, tmp_path, CodexJudgeSettings("model", "0.153.4", ()), "Rubric", retain_result=retain
+        )
+        task = asyncio.create_task(adapter.judge(inputs))
+        try:
+            await asyncio.wait_for(started.wait(), 2)
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(task, 0.05)
+            assert cancelled.is_set()
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    asyncio.run(exercise())
 
 
 def test_version_failure_retains_safe_diagnostic(tmp_path: Path) -> None:
@@ -474,7 +542,7 @@ def test_selected_case_outer_deadline_remains_authoritative(tmp_path: Path, monk
         tmp_path,
         CodexJudgeSettings("model", "0.153.4", ()),
         "Rubric",
-        retain_result=lambda ref, data: pytest.fail("timed-out result retained"),
+        retain_result=_retain_noop,
     )
     assert live_selected_case.DEFAULT_PROVIDER_CALL_LIMITS.overall_seconds == 30
     monkeypatch.setattr(
@@ -508,12 +576,16 @@ def test_selected_case_service_retains_auditable_result(tmp_path: Path) -> None:
     definition, payload, request, events = _setup(package)
     executable = _executable(tmp_path, "print(" + repr(_events(ids=definition.semantic_signal_ids)) + ")")
     retained: dict[str, bytes] = {}
+
+    async def retain(ref: str, data: bytes) -> None:
+        retained[ref] = data
+
     adapter = CodexJudgeAdapter(
         executable,
         tmp_path,
         CodexJudgeSettings("model", "0.153.4", ()),
         "Rubric",
-        retain_result=lambda ref, data: retained.update({ref: data}),
+        retain_result=retain,
     )
     receipt = asyncio.run(
         execute_selected_case_with_judge(
