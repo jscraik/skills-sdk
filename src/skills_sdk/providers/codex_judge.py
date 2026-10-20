@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import TracebackType
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
@@ -27,6 +28,43 @@ from skills_sdk.models.selected_case import SelectedCaseJudgeEvidence
 
 if TYPE_CHECKING:
     from skills_sdk.evaluation.live_selected_case import SelectedCaseJudgeInput
+
+
+class _JudgeWorkspace:
+    """Keep scratch setup and teardown failures separate from process failures."""
+
+    def __init__(self, adapter: CodexJudgeAdapter) -> None:
+        self.adapter = adapter
+        self.workspace: tempfile.TemporaryDirectory[str] | None = None
+
+    def __enter__(self) -> str:
+        try:
+            self.workspace = tempfile.TemporaryDirectory(prefix="sdk-judge-", dir=self.adapter._parent)
+        except OSError:
+            raise ContractError(
+                "codex_judge_workspace_unavailable", "Codex judge scratch workspace is unavailable"
+            ) from None
+        return self.workspace.name
+
+    def __exit__(
+        self, kind: type[BaseException] | None, primary: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        assert self.workspace is not None
+        try:
+            self.workspace.cleanup()
+        except OSError:
+            code = "codex_judge_cleanup_failed"
+            if self.adapter._cleanup_error is None:
+                self.adapter._cleanup_error = code
+            failure = ContractError(code, "Judge scratch cleanup could not complete")
+            if isinstance(primary, asyncio.CancelledError):
+                primary.add_note(code)
+            elif isinstance(primary, ContractError):
+                raise ContractError(
+                    primary.code, "Judge failed and scratch cleanup failed", (*primary.details, failure)
+                ) from None
+            else:
+                raise failure from None
 
 
 class _Verdict(BaseModel):
@@ -238,19 +276,25 @@ async def _run(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float)
     except TimeoutError:
         primary_failure = ContractError("codex_judge_timeout", "Codex judge exceeded its deadline")
         raise primary_failure from None
+    except OSError:
+        primary_failure = ContractError("codex_judge_process_failed", "Codex judge transport failed")
+        raise primary_failure from None
     except (ContractError, asyncio.CancelledError) as error:
         primary_failure = error
         raise
     finally:
         # A completed group is already absent; otherwise terminate its descendants.
-        with suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGKILL)
+        cleanup_failure = None
+        try:
+            with suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            cleanup_failure = ContractError("codex_judge_cleanup_failed", "Judge termination could not complete")
         cleanup = [
             asyncio.create_task(_discard_to_eof(process.stdout)),
             asyncio.create_task(_discard_to_eof(process.stderr)),
             asyncio.create_task(process.wait()),
         ]
-        cleanup_failure = None
         try:
             outcomes = await asyncio.wait_for(asyncio.gather(*cleanup, return_exceptions=True), 5)
             if any(isinstance(item, BaseException) for item in outcomes):
@@ -415,10 +459,6 @@ class CodexJudgeAdapter:
         self._assessment_task = asyncio.current_task()
         try:
             return await self._assess(task, response, assertions)
-        except OSError:
-            raise ContractError(
-                "codex_judge_workspace_unavailable", "Codex judge scratch workspace is unavailable"
-            ) from None
         except asyncio.CancelledError as error:
             cleanup_note = next(
                 (
@@ -476,13 +516,18 @@ class CodexJudgeAdapter:
         if len(ids) != len(set(ids)) or not assertions:
             raise ValueError("judge assertions must be nonempty and unique")
         prompt = compile_codex_judge_prompt(task, response, self._rubric, assertions)
-        with tempfile.TemporaryDirectory(prefix="sdk-judge-", dir=self._parent) as folder:
+        with _JudgeWorkspace(self) as folder:
             root = Path(folder)
             version = await self._invoke((str(self._executable), "--version"), root, b"", remaining(10))
             if version.strip() != ("codex-cli " + self._settings.cli_version).encode():
                 raise ContractError("codex_judge_version_drift", "Rebind the installed Codex CLI version")
             schema = root / "verdict.schema.json"
-            schema.write_text(json.dumps(_Verdict.model_json_schema()))
+            try:
+                schema.write_text(json.dumps(_Verdict.model_json_schema()))
+            except OSError:
+                raise ContractError(
+                    "codex_judge_workspace_unavailable", "Codex judge scratch workspace is unavailable"
+                ) from None
             argv = (
                 str(self._executable),
                 "exec",
