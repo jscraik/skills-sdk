@@ -604,7 +604,8 @@ or completed reviewer execution.
   that stores the supplied canonical verdict bytes under the supplied portable
   reference and returns `None`. Evidence is emitted only after that callback
   succeeds; the trusted host owns actual retention and access control. The
-  callback must use non-blocking storage awaits and propagate cancellation;
+  callback may be an async function or an object with async `__call__`. It
+  must use non-blocking storage awaits and propagate cancellation;
   synchronous callbacks are rejected. Blocking code inside trusted async host
   code is outside the adapter isolation guarantee. Direct
   `assess` also returns those bytes as private `result_json` for host retention.
@@ -641,7 +642,7 @@ or completed reviewer execution.
   `CodexNativeJudgeParameters` is available from `skills_sdk.models` with
   generated schema `codex-native-judge-parameters.v1`. These frozen requested
   settings have structural JSON Schema checks plus integration-model semantic
-  checks for portable identities and unique simple MCP names. Consumers load
+  checks for portable identities and unique simple ASCII MCP names. Consumers load
   the packaged resource with Draft 2020-12 and `FormatChecker`, then call
   `CodexNativeJudgeParameters.model_validate` for semantic acceptance. This
   provider-specific family is deliberately absent from portable core's

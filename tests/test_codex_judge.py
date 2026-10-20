@@ -40,6 +40,56 @@ def _events(score: float = 0.9, ids: tuple[str, ...] = ("scope",)) -> str:
     )
 
 
+@pytest.mark.parametrize("name", ["café", "文档"])
+def test_mcp_overrides_reject_non_ascii_bare_keys(name: str) -> None:
+    """Unsupported TOML bare keys must fail before executable configuration."""
+    with pytest.raises(ValueError):
+        CodexJudgeSettings("model", "0.153.4", (name,))
+
+
+@pytest.mark.parametrize("field", ["task", "response", "rubric", "assertion", "judge_output"])
+def test_invalid_utf8_is_a_typed_blocker_before_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    """Malformed private text must not reach a subprocess or raw diagnostic."""
+    from skills_sdk.providers import codex_judge
+
+    async def forbidden(*args: object) -> bytes:
+        pytest.fail("invalid Unicode reached process")
+
+    monkeypatch.setattr(codex_judge, "_run", forbidden)
+    executable = _executable(tmp_path, "raise AssertionError('not reached')")
+    malformed = chr(0xD800)
+    with pytest.raises(ContractError) as raised:
+        adapter = CodexJudgeAdapter(
+            executable,
+            tmp_path,
+            CodexJudgeSettings("model", "0.153.4", ()),
+            malformed if field == "rubric" else "Rubric",
+            retain_result=_retain_noop,
+        )
+        if field == "judge_output":
+            from test_live_selected_case import _setup
+
+            package = tmp_path / "candidate"
+            package.mkdir()
+            definition, _payload, request, _events_seen = _setup(package)
+            inputs = SelectedCaseJudgeInput(
+                request, malformed, "0" * 64, definition.assertion_contract_sha256, definition.semantic_assertions
+            )
+            asyncio.run(adapter.judge(inputs))
+        else:
+            asyncio.run(
+                adapter.assess(
+                    malformed if field == "task" else "Task",
+                    malformed if field == "response" else "Response",
+                    (("scope", malformed if field == "assertion" else "Scope"),),
+                )
+            )
+    assert raised.value.code == "codex_judge_input_invalid"
+    assert malformed not in str(raised.value)
+
+
 async def _retain_noop(ref: str, data: bytes) -> None:
     return None
 
@@ -244,7 +294,8 @@ def test_settings_snapshot_rejects_forgery_and_preserves_applied_identity(tmp_pa
         CodexJudgeAdapter(executable, tmp_path, settings, "Rubric")
 
 
-def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Path) -> None:
+@pytest.mark.parametrize("retention_kind", ["function", "object"])
+def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Path, retention_kind: str) -> None:
     """The live integration emits the existing public selected-case evidence."""
     from test_live_selected_case import _setup
 
@@ -257,12 +308,16 @@ def test_selected_case_protocol_binds_actual_output_and_assertions(tmp_path: Pat
     async def retain(ref: str, data: bytes) -> None:
         retained[ref] = data
 
+    class Store:
+        async def __call__(self, ref: str, data: bytes) -> None:
+            retained[ref] = data
+
     adapter = CodexJudgeAdapter(
         executable,
         tmp_path,
         CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()),
         "Rubric",
-        retain_result=retain,
+        retain_result=retain if retention_kind == "function" else Store(),
     )
     response = "Actual controlled response"
     inputs = SelectedCaseJudgeInput(

@@ -63,7 +63,7 @@ class CodexNativeJudgeParameters(_ContractModel):
     def simple_unique_names(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         """Bind an explicit, unique list of configuration keys."""
         if len(set(value)) != len(value) or any(
-            not name or not all(char.isalnum() or char in "_-" for char in name) for name in value
+            not name or not all(char.isascii() and (char.isalnum() or char in "_-") for char in name) for name in value
         ):
             raise ValueError("MCP names must be unique simple keys")
         return value

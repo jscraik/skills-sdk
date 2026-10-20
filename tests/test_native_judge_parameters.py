@@ -59,6 +59,8 @@ def test_public_native_tags_remain_valid_and_forged_paths_fail_revalidation() ->
         ("sandbox", "workspace-write"),
         ("disabled_mcp_servers", ["docs", "docs"]),
         ("disabled_mcp_servers", ["docs.enabled=true"]),
+        ("disabled_mcp_servers", ["café"]),
+        ("disabled_mcp_servers", ["文档"]),
         ("model", "/absolute/local-model"),
         ("cli_version", "/absolute/version"),
         ("model", "C:\\local\\model"),
