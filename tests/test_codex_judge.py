@@ -3,14 +3,13 @@
 import asyncio
 import hashlib
 import json
-import os
 import sys
 import time
-from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from process_observation import assert_process_terminated, read_process
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.live_selected_case import SelectedCaseJudgeInput
@@ -274,27 +273,28 @@ def test_timeout_cleans_launcher_descendants_that_keep_output_pipes_open(tmp_pat
         "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)']); "
         f"pathlib.Path({str(marker)!r}).write_text(str(p.pid))"
     )
-    with pytest.raises(ContractError) as raised:
-        asyncio.run(_run((sys.executable, "-c", script), tmp_path, b"", 1))
-    assert raised.value.code == "codex_judge_timeout"
-    pid = int(marker.read_text())
-    try:
-        for _ in range(200):
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
-                break
-            if sys.platform == "linux":
-                with suppress(FileNotFoundError):
-                    state = Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()[0]
-                    if state == "Z":
-                        break
-            time.sleep(0.01)
-        else:
-            pytest.fail("launcher descendant survived cleanup")
-    finally:
-        with suppress(ProcessLookupError):
-            os.kill(pid, 9)
+
+    async def invoke() -> None:
+        operation = asyncio.create_task(_run((sys.executable, "-c", script), tmp_path, b"", 1))
+        try:
+            for _ in range(100):
+                if marker.exists():
+                    break
+                await asyncio.sleep(0.01)
+            assert marker.exists(), "fixture did not start"
+            pid = int(marker.read_text())
+            original = read_process(pid)
+            assert original is not None, "fixture exited before timeout"
+            with pytest.raises(ContractError) as raised:
+                await operation
+            assert raised.value.code == "codex_judge_timeout"
+            assert_process_terminated(pid, original)
+        finally:
+            if not operation.done():
+                operation.cancel()
+            await asyncio.gather(operation, return_exceptions=True)
+
+    asyncio.run(invoke())
 
 
 def test_cleanup_discards_large_residual_pipe_without_retaining_output() -> None:
