@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from process_observation import assert_process_terminated, read_process
 from test_codex_judge import _events, _executable
 
 from skills_sdk.core.errors import ContractError
@@ -266,7 +267,7 @@ def test_scratch_setup_failure_is_typed_and_private(
 
 
 @pytest.mark.parametrize("mode", ["caller", "cleanup", "cancelled_cleanup_waiter", "cleanup_failure"])
-def test_external_cancellation_reaps_process_and_cleans_scratch(
+def test_external_cancellation_terminates_process_and_cleans_scratch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
 ) -> None:
     """Caller cancellation remains cancellation after owned process cleanup."""
@@ -303,6 +304,9 @@ def test_external_cancellation_reaps_process_and_cleans_scratch(
                     break
                 await asyncio.sleep(0.01)
             assert marker.exists(), "fixture did not start"
+            pid = int(marker.read_text())
+            original_process = read_process(pid)
+            assert original_process is not None, "fixture exited before cancellation"
             if mode == "cancelled_cleanup_waiter":
                 waiter = asyncio.create_task(adapter.cleanup())
                 await asyncio.wait_for(drained.wait(), 2)
@@ -322,6 +326,7 @@ def test_external_cancellation_reaps_process_and_cleans_scratch(
                 task.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await task
+            assert_process_terminated(pid, original_process)
         finally:
             release.set()
             if not task.done():
@@ -329,8 +334,6 @@ def test_external_cancellation_reaps_process_and_cleans_scratch(
             await asyncio.gather(task, return_exceptions=True)
 
     asyncio.run(cancel_running())
-    with pytest.raises(ProcessLookupError):
-        os.kill(int(marker.read_text()), 0)
     assert not list(tmp_path.glob("sdk-judge-*"))
 
 
