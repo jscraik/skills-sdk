@@ -1,0 +1,63 @@
+version: 2.1
+
+jobs:
+  pr-template:
+    docker:
+      - image: cimg/python:3.12.12
+    steps:
+      - checkout
+      - run:
+          name: Validate trusted PR template
+          command: |
+            if [[ -z "${CIRCLE_PULL_REQUEST:-}" ]]; then
+              if [[ "$CIRCLE_BRANCH" == main ]]; then exit 0; fi
+              echo "PR metadata required for non-main validation" >&2
+              exit 1
+            fi
+            : "${GH_TOKEN:?Configure a read-only GitHub token for PR metadata}"
+            sudo apt-get update
+            sudo apt-get install -y gh
+            pr_number="${CIRCLE_PULL_REQUEST##*/}"
+            [[ "$pr_number" =~ ^[0-9]+$ ]]
+            repo="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+            metadata="$(mktemp -d)"
+            trap 'rm -rf "$metadata"' EXIT
+            gh api "repos/$repo/pulls/$pr_number" > "$metadata/pr.json"
+            jq -e --arg head "$CIRCLE_SHA1" '.head.sha == $head and .state == "open"' "$metadata/pr.json"
+            base="$(jq -r .base.sha "$metadata/pr.json")"
+            [[ "$base" =~ ^[0-9a-f]{40}$ ]]
+            git fetch origin "$base"
+            git show "$base:.github/scripts/validate_pr_template_body.py" > "$metadata/validator.py"
+            git show "$base:.github/PULL_REQUEST_TEMPLATE.md" > "$metadata/template.md"
+            jq -r '.body // ""' "$metadata/pr.json" > "$metadata/body.md"
+            python3 "$metadata/validator.py" --template "$metadata/template.md" --body-file "$metadata/body.md"
+  validate:
+    docker:
+      - image: cimg/python:3.12.12
+    steps:
+      - checkout
+      - run:
+          name: Install pinned repository tools
+          command: |
+            curl --fail --location --retry 3 --max-time 120 https://github.com/jdx/mise/releases/download/v2026.8.14/mise-v2026.8.14-linux-x64.tar.gz -o /tmp/mise.tar.gz
+            echo "64d5f34aeb7a4e0e327dc1c9be66cd8162e14899a47b11901154a100285a3d61  /tmp/mise.tar.gz" | sha256sum -c -
+            tar -xzf /tmp/mise.tar.gz -C /tmp
+            sudo install /tmp/mise/bin/mise /usr/local/bin/mise
+            export MISE_CEILING_PATHS="$PWD/.."
+            export MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"
+            mise install python uv ruff vale
+            mise exec -- uv sync --frozen
+      - run:
+          name: Complete repository validation
+          command: |
+            export MISE_CEILING_PATHS="$PWD/.."
+            export MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"
+            mise exec -- bash scripts/validate-repository.sh
+          no_output_timeout: 20m
+
+workflows:
+  validation:
+    jobs:
+      - pr-template
+      - validate
+
