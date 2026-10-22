@@ -1,41 +1,19 @@
 version: 2.1
 
 jobs:
-  pr-template:
-    docker:
-      - image: cimg/python:3.12.12
-    steps:
-      - checkout
-      - run:
-          name: Validate trusted PR template
-          command: |
-            if [[ -z "${CIRCLE_PULL_REQUEST:-}" ]]; then
-              if [[ "$CIRCLE_BRANCH" == main ]]; then exit 0; fi
-              echo "PR metadata required for non-main validation" >&2
-              exit 1
-            fi
-            : "${GH_TOKEN:?Configure a read-only GitHub token for PR metadata}"
-            sudo apt-get update
-            sudo apt-get install -y gh
-            pr_number="${CIRCLE_PULL_REQUEST##*/}"
-            [[ "$pr_number" =~ ^[0-9]+$ ]]
-            repo="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
-            metadata="$(mktemp -d)"
-            trap 'rm -rf "$metadata"' EXIT
-            gh api "repos/$repo/pulls/$pr_number" > "$metadata/pr.json"
-            jq -e --arg head "$CIRCLE_SHA1" '.head.sha == $head and .state == "open"' "$metadata/pr.json"
-            base="$(jq -r .base.sha "$metadata/pr.json")"
-            [[ "$base" =~ ^[0-9a-f]{40}$ ]]
-            git fetch origin "$base"
-            git show "$base:.github/scripts/validate_pr_template_body.py" > "$metadata/validator.py"
-            git show "$base:.github/PULL_REQUEST_TEMPLATE.md" > "$metadata/template.md"
-            jq -r '.body // ""' "$metadata/pr.json" > "$metadata/body.md"
-            python3 "$metadata/validator.py" --template "$metadata/template.md" --body-file "$metadata/body.md"
   validate:
     docker:
       - image: cimg/python:3.12.12
     steps:
       - checkout
+      - run:
+          name: Install GitHub metadata client
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gh
+      - run:
+          name: Validate trusted PR contract and prepare merge result
+          command: bash scripts/circleci_pr_contract.sh
       - run:
           name: Install pinned repository tools
           command: |
@@ -45,19 +23,43 @@ jobs:
             sudo install /tmp/mise/bin/mise /usr/local/bin/mise
             export MISE_CEILING_PATHS="$PWD/.."
             export MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"
-            mise install python uv ruff vale
-            mise exec -- uv sync --frozen
+            env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise install python uv ruff vale
+            env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- uv sync --frozen
+            printf 'export MISE_CEILING_PATHS=%q\nexport MISE_TRUSTED_CONFIG_PATHS=%q\n' "$MISE_CEILING_PATHS" "$MISE_TRUSTED_CONFIG_PATHS" >> "$BASH_ENV"
       - run:
-          name: Complete repository validation
+          name: Quality and schema checks
+          command: env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh quality
+      - run:
+          name: Documentation-dependent contract tests
           command: |
-            export MISE_CEILING_PATHS="$PWD/.."
-            export MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"
-            mise exec -- bash scripts/validate-repository.sh
+            if [[ "$SDK_CI_SCOPE" == docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh docs-tests
+            fi
+      - run:
+          name: Full tests (two isolated workers and slow-test report)
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh tests
+            fi
           no_output_timeout: 20m
+      - run:
+          name: Build source and wheel
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh build
+            fi
+      - run:
+          name: Installed public API and CLI proof
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh installed
+            fi
+          no_output_timeout: 20m
+      - run:
+          name: Diff hygiene
+          command: env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh diff
 
 workflows:
   validation:
     jobs:
-      - pr-template
       - validate
-

@@ -208,7 +208,7 @@ registry mutation, a packaged reference adapter, release, and remote promotion.
 - The package contract is Python `>=3.12,<3.13`; the pilot must run on Python
   3.12 and may not claim compatibility with another Python line.
 - The selected offline conformance matrix is CPython 3.12 on the repository's
-  `ubuntu-latest` GitHub Actions job. Local macOS or Windows runs may provide
+  pinned Linux CircleCI job. Local macOS or Windows runs may provide
   additional evidence, but neither operating system is selected as a supported
   pilot target until it has a pinned required job and recorded result.
 - The repository package remains in the `0.1.x` compatibility line. New

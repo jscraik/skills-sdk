@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import runpy
 import shutil
 import subprocess
 import sys
@@ -387,17 +389,20 @@ def test_parallel_workers_preserve_isolation_and_propagate_failure(tmp_path: Pat
 
 def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> None:
     """Check trusted-base workflow routing and preservation of the full validation phases."""
-    workflow = (ROOT / ".github/workflows/validate.yml").read_text()
+    workflow = (ROOT / ".circleci/config.yml").read_text()
     steps = yaml.safe_load(workflow)["jobs"]["validate"]["steps"]
-    docs_step = next(step for step in steps if step.get("name") == "Documentation-dependent contract tests")
-    assert docs_step["if"] == "github.event_name == 'pull_request' && steps.pr_contract.outputs.scope == 'docs'"
-    assert docs_step["run"] == "bash scripts/validate-repository.sh docs-tests"
-    assert "cp trusted-base/scripts/validation_scope.py" in workflow
-    assert "scope=full" in workflow
-    assert "github.event_name != 'pull_request' || steps.pr_contract.outputs.scope != 'docs'" in workflow
+    docs_step = next(
+        step["run"]
+        for step in steps
+        if isinstance(step, dict) and step.get("run", {}).get("name") == "Documentation-dependent contract tests"
+    )
+    assert 'if [[ "$SDK_CI_SCOPE" == docs ]]' in docs_step["command"]
+    contract = (ROOT / "scripts/circleci_pr_contract.sh").read_text()
+    assert 'git show "$BASE_SHA:scripts/validation_scope.py"' in contract
+    assert "scope=full" in contract
+    assert 'if [[ "$SDK_CI_SCOPE" != docs ]]' in workflow
     for phase in ("quality", "tests", "build", "installed", "diff"):
         assert f"bash scripts/validate-repository.sh {phase}" in workflow
-    assert "github.event_name == 'pull_request' && steps.pr_contract.outputs.scope == 'docs'" in workflow
     assert "bash scripts/validate-repository.sh docs-tests" in workflow
     wrapper = (ROOT / "scripts/validate-repository.sh").read_text()
     assert 'phase="${1:-all}"' in wrapper and "pytest -n 2 --dist load --durations=25" in wrapper
@@ -406,10 +411,8 @@ def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> N
 
 def _hosted_classification(root: Path, runner: Path, base: str, head: str) -> subprocess.CompletedProcess[str]:
     """Execute the real hosted classification fragment without changing the validation tree."""
-    workflow = yaml.safe_load((ROOT / ".github/workflows/validate.yml").read_text())
-    steps = workflow["jobs"]["validate"]["steps"]
-    assert "ref" not in steps[0]["with"], "validation must retain the default merge-result checkout"
-    command = next(step["run"] for step in steps if step.get("id") == "pr_contract")
+    command = (ROOT / "scripts/circleci_pr_contract.sh").read_text()
+    assert "git checkout --detach refs/ci/pr-merge" in command
     fragment = command[command.index('if [[ -f "$classifier" ]]; then') : command.index('echo "scope=$scope"')]
     runner.mkdir()
     classifier = runner / "trusted-classifier.py"
@@ -428,6 +431,123 @@ def _hosted_classification(root: Path, runner: Path, base: str, head: str) -> su
         text=True,
         check=False,
     )
+
+
+def _circleci_fixture(tmp_path: Path, docs_only: bool = False) -> tuple[Path, dict[str, str], str]:
+    """Create real Git merge refs, trusted controls and a bounded metadata fixture."""
+    root = tmp_path / "checkout"
+    root.mkdir()
+    _repository(root)
+    for relative in (
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".github/scripts/validate_pr_template_body.py",
+        "scripts/validation_scope.py",
+    ):
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, target)
+    _git(root, "add", ".")
+    _git(root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture trusted controls")
+    base = _git(root, "rev-parse", "HEAD")
+    _git(root, "update-ref", "refs/heads/main", base)
+    _git(root, "update-ref", "-d", "refs/remotes/origin/main")
+    _git(root, "checkout", "-b", "fixture-head")
+    if docs_only:
+        (root / "README.md").write_text("# Revised documentation\n")
+    else:
+        (root / ".github/scripts/validate_pr_template_body.py").write_text("raise SystemExit(99)\n")
+    _git(root, "add", ".")
+    _git(root, "-c", "commit.gpgsign=false", "commit", "-m", "fixture untrusted candidate validator")
+    head = _git(root, "rev-parse", "HEAD")
+    _git(root, "checkout", "-b", "fixture-base", base)
+    _git(root, "-c", "commit.gpgsign=false", "merge", "--no-ff", "--no-edit", "fixture-head")
+    merge = _git(root, "rev-parse", "HEAD")
+    _git(root, "update-ref", "refs/pull/52/merge", merge)
+    _git(root, "checkout", "--detach", head)
+    _git(root, "remote", "add", "origin", str(root))
+    validator = runpy.run_path(str(ROOT / ".github/scripts/validate_pr_template_body.py"))
+    body = (ROOT / ".github/PULL_REQUEST_TEMPLATE.md").read_text().replace("- [ ]", "- [x]")
+    body = validator["FIELD_LINE_RE"].sub(
+        lambda match: (
+            match.group(0)
+            if match.group("label") == "Command" or match.group("value").strip()
+            else f"- {match.group('label')}: repo-relative evidence"
+        ),
+        body,
+    )
+    body = body.replace(
+        "- Regression coverage: repo-relative evidence",
+        "- Regression coverage: focused proof\n- Command: `bash scripts/validate-repository.sh` -> pass",
+    )
+    metadata = tmp_path / "pr.json"
+    metadata.write_text(json.dumps({"state": "open", "head": {"sha": head}, "base": {"sha": base}, "body": body}))
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    gh = binaries / "gh"
+    gh.write_text(
+        "#!/usr/bin/env python3\nimport json, os, sys\n"
+        "p=json.load(open(os.environ['CI_METADATA']))\n"
+        "print(p['body'] if '--jq' in sys.argv else json.dumps(p))\n"
+    )
+    gh.chmod(0o755)
+    sleep = binaries / "sleep"
+    sleep.write_text("#!/bin/sh\nexit 0\n")
+    sleep.chmod(0o755)
+    environment = {
+        **git_environment(),
+        "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
+        "CI_METADATA": str(metadata),
+        "BASH_ENV": str(tmp_path / "bash-env"),
+        "CIRCLE_PULL_REQUEST": "https://github.com/fixture/sdk/pull/52",
+        "CIRCLE_PROJECT_USERNAME": "fixture",
+        "CIRCLE_PROJECT_REPONAME": "sdk",
+        "CIRCLE_SHA1": head,
+        "CIRCLE_BRANCH": "fixture-head",
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "fixture-only",
+    }
+    return root, environment, merge
+
+
+@pytest.mark.parametrize(
+    "case", ["valid", "docs", "main", "missing-pr", "invalid-body", "wrong-head", "wrong-base", "wrong-merge"]
+)
+def test_circleci_operator_path_uses_trusted_base_and_verified_merge(tmp_path: Path, case: str) -> None:
+    """Execute the production shell route with real Git and controlled API responses."""
+    root, environment, merge = _circleci_fixture(tmp_path, docs_only=case == "docs")
+    initial = _git(root, "rev-parse", "HEAD")
+    metadata = Path(environment["CI_METADATA"])
+    data = json.loads(metadata.read_text())
+    if case == "invalid-body":
+        data["body"] = ""
+    elif case == "wrong-head":
+        data["head"]["sha"] = "f" * 40
+    elif case == "wrong-base":
+        data["base"]["sha"] = initial
+    elif case == "wrong-merge":
+        _git(root, "update-ref", "refs/pull/52/merge", initial)
+    elif case in {"main", "missing-pr"}:
+        environment["CIRCLE_PULL_REQUEST"] = ""
+        if case == "main":
+            environment["CIRCLE_BRANCH"] = "main"
+    metadata.write_text(json.dumps(data))
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/circleci_pr_contract.sh")],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == (0 if case in {"valid", "docs", "main"} else 1), result.stderr
+    if case in {"valid", "docs", "main"}:
+        assert _git(root, "rev-parse", "HEAD") == (initial if case == "main" else merge)
+        scope = "docs" if case == "docs" else "full"
+        assert Path(environment["BASH_ENV"]).read_text() == f"export SDK_CI_SCOPE={scope}\n"
+        if case != "main":
+            assert _git(root, "rev-parse", "refs/remotes/origin/main") == data["base"]["sha"]
+    else:
+        assert _git(root, "rev-parse", "HEAD") == initial
+        assert not Path(environment["BASH_ENV"]).exists()
 
 
 def test_hosted_merge_validation_rejects_semantic_base_drift_and_recovers(tmp_path: Path) -> None:

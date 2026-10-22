@@ -68,8 +68,9 @@ the otherwise valid PR.
 
 Hosted PR scope comes from the trusted base classifier, never from an unreviewed
 candidate classifier. A base without that classifier uses full validation.
-Validation retains GitHub's default PR merge-result checkout so tests, builds
-and installed proof include the base changes. Classification alone runs in a
+CircleCI fetches GitHub's synthetic PR merge result and verifies its two parents
+against the live base and head before checkout, so tests, builds and installed
+proof include the base changes. Classification alone runs in a
 temporary detached worktree at the exact PR head; it does not move or rewrite
 the validation checkout. An advanced base requires full merge-tree proof, not
 head-only tests. Invalid head identity blocks classification; corrected inputs

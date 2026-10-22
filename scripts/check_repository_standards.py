@@ -567,6 +567,56 @@ def _tool_pin_findings(pyproject: dict[str, Any], mise: dict[str, Any], lock: di
     return findings
 
 
+def _circleci_findings(root: Path) -> tuple[list[Finding], bool]:
+    """Require the CircleCI replacement to retain trusted metadata and full proof."""
+    path = root / ".circleci/config.yml"
+    if not path.is_file():
+        return [], False
+    findings: list[Finding] = []
+    try:
+        config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        return [Finding(".circleci/config.yml", 1, "yaml", str(error))], False
+    text = path.read_text(encoding="utf-8")
+    contract_path = root / "scripts/circleci_pr_contract.sh"
+    contract = contract_path.read_text(encoding="utf-8") if contract_path.is_file() else ""
+    fragments = (
+        'git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py"',
+        'git show "$BASE_SHA:.github/PULL_REQUEST_TEMPLATE.md"',
+        'gh api "repos/$repo/pulls/$PR_NUMBER"',
+        '--body-file "$body_file"',
+        "git rev-parse --verify refs/ci/pr-merge^1",
+        "git rev-parse --verify refs/ci/pr-merge^2",
+        "git checkout --detach refs/ci/pr-merge",
+        "+refs/heads/main:refs/remotes/origin/main",
+    )
+    enforced = all(fragment in contract for fragment in fragments)
+    if not enforced:
+        findings.append(
+            Finding("scripts/circleci_pr_contract.sh", 1, "pr-template", "trusted PR and merge binding required")
+        )
+    steps = config.get("jobs", {}).get("validate", {}).get("steps", []) if isinstance(config, dict) else []
+    commands = [
+        step["run"].get("command", "") for step in steps if isinstance(step, dict) and isinstance(step.get("run"), dict)
+    ]
+    required_order = ("bash scripts/circleci_pr_contract.sh", "mise install", "validate-repository.sh quality")
+    positions = [
+        next((i for i, command in enumerate(commands) if fragment in command), len(commands))
+        for fragment in required_order
+    ]
+    if positions != sorted(set(positions)) or positions[-1] == len(commands):
+        findings.append(
+            Finding(".circleci/config.yml", 1, "ci-contract", "trusted PR preparation must run before validation")
+        )
+    for fragment in ("mise install python uv ruff vale", "sha256sum -c -", "uv sync --frozen"):
+        if fragment not in text:
+            findings.append(Finding(".circleci/config.yml", 1, "ci-tooling", f"missing pinned tooling: {fragment}"))
+    for phase in ("quality", "docs-tests", "tests", "build", "installed", "diff"):
+        if f"bash scripts/validate-repository.sh {phase}" not in text:
+            findings.append(Finding(".circleci/config.yml", 1, "ci-validation", f"missing validation phase: {phase}"))
+    return findings, enforced
+
+
 def _config_findings(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
@@ -579,7 +629,8 @@ def _config_findings(root: Path) -> list[Finding]:
             json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             findings.append(Finding(_relative(root, path), error.lineno, "json", error.msg))
-    pr_template_enforced = False
+    circleci_findings, pr_template_enforced = _circleci_findings(root)
+    findings.extend(circleci_findings)
     for path in _iter_files(root, (".github/workflows",), (".yaml", ".yml")):
         workflow_text = path.read_text(encoding="utf-8")
         try:

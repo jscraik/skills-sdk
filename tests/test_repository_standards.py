@@ -7,11 +7,12 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts.check_repository_standards import (
-    PR_TEMPLATE_BOOTSTRAP_BASE,
     PYTHON_ROOTS,
     REQUIRED_MYPY_FILES,
+    _circleci_findings,
     _config_findings,
     _iter_files,
     _local_link_findings,
@@ -505,15 +506,14 @@ def test_ci_rejects_unenforced_pr_template_contract(tmp_path: Path) -> None:
 
 
 def test_ci_fetches_live_pr_body_for_template_validation() -> None:
-    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
-
-    assert "pull-requests: read" in workflow
-    assert 'gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"' in workflow
+    workflow = (REPOSITORY_ROOT / "scripts/circleci_pr_contract.sh").read_text(encoding="utf-8")
+    assert "GITHUB_PERSONAL_ACCESS_TOKEN" in workflow
+    assert 'gh api "repos/$repo/pulls/$PR_NUMBER"' in workflow
     assert '--body-file "$body_file"' in workflow
     assert "for attempt in 1 2 3 4" in workflow
     assert "github.event.pull_request.body" not in workflow
-    assert 'install_args: "python uv ruff vale"' in workflow
-    assert "persist-credentials: false" in workflow
+    assert 'git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py"' in workflow
+    assert 'git show "$BASE_SHA:.github/PULL_REQUEST_TEMPLATE.md"' in workflow
 
 
 def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) -> None:
@@ -725,11 +725,38 @@ def test_ci_rejects_unbound_candidate_validator_bootstrap(tmp_path: Path) -> Non
     assert any(finding.code == "pr-template-bootstrap" for finding in findings)
 
 
-def test_ci_binds_candidate_validator_fallback_to_approved_base() -> None:
-    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
+def test_circleci_requires_trusted_base_without_candidate_fallback() -> None:
+    workflow = (REPOSITORY_ROOT / "scripts/circleci_pr_contract.sh").read_text(encoding="utf-8")
+    assert 'git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py"' in workflow
+    assert "validator=.github/scripts/validate_pr_template_body.py" not in workflow
 
-    assert f"bootstrap_base={PR_TEMPLATE_BOOTSTRAP_BASE}" in workflow
-    assert '${{ github.event.pull_request.base.sha }}" != "$bootstrap_base' in workflow
+
+@pytest.mark.parametrize(
+    "damage,expected", [("base", "pr-template"), ("phase", "ci-validation"), ("order", "ci-contract")]
+)
+def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
+    tmp_path: Path, damage: str, expected: str
+) -> None:
+    config = tmp_path / ".circleci/config.yml"
+    config.parent.mkdir()
+    text = (REPOSITORY_ROOT / ".circleci/config.yml").read_text()
+    script = tmp_path / "scripts/circleci_pr_contract.sh"
+    script.parent.mkdir()
+    contract = (REPOSITORY_ROOT / "scripts/circleci_pr_contract.sh").read_text()
+    if damage == "base":
+        contract = contract.replace('git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py"', "false")
+    elif damage == "phase":
+        text = text.replace("bash scripts/validate-repository.sh installed", "false")
+    else:
+        parsed = yaml.safe_load(text)
+        steps = parsed["jobs"]["validate"]["steps"]
+        steps[2], steps[4] = steps[4], steps[2]
+        text = yaml.safe_dump(parsed)
+    config.write_text(text)
+    script.write_text(contract)
+    findings, enforced = _circleci_findings(tmp_path)
+    assert any(finding.code == expected for finding in findings)
+    assert enforced is (damage != "base")
 
 
 def test_malformed_indentation_is_a_typed_tokenize_finding(tmp_path: Path) -> None:
