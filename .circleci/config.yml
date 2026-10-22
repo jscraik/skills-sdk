@@ -7,11 +7,6 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install GitHub metadata client
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y gh
-      - run:
           name: Validate trusted PR contract and prepare merge result
           command: bash scripts/circleci_pr_contract.sh
       - run:

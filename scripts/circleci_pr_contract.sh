@@ -9,13 +9,17 @@ if [[ -z "${CIRCLE_PULL_REQUEST:-}" ]]; then
     exit 1
   fi
 else
-  export GH_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN:?Configure a read-only GitHub token for PR metadata}"
   PR_NUMBER="${CIRCLE_PULL_REQUEST##*/}"
   [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
   repo="$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+  # Public metadata needs no reusable credential in the candidate project.
+  pr_metadata() {
+    curl --fail --silent --show-error --retry 3 --connect-timeout 10 --max-time 30 \
+      --header 'Accept: application/vnd.github+json' "https://api.github.com/repos/$repo/pulls/$PR_NUMBER"
+  }
   metadata="$(mktemp -d)"
   trap 'rm -rf -- "$metadata"' EXIT
-  gh api "repos/$repo/pulls/$PR_NUMBER" > "$metadata/pr.json"
+  pr_metadata > "$metadata/pr.json"
   jq -e --arg head "$CIRCLE_SHA1" '.head.sha == $head and .state == "open"' "$metadata/pr.json"
   BASE_SHA="$(jq -r .base.sha "$metadata/pr.json")"
   HEAD_SHA="$CIRCLE_SHA1"
@@ -34,7 +38,8 @@ else
   git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py" > "$validator"
   git show "$BASE_SHA:.github/PULL_REQUEST_TEMPLATE.md" > "$template"
   for attempt in 1 2 3 4; do
-    gh api "repos/$repo/pulls/$PR_NUMBER" --jq '.body // ""' > "$body_file"
+    pr_metadata > "$metadata/body.json"
+    jq -r '.body // ""' "$metadata/body.json" > "$body_file"
     if python3 "$validator" --template "$template" --body-file "$body_file"; then
       break
     fi
@@ -54,11 +59,14 @@ else
   fi
   echo "scope=$scope"
   # Recheck live identity after fetching the merge tree and validating the body.
-  gh api "repos/$repo/pulls/$PR_NUMBER" > "$metadata/final.json"
+  pr_metadata > "$metadata/final.json"
   jq -e --arg head "$HEAD_SHA" --arg base "$BASE_SHA" \
     '.head.sha == $head and .base.sha == $base and .state == "open"' "$metadata/final.json"
   git checkout --detach refs/ci/pr-merge
 fi
 [[ "$scope" == full || "$scope" == docs ]]
 printf 'export SDK_CI_SCOPE=%q\n' "$scope" >> "$BASH_ENV"
+if [[ -n "${BASE_SHA:-}" ]]; then
+  printf 'export SDK_CI_BASE_SHA=%q\n' "$BASE_SHA" >> "$BASH_ENV"
+fi
 printf 'Validation revision: %s; scope: %s\n' "$(git rev-parse HEAD)" "$scope"

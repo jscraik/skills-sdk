@@ -577,13 +577,12 @@ def _circleci_findings(root: Path) -> tuple[list[Finding], bool]:
         config = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as error:
         return [Finding(".circleci/config.yml", 1, "yaml", str(error))], False
-    text = path.read_text(encoding="utf-8")
     contract_path = root / "scripts/circleci_pr_contract.sh"
     contract = contract_path.read_text(encoding="utf-8") if contract_path.is_file() else ""
     fragments = (
         'git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py"',
         'git show "$BASE_SHA:.github/PULL_REQUEST_TEMPLATE.md"',
-        'gh api "repos/$repo/pulls/$PR_NUMBER"',
+        '"https://api.github.com/repos/$repo/pulls/$PR_NUMBER"',
         '--body-file "$body_file"',
         "git rev-parse --verify refs/ci/pr-merge^1",
         "git rev-parse --verify refs/ci/pr-merge^2",
@@ -597,7 +596,9 @@ def _circleci_findings(root: Path) -> tuple[list[Finding], bool]:
         )
     steps = config.get("jobs", {}).get("validate", {}).get("steps", []) if isinstance(config, dict) else []
     commands = [
-        step["run"].get("command", "") for step in steps if isinstance(step, dict) and isinstance(step.get("run"), dict)
+        " ".join(shlex.split(step["run"].get("command", ""), comments=True))
+        for step in steps
+        if isinstance(step, dict) and isinstance(step.get("run"), dict)
     ]
     required_order = ("bash scripts/circleci_pr_contract.sh", "mise install", "validate-repository.sh quality")
     positions = [
@@ -609,10 +610,10 @@ def _circleci_findings(root: Path) -> tuple[list[Finding], bool]:
             Finding(".circleci/config.yml", 1, "ci-contract", "trusted PR preparation must run before validation")
         )
     for fragment in ("mise install python uv ruff vale", "sha256sum -c -", "uv sync --frozen"):
-        if fragment not in text:
+        if not any(fragment in command for command in commands):
             findings.append(Finding(".circleci/config.yml", 1, "ci-tooling", f"missing pinned tooling: {fragment}"))
     for phase in ("quality", "docs-tests", "tests", "build", "installed", "diff"):
-        if f"bash scripts/validate-repository.sh {phase}" not in text:
+        if not any(f"bash scripts/validate-repository.sh {phase}" in command for command in commands):
             findings.append(Finding(".circleci/config.yml", 1, "ci-validation", f"missing validation phase: {phase}"))
     return findings, enforced
 

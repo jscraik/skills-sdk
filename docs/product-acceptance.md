@@ -324,7 +324,7 @@ treated the pending intake commit `ff02000` as a future overlap rather than a
 present dependency.
 
 This is local macOS offline conformance evidence only. It does not establish
-the selected `ubuntu-latest` hosted job, real-provider behavior, a packaged
+the selected pinned Linux CircleCI job, real-provider behavior, a packaged
 reference adapter, credential or spend authority, an installed consumer,
 publication, release, or programme completion. The zero-retry pilot preserves
 retry classification but does not close the parent retry-policy requirement.

@@ -483,13 +483,15 @@ def _circleci_fixture(tmp_path: Path, docs_only: bool = False) -> tuple[Path, di
     metadata.write_text(json.dumps({"state": "open", "head": {"sha": head}, "base": {"sha": base}, "body": body}))
     binaries = tmp_path / "bin"
     binaries.mkdir()
-    gh = binaries / "gh"
-    gh.write_text(
+    curl = binaries / "curl"
+    curl.write_text(
         "#!/usr/bin/env python3\nimport json, os, sys\n"
+        "if os.environ.get('CI_METADATA_FAILURE'): sys.exit(22)\n"
         "p=json.load(open(os.environ['CI_METADATA']))\n"
-        "print(p['body'] if '--jq' in sys.argv else json.dumps(p))\n"
+        "assert not any('Authorization' in arg for arg in sys.argv)\n"
+        "print(json.dumps(p))\n"
     )
-    gh.chmod(0o755)
+    curl.chmod(0o755)
     sleep = binaries / "sleep"
     sleep.write_text("#!/bin/sh\nexit 0\n")
     sleep.chmod(0o755)
@@ -503,13 +505,13 @@ def _circleci_fixture(tmp_path: Path, docs_only: bool = False) -> tuple[Path, di
         "CIRCLE_PROJECT_REPONAME": "sdk",
         "CIRCLE_SHA1": head,
         "CIRCLE_BRANCH": "fixture-head",
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "fixture-only",
     }
     return root, environment, merge
 
 
 @pytest.mark.parametrize(
-    "case", ["valid", "docs", "main", "missing-pr", "invalid-body", "wrong-head", "wrong-base", "wrong-merge"]
+    "case",
+    ["valid", "docs", "main", "missing-pr", "invalid-body", "wrong-head", "wrong-base", "wrong-merge", "api-error"],
 )
 def test_circleci_operator_path_uses_trusted_base_and_verified_merge(tmp_path: Path, case: str) -> None:
     """Execute the production shell route with real Git and controlled API responses."""
@@ -519,6 +521,8 @@ def test_circleci_operator_path_uses_trusted_base_and_verified_merge(tmp_path: P
     data = json.loads(metadata.read_text())
     if case == "invalid-body":
         data["body"] = ""
+    elif case == "api-error":
+        environment["CI_METADATA_FAILURE"] = "1"
     elif case == "wrong-head":
         data["head"]["sha"] = "f" * 40
     elif case == "wrong-base":
@@ -538,16 +542,67 @@ def test_circleci_operator_path_uses_trusted_base_and_verified_merge(tmp_path: P
         text=True,
         check=False,
     )
-    assert result.returncode == (0 if case in {"valid", "docs", "main"} else 1), result.stderr
+    expected_status = 0 if case in {"valid", "docs", "main"} else 22 if case == "api-error" else 1
+    assert result.returncode == expected_status, result.stderr
     if case in {"valid", "docs", "main"}:
         assert _git(root, "rev-parse", "HEAD") == (initial if case == "main" else merge)
         scope = "docs" if case == "docs" else "full"
-        assert Path(environment["BASH_ENV"]).read_text() == f"export SDK_CI_SCOPE={scope}\n"
+        expected = f"export SDK_CI_SCOPE={scope}\n"
+        if case != "main":
+            expected += f"export SDK_CI_BASE_SHA={data['base']['sha']}\n"
+        assert Path(environment["BASH_ENV"]).read_text() == expected
         if case != "main":
             assert _git(root, "rev-parse", "refs/remotes/origin/main") == data["base"]["sha"]
     else:
         assert _git(root, "rev-parse", "HEAD") == initial
         assert not Path(environment["BASH_ENV"]).exists()
+
+
+@pytest.mark.parametrize("state", ["committed", "staged", "working-tree", "clean", "bad-base"])
+def test_diff_phase_checks_committed_staged_and_working_tree_changes(tmp_path: Path, state: str) -> None:
+    """Run the real diff phase against clean and whitespace-damaged isolated checkouts."""
+    base = _repository(tmp_path)
+    if state not in {"clean", "bad-base"}:
+        (tmp_path / "README.md").write_text("trailing whitespace  \n")
+        if state != "working-tree":
+            _git(tmp_path, "add", ".")
+        if state == "committed":
+            _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "-m", "fixture whitespace")
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/validate-repository.sh"), "diff"],
+        cwd=tmp_path,
+        env={**git_environment(), "SDK_CI_BASE_SHA": "missing" if state == "bad-base" else base},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert (result.returncode == 0) is (state == "clean"), result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("case", ["main-clean", "main-damage", "root-clean", "root-damage", "parent-clean"])
+def test_diff_default_comparisons_cover_main_pushes_and_root_commits(tmp_path: Path, case: str) -> None:
+    """Check main's full tree, root commits and the local first-parent fallback."""
+    _repository(tmp_path)
+    if case.endswith("damage"):
+        (tmp_path / "README.md").write_text("trailing whitespace  \n")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "--amend", "--no-edit")
+    if not case.startswith("root"):
+        (tmp_path / "next.md").write_text("clean final commit\n")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "-m", "fixture clean tip")
+    environment = git_environment()
+    environment.pop("SDK_CI_BASE_SHA", None)
+    environment["CIRCLE_BRANCH"] = "main" if case.startswith("main") else "fixture"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/validate-repository.sh"), "diff"],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert (result.returncode == 0) is not case.endswith("damage"), result.stdout + result.stderr
 
 
 def test_hosted_merge_validation_rejects_semantic_base_drift_and_recovers(tmp_path: Path) -> None:
