@@ -20,11 +20,18 @@ def test_circleci_requires_trusted_base_without_candidate_fallback() -> None:
     "damage,expected",
     [
         ("base", "pr-template"),
+        ("unscheduled", "pr-template"),
+        ("filtered", "pr-template"),
+        ("conditional", "pr-template"),
         ("phase", "ci-validation"),
         ("order", "ci-contract"),
         ("comment-prepare", "ci-contract"),
         ("comment-checksum", "ci-tooling"),
         ("comment-phase", "ci-validation"),
+        ("echo-prepare", "ci-contract"),
+        ("echo-phase", "ci-validation"),
+        ("checksum-noop", "ci-tooling"),
+        ("checksum-quoted-pipe", "ci-tooling"),
     ],
 )
 def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
@@ -38,6 +45,26 @@ def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
     contract = (REPOSITORY_ROOT / "scripts/circleci_pr_contract.sh").read_text()
     if damage == "base":
         contract = contract.replace('git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py"', "false")
+    elif damage in {"unscheduled", "filtered", "conditional"}:
+        parsed = yaml.safe_load(text)
+        workflow = parsed["workflows"]["validation"]
+        if damage == "unscheduled":
+            workflow["jobs"] = []
+        elif damage == "filtered":
+            workflow["jobs"] = [{"validate": {"filters": {"branches": {"only": "main"}}}}]
+        else:
+            workflow["when"] = False
+        text = yaml.safe_dump(parsed)
+    elif damage == "echo-prepare":
+        text = text.replace("bash scripts/circleci_pr_contract.sh", "echo bash scripts/circleci_pr_contract.sh")
+    elif damage == "echo-phase":
+        text = text.replace(
+            "bash scripts/validate-repository.sh installed", "echo bash scripts/validate-repository.sh installed"
+        )
+    elif damage == "checksum-noop":
+        text = text.replace("sha256sum -c -", "sha256sum -c - || true")
+    elif damage == "checksum-quoted-pipe":
+        text = text.replace(" | sha256sum", ' "|" sha256sum')
     elif damage == "phase":
         text = text.replace("bash scripts/validate-repository.sh installed", "false")
     elif damage.startswith("comment-"):
@@ -63,4 +90,4 @@ def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
     script.write_text(contract)
     findings, enforced = _circleci_findings(tmp_path)
     assert any(finding.code == expected for finding in findings)
-    assert enforced is (damage != "base")
+    assert enforced is (damage not in {"base", "unscheduled", "filtered", "conditional"})

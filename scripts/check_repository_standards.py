@@ -19,6 +19,9 @@ from typing import Any
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.circleci_standards import command_contract_findings, validation_scheduled
+
 MAX_MODULE_LINES = 800
 MAX_FUNCTION_LINES = 120
 MAX_PUBLIC_PARAMETERS = 5
@@ -589,32 +592,13 @@ def _circleci_findings(root: Path) -> tuple[list[Finding], bool]:
         "git checkout --detach refs/ci/pr-merge",
         "+refs/heads/main:refs/remotes/origin/main",
     )
-    enforced = all(fragment in contract for fragment in fragments)
+    enforced = all(fragment in contract for fragment in fragments) and validation_scheduled(config)
     if not enforced:
         findings.append(
             Finding("scripts/circleci_pr_contract.sh", 1, "pr-template", "trusted PR and merge binding required")
         )
-    steps = config.get("jobs", {}).get("validate", {}).get("steps", []) if isinstance(config, dict) else []
-    commands = [
-        " ".join(shlex.split(step["run"].get("command", ""), comments=True))
-        for step in steps
-        if isinstance(step, dict) and isinstance(step.get("run"), dict)
-    ]
-    required_order = ("bash scripts/circleci_pr_contract.sh", "mise install", "validate-repository.sh quality")
-    positions = [
-        next((i for i, command in enumerate(commands) if fragment in command), len(commands))
-        for fragment in required_order
-    ]
-    if positions != sorted(set(positions)) or positions[-1] == len(commands):
-        findings.append(
-            Finding(".circleci/config.yml", 1, "ci-contract", "trusted PR preparation must run before validation")
-        )
-    for fragment in ("mise install python uv ruff vale", "sha256sum -c -", "uv sync --frozen"):
-        if not any(fragment in command for command in commands):
-            findings.append(Finding(".circleci/config.yml", 1, "ci-tooling", f"missing pinned tooling: {fragment}"))
-    for phase in ("quality", "docs-tests", "tests", "build", "installed", "diff"):
-        if not any(f"bash scripts/validate-repository.sh {phase}" in command for command in commands):
-            findings.append(Finding(".circleci/config.yml", 1, "ci-validation", f"missing validation phase: {phase}"))
+    for code, message in command_contract_findings(config):
+        findings.append(Finding(".circleci/config.yml", 1, code, message))
     return findings, enforced
 
 

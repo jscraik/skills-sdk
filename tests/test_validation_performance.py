@@ -19,9 +19,17 @@ from scripts.validation_scope import main as validation_main
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _fixture_environment() -> dict[str, str]:
+    """Keep disposable checkouts independent of the caller's CI bootstrap."""
+    environment = git_environment()
+    for name in ("BASH_ENV", "SDK_CI_BASE_SHA", "SDK_CI_SCOPE", "CIRCLE_BRANCH", "CIRCLE_SHA1"):
+        environment.pop(name, None)
+    return environment
+
+
 def _git(root: Path, *arguments: str) -> str:
     """Run an isolated fixture Git command and return its stripped text output."""
-    environment = git_environment()
+    environment = _fixture_environment()
     return subprocess.run(
         ["git", *arguments], cwd=root, env=environment, check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -209,13 +217,15 @@ def test_worktree_executable_mode_requires_full_even_when_git_ignores_it(
     index, config = tmp_path / ".git/index", tmp_path / ".git/config"
     before = index.read_bytes(), config.read_bytes()
     assert validation_scope(tmp_path, head, head) == "full"
-    rejected = subprocess.run(command, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False)
+    rejected = subprocess.run(
+        command, cwd=tmp_path, env=_fixture_environment(), capture_output=True, text=True, check=False
+    )
     assert rejected.returncode == 0 and rejected.stdout.strip() == "full", rejected.stderr
     assert (index.read_bytes(), config.read_bytes()) == before
     source.chmod(0o644)
     assert validation_scope(tmp_path, head, head) == "docs"
     recovered = subprocess.run(
-        command, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False
+        command, cwd=tmp_path, env=_fixture_environment(), capture_output=True, text=True, check=False
     )
     assert recovered.returncode == 0 and recovered.stdout.strip() == "docs", recovered.stderr
     assert (index.read_bytes(), config.read_bytes()) == before
@@ -274,7 +284,9 @@ def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path, 
     declared_base = advanced if baseline_choice == "current" else base
     assert validation_scope(tmp_path, declared_base, head) == "full"
     command = [sys.executable, str(ROOT / "scripts/validation_scope.py"), "--base", declared_base, "--head", head]
-    rejected = subprocess.run(command, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False)
+    rejected = subprocess.run(
+        command, cwd=tmp_path, env=_fixture_environment(), capture_output=True, text=True, check=False
+    )
     assert rejected.returncode == 0 and rejected.stdout.strip() == "full", rejected.stderr
     _git(tmp_path, "-c", "commit.gpgsign=false", "merge", "--no-edit", advanced)
     rebound = _git(tmp_path, "rev-parse", "HEAD")
@@ -282,7 +294,7 @@ def test_base_advanced_after_branch_creation_falls_back_to_full(tmp_path: Path, 
     assert validation_scope(tmp_path, advanced, rebound) == "docs"
     corrected = [sys.executable, str(ROOT / "scripts/validation_scope.py"), "--base", advanced, "--head", rebound]
     recovered = subprocess.run(
-        corrected, cwd=tmp_path, env=git_environment(), capture_output=True, text=True, check=False
+        corrected, cwd=tmp_path, env=_fixture_environment(), capture_output=True, text=True, check=False
     )
     assert recovered.returncode == 0 and recovered.stdout.strip() == "docs", recovered.stderr
     assert (tmp_path / ".git" / "index").read_bytes() == index_before
@@ -421,7 +433,7 @@ def _hosted_classification(root: Path, runner: Path, base: str, head: str) -> su
         ["bash", "-euo", "pipefail", "-c", fragment + 'printf "%s\\n" "$scope"'],
         cwd=root,
         env={
-            **git_environment(),
+            **_fixture_environment(),
             "RUNNER_TEMP": str(runner),
             "classifier": str(classifier),
             "BASE_SHA": base,
@@ -496,7 +508,7 @@ def _circleci_fixture(tmp_path: Path, docs_only: bool = False) -> tuple[Path, di
     sleep.write_text("#!/bin/sh\nexit 0\n")
     sleep.chmod(0o755)
     environment = {
-        **git_environment(),
+        **_fixture_environment(),
         "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
         "CI_METADATA": str(metadata),
         "BASH_ENV": str(tmp_path / "bash-env"),
@@ -559,9 +571,15 @@ def test_circleci_operator_path_uses_trusted_base_and_verified_merge(tmp_path: P
 
 
 @pytest.mark.parametrize("state", ["committed", "staged", "working-tree", "clean", "bad-base"])
-def test_diff_phase_checks_committed_staged_and_working_tree_changes(tmp_path: Path, state: str) -> None:
+def test_diff_phase_checks_committed_staged_and_working_tree_changes(
+    tmp_path: Path, state: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Run the real diff phase against clean and whitespace-damaged isolated checkouts."""
     base = _repository(tmp_path)
+    inherited = tmp_path / "caller-bootstrap"
+    inherited.write_text("export SDK_CI_BASE_SHA=unrelated-caller-revision\n")
+    monkeypatch.setenv("BASH_ENV", str(inherited))
+    monkeypatch.setenv("SDK_CI_BASE_SHA", "unrelated-caller-revision")
     if state not in {"clean", "bad-base"}:
         (tmp_path / "README.md").write_text("trailing whitespace  \n")
         if state != "working-tree":
@@ -571,7 +589,7 @@ def test_diff_phase_checks_committed_staged_and_working_tree_changes(tmp_path: P
     result = subprocess.run(
         ["bash", str(ROOT / "scripts/validate-repository.sh"), "diff"],
         cwd=tmp_path,
-        env={**git_environment(), "SDK_CI_BASE_SHA": "missing" if state == "bad-base" else base},
+        env={**_fixture_environment(), "SDK_CI_BASE_SHA": "missing" if state == "bad-base" else base},
         capture_output=True,
         text=True,
         check=False,
@@ -591,7 +609,7 @@ def test_diff_default_comparisons_cover_main_pushes_and_root_commits(tmp_path: P
         (tmp_path / "next.md").write_text("clean final commit\n")
         _git(tmp_path, "add", ".")
         _git(tmp_path, "-c", "commit.gpgsign=false", "commit", "-m", "fixture clean tip")
-    environment = git_environment()
+    environment = _fixture_environment()
     environment.pop("SDK_CI_BASE_SHA", None)
     environment["CIRCLE_BRANCH"] = "main" if case.startswith("main") else "fixture"
     result = subprocess.run(
@@ -662,7 +680,7 @@ def test_docs_wrapper_runs_real_quality_rejects_source_and_recovers(tmp_path: Pa
     paths = subprocess.run(
         ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
         cwd=ROOT,
-        env=git_environment(),
+        env=_fixture_environment(),
         capture_output=True,
         check=True,
     ).stdout
@@ -679,7 +697,7 @@ def test_docs_wrapper_runs_real_quality_rejects_source_and_recovers(tmp_path: Pa
     base = _git(tmp_path, "rev-parse", "HEAD")
     _git(tmp_path, "update-ref", "refs/remotes/origin/main", base)
     environment = {
-        **git_environment(),
+        **_fixture_environment(),
         "UV_OFFLINE": "1",
         "MISE_CEILING_PATHS": str(tmp_path.parent),
         "MISE_TRUSTED_CONFIG_PATHS": str(tmp_path / ".mise.toml"),
