@@ -34,6 +34,7 @@ from skills_sdk.models.provider_execution import (
 from skills_sdk.providers.types import (
     DEFAULT_PROVIDER_CALL_CLOCK,
     DEFAULT_PROVIDER_CALL_LIMITS,
+    AsyncioProviderCallClock,
     JsonValue,
     ProviderAdapterBatch,
     ProviderAdapterChunk,
@@ -45,6 +46,7 @@ from skills_sdk.providers.types import (
     ProviderCallLimits,
     ProviderCallOutcome,
     TextProviderAdapter,
+    _retain_provider_task,
 )
 
 
@@ -75,6 +77,7 @@ class _AdapterBindings:
 class _ClockBindings:
     now: Callable[[], datetime]
     wait_for: Callable[[Awaitable[object], float], Awaitable[object]]
+    pending: set[asyncio.Future[object]]
 
 
 @dataclass(slots=True)
@@ -250,9 +253,17 @@ async def _read_clock_bindings(clock: object) -> _ClockBindings:
         or not all(callable(member) for member in observed)
     ):
         raise _contract_error("invalid_provider_clock", "provider clock members are invalid") from None
+    scheduler = cast(Callable[[Awaitable[object], float], Awaitable[object]], observed[1])
+    pending: set[asyncio.Future[object]] = set()
+    # Rebind the inherited production scheduler only; preserve a custom now()
+    # or wait_for() implementation without sharing production task ownership.
+    if inspect.ismethod(scheduler) and scheduler.__func__ is AsyncioProviderCallClock.wait_for:
+        owned_clock = AsyncioProviderCallClock()
+        scheduler, pending = owned_clock.wait_for, owned_clock._pending_tasks
     return _ClockBindings(
         now=cast(Callable[[], datetime], observed[0]),
-        wait_for=cast(Callable[[Awaitable[object], float], Awaitable[object]], observed[1]),
+        wait_for=scheduler,
+        pending=pending,
     )
 
 
@@ -269,7 +280,7 @@ async def _read_clock(now: Callable[[], datetime]) -> datetime:
 
 
 def _close_awaitable(awaitable: object) -> None:
-    if inspect.iscoroutine(awaitable):
+    if inspect.iscoroutine(awaitable) and inspect.getcoroutinestate(awaitable) == inspect.CORO_CREATED:
         awaitable.close()
     elif isinstance(awaitable, asyncio.Future):
         awaitable.cancel()
@@ -554,13 +565,23 @@ def _execution_result(
 
 
 async def _cleanup(adapter: _AdapterBindings, limits: ProviderCallLimits, clock: _ClockBindings) -> bool:
+    pending = {task for task in clock.pending if not task.done()}
+
     async def cleanup() -> object:
+        if pending:
+            await asyncio.wait(pending)
         cleanup_call = adapter.cleanup()
         if not inspect.isawaitable(cleanup_call):
             raise _contract_error("invalid_provider_adapter", "provider cleanup must return an awaitable")
         return await _clock_wait_for(clock, cleanup_call, limits.cleanup_seconds)
 
-    observed = await _captured(cleanup())
+    # Shield resource teardown from cancellation of its receipt waiter. It may
+    # finish later, but must never race an adapter operation still draining.
+    cleanup_task = asyncio.create_task(cleanup())
+    clock.pending.add(cleanup_task)
+    cleanup_task.add_done_callback(clock.pending.discard)
+    _retain_provider_task(cleanup_task)
+    observed = await _captured(_clock_wait_for(clock, asyncio.shield(cleanup_task), limits.cleanup_seconds))
     if isinstance(observed, CancelledError):
         return False
     if isinstance(observed, ContractError):
