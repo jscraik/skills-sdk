@@ -40,5 +40,16 @@ if [[ "$phase" == all || "$phase" == installed ]]; then
   run_timed installed bash scripts/validate-installed.sh
 fi
 if [[ "$phase" == all || "$phase" == diff ]]; then
+  # Main checks the entire tree so multi-commit pushes cannot hide earlier damage.
+  if [[ -n "${SDK_CI_BASE_SHA:-}" ]]; then
+    diff_base="$SDK_CI_BASE_SHA"
+    git rev-parse --verify "$diff_base^{commit}" >/dev/null
+  elif [[ "${CIRCLE_BRANCH:-}" != main ]] && git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+    diff_base=HEAD^
+  else
+    diff_base="$(git hash-object -t tree /dev/null)"
+  fi
+  run_timed committed-diff git diff --check "$diff_base" HEAD
+  run_timed staged-diff git diff --cached --check
   run_timed diff git diff --check
 fi
