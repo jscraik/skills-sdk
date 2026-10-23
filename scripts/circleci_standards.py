@@ -8,8 +8,37 @@ def validation_commands(config: Any) -> list[str]:
     """Read active shell commands from the canonical validation job."""
     steps = config.get("jobs", {}).get("validate", {}).get("steps", []) if isinstance(config, dict) else []
     return [
-        step["run"].get("command", "") for step in steps if isinstance(step, dict) and isinstance(step.get("run"), dict)
+        step["run"].get("command", "")
+        for step in steps
+        if isinstance(step, dict)
+        and isinstance(step.get("run"), dict)
+        and step["run"].get("when", "on_success") in ("on_success", "always")
     ]
+
+
+def _unbranched_lines(command: str, expected: str) -> list[str]:
+    """Accept unbranched shell lines and only the exact SDK phase guards."""
+    lines = [line.strip() for line in command.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    phase = expected.removeprefix("bash scripts/validate-repository.sh ")
+    if phase in {"docs-tests", "tests", "build", "installed"} and len(lines) == 3:
+        operator = "==" if phase == "docs-tests" else "!="
+        if lines[0] == f'if [[ "$SDK_CI_SCOPE" {operator} docs ]]; then' and lines[-1] == "fi":
+            lines = lines[1:2]
+    controls = {"if", "then", "elif", "else", "fi", "for", "while", "until", "case", "esac", "select", "function"}
+    for line in lines:
+        lexer = shlex.shlex(line, posix=True, punctuation_chars=";&|(){}<>")
+        lexer.whitespace_split = True
+        try:
+            tokens = list(lexer)
+        except ValueError:
+            return []
+        if tokens and (
+            tokens[0] in controls
+            or any(token in {";", "&&", "||", "&", "(", ")", "()", "{", "}", "<", "<<", "<<<"} for token in tokens)
+            or line.endswith("\\")
+        ):
+            return []
+    return lines
 
 
 def _invokes(command: str, expected: str) -> bool:
@@ -17,7 +46,7 @@ def _invokes(command: str, expected: str) -> bool:
     target = shlex.split(expected)
     environment = ["env", "-u", "GH_TOKEN", "-u", "GITHUB_TOKEN", "-u", "GITHUB_PERSONAL_ACCESS_TOKEN"]
     prefixes: tuple[list[str], ...] = ([], ["mise", "exec", "--"], environment, [*environment, "mise", "exec", "--"])
-    for line in command.splitlines():
+    for line in _unbranched_lines(command, expected):
         if " | " in expected:
             if line.strip() == expected:
                 return True

@@ -32,6 +32,11 @@ def test_circleci_requires_trusted_base_without_candidate_fallback() -> None:
         ("echo-phase", "ci-validation"),
         ("checksum-noop", "ci-tooling"),
         ("checksum-quoted-pipe", "ci-tooling"),
+        ("failure-only-prepare", "ci-contract"),
+        ("failure-only-phase", "ci-validation"),
+        ("false-prepare", "ci-contract"),
+        ("false-checksum", "ci-tooling"),
+        ("false-phase", "ci-validation"),
     ],
 )
 def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
@@ -54,6 +59,24 @@ def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
             workflow["jobs"] = [{"validate": {"filters": {"branches": {"only": "main"}}}}]
         else:
             workflow["when"] = False
+        text = yaml.safe_dump(parsed)
+    elif damage.startswith("failure-only-") or damage.startswith("false-"):
+        parsed = yaml.safe_load(text)
+        fragment = {
+            "failure-only-prepare": "bash scripts/circleci_pr_contract.sh",
+            "failure-only-phase": "bash scripts/validate-repository.sh installed",
+            "false-prepare": "bash scripts/circleci_pr_contract.sh",
+            "false-checksum": "sha256sum -c -",
+            "false-phase": "bash scripts/validate-repository.sh installed",
+        }[damage]
+        for step in parsed["jobs"]["validate"]["steps"]:
+            if isinstance(step, dict) and isinstance(step.get("run"), dict):
+                run = step["run"]
+                if fragment in run["command"]:
+                    if damage.startswith("failure-only-"):
+                        run["when"] = "on_fail"
+                    else:
+                        run["command"] = "if false; then\n" + run["command"] + "\nfi"
         text = yaml.safe_dump(parsed)
     elif damage == "echo-prepare":
         text = text.replace("bash scripts/circleci_pr_contract.sh", "echo bash scripts/circleci_pr_contract.sh")
