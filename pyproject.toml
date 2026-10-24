@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-images = ["pillow>=12.3.0,<13"]
+images = ["pillow>=13.0.0,<14"]
 
 [project.scripts]
 skills-sdk = "skills_sdk.cli.main:main"
