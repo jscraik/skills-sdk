@@ -1,0 +1,60 @@
+version: 2.1
+
+jobs:
+  validate:
+    docker:
+      - image: cimg/python:3.12.12
+    steps:
+      - checkout
+      - run:
+          name: Validate trusted PR contract and prepare merge result
+          command: bash scripts/circleci_pr_contract.sh
+      - run:
+          name: Install pinned repository tools
+          command: |
+            curl --fail --location --retry 3 --max-time 120 https://github.com/jdx/mise/releases/download/v2026.8.14/mise-v2026.8.14-linux-x64.tar.gz -o /tmp/mise.tar.gz
+            echo "64d5f34aeb7a4e0e327dc1c9be66cd8162e14899a47b11901154a100285a3d61  /tmp/mise.tar.gz" | sha256sum -c -
+            tar -xzf /tmp/mise.tar.gz -C /tmp
+            sudo install /tmp/mise/bin/mise /usr/local/bin/mise
+            export MISE_CEILING_PATHS="$PWD/.."
+            export MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml"
+            env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise install python uv ruff vale
+            env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- uv sync --frozen
+            printf 'export MISE_CEILING_PATHS=%q\nexport MISE_TRUSTED_CONFIG_PATHS=%q\n' "$MISE_CEILING_PATHS" "$MISE_TRUSTED_CONFIG_PATHS" >> "$BASH_ENV"
+      - run:
+          name: Quality and schema checks
+          command: env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh quality
+      - run:
+          name: Documentation-dependent contract tests
+          command: |
+            if [[ "$SDK_CI_SCOPE" == docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh docs-tests
+            fi
+      - run:
+          name: Full tests (two isolated workers and slow-test report)
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh tests
+            fi
+          no_output_timeout: 20m
+      - run:
+          name: Build source and wheel
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh build
+            fi
+      - run:
+          name: Installed public API and CLI proof
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh installed
+            fi
+          no_output_timeout: 20m
+      - run:
+          name: Diff hygiene
+          command: env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh diff
+
+workflows:
+  validation:
+    jobs:
+      - validate
