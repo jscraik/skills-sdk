@@ -62,6 +62,8 @@ else
   pr_metadata > "$metadata/final.json"
   jq -e --arg head "$HEAD_SHA" --arg base "$BASE_SHA" \
     '.head.sha == $head and .base.sha == $base and .state == "open"' "$metadata/final.json"
+  jq -r '.body // ""' "$metadata/final.json" > "$body_file"
+  python3 "$validator" --template "$template" --body-file "$body_file"
   git checkout --detach refs/ci/pr-merge
 fi
 [[ "$scope" == full || "$scope" == docs ]]

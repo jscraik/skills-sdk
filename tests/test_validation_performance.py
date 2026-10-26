@@ -497,9 +497,14 @@ def _circleci_fixture(tmp_path: Path, docs_only: bool = False) -> tuple[Path, di
     binaries.mkdir()
     curl = binaries / "curl"
     curl.write_text(
-        "#!/usr/bin/env python3\nimport json, os, sys\n"
+        "#!/usr/bin/env python3\nimport json, os, sys\nfrom pathlib import Path\n"
         "if os.environ.get('CI_METADATA_FAILURE'): sys.exit(22)\n"
         "p=json.load(open(os.environ['CI_METADATA']))\n"
+        "if os.environ.get('CI_BODY_CHANGES_ON_FINAL'):\n"
+        " counter=Path(os.environ['CI_METADATA']+'.calls')\n"
+        " calls=int(counter.read_text())+1 if counter.exists() else 1\n"
+        " counter.write_text(str(calls))\n"
+        " if calls >= 3: p['body']=''\n"
         "assert not any('Authorization' in arg for arg in sys.argv)\n"
         "print(json.dumps(p))\n"
     )
@@ -523,7 +528,18 @@ def _circleci_fixture(tmp_path: Path, docs_only: bool = False) -> tuple[Path, di
 
 @pytest.mark.parametrize(
     "case",
-    ["valid", "docs", "main", "missing-pr", "invalid-body", "wrong-head", "wrong-base", "wrong-merge", "api-error"],
+    [
+        "valid",
+        "docs",
+        "main",
+        "missing-pr",
+        "invalid-body",
+        "changed-body",
+        "wrong-head",
+        "wrong-base",
+        "wrong-merge",
+        "api-error",
+    ],
 )
 def test_circleci_operator_path_uses_trusted_base_and_verified_merge(tmp_path: Path, case: str) -> None:
     """Execute the production shell route with real Git and controlled API responses."""
@@ -533,6 +549,8 @@ def test_circleci_operator_path_uses_trusted_base_and_verified_merge(tmp_path: P
     data = json.loads(metadata.read_text())
     if case == "invalid-body":
         data["body"] = ""
+    elif case == "changed-body":
+        environment["CI_BODY_CHANGES_ON_FINAL"] = "1"
     elif case == "api-error":
         environment["CI_METADATA_FAILURE"] = "1"
     elif case == "wrong-head":

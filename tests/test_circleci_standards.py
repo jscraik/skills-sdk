@@ -6,8 +6,24 @@ import pytest
 import yaml
 
 from scripts.check_repository_standards import _circleci_findings
+from scripts.circleci_standards import _invokes
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("terminator", ["exit 0", "exec true"])
+@pytest.mark.parametrize(
+    "required",
+    [
+        "bash scripts/circleci_pr_contract.sh",
+        "mise install python uv ruff vale",
+        "bash scripts/validate-repository.sh quality",
+    ],
+)
+def test_required_commands_must_precede_shell_termination(terminator: str, required: str) -> None:
+    """Retain reachable commands but never count lines after shell termination."""
+    assert not _invokes(f"{terminator}\n{required}", required)
+    assert _invokes(f"{required}\n{terminator}", required)
 
 
 def test_circleci_requires_trusted_base_without_candidate_fallback() -> None:

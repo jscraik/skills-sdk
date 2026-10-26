@@ -25,6 +25,7 @@ def _unbranched_lines(command: str, expected: str) -> list[str]:
         if lines[0] == f'if [[ "$SDK_CI_SCOPE" {operator} docs ]]; then' and lines[-1] == "fi":
             lines = lines[1:2]
     controls = {"if", "then", "elif", "else", "fi", "for", "while", "until", "case", "esac", "select", "function"}
+    reachable: list[str] = []
     for line in lines:
         lexer = shlex.shlex(line, posix=True, punctuation_chars=";&|(){}<>")
         lexer.whitespace_split = True
@@ -32,13 +33,16 @@ def _unbranched_lines(command: str, expected: str) -> list[str]:
             tokens = list(lexer)
         except ValueError:
             return []
+        if tokens and tokens[0] in {"exit", "exec"}:
+            return reachable
         if tokens and (
             tokens[0] in controls
             or any(token in {";", "&&", "||", "&", "(", ")", "()", "{", "}", "<", "<<", "<<<"} for token in tokens)
             or line.endswith("\\")
         ):
             return []
-    return lines
+        reachable.append(line)
+    return reachable
 
 
 def _invokes(command: str, expected: str) -> bool:
