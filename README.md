@@ -1,5 +1,7 @@
 # Skills SDK
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/jscraik/skills-sdk?utm_source=oss&utm_medium=github&utm_campaign=jscraik%2Fskills-sdk&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 Accepted PR #60 provides read-only
 [`check-plugin-presentation`](docs/cli.md#plugin-presentation-assessment) for
 fresh complete-plugin assets and supplied candidate-bound approvals. Optional
