@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import math
 from collections.abc import AsyncIterator, Awaitable
-from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from types import MappingProxyType
@@ -20,6 +19,10 @@ from skills_sdk.models.provider_execution import ProviderExecutionRequest, Provi
 
 JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 _T = TypeVar("_T")
+
+# Asyncio keeps only weak task references. This registry owns lifetime only;
+# scheduling and cleanup ordering always use the separate per-call set.
+_RETAINED_PROVIDER_TASKS: set[asyncio.Future[object]] = set()
 
 _LIMIT_CEILINGS = MappingProxyType(
     {
@@ -135,23 +138,37 @@ class ProviderCallClock(Protocol):
 class AsyncioProviderCallClock:
     """SDK-owned production clock and timeout scheduler."""
 
+    _pending_tasks: set[asyncio.Future[object]] = field(default_factory=set, init=False, repr=False, compare=False)
+
     def now(self) -> datetime:
         return datetime.now(UTC)
 
     async def wait_for(self, awaitable: Awaitable[_T], timeout_seconds: float) -> _T:
         task = asyncio.ensure_future(awaitable)
+        self._pending_tasks.add(task)
+        task.add_done_callback(self._pending_tasks.discard)
+        _retain_provider_task(task)
         try:
             done, _pending = await asyncio.wait({task}, timeout=timeout_seconds)
             if task in done:
                 return task.result()
             task.cancel()
-            with suppress(asyncio.CancelledError, Exception):
-                await task
             raise TimeoutError
         except asyncio.CancelledError:
             task.cancel()
-            task.add_done_callback(_consume_detached_task_result)
             raise
+
+
+def _retain_provider_task[T](task: asyncio.Future[T]) -> None:
+    """Retain scheduled work until its result has been consumed."""
+
+    _RETAINED_PROVIDER_TASKS.add(task)
+
+    def completed(done: asyncio.Future[T]) -> None:
+        _RETAINED_PROVIDER_TASKS.discard(done)
+        _consume_detached_task_result(done)
+
+    task.add_done_callback(completed)
 
 
 def _consume_detached_task_result[T](task: asyncio.Future[T]) -> None:

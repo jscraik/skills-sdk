@@ -584,7 +584,17 @@ or completed reviewer execution.
   terminal evidence, adapter-reported usage and cost observations, and its
   request-bound `ProviderExecutionResult`. Known failures become typed terminal
   outcomes; invalid caller or adapter contracts raise `ContractError`.
-  Cancellation remains cancellation after bounded cleanup. This service does
+  Cancellation remains cancellation after a bounded cleanup wait. The default
+  scheduler tracks work separately for each call and rejects late output after
+  expiry. If cancelled work is still draining, resource cleanup waits for that
+  work before calling the adapter hook. The receipt wait remains bounded and
+  reports `cleanup_succeeded=false` with `cleanup_failed` when teardown has not
+  finished; `cleanup_attempted=true` includes this scheduled teardown attempt.
+  Deferred teardown can finish later while the event loop remains running.
+  These limits bound receipt return, not termination of arbitrary adapter code.
+  Hooks must yield to the event loop; cancellation-resistant hooks may retain
+  resources until they finish. Injected clocks own their scheduling guarantees.
+  This service does
   not discover adapters, read credentials, contact a network, evaluate output,
   or establish external provider truth.
 - **Optional Codex CLI judge (delivery candidate):** Import `CodexJudgeAdapter`
