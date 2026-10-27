@@ -42,7 +42,7 @@ independent values, and malformed input is never cached. Source capture, digest
 verification and safety decisions still run. Cache data is cleared on return,
 failure or cancellation; child tasks and threads cannot use a parent's cache.
 
-Both test routes write JUnit results under `.tmp/test-results/`. CircleCI uploads
+Both test routes write JUnit results under `test-results/`. CircleCI uploads
 these results to expose per-test timings and failures in its Tests tab. The XML
 includes test file names for timing-based splitting. Test uploads do not enable
 test selection, automatic retries or additional parallel containers.
