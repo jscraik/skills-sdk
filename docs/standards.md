@@ -35,6 +35,13 @@ paths and environment changes remain worker-local. Package builds and installed
 smokes remain sequential after tests. Runtime source recapture, calibration,
 drift, failure and recovery checks are not cached or removed for speed.
 
+Matched-lane execution may reuse closed YAML parsing within its own operation.
+The cache holds at most 32 entries and 2 MiB of accounted retained data; inputs
+over 64 KiB bypass it. Exact current text identifies entries, callers receive
+independent values, and malformed input is never cached. Source capture, digest
+verification and safety decisions still run. Cache data is cleared on return,
+failure or cancellation; child tasks and threads cannot use a parent's cache.
+
 Both test routes write JUnit results under `.tmp/test-results/`. CircleCI uploads
 these results to expose per-test timings and failures in its Tests tab. The XML
 includes test file names for timing-based splitting. Test uploads do not enable
