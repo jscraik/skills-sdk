@@ -28,10 +28,12 @@ if [[ "$phase" == all || "$phase" == quality ]]; then
 fi
 if [[ "$phase" == docs-tests ]]; then
   run_timed docs-tests mise exec -- uv run --frozen pytest \
-    tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py --durations=10
+    tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py --durations=10 \
+    --junitxml=.tmp/test-results/docs.xml -o junit_family=xunit1
 fi
 if [[ "$phase" == all || "$phase" == tests ]]; then
-  run_timed tests mise exec -- uv run --frozen --extra images pytest -n 2 --dist load --durations=25 --durations-min=0.1
+  run_timed tests mise exec -- uv run --frozen --extra images pytest -n 2 --dist load --durations=25 \
+    --durations-min=0.1 --junitxml=.tmp/test-results/full.xml -o junit_family=xunit1
 fi
 if [[ "$phase" == all || "$phase" == build ]]; then
   run_timed build mise exec -- uv build
