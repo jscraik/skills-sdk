@@ -59,7 +59,7 @@ MACHINE_PATH_PATTERNS = (
     re.compile(r"[A-Za-z]:\\" + r"Users\\[^\\\s]+\\"),
 )
 PINNED_TOOLS = {
-    "uv": "0.13.4",
+    "uv": "0.13.5",
     "ruff": "0.15.22",
     "pytest": "9.1.1",
     "pytest_xdist": "3.8.0",

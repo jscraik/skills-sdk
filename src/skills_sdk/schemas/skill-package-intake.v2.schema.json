@@ -32,6 +32,53 @@
     },
     "IntakeDecision": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "blocker_codes": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "blocker_codes"
+            ]
+          },
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "admit"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "blocker_codes": {
+                "maxItems": 0
+              },
+              "checks": {
+                "properties": {
+                  "identity": {
+                    "const": true
+                  },
+                  "owner_unchanged": {
+                    "const": true
+                  },
+                  "provenance": {
+                    "const": true
+                  },
+                  "rights": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
       "description": "Candidate-bound admission result with typed, explicit blockers.",
       "properties": {
         "blocker_codes": {
@@ -80,6 +127,54 @@
     },
     "NormalizedPackageV2": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "package_type": {
+                "const": "skill"
+              }
+            },
+            "required": [
+              "package_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "package_type": {
+                    "const": "skill"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "package_type": {
+                "const": "plugin"
+              }
+            },
+            "required": [
+              "package_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "package_type": {
+                    "const": "plugin"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
       "description": "Additive normalized saved-release package; old v1 source stays unchanged.",
       "properties": {
         "dependencies": {

@@ -356,7 +356,7 @@ def test_tool_pin_drift_is_rejected() -> None:
             ]
         },
     }
-    mise = {"tools": {"python": "3.12", "uv": "0.13.4", "ruff": "0.15.22", "vale": "3.18.0"}}
+    mise = {"tools": {"python": "3.12", "uv": "0.13.5", "ruff": "0.15.22", "vale": "3.18.0"}}
     lock = {
         "package": [
             {"name": "mypy", "version": "1.18.1"},
@@ -374,7 +374,7 @@ def test_tool_pin_drift_is_rejected() -> None:
     assert any(finding.code == "lock-pin" for finding in findings)
 
 
-@pytest.mark.parametrize(("uv_version", "rejected"), [("0.13.4", False), ("0.11.3", True)])
+@pytest.mark.parametrize(("uv_version", "rejected"), [("0.13.5", False), ("0.13.4", True), ("0.11.3", True)])
 def test_uv_cli_security_pin_is_enforced(uv_version: str, rejected: bool) -> None:
     pyproject = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     mise = tomllib.loads((REPOSITORY_ROOT / ".mise.toml").read_text(encoding="utf-8"))
@@ -383,7 +383,7 @@ def test_uv_cli_security_pin_is_enforced(uv_version: str, rejected: bool) -> Non
 
     findings = _tool_pin_findings(pyproject, mise, lock)
 
-    assert any(finding.message == "uv must be pinned to 0.13.4" for finding in findings) is rejected
+    assert any(finding.message == "uv must be pinned to 0.13.5" for finding in findings) is rejected
     assert pyproject["build-system"]["requires"] == ["uv_build==0.11.3"]
 
 

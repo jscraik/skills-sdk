@@ -7,6 +7,14 @@ def append_intake_family_constraints(schema: dict[str, Any], filename: str) -> N
     """Project intake metadata without changing frozen or unrelated schemas."""
     if filename == "skill-package-intake.v1.schema.json":
         append_intake_constraints(schema)
+    elif filename in {
+        "skill-package-intake.v2.schema.json",
+        "local-check.v3.schema.json",
+        "plugin-quality.v2.schema.json",
+    }:
+        append_intake_constraints(schema, normalized_name="NormalizedPackageV2")
+    elif filename == "normalized-package.v2.schema.json":
+        schema["allOf"] = _normalized_type_constraints()
     if filename in {
         "saved-release-snapshot.v1.schema.json",
         "saved-release-provenance.v1.schema.json",
@@ -29,7 +37,7 @@ def append_intake_family_constraints(schema: dict[str, Any], filename: str) -> N
         }
 
 
-def append_intake_constraints(schema: dict[str, Any]) -> None:
+def append_intake_constraints(schema: dict[str, Any], normalized_name: str = "NormalizedPackage") -> None:
     """Keep legacy package schemas frozen while describing intake proof limits."""
     definitions = schema["$defs"]
     definitions["IntakeDecision"]["allOf"] = [
@@ -48,13 +56,7 @@ def append_intake_constraints(schema: dict[str, Any]) -> None:
             "else": {"properties": {"blocker_codes": {"minItems": 1}}, "required": ["blocker_codes"]},
         }
     ]
-    definitions["NormalizedPackage"]["allOf"] = [
-        {
-            "if": {"properties": {"package_type": {"const": package_type}}, "required": ["package_type"]},
-            "then": {"properties": {"identity": {"properties": {"package_type": {"const": package_type}}}}},
-        }
-        for package_type in ("skill", "plugin")
-    ]
+    definitions[normalized_name]["allOf"] = _normalized_type_constraints()
     schema["x-skills-sdk-semantic-validation"] = {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
         "required_for": [
@@ -63,3 +65,14 @@ def append_intake_constraints(schema: dict[str, Any]) -> None:
             "decision and blocker must match their persisted validation and admission evidence",
         ],
     }
+
+
+def _normalized_type_constraints() -> list[dict[str, Any]]:
+    """Express the local package and identity type agreement for either shape."""
+    return [
+        {
+            "if": {"properties": {"package_type": {"const": package_type}}, "required": ["package_type"]},
+            "then": {"properties": {"identity": {"properties": {"package_type": {"const": package_type}}}}},
+        }
+        for package_type in ("skill", "plugin")
+    ]

@@ -343,6 +343,54 @@
   "$id": "https://schemas.skills-sdk.dev/normalized-package.v2.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "package_type": {
+            "const": "skill"
+          }
+        },
+        "required": [
+          "package_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "identity": {
+            "properties": {
+              "package_type": {
+                "const": "skill"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "package_type": {
+            "const": "plugin"
+          }
+        },
+        "required": [
+          "package_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "identity": {
+            "properties": {
+              "package_type": {
+                "const": "plugin"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "description": "Additive normalized saved-release package; old v1 source stays unchanged.",
   "properties": {
     "dependencies": {

@@ -246,3 +246,48 @@ def test_consistent_wrong_version_stops_at_fresh_root(tmp_path: Path) -> None:
     result = asyncio.run(check_plugin_quality(root, request))
     assert result.blocker.code == "plugin_quality_root_mismatch"
     assert result.initial_capture is not None and not result.children
+
+
+@pytest.mark.parametrize("schema_name", ["skill-package-intake.v2", "local-check.v3", "plugin-quality.v2"])
+@pytest.mark.parametrize("defect", ["false_check", "admit_blocker", "missing_blocker"])
+def test_saved_result_schemas_reject_inconsistent_decisions(tmp_path: Path, schema_name: str, defect: str) -> None:
+    """Raw schema consumers retain expressible admission rules in nested results."""
+    _, request, _, _ = saved_request(tmp_path)
+    decision = {
+        "candidate": request["children"][0]["request"]["candidate"],
+        "decision": "admit",
+        "checks": dict.fromkeys(("identity", "provenance", "rights", "owner_unchanged"), True),
+        "blocker_codes": [],
+    }
+    schema = SchemaRegistry().load(schema_name)
+    validator = Draft202012Validator({"$defs": schema["$defs"], "$ref": "#/$defs/IntakeDecision"})
+    assert validator.is_valid(decision)
+    rejected = deepcopy(decision)
+    if defect == "false_check":
+        rejected["checks"]["rights"] = False
+    elif defect == "admit_blocker":
+        rejected["blocker_codes"] = ["rights_unconfirmed"]
+    else:
+        rejected["decision"] = "block"
+    assert not validator.is_valid(rejected)
+    rejected["decision"] = "block"
+    rejected["blocker_codes"] = ["rights_unconfirmed"]
+    assert validator.is_valid(rejected)
+
+
+@pytest.mark.parametrize(
+    "schema_name", ["normalized-package.v2", "skill-package-intake.v2", "local-check.v3", "plugin-quality.v2"]
+)
+def test_saved_result_schemas_reject_normalized_type_mismatch(tmp_path: Path, schema_name: str) -> None:
+    """Package type agreement is structural even when other bindings need models."""
+    root, request, _, _ = saved_request(tmp_path)
+    child = request["children"][0]
+    receipt = intake_skill_package(root / child["path"], child["request"]["intake"])
+    normalized = receipt.normalized_package.model_dump(mode="json")
+    schema = SchemaRegistry().load(schema_name)
+    if schema_name != "normalized-package.v2":
+        schema = {"$defs": schema["$defs"], "$ref": "#/$defs/NormalizedPackageV2"}
+    validator = Draft202012Validator(schema)
+    assert validator.is_valid(normalized)
+    normalized["package_type"] = "plugin" if normalized["package_type"] == "skill" else "skill"
+    assert not validator.is_valid(normalized)
