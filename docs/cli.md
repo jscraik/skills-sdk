@@ -74,6 +74,17 @@ result.
 
 ### Whole-plugin quality composition
 
+The local saved-release candidate also accepts an explicit
+`plugin-quality-request/v2` file through this command. It carries one
+`source_snapshot` and `local-check-request/v3` child requests with
+`skill-package-intake-context/v2` provenance. Output is `plugin-quality/v2`;
+the source must agree with a fresh whole-plugin capture before child checks.
+An unconfirmed provenance or rights check still blocks intake. This is source
+representation and local consistency, not remote authentication or release
+permission. The older request family retains its repository-only semantics.
+See [saved-release source contracts](api.md#saved-release-source-candidate) for
+fields, limitations and the standalone CLI boundary.
+
 Issue #92: PR #93 merged at `93526d6`:
 `skills-sdk check-plugin-quality ./my-plugin --request ./request.json --assessments ./assessments.json --presentation-request ./presentation.json --json --robot`.
 Keep all three inputs outside plugin source as bounded no-follow JSON. The

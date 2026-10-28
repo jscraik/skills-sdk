@@ -28,7 +28,13 @@ from skills_sdk.models.evaluation_v2 import (
     ScenarioObservationV2,
     ScenarioSetV2,
 )
-from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt, build_intake_decision
+from skills_sdk.models.intake import (
+    SkillPackageIntakeContext,
+    SkillPackageIntakeContextV2,
+    SkillPackageIntakeReceipt,
+    SkillPackageIntakeReceiptV2,
+    build_intake_decision,
+)
 from skills_sdk.models.inventory import (
     FormatChecks,
     MantraAssessment,
@@ -93,6 +99,7 @@ from skills_sdk.models.package import (
     IntakeDecision,
     IntakeDecisionStatus,
     NormalizedPackage,
+    NormalizedPackageV2,
     OwnershipState,
     PackageCandidateIdentity,
     PackageLifecycleState,
@@ -100,6 +107,9 @@ from skills_sdk.models.package import (
     PackageSource,
     PackageSourceKind,
     PluginIdentity,
+    SavedReleasePackageSource,
+    SavedReleaseProvenance,
+    SavedReleaseSnapshot,
     SkillIdentity,
 )
 from skills_sdk.models.packaging import (
@@ -131,7 +141,12 @@ from skills_sdk.models.plugin_presentation import (
     PluginPresentationImage,
     PluginPresentationRequest,
 )
-from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityResult
+from skills_sdk.models.plugin_quality import (
+    PluginQualityRequest,
+    PluginQualityRequestV2,
+    PluginQualityResult,
+    PluginQualityResultV2,
+)
 from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
@@ -150,7 +165,9 @@ from skills_sdk.models.provider_execution import (
 )
 from skills_sdk.models.quality_workflow import (
     LocalCheckRequestV2,
+    LocalCheckRequestV3,
     LocalCheckResultV2,
+    LocalCheckResultV3,
     LocalQualityPolicy,
     LocalQualityStage,
 )
@@ -224,7 +241,9 @@ __all__ = [
     "IntakeDecision",
     "IntakeDecisionStatus",
     "LocalCheckRequestV2",
+    "LocalCheckRequestV3",
     "LocalCheckResultV2",
+    "LocalCheckResultV3",
     "LocalQualityPolicy",
     "LocalQualityStage",
     "MantraAssessment",
@@ -256,6 +275,7 @@ __all__ = [
     "MatchedVariantJudgment",
     "MutationRaceEvidence",
     "NormalizedPackage",
+    "NormalizedPackageV2",
     "ObservedCalibrationPlan",
     "ObservedCalibrationProbeResult",
     "ObservedCalibrationReceipt",
@@ -300,7 +320,9 @@ __all__ = [
     "PluginPresentationImage",
     "PluginPresentationRequest",
     "PluginQualityRequest",
+    "PluginQualityRequestV2",
     "PluginQualityResult",
+    "PluginQualityResultV2",
     "PluginSkillBinding",
     "PluginValidationPolicy",
     "PortablePluginManifest",
@@ -339,6 +361,9 @@ __all__ = [
     "RuntimeOutcomeReceipt",
     "RuntimeTarget",
     "RuntimeVisibility",
+    "SavedReleasePackageSource",
+    "SavedReleaseProvenance",
+    "SavedReleaseSnapshot",
     "ScenarioCase",
     "ScenarioCaseResult",
     "ScenarioCaseResultV2",
@@ -367,7 +392,9 @@ __all__ = [
     "SkillIdentity",
     "SkillPackageFinding",
     "SkillPackageIntakeContext",
+    "SkillPackageIntakeContextV2",
     "SkillPackageIntakeReceipt",
+    "SkillPackageIntakeReceiptV2",
     "SkillPackageValidation",
     "SourceProvenance",
     "TextProviderAdapterDescriptor",

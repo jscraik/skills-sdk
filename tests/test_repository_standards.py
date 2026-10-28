@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -355,7 +356,7 @@ def test_tool_pin_drift_is_rejected() -> None:
             ]
         },
     }
-    mise = {"tools": {"python": "3.12", "uv": "0.11.3", "ruff": "0.15.22", "vale": "3.18.0"}}
+    mise = {"tools": {"python": "3.12", "uv": "0.13.4", "ruff": "0.15.22", "vale": "3.18.0"}}
     lock = {
         "package": [
             {"name": "mypy", "version": "1.18.1"},
@@ -371,6 +372,19 @@ def test_tool_pin_drift_is_rejected() -> None:
     assert any(finding.code == "tool-pin" for finding in findings)
     assert any("vale" in finding.message for finding in findings)
     assert any(finding.code == "lock-pin" for finding in findings)
+
+
+@pytest.mark.parametrize(("uv_version", "rejected"), [("0.13.4", False), ("0.11.3", True)])
+def test_uv_cli_security_pin_is_enforced(uv_version: str, rejected: bool) -> None:
+    pyproject = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    mise = tomllib.loads((REPOSITORY_ROOT / ".mise.toml").read_text(encoding="utf-8"))
+    lock = tomllib.loads((REPOSITORY_ROOT / "uv.lock").read_text(encoding="utf-8"))
+    mise["tools"]["uv"] = uv_version
+
+    findings = _tool_pin_findings(pyproject, mise, lock)
+
+    assert any(finding.message == "uv must be pinned to 0.13.4" for finding in findings) is rejected
+    assert pyproject["build-system"]["requires"] == ["uv_build==0.11.3"]
 
 
 def test_ci_rejects_repository_validation_without_mise_vale_bootstrap(tmp_path: Path) -> None:

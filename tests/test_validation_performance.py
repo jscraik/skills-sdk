@@ -717,6 +717,7 @@ def test_docs_wrapper_runs_real_quality_rejects_source_and_recovers(tmp_path: Pa
     environment = {
         **_fixture_environment(),
         "UV_OFFLINE": "1",
+        "MISE_STATE_DIR": str(tmp_path / ".tmp" / "mise-state"),
         "MISE_CEILING_PATHS": str(tmp_path.parent),
         "MISE_TRUSTED_CONFIG_PATHS": str(tmp_path / ".mise.toml"),
     }

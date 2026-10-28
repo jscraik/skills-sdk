@@ -10,11 +10,16 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from skills_sdk.models.inventory import PortablePath, Sha256, _ContractModel
-from skills_sdk.models.package import PackageCandidateIdentity
+from skills_sdk.models.package import PackageCandidateIdentity, SavedReleaseSnapshot
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding
 from skills_sdk.models.plugin_presentation import PluginPresentationCheck
-from skills_sdk.models.quality_workflow import LocalCheckRequestV2, LocalCheckResultV2
+from skills_sdk.models.quality_workflow import (
+    LocalCheckRequestV2,
+    LocalCheckRequestV3,
+    LocalCheckResultV2,
+    LocalCheckResultV3,
+)
 from skills_sdk.models.safety import _public_text_is_redaction_safe
 
 PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES = 32 * 1_048_576
@@ -239,6 +244,10 @@ def supported_quality_root(request: PluginQualityRequest, capture: PluginPackage
         and tuple((child.path, child.validation.candidate) for child in capture.skills)
         == tuple((child.path, child.request.candidate) for child in request.children)
         and not any(item.path == "mcp.json" for item in capture.files)
+        and (
+            not isinstance(request, PluginQualityRequestV2)
+            or (capture.manifest is not None and capture.manifest.version == request.source_snapshot.version)
+        )
     )
 
 
@@ -466,10 +475,50 @@ class PluginQualityResult(_ContractModel):
             raise ValueError("presentation must bind the captured image bytes")
 
 
+class PluginQualityChildV2(PluginQualityChild):
+    """Explicit saved-release child quality request."""
+
+    request: LocalCheckRequestV3
+
+
+class PluginQualityRequestV2(PluginQualityRequest):
+    """Whole-plugin saved snapshot and children bound before any child checks."""
+
+    schema_version: Literal["plugin-quality-request/v2"] = "plugin-quality-request/v2"
+    source_snapshot: SavedReleaseSnapshot
+    children: tuple[PluginQualityChildV2, ...] = Field(min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def snapshot_matches_children(self) -> Self:
+        """Reject mixed releases, root identities, modes and selected child paths."""
+        if (
+            self.source_snapshot.root_candidate != self.candidate
+            or self.source_snapshot.root_mode_manifest_sha256 != self.mode_manifest_sha256
+            or any(
+                child.request.intake.source.snapshot != self.source_snapshot
+                or child.request.intake.source.path != child.path
+                for child in self.children
+            )
+        ):
+            raise ValueError("saved-release quality must bind one whole snapshot and its child paths")
+        return self
+
+
+class PluginQualityResultV2(PluginQualityResult):
+    """Retain saved-release provenance throughout the existing quality sequence."""
+
+    schema_version: Literal["plugin-quality/v2"] = "plugin-quality/v2"
+    request: PluginQualityRequestV2 | None = None
+    children: tuple[LocalCheckResultV3, ...] = Field(default=(), max_length=128)
+
+
 __all__ = [
     "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES",
     "PluginQualityChild",
+    "PluginQualityChildV2",
     "PluginQualityRequest",
+    "PluginQualityRequestV2",
     "PluginQualityResult",
+    "PluginQualityResultV2",
     "bounded_json_size",
 ]

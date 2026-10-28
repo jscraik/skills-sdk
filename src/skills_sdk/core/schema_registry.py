@@ -101,6 +101,16 @@ SCHEMA_NAMES = frozenset(
         "plugin-quality.v1",
         "skill-package-intake.v1",
         "skill-package-intake-context.v1",
+        "saved-release-snapshot.v1",
+        "saved-release-provenance.v1",
+        "saved-release-package-source.v1",
+        "normalized-package.v2",
+        "skill-package-intake-context.v2",
+        "skill-package-intake.v2",
+        "local-check-request.v3",
+        "local-check.v3",
+        "plugin-quality-request.v2",
+        "plugin-quality.v2",
         "plugin-normalization-metadata.v1",
         "plugin-normalization.v1",
     }
@@ -279,7 +289,41 @@ class SchemaRegistry:
         """Apply semantic invariants after structural schema validation."""
 
         model: type[BaseModel]
-        if name == "package-inventory.v2":
+        if name in {
+            "saved-release-snapshot.v1",
+            "saved-release-provenance.v1",
+            "saved-release-package-source.v1",
+            "normalized-package.v2",
+            "skill-package-intake-context.v2",
+            "skill-package-intake.v2",
+            "local-check-request.v3",
+            "local-check.v3",
+            "plugin-quality-request.v2",
+            "plugin-quality.v2",
+        }:
+            from skills_sdk.models.intake import SkillPackageIntakeContextV2, SkillPackageIntakeReceiptV2
+            from skills_sdk.models.package import (
+                NormalizedPackageV2,
+                SavedReleasePackageSource,
+                SavedReleaseProvenance,
+                SavedReleaseSnapshot,
+            )
+            from skills_sdk.models.plugin_quality import PluginQualityRequestV2, PluginQualityResultV2
+            from skills_sdk.models.quality_workflow import LocalCheckRequestV3, LocalCheckResultV3
+
+            model = {
+                "saved-release-snapshot.v1": SavedReleaseSnapshot,
+                "saved-release-provenance.v1": SavedReleaseProvenance,
+                "saved-release-package-source.v1": SavedReleasePackageSource,
+                "normalized-package.v2": NormalizedPackageV2,
+                "skill-package-intake-context.v2": SkillPackageIntakeContextV2,
+                "skill-package-intake.v2": SkillPackageIntakeReceiptV2,
+                "local-check-request.v3": LocalCheckRequestV3,
+                "local-check.v3": LocalCheckResultV3,
+                "plugin-quality-request.v2": PluginQualityRequestV2,
+                "plugin-quality.v2": PluginQualityResultV2,
+            }[name]
+        elif name == "package-inventory.v2":
             from skills_sdk.models.inventory import PackageInventoryRecordV2
 
             model = PackageInventoryRecordV2

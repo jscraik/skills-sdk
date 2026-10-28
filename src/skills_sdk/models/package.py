@@ -9,11 +9,13 @@ from typing import Annotated, Literal
 
 from pydantic import ConfigDict, Field, StringConstraints, field_validator, model_validator
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.inventory import (
     GitRevision,
     NonEmptyText,
     PackageId,
     PackageType,
+    PortablePath,
     RightsStatus,
     SourceProvenance,
     _ContractModel,
@@ -177,11 +179,103 @@ class NormalizedPackage(_ContractModel):
         return self
 
 
+class SavedReleaseSnapshot(_ContractModel):
+    """Supplied immutable release binding; neither origin authentication nor admission."""
+
+    model_config = ConfigDict(revalidate_instances="always")
+    schema_version: Literal["saved-release-snapshot/v1"] = "saved-release-snapshot/v1"
+    locator: Annotated[str, StringConstraints(strip_whitespace=False, max_length=2048)]
+    source_id: Annotated[str, StringConstraints(strip_whitespace=False, max_length=200)]
+    release_id: Annotated[str, StringConstraints(strip_whitespace=False, max_length=200)]
+    version: Annotated[str, StringConstraints(strip_whitespace=False, max_length=200)]
+    archive_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    root_candidate: PackageCandidateIdentity
+    root_mode_manifest_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    binding_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+    @field_validator("archive_sha256", "root_mode_manifest_sha256", "binding_sha256", mode="before")
+    @classmethod
+    def digests_are_exact(cls, value: object) -> str:
+        """Reject padding and coercion before shared text normalization."""
+        if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise ValueError("saved release digests require exact lowercase SHA-256")
+        return value
+
+    @field_validator("locator", mode="before")
+    @classmethod
+    def locator_is_public_https(cls, value: object) -> str:
+        """Retain an exact bounded HTTPS locator without credentials, query or fragment."""
+        pattern = r"https://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?/[A-Za-z0-9._~/-]+"
+        if type(value) is not str or re.fullmatch(pattern, value) is None:
+            raise ValueError("saved release requires a canonical credential-free HTTPS locator")
+        if any(part in {".", "..", ""} for part in value.split("/", 3)[-1].split("/")):
+            raise ValueError("saved release locator path must be canonical")
+        return value
+
+    @field_validator("source_id", "release_id", "version", mode="before")
+    @classmethod
+    def release_tokens_are_exact(cls, value: object) -> str:
+        """Reject padded or free-form release identifiers before normalization."""
+        if type(value) is not str or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,199}", value) is None:
+            raise ValueError("saved release identifiers require bounded exact tokens")
+        return value
+
+    @model_validator(mode="after")
+    def binding_is_consistent(self) -> SavedReleaseSnapshot:
+        """Detect changes to a frozen supplied descriptor, not an authenticated forgery."""
+        payload = self.model_dump(mode="json", exclude={"binding_sha256"})
+        if canonical_json_sha256(payload) != self.binding_sha256:
+            raise ValueError("saved release descriptor does not match its binding digest")
+        return self
+
+
+class SavedReleaseProvenance(_ContractModel):
+    """One selected child bound to its containing saved-release snapshot."""
+
+    model_config = ConfigDict(revalidate_instances="always")
+    schema_version: Literal["saved-release-provenance/v1"] = "saved-release-provenance/v1"
+    snapshot: SavedReleaseSnapshot
+    path: PortablePath
+    candidate: PackageCandidateIdentity
+
+    @model_validator(mode="after")
+    def source_revision_matches(self) -> SavedReleaseProvenance:
+        """Keep child identity in the containing snapshot's source revision."""
+        require_path = re.fullmatch(r"skills/[a-z0-9]+(?:[._-][a-z0-9]+)*", self.path)
+        if not require_path or self.candidate.source_revision != self.snapshot.root_candidate.source_revision:
+            raise ValueError("saved child path and revision must bind the whole-plugin snapshot")
+        return self
+
+
+class SavedReleasePackageSource(_ContractModel):
+    """Saved-source representation without a fabricated repository field."""
+
+    schema_version: Literal["saved-release-package-source/v1"] = "saved-release-package-source/v1"
+    package_id: PackageId
+    provenance: SavedReleaseProvenance
+    source_kind: Literal[PackageSourceKind.EXTERNAL] = PackageSourceKind.EXTERNAL
+
+    @model_validator(mode="after")
+    def source_matches_child(self) -> SavedReleasePackageSource:
+        """Retain the exact selected child rather than its whole-plugin digest."""
+        if self.package_id != self.provenance.candidate.package_id:
+            raise ValueError("saved source package must match its selected child")
+        return self
+
+
+class NormalizedPackageV2(NormalizedPackage):
+    """Additive normalized saved-release package; old v1 source stays unchanged."""
+
+    schema_version: Literal["normalized-package/v2"] = "normalized-package/v2"
+    source: SavedReleasePackageSource
+
+
 __all__ = [
     "IntakeChecks",
     "IntakeDecision",
     "IntakeDecisionStatus",
     "NormalizedPackage",
+    "NormalizedPackageV2",
     "OwnershipState",
     "PackageCandidateIdentity",
     "PackageLifecycleState",
@@ -189,5 +283,8 @@ __all__ = [
     "PackageSource",
     "PackageSourceKind",
     "PluginIdentity",
+    "SavedReleasePackageSource",
+    "SavedReleaseProvenance",
+    "SavedReleaseSnapshot",
     "SkillIdentity",
 ]
