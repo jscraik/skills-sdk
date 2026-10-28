@@ -476,6 +476,25 @@ instances cannot bypass the intake boundary or coerce non-boolean checks.
 Repository slugs are checked before whitespace stripping or byte decoding;
 direct model and service callers cannot normalize invalid raw locators.
 
+The unmerged saved-release candidate preserves those v1 restrictions. It adds
+`saved-release-snapshot/v1`, `saved-release-provenance/v1`,
+`saved-release-package-source/v1`, `normalized-package/v2`,
+`skill-package-intake-context/v2` and `skill-package-intake/v2`. Nested quality
+contracts use `local-check-request/v3`, `local-check/v3`,
+`plugin-quality-request/v2` and `plugin-quality/v2`; older families reject the
+new shapes. No candidate identity or original repository-backed context is
+reinterpreted. Source locators remain locators, never fabricated repository
+slugs. A saved-source snapshot revision is not automatically a Git commit.
+
+The maintained quality caller dispatches only explicit versions and preserves
+first-stop ordering, raw boolean checks, owner-text screening and read-only
+source recapture. Local descriptor fingerprints detect inconsistent changes;
+recomputing one does not authenticate a release or refresh external evidence.
+Callers still own independently obtained provenance, rights and remote
+freshness. A source or mode change invalidates the affected binding. New schemas
+advertise required `SchemaRegistry.validate` semantic checks; structural schema
+validation alone cannot establish those comparisons or any live acceptance.
+
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still
 blocked. The corresponding `v1` models and schemas remain unchanged and reject

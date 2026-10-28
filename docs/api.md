@@ -945,6 +945,47 @@ spending. See [CLI input boundaries](cli.md#matched-evaluation) and
 
 ## Read-only intake
 
+### Saved-release source candidate
+
+The local saved-release implementation uses explicit new families rather than
+relaxing repository-backed intake. `SavedReleaseSnapshot` records a canonical
+HTTPS locator, source and release IDs, version, archive SHA-256, whole-plugin
+candidate and mode digest. Its `binding_sha256` is the canonical JSON digest of
+all its other fields, including `schema_version`. This detects inconsistent
+changes to a supplied descriptor; anyone can recompute it. It authenticates
+neither an issuer nor current remote state. A snapshot revision may identify a
+documented saved source state; it must not be described as an authoring Git
+commit unless that provenance was independently established.
+
+`SavedReleaseProvenance` adds the selected child path and candidate.
+`SkillPackageIntakeContextV2` uses `source`, `owner` and `checks`, with no
+`source_repository` field. `intake_skill_package` accepts this explicit context
+version and returns `skill-package-intake/v2` with a
+`saved-release-package-source/v1` and `normalized-package/v2`. It freshly
+captures the child and rejects a changed candidate. A normalized source can
+still have a blocked admission decision; supplied false checks remain false.
+
+For whole-plugin quality, `PluginQualityRequestV2` adds `source_snapshot` and
+uses `LocalCheckRequestV3` children containing the new intake context. The
+existing `check_plugin_quality` service and `check-plugin-quality` CLI dispatch
+on `plugin-quality-request/v2` and retain `plugin-quality/v2` output, with
+`local-check/v3` child results. Root identity, modes, manifest version and every
+selected child must agree before child checks. Existing validation, admission,
+scenario, scorer, content and presentation gates still apply. Unparseable input
+retains the existing generic blocked-output convention.
+
+These are local implementation candidates, not accepted release or live-provider
+proof. `SchemaRegistry.validate` applies model semantics to the new resources;
+plain JSON Schema cannot compare fingerprints and candidate bindings. Neither
+representation nor successful quality composition grants execution, publication,
+rights, authenticated-review or installation authority. The original intake v1,
+local-quality v2 and plugin-quality v1 contracts remain unchanged and reject
+these new versioned shapes. The standalone `intake` and `check-local` CLI routes
+continue to require their original v1 context; use the versioned quality route
+or the public intake API for saved-source inspection.
+
+### Repository-backed intake
+
 `source_repository` accepts a credential-free `owner/repository` slug, not a
 URL or a local checkout path. Raw intake checks must be actual booleans.
 Existing `IntakeChecks` instances are accepted using their current boolean
