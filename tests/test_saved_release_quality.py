@@ -22,6 +22,7 @@ from skills_sdk.models.intake import (
     SkillPackageIntakeContextV2,
     SkillPackageIntakeReceiptV2,
 )
+from skills_sdk.models.package import NormalizedPackageV2
 from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityRequestV2, PluginQualityResultV2
 
 
@@ -278,7 +279,8 @@ def test_saved_result_schemas_reject_inconsistent_decisions(tmp_path: Path, sche
 @pytest.mark.parametrize(
     "schema_name", ["normalized-package.v2", "skill-package-intake.v2", "local-check.v3", "plugin-quality.v2"]
 )
-def test_saved_result_schemas_reject_normalized_type_mismatch(tmp_path: Path, schema_name: str) -> None:
+@pytest.mark.parametrize("defect", ["mismatch", "missing_discriminator"])
+def test_saved_result_schemas_reject_normalized_type_mismatch(tmp_path: Path, schema_name: str, defect: str) -> None:
     """Package type agreement is structural even when other bindings need models."""
     root, request, _, _ = saved_request(tmp_path)
     child = request["children"][0]
@@ -289,5 +291,10 @@ def test_saved_result_schemas_reject_normalized_type_mismatch(tmp_path: Path, sc
         schema = {"$defs": schema["$defs"], "$ref": "#/$defs/NormalizedPackageV2"}
     validator = Draft202012Validator(schema)
     assert validator.is_valid(normalized)
-    normalized["package_type"] = "plugin" if normalized["package_type"] == "skill" else "skill"
+    if defect == "mismatch":
+        normalized["package_type"] = "plugin" if normalized["package_type"] == "skill" else "skill"
+    else:
+        del normalized["identity"]["package_type"]
+    with pytest.raises(ValidationError):
+        NormalizedPackageV2.model_validate(normalized)
     assert not validator.is_valid(normalized)

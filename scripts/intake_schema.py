@@ -14,7 +14,7 @@ def append_intake_family_constraints(schema: dict[str, Any], filename: str) -> N
     }:
         append_intake_constraints(schema, normalized_name="NormalizedPackageV2")
     elif filename == "normalized-package.v2.schema.json":
-        schema["allOf"] = _normalized_type_constraints()
+        schema["allOf"] = _normalized_type_constraints(require_discriminator=True)
     if filename in {
         "saved-release-snapshot.v1.schema.json",
         "saved-release-provenance.v1.schema.json",
@@ -56,7 +56,9 @@ def append_intake_constraints(schema: dict[str, Any], normalized_name: str = "No
             "else": {"properties": {"blocker_codes": {"minItems": 1}}, "required": ["blocker_codes"]},
         }
     ]
-    definitions[normalized_name]["allOf"] = _normalized_type_constraints()
+    definitions[normalized_name]["allOf"] = _normalized_type_constraints(
+        require_discriminator=normalized_name == "NormalizedPackageV2"
+    )
     schema["x-skills-sdk-semantic-validation"] = {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
         "required_for": [
@@ -67,12 +69,19 @@ def append_intake_constraints(schema: dict[str, Any], normalized_name: str = "No
     }
 
 
-def _normalized_type_constraints() -> list[dict[str, Any]]:
+def _normalized_type_constraints(*, require_discriminator: bool = False) -> list[dict[str, Any]]:
     """Express the local package and identity type agreement for either shape."""
     return [
         {
             "if": {"properties": {"package_type": {"const": package_type}}, "required": ["package_type"]},
-            "then": {"properties": {"identity": {"properties": {"package_type": {"const": package_type}}}}},
+            "then": {
+                "properties": {
+                    "identity": {
+                        "properties": {"package_type": {"const": package_type}},
+                        **({"required": ["package_type"]} if require_discriminator else {}),
+                    }
+                }
+            },
         }
         for package_type in ("skill", "plugin")
     ]

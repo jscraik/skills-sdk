@@ -829,7 +829,10 @@
                   "package_type": {
                     "const": "skill"
                   }
-                }
+                },
+                "required": [
+                  "package_type"
+                ]
               }
             }
           }
@@ -852,7 +855,10 @@
                   "package_type": {
                     "const": "plugin"
                   }
-                }
+                },
+                "required": [
+                  "package_type"
+                ]
               }
             }
           }
