@@ -11,4 +11,4 @@ build/
 # SDK receipts and provider runs are runtime output, never public source.
 .harness/
 .tmp/
-test-results/
+/test-results/

@@ -145,10 +145,10 @@ def _eval_security_text(text: str) -> str:
     """Exclude only closed, explicit refusal prompts; malformed input scans raw."""
     import yaml
 
-    from skills_sdk.validation.safe_yaml import _ClosedLoader
+    from skills_sdk.validation.yaml_cache import load_closed_yaml
 
     try:
-        payload = yaml.load(text, Loader=_ClosedLoader)
+        payload = load_closed_yaml(text)
     except (yaml.YAMLError, ValueError, TypeError, RecursionError):
         return text
     if not isinstance(payload, dict) or not isinstance(payload.get("cases"), list):
