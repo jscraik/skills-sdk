@@ -35,6 +35,11 @@ paths and environment changes remain worker-local. Package builds and installed
 smokes remain sequential after tests. Runtime source recapture, calibration,
 drift, failure and recovery checks are not cached or removed for speed.
 
+Both test routes write JUnit results under `test-results/`. CircleCI uploads
+these results to expose per-test timings and failures in its Tests tab. The XML
+includes test file names for timing-based splitting. Test uploads do not enable
+test selection, automatic retries or additional parallel containers.
+
 The documentation-only route is
 `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`.
 It runs schema drift, all codestyle/structural/link/prose checks, documentation-dependent
