@@ -1,0 +1,961 @@
+{
+  "$defs": {
+    "ArchivePackageSource": {
+      "additionalProperties": false,
+      "description": "Represent archive acquisition without repository or remote identifiers.",
+      "properties": {
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArchiveSourceProvenance"
+        },
+        "schema_version": {
+          "const": "archive-package-source/v1",
+          "default": "archive-package-source/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_kind": {
+          "const": "archive",
+          "default": "archive",
+          "title": "Source Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "provenance"
+      ],
+      "title": "ArchivePackageSource",
+      "type": "object"
+    },
+    "ArchiveSourceProvenance": {
+      "additionalProperties": false,
+      "description": "One child bound to a local archive snapshot, not a saved release.",
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "archive-source-provenance/v1",
+          "default": "archive-source-provenance/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ArchiveSourceSnapshot"
+        }
+      },
+      "required": [
+        "snapshot",
+        "path",
+        "candidate"
+      ],
+      "title": "ArchiveSourceProvenance",
+      "type": "object"
+    },
+    "ArchiveSourceSnapshot": {
+      "additionalProperties": false,
+      "description": "Local recovery binding, explicitly without upstream release identity.",
+      "properties": {
+        "acquisition": {
+          "const": "user-supplied-recovery",
+          "default": "user-supplied-recovery",
+          "title": "Acquisition",
+          "type": "string"
+        },
+        "archive_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Archive Sha256",
+          "type": "string"
+        },
+        "binding_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Binding Sha256",
+          "type": "string"
+        },
+        "root_candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "root_mode_manifest_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Root Mode Manifest Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "archive-source-snapshot/v1",
+          "default": "archive-source-snapshot/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "upstream_release": {
+          "default": null,
+          "title": "Upstream Release",
+          "type": "null"
+        },
+        "version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "archive_sha256",
+        "root_candidate",
+        "root_mode_manifest_sha256",
+        "binding_sha256"
+      ],
+      "title": "ArchiveSourceSnapshot",
+      "type": "object"
+    },
+    "IntakeChecks": {
+      "additionalProperties": false,
+      "description": "Boolean proof lanes required before canonical admission.",
+      "properties": {
+        "identity": {
+          "title": "Identity",
+          "type": "boolean"
+        },
+        "owner_unchanged": {
+          "title": "Owner Unchanged",
+          "type": "boolean"
+        },
+        "provenance": {
+          "title": "Provenance",
+          "type": "boolean"
+        },
+        "rights": {
+          "title": "Rights",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "identity",
+        "provenance",
+        "rights",
+        "owner_unchanged"
+      ],
+      "title": "IntakeChecks",
+      "type": "object"
+    },
+    "IntakeDecision": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "blocker_codes": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "blocker_codes"
+            ]
+          },
+          "if": {
+            "properties": {
+              "decision": {
+                "const": "admit"
+              }
+            },
+            "required": [
+              "decision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "blocker_codes": {
+                "maxItems": 0
+              },
+              "checks": {
+                "properties": {
+                  "identity": {
+                    "const": true
+                  },
+                  "owner_unchanged": {
+                    "const": true
+                  },
+                  "provenance": {
+                    "const": true
+                  },
+                  "rights": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Candidate-bound admission result with typed, explicit blockers.",
+      "properties": {
+        "blocker_codes": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Blocker Codes",
+          "type": "array"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "checks": {
+          "$ref": "#/$defs/IntakeChecks"
+        },
+        "decision": {
+          "$ref": "#/$defs/IntakeDecisionStatus"
+        },
+        "schema_version": {
+          "const": "intake-decision/v1",
+          "default": "intake-decision/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "decision",
+        "checks"
+      ],
+      "title": "IntakeDecision",
+      "type": "object"
+    },
+    "IntakeDecisionStatus": {
+      "description": "Explicit intake result with no implicit waiver path.",
+      "enum": [
+        "admit",
+        "block",
+        "reject",
+        "needs_owner_decision"
+      ],
+      "title": "IntakeDecisionStatus",
+      "type": "string"
+    },
+    "NormalizedPackageV3": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "package_type": {
+                "const": "skill"
+              }
+            },
+            "required": [
+              "package_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "package_type": {
+                    "const": "skill"
+                  }
+                },
+                "required": [
+                  "package_type"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "package_type": {
+                "const": "plugin"
+              }
+            },
+            "required": [
+              "package_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "identity": {
+                "properties": {
+                  "package_type": {
+                    "const": "plugin"
+                  }
+                },
+                "required": [
+                  "package_type"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "description": "Archive-backed normalization with unchanged admission semantics.",
+      "properties": {
+        "dependencies": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "identity": {
+          "discriminator": {
+            "mapping": {
+              "plugin": "#/$defs/PluginIdentity",
+              "skill": "#/$defs/SkillIdentity"
+            },
+            "propertyName": "package_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SkillIdentity"
+            },
+            {
+              "$ref": "#/$defs/PluginIdentity"
+            }
+          ],
+          "title": "Identity"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/PackageLifecycleState",
+          "default": "normalized"
+        },
+        "owner": {
+          "$ref": "#/$defs/PackageOwner"
+        },
+        "package_type": {
+          "$ref": "#/$defs/PackageType"
+        },
+        "schema_version": {
+          "const": "normalized-package/v3",
+          "default": "normalized-package/v3",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ArchivePackageSource"
+        }
+      },
+      "required": [
+        "package_type",
+        "identity",
+        "source",
+        "owner"
+      ],
+      "title": "NormalizedPackageV3",
+      "type": "object"
+    },
+    "OwnershipState": {
+      "description": "Ownership posture at intake; it is not a runtime state.",
+      "enum": [
+        "canonical",
+        "transitional",
+        "external"
+      ],
+      "title": "OwnershipState",
+      "type": "string"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageFileRole": {
+      "description": "The portable role of a file included in a package manifest.",
+      "enum": [
+        "skill_md",
+        "readme",
+        "reference",
+        "script",
+        "asset",
+        "eval"
+      ],
+      "title": "PackageFileRole",
+      "type": "string"
+    },
+    "PackageLifecycleState": {
+      "description": "Portable lifecycle state for a normalized package candidate.",
+      "enum": [
+        "discovered",
+        "normalized",
+        "admitted",
+        "blocked",
+        "retired"
+      ],
+      "title": "PackageLifecycleState",
+      "type": "string"
+    },
+    "PackageManifestFile": {
+      "additionalProperties": false,
+      "description": "One immutable file entry in a package manifest.",
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/PackageFileRole"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "role"
+      ],
+      "title": "PackageManifestFile",
+      "type": "object"
+    },
+    "PackageOwner": {
+      "additionalProperties": false,
+      "description": "Canonical ownership and rights evidence for one package candidate.",
+      "properties": {
+        "maintainer": {
+          "minLength": 1,
+          "title": "Maintainer",
+          "type": "string"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "ownership_state": {
+          "$ref": "#/$defs/OwnershipState"
+        },
+        "rights": {
+          "$ref": "#/$defs/RightsStatus"
+        },
+        "schema_version": {
+          "const": "package-owner/v1",
+          "default": "package-owner/v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "maintainer",
+        "ownership_state",
+        "rights"
+      ],
+      "title": "PackageOwner",
+      "type": "object"
+    },
+    "PackageReceiptBlocker": {
+      "additionalProperties": false,
+      "description": "Stable typed blocker details for a package proof receipt.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageReceiptBlocker",
+      "type": "object"
+    },
+    "PackageType": {
+      "description": "Canonical package categories admitted by the Foundry.",
+      "enum": [
+        "skill",
+        "plugin"
+      ],
+      "title": "PackageType",
+      "type": "string"
+    },
+    "PluginIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Plugins identity, independent of a client adapter.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "plugin",
+          "default": "plugin",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "plugin-identity/v1",
+          "default": "plugin-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "PluginIdentity",
+      "type": "object"
+    },
+    "RightsStatus": {
+      "additionalProperties": false,
+      "description": "Rights evidence required before canonical admission.",
+      "properties": {
+        "basis": {
+          "enum": [
+            "authored",
+            "license",
+            "permission"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "license": {
+          "minLength": 1,
+          "title": "License",
+          "type": "string"
+        }
+      },
+      "required": [
+        "basis",
+        "license",
+        "evidence_ref"
+      ],
+      "title": "RightsStatus",
+      "type": "object"
+    },
+    "SkillIdentity": {
+      "additionalProperties": false,
+      "description": "Agent Skills identity, independent of runtime installation.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "package_type": {
+          "const": "skill",
+          "default": "skill",
+          "title": "Package Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "skill-identity/v1",
+          "default": "skill-identity/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "name",
+        "version"
+      ],
+      "title": "SkillIdentity",
+      "type": "object"
+    },
+    "SkillPackageFinding": {
+      "additionalProperties": false,
+      "description": "One stable, evidence-bound standalone-skill finding.",
+      "properties": {
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?!.*[\\r\\n])(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/ValidationSeverity"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "title": "SkillPackageFinding",
+      "type": "object"
+    },
+    "SkillPackageIntakeContextV3": {
+      "additionalProperties": false,
+      "description": "Local recovery archive with no claimed upstream release metadata.",
+      "properties": {
+        "checks": {
+          "$ref": "#/$defs/IntakeChecks"
+        },
+        "owner": {
+          "$ref": "#/$defs/PackageOwner",
+          "properties": {
+            "maintainer": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "owner": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "rights": {
+              "properties": {
+                "license": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "schema_version": {
+          "const": "skill-package-intake-context/v3",
+          "default": "skill-package-intake-context/v3",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ArchiveSourceProvenance"
+        }
+      },
+      "required": [
+        "source",
+        "owner",
+        "checks"
+      ],
+      "title": "SkillPackageIntakeContextV3",
+      "type": "object"
+    },
+    "SkillPackageValidation": {
+      "additionalProperties": false,
+      "description": "Read-only structural result for one standalone skill candidate.",
+      "properties": {
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageCandidateIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "files": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageManifestFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "findings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SkillPackageFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "skill-package-validation/v1",
+          "default": "skill-package-validation/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SkillPackageValidation",
+      "type": "object"
+    },
+    "ValidationSeverity": {
+      "description": "Whether a finding blocks immutable candidate construction.",
+      "enum": [
+        "warning",
+        "blocker"
+      ],
+      "title": "ValidationSeverity",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/skill-package-intake.v3.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Archive intake retains the same source binding and fail-closed admission.",
+  "properties": {
+    "blocker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageReceiptBlocker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "context": {
+      "$ref": "#/$defs/SkillPackageIntakeContextV3"
+    },
+    "decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IntakeDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "execution_performed": {
+      "const": false,
+      "default": false,
+      "title": "Execution Performed",
+      "type": "boolean"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "network_used": {
+      "const": false,
+      "default": false,
+      "title": "Network Used",
+      "type": "boolean"
+    },
+    "normalized_package": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NormalizedPackageV3"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "properties": {
+        "owner": {
+          "properties": {
+            "maintainer": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "owner": {
+              "not": {
+                "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+              },
+              "type": "string"
+            },
+            "rights": {
+              "properties": {
+                "license": {
+                  "not": {
+                    "pattern": "(?:^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA][A-Za-z0-9_-]{35}|[aA][kK][iI][aA][A-Za-z0-9]{16}|[bB][eE][aA][rR][eE][rR]\\s+\\S+|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bBpP]-|(?:[aA][pP][iI][_-]?[kK][eE][yY]|[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL])[\\\"']?\\s*[:=])|-----BEGIN[ A-Z]* PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\\s]*@|[fF][iI][lL][eE]://|(?:^|[\\s(=:\\\"'])(?:/(?!/)[^\\s]|[A-Za-z]:[\\\\/])|\\\\\\\\|~[\\\\/]|\\$(?:\\{)?(?:HOME|USER|USERPROFILE)(?:\\})?[\\\\/]|%(?:HOME|USER|USERPROFILE)%[\\\\/]"
+                  },
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schema_version": {
+      "const": "skill-package-intake/v3",
+      "default": "skill-package-intake/v3",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArchivePackageSource"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "status": {
+      "enum": [
+        "normalized",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "validation": {
+      "$ref": "#/$defs/SkillPackageValidation"
+    }
+  },
+  "required": [
+    "status",
+    "context",
+    "validation"
+  ],
+  "title": "SkillPackageIntakeReceiptV3",
+  "type": "object",
+  "x-skills-sdk-semantic-validation": {
+    "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",
+    "required_for": [
+      "saved descriptor fingerprint, root, mode, revision and selected-child bindings",
+      "ordered quality receipts and unchanged source captures",
+      "admission decisions preserve supplied checks without authenticating provenance"
+    ]
+  }
+}

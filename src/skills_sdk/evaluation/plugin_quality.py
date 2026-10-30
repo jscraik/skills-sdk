@@ -18,8 +18,10 @@ from skills_sdk.models.plugin_quality import (
     PLUGIN_QUALITY_REQUEST_MAX_BYTES,
     PluginQualityRequest,
     PluginQualityRequestV2,
+    PluginQualityRequestV3,
     PluginQualityResult,
     PluginQualityResultV2,
+    PluginQualityResultV3,
     _capture_metadata_is_safe,
     _child_metadata_is_safe,
     _presentation_metadata_is_safe,
@@ -103,9 +105,13 @@ def _block(code: str, **evidence: object) -> PluginQualityResult:
         return _block("plugin_quality_input_invalid")
     try:
         model = (
-            PluginQualityResultV2
-            if isinstance(evidence.get("request"), PluginQualityRequestV2)
-            else PluginQualityResult
+            PluginQualityResultV3
+            if isinstance(evidence.get("request"), PluginQualityRequestV3)
+            else (
+                PluginQualityResultV2
+                if isinstance(evidence.get("request"), PluginQualityRequestV2)
+                else PluginQualityResult
+            )
         )
         return model.model_validate(envelope)
     except ValueError:
@@ -136,8 +142,11 @@ async def _check_plugin_quality(
                 return _block("plugin_quality_input_invalid")
         payload = PluginQualityRequest.canonical_inputs(request)
         model = (
-            PluginQualityRequestV2
-            if isinstance(payload, dict) and payload.get("schema_version") == "plugin-quality-request/v2"
+            {
+                "plugin-quality-request/v2": PluginQualityRequestV2,
+                "plugin-quality-request/v3": PluginQualityRequestV3,
+            }.get(payload.get("schema_version"), PluginQualityRequest)
+            if isinstance(payload, dict)
             else PluginQualityRequest
         )
         selected = model.model_validate(payload)
@@ -206,7 +215,11 @@ async def _check_plugin_quality(
     if not _public_envelope_is_safe(envelope):
         return _block("plugin_quality_input_invalid")
     try:
-        model = PluginQualityResultV2 if isinstance(selected, PluginQualityRequestV2) else PluginQualityResult
+        model = (
+            PluginQualityResultV3
+            if isinstance(selected, PluginQualityRequestV3)
+            else (PluginQualityResultV2 if isinstance(selected, PluginQualityRequestV2) else PluginQualityResult)
+        )
         return model.model_validate(envelope)
     except ValueError:
         return _block("plugin_quality_input_invalid")

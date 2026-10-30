@@ -476,7 +476,17 @@ instances cannot bypass the intake boundary or coerce non-boolean checks.
 Repository slugs are checked before whitespace stripping or byte decoding;
 direct model and service callers cannot normalize invalid raw locators.
 
-The unmerged saved-release candidate preserves those v1 restrictions. It adds
+The local archive-source repair adds `archive-source-snapshot/v1`,
+`archive-source-provenance/v1`, `archive-package-source/v1`,
+`normalized-package/v3`, `skill-package-intake-context/v3`,
+`skill-package-intake/v3`, `local-check-request/v4`, `local-check/v4`,
+`plugin-quality-request/v3` and `plugin-quality/v3`. Unknown upstream release
+identity stays null; old saved-release and repository contracts reject these
+new shapes. The archive source reuses maintained read-only callers and does not
+grant admission, provider, registry or installation authority. The repair
+requires its own schema, focused, full-validation and delivery proof.
+
+The saved-release candidate preserves those v1 restrictions. It adds
 `saved-release-snapshot/v1`, `saved-release-provenance/v1`,
 `saved-release-package-source/v1`, `normalized-package/v2`,
 `skill-package-intake-context/v2` and `skill-package-intake/v2`. Nested quality

@@ -945,6 +945,34 @@ spending. See [CLI input boundaries](cli.md#matched-evaluation) and
 
 ## Read-only intake
 
+### Local recovery archive candidate
+
+The local repair adds explicit archive-source families for user-supplied recovery
+inputs whose upstream release identity is unknown. `ArchiveSourceSnapshot` binds
+the supplied archive SHA-256, plugin version, whole-plugin candidate and modes;
+`acquisition` is `user-supplied-recovery` and `upstream_release` is null. Its
+canonical `binding_sha256` checks descriptor consistency, not archive origin or
+issuer authority. The caller retains acquisition paths and owner decisions in
+private task evidence, outside portable receipts. No repository, HTTPS locator
+or remote release identifier is fabricated.
+
+`ArchiveSourceProvenance` binds the selected child to that snapshot.
+`SkillPackageIntakeContextV3` and `skill-package-intake/v3` use it through the
+existing `intake_skill_package` service. `PluginQualityRequestV3` uses
+`local-check-request/v4` children and the existing `check-plugin-quality` CLI;
+results are `plugin-quality/v3` with `local-check/v4` children. Source is freshly
+recaptured; whole-plugin version, modes, selected child and snapshot agreement
+remain mandatory. Supplied false admission checks still stop the workflow.
+
+These are local repair contracts pending full validation and delivery. They do
+not establish that an attached archive came from a saved platform release.
+Archive digest consistency does not verify the original ZIP against its source
+tree; the acquisition boundary must retain that mapping. A caller cannot make
+an unknown issuer authentic by recomputing a binding digest. Owner assertions,
+trusted safety ingress, semantic review, evaluation, publication and installed
+runtime proof remain separate. Existing repository and saved-release versions
+retain their original restrictions.
+
 ### Saved-release source candidate
 
 The local saved-release implementation uses explicit new families rather than

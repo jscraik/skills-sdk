@@ -16,10 +16,13 @@ from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.quality_workflow import (
     LocalCheckRequestV2,
     LocalCheckRequestV3,
+    LocalCheckRequestV4,
     LocalCheckResultV2,
     LocalCheckResultV3,
+    LocalCheckResultV4,
     LocalQualityStage,
     LocalQualityStageV2,
+    LocalQualityStageV3,
     QualityStageName,
     QualityStageReceipt,
 )
@@ -31,7 +34,11 @@ def _blocked(
     request: LocalCheckRequestV2 | None, stages: list[LocalQualityStage], stage: str, code: str
 ) -> LocalCheckResultV2:
     """Return portable orchestration failure without host paths or exception text."""
-    result_model = LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2
+    result_model = (
+        LocalCheckResultV4
+        if isinstance(request, LocalCheckRequestV4)
+        else (LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2)
+    )
     return result_model(
         status="blocked",
         request=request,
@@ -48,7 +55,11 @@ def _record(
     request: LocalCheckRequestV2, stages: list[LocalQualityStage], name: QualityStageName, receipt: QualityStageReceipt
 ) -> LocalCheckResultV2 | None:
     """Stop at the first changed candidate or incomplete stage; retain its receipt."""
-    stage_model = LocalQualityStageV2 if isinstance(request, LocalCheckRequestV3) else LocalQualityStage
+    stage_model = (
+        LocalQualityStageV3
+        if isinstance(request, LocalCheckRequestV4)
+        else (LocalQualityStageV2 if isinstance(request, LocalCheckRequestV3) else LocalQualityStage)
+    )
     stage = stage_model(name=name, receipt=receipt)
     stages.append(stage)
     candidate = request.update_baseline if name == "baseline" else request.candidate
@@ -96,7 +107,11 @@ def _final_result(
             and baseline.status == "pass"
             and baseline.candidate == request.update_baseline
         )
-    result_model = LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2
+    result_model = (
+        LocalCheckResultV4
+        if isinstance(request, LocalCheckRequestV4)
+        else (LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2)
+    )
     return result_model(
         status="local_checks_passed" if unchanged else "blocked",
         request=request,
@@ -129,8 +144,11 @@ async def check_local_quality(
     try:
         payload = LocalCheckRequestV2.inputs_are_revalidated(request)
         model = (
-            LocalCheckRequestV3
-            if isinstance(payload, dict) and payload.get("schema_version") == "local-check-request/v3"
+            {
+                "local-check-request/v3": LocalCheckRequestV3,
+                "local-check-request/v4": LocalCheckRequestV4,
+            }.get(payload.get("schema_version"), LocalCheckRequestV2)
+            if isinstance(payload, dict)
             else LocalCheckRequestV2
         )
         selected = model.model_validate(payload)

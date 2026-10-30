@@ -15,7 +15,25 @@ def append_intake_family_constraints(schema: dict[str, Any], filename: str) -> N
         append_intake_constraints(schema, normalized_name="NormalizedPackageV2")
     elif filename == "normalized-package.v2.schema.json":
         schema["allOf"] = _normalized_type_constraints(require_discriminator=True)
+    elif filename in {
+        "skill-package-intake.v3.schema.json",
+        "local-check.v4.schema.json",
+        "plugin-quality.v3.schema.json",
+    }:
+        append_intake_constraints(schema, normalized_name="NormalizedPackageV3")
+    elif filename == "normalized-package.v3.schema.json":
+        schema["allOf"] = _normalized_type_constraints(require_discriminator=True)
     if filename in {
+        "archive-source-snapshot.v1.schema.json",
+        "archive-source-provenance.v1.schema.json",
+        "archive-package-source.v1.schema.json",
+        "normalized-package.v3.schema.json",
+        "skill-package-intake-context.v3.schema.json",
+        "skill-package-intake.v3.schema.json",
+        "local-check-request.v4.schema.json",
+        "local-check.v4.schema.json",
+        "plugin-quality-request.v3.schema.json",
+        "plugin-quality.v3.schema.json",
         "saved-release-snapshot.v1.schema.json",
         "saved-release-provenance.v1.schema.json",
         "saved-release-package-source.v1.schema.json",
@@ -57,7 +75,7 @@ def append_intake_constraints(schema: dict[str, Any], normalized_name: str = "No
         }
     ]
     definitions[normalized_name]["allOf"] = _normalized_type_constraints(
-        require_discriminator=normalized_name == "NormalizedPackageV2"
+        require_discriminator=normalized_name in {"NormalizedPackageV2", "NormalizedPackageV3"}
     )
     schema["x-skills-sdk-semantic-validation"] = {
         "entrypoint": "skills_sdk.core.schema_registry.SchemaRegistry.validate",

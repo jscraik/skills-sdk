@@ -13,11 +13,14 @@ from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import MAX_JSON_NESTING_DEPTH
 from skills_sdk.models.inventory import GitRevision, NonEmptyText, PortablePath, _ContractModel
 from skills_sdk.models.package import (
+    ArchivePackageSource,
+    ArchiveSourceProvenance,
     IntakeChecks,
     IntakeDecision,
     IntakeDecisionStatus,
     NormalizedPackage,
     NormalizedPackageV2,
+    NormalizedPackageV3,
     PackageCandidateIdentity,
     PackageLifecycleState,
     PackageOwner,
@@ -357,10 +360,30 @@ class SkillPackageIntakeReceiptV2(SkillPackageIntakeReceipt):
             raise ValueError("saved intake source must match the selected child and context")
 
 
+class SkillPackageIntakeContextV3(SkillPackageIntakeContextV2):
+    """Local recovery archive with no claimed upstream release metadata."""
+
+    schema_version: Literal["skill-package-intake-context/v3"] = "skill-package-intake-context/v3"
+    source: ArchiveSourceProvenance
+
+
+class SkillPackageIntakeReceiptV3(SkillPackageIntakeReceiptV2):
+    """Archive intake retains the same source binding and fail-closed admission."""
+
+    schema_version: Literal["skill-package-intake/v3"] = "skill-package-intake/v3"
+    context: SkillPackageIntakeContextV3
+    source: ArchivePackageSource | None = None
+    normalized_package: NormalizedPackageV3 | None = Field(
+        default=None, json_schema_extra={"properties": {"owner": _OWNER_PUBLIC_SCHEMA}}
+    )
+
+
 __all__ = [
     "SkillPackageIntakeContext",
     "SkillPackageIntakeContextV2",
+    "SkillPackageIntakeContextV3",
     "SkillPackageIntakeReceipt",
     "SkillPackageIntakeReceiptV2",
+    "SkillPackageIntakeReceiptV3",
     "build_intake_decision",
 ]

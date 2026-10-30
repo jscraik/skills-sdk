@@ -7,13 +7,17 @@ from pathlib import Path
 from skills_sdk.models.intake import (
     SkillPackageIntakeContext,
     SkillPackageIntakeContextV2,
+    SkillPackageIntakeContextV3,
     SkillPackageIntakeReceipt,
     SkillPackageIntakeReceiptV2,
+    SkillPackageIntakeReceiptV3,
     build_intake_decision,
 )
 from skills_sdk.models.package import (
+    ArchivePackageSource,
     NormalizedPackage,
     NormalizedPackageV2,
+    NormalizedPackageV3,
     PackageLifecycleState,
     PackageSource,
     SavedReleasePackageSource,
@@ -31,12 +35,25 @@ def intake_skill_package(
 ) -> SkillPackageIntakeReceipt | SkillPackageIntakeReceiptV2:
     """Validate and normalize one package without copying, executing, or admitting it."""
 
-    saved = type(context) is SkillPackageIntakeContextV2 or (
-        type(context) is dict and context.get("schema_version") == "skill-package-intake-context/v2"
+    archive = type(context) is SkillPackageIntakeContextV3 or (
+        type(context) is dict and context.get("schema_version") == "skill-package-intake-context/v3"
     )
-    context_model = SkillPackageIntakeContextV2 if saved else SkillPackageIntakeContext
+    saved = (
+        archive
+        or type(context) is SkillPackageIntakeContextV2
+        or (type(context) is dict and context.get("schema_version") == "skill-package-intake-context/v2")
+    )
+    context_model = (
+        SkillPackageIntakeContextV3
+        if archive
+        else (SkillPackageIntakeContextV2 if saved else SkillPackageIntakeContext)
+    )
     context = context_model.model_validate(dict(context))
-    receipt_model = SkillPackageIntakeReceiptV2 if saved else SkillPackageIntakeReceipt
+    receipt_model = (
+        SkillPackageIntakeReceiptV3
+        if archive
+        else (SkillPackageIntakeReceiptV2 if saved else SkillPackageIntakeReceipt)
+    )
     validation = validate_skill_package(package_root, source_revision=context.source_revision, policy=policy)
     if saved and validation.status == "pass" and validation.candidate != context.source.candidate:
         validation = SkillPackageValidation.model_validate(
@@ -76,7 +93,9 @@ def intake_skill_package(
     assert validation.candidate is not None
     assert validation.identity is not None
     source = (
-        SavedReleasePackageSource(package_id=validation.candidate.package_id, provenance=context.source)
+        (ArchivePackageSource if archive else SavedReleasePackageSource)(
+            package_id=validation.candidate.package_id, provenance=context.source
+        )
         if saved
         else PackageSource(
             package_id=validation.candidate.package_id,
@@ -90,7 +109,7 @@ def intake_skill_package(
         )
     )
     decision = build_intake_decision(validation.candidate, context.checks)
-    normalized_model = NormalizedPackageV2 if saved else NormalizedPackage
+    normalized_model = NormalizedPackageV3 if archive else (NormalizedPackageV2 if saved else NormalizedPackage)
     normalized = normalized_model(
         package_type="skill",
         identity=validation.identity,

@@ -229,6 +229,39 @@ class SavedReleaseSnapshot(_ContractModel):
         return self
 
 
+class ArchiveSourceSnapshot(_ContractModel):
+    """Local recovery binding, explicitly without upstream release identity."""
+
+    model_config = ConfigDict(revalidate_instances="always")
+    schema_version: Literal["archive-source-snapshot/v1"] = "archive-source-snapshot/v1"
+    acquisition: Literal["user-supplied-recovery"] = "user-supplied-recovery"
+    upstream_release: None = None
+    version: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$")]
+    archive_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    root_candidate: PackageCandidateIdentity
+    root_mode_manifest_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    binding_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def exact_version(cls, value: object) -> str:
+        """Do not normalise a malformed supplied version into acceptance."""
+        return SavedReleaseSnapshot.release_tokens_are_exact(value)
+
+    @field_validator("archive_sha256", "root_mode_manifest_sha256", "binding_sha256", mode="before")
+    @classmethod
+    def exact_digest(cls, value: object) -> str:
+        """Retain exact digest checks without claiming archive authentication."""
+        return SavedReleaseSnapshot.digests_are_exact(value)
+
+    @model_validator(mode="after")
+    def binding_is_consistent(self) -> ArchiveSourceSnapshot:
+        """Check descriptor consistency; the caller still establishes provenance."""
+        if canonical_json_sha256(self.model_dump(mode="json", exclude={"binding_sha256"})) != self.binding_sha256:
+            raise ValueError("archive descriptor does not match its binding digest")
+        return self
+
+
 class SavedReleaseProvenance(_ContractModel):
     """One selected child bound to its containing saved-release snapshot."""
 
@@ -270,12 +303,38 @@ class NormalizedPackageV2(NormalizedPackage):
     source: SavedReleasePackageSource
 
 
+class ArchiveSourceProvenance(SavedReleaseProvenance):
+    """One child bound to a local archive snapshot, not a saved release."""
+
+    schema_version: Literal["archive-source-provenance/v1"] = "archive-source-provenance/v1"
+    snapshot: ArchiveSourceSnapshot
+
+
+class ArchivePackageSource(SavedReleasePackageSource):
+    """Represent archive acquisition without repository or remote identifiers."""
+
+    schema_version: Literal["archive-package-source/v1"] = "archive-package-source/v1"
+    provenance: ArchiveSourceProvenance
+    source_kind: Literal[PackageSourceKind.ARCHIVE] = PackageSourceKind.ARCHIVE
+
+
+class NormalizedPackageV3(NormalizedPackageV2):
+    """Archive-backed normalization with unchanged admission semantics."""
+
+    schema_version: Literal["normalized-package/v3"] = "normalized-package/v3"
+    source: ArchivePackageSource
+
+
 __all__ = [
+    "ArchivePackageSource",
+    "ArchiveSourceProvenance",
+    "ArchiveSourceSnapshot",
     "IntakeChecks",
     "IntakeDecision",
     "IntakeDecisionStatus",
     "NormalizedPackage",
     "NormalizedPackageV2",
+    "NormalizedPackageV3",
     "OwnershipState",
     "PackageCandidateIdentity",
     "PackageLifecycleState",
