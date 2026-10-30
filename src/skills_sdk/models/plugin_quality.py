@@ -10,15 +10,17 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from skills_sdk.models.inventory import PortablePath, Sha256, _ContractModel
-from skills_sdk.models.package import PackageCandidateIdentity, SavedReleaseSnapshot
+from skills_sdk.models.package import ArchiveSourceSnapshot, PackageCandidateIdentity, SavedReleaseSnapshot
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.plugin import PluginPackageValidation, PluginSkillBinding
 from skills_sdk.models.plugin_presentation import PluginPresentationCheck
 from skills_sdk.models.quality_workflow import (
     LocalCheckRequestV2,
     LocalCheckRequestV3,
+    LocalCheckRequestV4,
     LocalCheckResultV2,
     LocalCheckResultV3,
+    LocalCheckResultV4,
 )
 from skills_sdk.models.safety import _public_text_is_redaction_safe
 
@@ -512,13 +514,38 @@ class PluginQualityResultV2(PluginQualityResult):
     children: tuple[LocalCheckResultV3, ...] = Field(default=(), max_length=128)
 
 
+class PluginQualityChildV3(PluginQualityChildV2):
+    """An archive-backed child selected from the containing plugin."""
+
+    request: LocalCheckRequestV4
+
+
+class PluginQualityRequestV3(PluginQualityRequestV2):
+    """Whole archive snapshot checked through the existing quality caller."""
+
+    schema_version: Literal["plugin-quality-request/v3"] = "plugin-quality-request/v3"
+    source_snapshot: ArchiveSourceSnapshot
+    children: tuple[PluginQualityChildV3, ...] = Field(min_length=1, max_length=128)
+
+
+class PluginQualityResultV3(PluginQualityResultV2):
+    """Archive provenance retained without upstream release claims."""
+
+    schema_version: Literal["plugin-quality/v3"] = "plugin-quality/v3"
+    request: PluginQualityRequestV3 | None = None
+    children: tuple[LocalCheckResultV4, ...] = Field(default=(), max_length=128)
+
+
 __all__ = [
     "PLUGIN_QUALITY_ASSESSMENT_BUNDLE_MAX_BYTES",
     "PluginQualityChild",
     "PluginQualityChildV2",
+    "PluginQualityChildV3",
     "PluginQualityRequest",
     "PluginQualityRequestV2",
+    "PluginQualityRequestV3",
     "PluginQualityResult",
     "PluginQualityResultV2",
+    "PluginQualityResultV3",
     "bounded_json_size",
 ]

@@ -22,8 +22,10 @@ from skills_sdk.models.evaluation_v2 import (
 from skills_sdk.models.intake import (
     SkillPackageIntakeContext,
     SkillPackageIntakeContextV2,
+    SkillPackageIntakeContextV3,
     SkillPackageIntakeReceipt,
     SkillPackageIntakeReceiptV2,
+    SkillPackageIntakeReceiptV3,
 )
 from skills_sdk.models.lifecycle import InstallPlan, RuntimeLock
 from skills_sdk.models.local_check import LocalCheckResult
@@ -37,7 +39,11 @@ from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrati
 from skills_sdk.models.native_judge import CodexNativeJudgeParameters
 from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 from skills_sdk.models.package import (
+    ArchivePackageSource,
+    ArchiveSourceProvenance,
+    ArchiveSourceSnapshot,
     NormalizedPackageV2,
+    NormalizedPackageV3,
     SavedReleasePackageSource,
     SavedReleaseProvenance,
     SavedReleaseSnapshot,
@@ -60,8 +66,10 @@ from skills_sdk.models.plugin_presentation import (
 from skills_sdk.models.plugin_quality import (
     PluginQualityRequest,
     PluginQualityRequestV2,
+    PluginQualityRequestV3,
     PluginQualityResult,
     PluginQualityResultV2,
+    PluginQualityResultV3,
 )
 from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pre_execution_safety import PreExecutionSafetyEvidence
@@ -70,8 +78,10 @@ from skills_sdk.models.provider_execution import ProviderExecutionRequest, Provi
 from skills_sdk.models.quality_workflow import (
     LocalCheckRequestV2,
     LocalCheckRequestV3,
+    LocalCheckRequestV4,
     LocalCheckResultV2,
     LocalCheckResultV3,
+    LocalCheckResultV4,
 )
 from skills_sdk.models.runtime_evidence import (
     ActivationObservation,
@@ -162,6 +172,16 @@ def intake_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (PluginQualityResult, "plugin-quality.v1.schema.json"),
         (SkillPackageIntakeContext, "skill-package-intake-context.v1.schema.json"),
         (SkillPackageIntakeReceipt, "skill-package-intake.v1.schema.json"),
+        (ArchiveSourceSnapshot, "archive-source-snapshot.v1.schema.json"),
+        (ArchiveSourceProvenance, "archive-source-provenance.v1.schema.json"),
+        (ArchivePackageSource, "archive-package-source.v1.schema.json"),
+        (NormalizedPackageV3, "normalized-package.v3.schema.json"),
+        (SkillPackageIntakeContextV3, "skill-package-intake-context.v3.schema.json"),
+        (SkillPackageIntakeReceiptV3, "skill-package-intake.v3.schema.json"),
+        (LocalCheckRequestV4, "local-check-request.v4.schema.json"),
+        (LocalCheckResultV4, "local-check.v4.schema.json"),
+        (PluginQualityRequestV3, "plugin-quality-request.v3.schema.json"),
+        (PluginQualityResultV3, "plugin-quality.v3.schema.json"),
         (SavedReleaseSnapshot, "saved-release-snapshot.v1.schema.json"),
         (SavedReleaseProvenance, "saved-release-provenance.v1.schema.json"),
         (SavedReleasePackageSource, "saved-release-package-source.v1.schema.json"),

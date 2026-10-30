@@ -102,6 +102,16 @@ SCHEMA_NAMES = frozenset(
         "skill-package-intake.v1",
         "skill-package-intake-context.v1",
         "saved-release-snapshot.v1",
+        "archive-source-snapshot.v1",
+        "archive-source-provenance.v1",
+        "archive-package-source.v1",
+        "normalized-package.v3",
+        "skill-package-intake-context.v3",
+        "skill-package-intake.v3",
+        "local-check-request.v4",
+        "local-check.v4",
+        "plugin-quality-request.v3",
+        "plugin-quality.v3",
         "saved-release-provenance.v1",
         "saved-release-package-source.v1",
         "normalized-package.v2",
@@ -290,6 +300,40 @@ class SchemaRegistry:
 
         model: type[BaseModel]
         if name in {
+            "archive-source-snapshot.v1",
+            "archive-source-provenance.v1",
+            "archive-package-source.v1",
+            "normalized-package.v3",
+            "skill-package-intake-context.v3",
+            "skill-package-intake.v3",
+            "local-check-request.v4",
+            "local-check.v4",
+            "plugin-quality-request.v3",
+            "plugin-quality.v3",
+        }:
+            from skills_sdk.models.intake import SkillPackageIntakeContextV3, SkillPackageIntakeReceiptV3
+            from skills_sdk.models.package import (
+                ArchivePackageSource,
+                ArchiveSourceProvenance,
+                ArchiveSourceSnapshot,
+                NormalizedPackageV3,
+            )
+            from skills_sdk.models.plugin_quality import PluginQualityRequestV3, PluginQualityResultV3
+            from skills_sdk.models.quality_workflow import LocalCheckRequestV4, LocalCheckResultV4
+
+            model = {
+                "archive-source-snapshot.v1": ArchiveSourceSnapshot,
+                "archive-source-provenance.v1": ArchiveSourceProvenance,
+                "archive-package-source.v1": ArchivePackageSource,
+                "normalized-package.v3": NormalizedPackageV3,
+                "skill-package-intake-context.v3": SkillPackageIntakeContextV3,
+                "skill-package-intake.v3": SkillPackageIntakeReceiptV3,
+                "local-check-request.v4": LocalCheckRequestV4,
+                "local-check.v4": LocalCheckResultV4,
+                "plugin-quality-request.v3": PluginQualityRequestV3,
+                "plugin-quality.v3": PluginQualityResultV3,
+            }[name]
+        elif name in {
             "saved-release-snapshot.v1",
             "saved-release-provenance.v1",
             "saved-release-package-source.v1",

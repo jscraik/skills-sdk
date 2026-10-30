@@ -74,6 +74,15 @@ result.
 
 ### Whole-plugin quality composition
 
+The local archive-source repair accepts `plugin-quality-request/v3` with
+`archive-source-snapshot/v1` and `local-check-request/v4` children through the
+same `check-plugin-quality` entrypoint. It represents a user-supplied recovery
+archive with unknown upstream release metadata. It does not retrieve, install
+or execute that archive. Caller-supplied checks remain assertions; missing
+admission, quality or presentation evidence still blocks. The new result is
+`plugin-quality/v3`; malformed requests retain the generic blocked convention.
+This local repair is not yet delivery or release acceptance evidence.
+
 The local saved-release candidate also accepts an explicit
 `plugin-quality-request/v2` file through this command. It carries one
 `source_snapshot` and `local-check-request/v3` child requests with

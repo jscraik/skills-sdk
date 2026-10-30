@@ -19,8 +19,10 @@ from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageRes
 from skills_sdk.models.intake import (
     SkillPackageIntakeContext,
     SkillPackageIntakeContextV2,
+    SkillPackageIntakeContextV3,
     SkillPackageIntakeReceipt,
     SkillPackageIntakeReceiptV2,
+    SkillPackageIntakeReceiptV3,
     _intake_evidence_data,
 )
 from skills_sdk.models.inventory import PortablePath, _ContractModel
@@ -507,12 +509,55 @@ class LocalCheckResultV3(LocalCheckResultV2):
     stages: tuple[LocalQualityStageV2, ...] = ()
 
 
+class LocalCheckRequestV4(LocalCheckRequestV3):
+    """Archive-backed external check, preserving old request source boundaries."""
+
+    schema_version: Literal["local-check-request/v4"] = "local-check-request/v4"
+    intake: SkillPackageIntakeContextV3
+
+
+class LocalQualityStageV3(LocalQualityStageV2):
+    """Only the new archive intake receipt changes the stage envelope."""
+
+    receipt: (
+        SkillPackageValidation
+        | SkillPackageIntakeReceiptV3
+        | ScenarioCoverageResult
+        | ScorerQualityReceipt
+        | ScorerCalibrationReceipt
+        | ContentReviewResult
+        | ContentReviewExecutionResult
+    )
+
+    @model_validator(mode="after")
+    def receipt_matches_name(self) -> LocalQualityStageV3:
+        """Keep canonical receipt checks and captured manifest consistency."""
+        expected = (SkillPackageIntakeReceiptV3,) if self.name == "intake" else _QUALITY_TYPES[self.name]
+        if type(self.receipt) not in expected:
+            raise ValueError("quality stage must use its canonical receipt type")
+        capture = self.receipt.validation if isinstance(self.receipt, SkillPackageIntakeReceiptV3) else self.receipt
+        if isinstance(capture, SkillPackageValidation):
+            _validation_manifest_matches(capture)
+        return self
+
+
+class LocalCheckResultV4(LocalCheckResultV3):
+    """Archive quality result; never execution, publication or release clearance."""
+
+    schema_version: Literal["local-check/v4"] = "local-check/v4"
+    request: LocalCheckRequestV4 | None
+    stages: tuple[LocalQualityStageV3, ...] = ()
+
+
 __all__ = [
     "LocalCheckRequestV2",
     "LocalCheckRequestV3",
+    "LocalCheckRequestV4",
     "LocalCheckResultV2",
     "LocalCheckResultV3",
+    "LocalCheckResultV4",
     "LocalQualityPolicy",
     "LocalQualityStage",
     "LocalQualityStageV2",
+    "LocalQualityStageV3",
 ]
