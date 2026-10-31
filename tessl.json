@@ -1,0 +1,19 @@
+{
+  "name": "skills-sdk-lab/skills-sdk",
+  "actions": {
+    "trial-pr109-shepherd": {
+      "skill": "tessl-labs/factory@0.7.1#shepherd",
+      "environment": "skills-sdk-factory-test",
+      "agent": "claude-code",
+      "model": "claude-opus-5-5",
+      "timeout": "2h",
+      "baseBranch": "main",
+      "inputs": {
+        "GITHUB_PR_NUMBER": "109"
+      },
+      "instructions": "Bounded PR109 assessment only. Keep the PR open and auto-merge disabled. Confirm the live PR, source issue and head before every write. Use the project's separately provisioned worker setup and native signer; verify setup before source changes. Missing helpers, signing capability or authority stop the dependent operation, never waive it. Follow repository validation and receipt contracts before commit, publication or metadata changes. A create receipt does not replace required validation. Preserve original failures and distinguish local checks, hosted checks, review execution and final acceptance. Never describe an agent-chosen process kill as platform enforcement. Do not start paid reviewers, downstream agents or another run. Report remaining blockers accurately and preserve evidence."
+    }
+  },
+  "triggers": {},
+  "schedules": {}
+}
