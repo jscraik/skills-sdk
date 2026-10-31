@@ -25,10 +25,14 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk check-local --help
 ```
 
-For focused checks while editing, run `bash scripts/validate-codestyle.sh`.
-Before a commit or pull request, run `bash scripts/validate-repository.sh`;
-it already includes the codestyle check. Repeat or broaden checks only after a
-relevant change, failure, or unresolved concern.
+Before a commit or pull request, run focused behaviour and contract checks,
+applicable codestyle checks and diff hygiene through permitted entrypoints.
+Use `bash scripts/validate-codestyle.sh` when available. Full local validation
+is optional; the appropriate current hosted validation, independent review
+and readiness remain required before merge. Record blocked local checks
+rather than bypassing guards or requiring manual terminal execution. Follow
+[validation order and evidence](standards.md#validation-order-and-evidence),
+and repeat checks only after a relevant change, failure or unresolved concern.
 
 The `inventory --help` route is the first detailed contract route. The SDK's
 target workflow owns agent-facing creation, update, checking, external intake,
