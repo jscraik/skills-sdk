@@ -1000,6 +1000,24 @@ none appeared in that archive listing. This is an archive-content observation,
 not a claim that the existing Tessl-format wrapper for skill evaluation is
 absent or unusable.
 
+### Additive trusted-host local review
+
+`evaluation.local_review_admission` adds a strict Python caller before matched
+execution. It composes the existing executor without changing portable schema
+versions, safety authenticity flags, callback receipts or legacy supplied-evidence
+acceptance. Hosts adopting it must provide independently selected review policy,
+native-event resolution and restart-safe consumption; a candidate cannot supply
+those capabilities. A synthetic host tests the integration path, not real issuer
+authority. A previously retrieved review remains historical after expiry.
+
+The strict caller raises a typed admission error before execution capability
+access on invalid authority, and retains the original executor's blocked or
+completed result after admission. A consumed operation is not automatically
+refunded when later preflight blocks. Removing the additive caller is a local
+code rollback, not authority to run through the legacy route: a deployment
+requiring trusted review must remain blocked until an equivalent route exists.
+No new registry, native transport, scanner or installation behavior is implied.
+
 Compatibility question for Tessl: what documented manifest field or package
 layout includes *all* required plugin resources, including canonical root
 `plugin.json`, any selected compatibility manifest, assets and scripts outside skill directories, in
