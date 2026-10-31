@@ -16,9 +16,39 @@ silently change the proof path.
 
 Run `bash scripts/validate-codestyle.sh` while editing. It checks Ruff formatting
 and lint, semantic typing for the standards tooling, and the repository-wide
-structural standards program. Run
-`bash scripts/validate-repository.sh` before a commit or pull request; it adds
-schema drift, the full test suite, package builds, and diff hygiene.
+structural standards program, where local execution is permitted.
+`bash scripts/validate-repository.sh` is the full contract for schema drift,
+codestyle, the full test suite, package builds, installed-package proof and
+diff hygiene. A full local run is optional, not required before every commit
+or pull request. Required hosted validation and review remain merge gates.
+
+## Validation order and evidence
+
+Before committing or opening a PR, run focused caller-visible proof for the
+owned change, rejected and boundary cases, applicable schema/compatibility and
+static checks, and diff hygiene. Choose checks by risk and the maintained
+consumer. Configuration that changes automation, permissions or spending needs
+the relevant structural and operational checks; it is not automatically prose.
+
+If a local wrapper is denied or its toolchain is unavailable, record that lane
+as blocked. Do not change command spelling, use another executor or request
+manual terminal execution to evade the restriction. The normal signed PR route
+may obtain required hosted proof without a per-task validation-order exception,
+subject to its create receipt and explicit remote/CI authority. An unsatisfied
+publication gate still blocks that action; this document does not waive it.
+
+Before merge, require every applicable hosted phase to pass for the current
+candidate or verified base/head merge result, qualifying independent review,
+zero unresolved findings and the normal readiness receipt. The CI scope rules
+below still determine full versus ordinary-prose validation. Local proof does
+not replace hosted proof, and opening a PR is not stage or product acceptance.
+
+Reuse a successful full run only while its assessed inputs and receiving
+contract remain unchanged. Relevant source, dependency, test, policy or base
+changes invalidate affected evidence. Do not repeat an unchanged successful
+local aggregate merely to publish a PR. Preserve failed and interrupted runs;
+focused passes cannot relabel them successful. Required full hosted gates are
+not removed to reduce latency, and no numeric speed improvement is assumed.
 
 ## Validation scope and phases
 

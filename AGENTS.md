@@ -113,14 +113,24 @@ operate the Tessl registry, or claim an installed runtime from local receipts.
   assertion, and `blocked` when the command cannot run or complete; include a
   concrete blocker reason and nearest fallback for `blocked`. Public contract
   changes need focused schema, behavior, and compatibility tests.
-- Before a commit or pull request, run
-  `bash scripts/validate-repository.sh`. The wrapper runs the generated-schema
-  check, Ruff, the full pytest suite, `uv build`, and `git diff --check`.
-  Ordinary prose-only changes may instead use
+- Before a commit or pull request, run proportionate focused regression and
+  contract checks, applicable codestyle checks, and `git diff --check` through
+  permitted maintained entrypoints. Record unavailable local checks as blocked;
+  do not bypass an execution guard or require a manual terminal workaround.
+  Full local validation is optional when permitted, not a prerequisite to
+  publishing a reviewable PR. Before merge, require passing current hosted
+  validation for the exact candidate or verified merge result, independent
+  review and the normal readiness receipt. Publication is not acceptance.
+  `bash scripts/validate-repository.sh` remains the full aggregate: generated
+  schemas, Ruff, full pytest, builds, installed-package proof and diff hygiene.
+  Ordinary prose-only changes may use
   `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`
   after its exact-change classifier accepts that scope. Code, policy,
   configuration, symlinks, executable modes and unidentified revisions cannot
-  use that exception. Executable changes and accepted-main CI remain full.
+  use that exception. Code, configuration, policy and accepted-main CI remain
+  full. Keep each required hosted check; do not repeat a successful unchanged
+  local aggregate merely to open a PR. See the validation-order contract in
+  `docs/standards.md` for blocked local checks and evidence invalidation.
   Two isolated pytest workers retain all collected tests and print the slowest
   cases. Named CI phases expose timings; one phase alone is not aggregate proof.
 - Report exact validation commands as `pass`, `fail`, or `blocked`, including
