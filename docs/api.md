@@ -1381,6 +1381,12 @@ have been resolved. A host must not authorise a report with outstanding
 applicable findings. Package metadata, a report file or a supplied boolean
 cannot select or substitute this host capability.
 
+The event must be a JSON object that meets these rules:
+- It has no duplicate keys at any level. The top-level object must not contain `policy` or `resolver`.
+- `thread.kind` must be `codex`, and `thread.id` must equal `thread_id`.
+- Exactly one turn must match `turn_id`. That turn must have status `completed`, a null `error`, and an integer `completedAt` equal to `completed_at`.
+- Exactly one item in that turn must match `message_id`. That item must have type `agentMessage`, phase `final_answer`, and string `text`.
+
 Consumption must atomically reject reused operations across process restarts.
 Only exact `True` admits first use. Missing, uncertain or failed consumption
 blocks the strict route. Host `OSError`, `RuntimeError`, `AttributeError`,
