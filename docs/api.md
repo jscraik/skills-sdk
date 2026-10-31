@@ -1353,6 +1353,53 @@ Pydantic semantic validation but are not generic receipts: generic receipt
 parsing must not reinterpret intended runtime state or a non-mutating plan as
 evidence that installation occurred.
 
+### Trusted local review before matched execution
+
+`skills_sdk.evaluation.local_review_admission.execute_reviewed_matched_lane`
+is an additive Python entrypoint for hosts requiring independently authorised
+source review before the existing matched executor. Supply the normal plan,
+lane, calibrations and ten paired executions, plus keyword-only
+`authority=LocalReviewAuthority(policy, host)`. It returns the existing `MatchedExecutionReceipt` after
+all original execution gates; review-admission failures raise `ContractError`
+before provider or judge property access.
+
+The caller constructs `LocalReviewPolicy` and one `LocalReviewExpectation` per
+distinct whole-plugin candidate, covering both variants. These frozen Python
+dataclasses are host configuration, not portable receipts. Policy binds the
+plan digest, operation, purpose, complete file and mode commitments, exact
+native Codex thread/turn/final-message identities, completion time, event bytes
+and report text. Report hashing uses UTF-8 text followed by one newline.
+The host operation lasts at most 600 seconds; review age is at most 3600
+seconds from actual completion. Retrieval never resets that age.
+
+The trusted `LocalReviewHost` implements `resolve_review(expected)` and
+`consume(operation_id, policy_sha256)`. Resolution returns at most 256 KiB of
+the exact native event bytes. The host independently obtains the event and
+chooses issuer, scope and report disposition outside package data. The SDK
+checks the commitment; it does not decide whether natural-language findings
+have been resolved. A host must not authorise a report with outstanding
+applicable findings. Package metadata, a report file or a supplied boolean
+cannot select or substitute this host capability.
+
+Consumption must atomically reject reused operations across process restarts.
+Only exact `True` admits first use. Missing, uncertain or failed consumption
+blocks the strict route. Use `OSError` or `RuntimeError` for host transport or
+consumption failures; other host exceptions propagate without entering the
+executor. An operation stays spent when later checks fail; inspecting state
+and authorising a new operation belongs to the host. Do not clear consumption
+state merely to retry. Source is rechecked around host calls, including after
+consumption. Existing matched preflight still checks calibration, safety,
+settings, budgets and the complete batch.
+
+This interface does not provide native event retrieval, replay storage,
+credentials or a sandbox. Hosts must bound their callbacks and preserve the
+independent policy boundary. Static screening, scanner coverage, permission
+deltas and containment remain separate obligations. Success does not grant
+model execution, publication or installation authority, and does not accept a
+lifecycle stage. Direct `execute_matched_lane` and supplied safety APIs retain
+their existing unauthenticated-evidence semantics; they do not satisfy this
+strict review-authority requirement.
+
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test
 and update the schema when changing a public contract.
