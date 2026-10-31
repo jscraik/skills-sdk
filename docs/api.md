@@ -1383,9 +1383,12 @@ cannot select or substitute this host capability.
 
 Consumption must atomically reject reused operations across process restarts.
 Only exact `True` admits first use. Missing, uncertain or failed consumption
-blocks the strict route. Use `OSError` or `RuntimeError` for host transport or
-consumption failures; other host exceptions propagate without entering the
-executor. An operation stays spent when later checks fail; inspecting state
+blocks the strict route. Host `OSError`, `RuntimeError`, `AttributeError`,
+`KeyError`, `IndexError`, `TypeError`, `ValueError` and `RecursionError`
+exceptions become `ContractError` with code `local_review_admission_failed`.
+An existing host `ContractError` passes through unchanged, including its code.
+Other host exceptions propagate without entering the executor.
+An operation stays spent when later checks fail; inspecting state
 and authorising a new operation belongs to the host. Do not clear consumption
 state merely to retry. Source is rechecked around host calls, including after
 consumption. Existing matched preflight still checks calibration, safety,

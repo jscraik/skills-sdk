@@ -21,7 +21,6 @@ from skills_sdk.evaluation.matched_execution import execute_matched_lane
 from skills_sdk.evaluation.matched_plugin_context import PluginExecutionContext
 from skills_sdk.models.matched_comparison import MatchedComparisonPlan
 from skills_sdk.models.matched_execution import MatchedExecutionReceipt
-from skills_sdk.models.matched_ingress import _canonical_matched_input
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.validation.plugin_evidence import verify_plugin_package_validation
 
@@ -230,7 +229,7 @@ async def execute_reviewed_matched_lane(
         if type(authority) is not LocalReviewAuthority:
             raise _reject("local_review_policy_required")
         policy, host = authority.policy, authority.host
-        parsed = MatchedComparisonPlan.model_validate(_canonical_matched_input(plan))
+        parsed = MatchedComparisonPlan.model_validate(plan)
         policy_digest = _policy_digest(policy, parsed)
         contexts = _contexts(executions)
         _check_sources(contexts, policy)

@@ -13,6 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import test_matched_execution as matched_fixture
 from test_matched_execution import _matched
 
 from skills_sdk.core.digests import canonical_json_sha256
@@ -25,6 +26,7 @@ from skills_sdk.evaluation.local_review_admission import (
     execute_reviewed_matched_lane,
 )
 from skills_sdk.evaluation.matched_admission import MatchedCaseExecution
+from skills_sdk.models.matched_comparison import MatchedComparisonPlan
 
 
 class _Host:
@@ -52,6 +54,35 @@ class _Host:
         finally:
             os.close(fd)
         return True
+
+
+def test_large_captures_preserve_plan_ingress_and_later_gates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    original = matched_fixture._plugin_definitions
+
+    def definitions(root: Path, score: float, count: int) -> tuple[object, ...]:
+        result = original(root, score, count)
+        for index in range(400):
+            (root / f"resource-{index}.md").write_text("Inert captured resource.\n")
+        return result
+
+    monkeypatch.setattr(matched_fixture, "_plugin_definitions", definitions)
+    plan, _calibrations, batch, events = _matched(tmp_path / "packages")
+    assert len(plan.plugin_scope.baseline.files) >= 400
+    assert len(plan.plugin_scope.candidate.files) >= 400
+    for index, incoming in enumerate((plan, plan.model_dump(mode="json"))):
+        assert MatchedComparisonPlan.model_validate(incoming).digest == plan.digest
+        directory = tmp_path / f"host-{index}"
+        directory.mkdir()
+        policy, host = _authority(plan, batch, directory)
+        accesses: list[str] = []
+        receipt = asyncio.run(
+            execute_reviewed_matched_lane(
+                incoming, "local", (), _observe(batch, accesses), authority=LocalReviewAuthority(policy, host)
+            )
+        )
+        assert receipt.status == "blocked" and receipt.blocker.code == "invalid_matched_execution"
+        assert host.consumptions == 1
+        assert not accesses and not events
 
 
 def _authority(plan: object, batch: tuple, directory: Path) -> tuple[LocalReviewPolicy, _Host]:
@@ -306,6 +337,74 @@ def test_review_age_boundary_preserves_later_calibration_gate(
         with pytest.raises(ContractError) as error:
             asyncio.run(operation)
         assert error.value.code == "local_review_stale" and host.consumptions == 0
+    assert not accesses and not events
+
+
+def test_source_drift_after_successful_consumption_blocks_execution(tmp_path: Path) -> None:
+    plan, calibration, batch, events = _matched(tmp_path / "source")
+    policy, host = _authority(plan, batch, tmp_path)
+    target = batch[-1].candidate.plugin_context.root / "shared.md"
+
+    class DriftHost(_Host):
+        def consume(self, operation_id: str, policy_sha256: str) -> bool:
+            accepted = super().consume(operation_id, policy_sha256)
+            target.write_text("Changed during successful consumption")
+            return accepted
+
+    drifting = DriftHost(tmp_path, host.origins)
+    accesses: list[str] = []
+    with pytest.raises(ContractError) as error:
+        asyncio.run(
+            execute_reviewed_matched_lane(
+                plan, "local", calibration, _observe(batch, accesses), authority=LocalReviewAuthority(policy, drifting)
+            )
+        )
+    assert error.value.code == "local_review_source_changed"
+    assert drifting.consumptions == 1 and not accesses and not events
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        OSError,
+        RuntimeError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        TypeError,
+        ValueError,
+        RecursionError,
+        ContractError,
+        ArithmeticError,
+    ],
+)
+def test_host_exception_contract_preserves_zero_access(
+    batch_fixture: tuple, tmp_path: Path, failure: type[Exception]
+) -> None:
+    plan, calibration, batch, events = batch_fixture
+    policy, host = _authority(plan, batch, tmp_path)
+
+    class FailingHost(_Host):
+        def resolve_review(self, expected: LocalReviewExpectation) -> bytes:
+            if failure is ContractError:
+                raise ContractError("synthetic_host_blocker", "Synthetic host blocker")
+            raise failure("Synthetic host failure")
+
+    accesses: list[str] = []
+    expected_error = ArithmeticError if failure is ArithmeticError else ContractError
+    with pytest.raises(expected_error) as error:
+        asyncio.run(
+            execute_reviewed_matched_lane(
+                plan,
+                "local",
+                calibration,
+                _observe(batch, accesses),
+                authority=LocalReviewAuthority(policy, FailingHost(tmp_path, host.origins)),
+            )
+        )
+    if isinstance(error.value, ContractError):
+        expected_code = "synthetic_host_blocker" if failure is ContractError else "local_review_admission_failed"
+        assert error.value.code == expected_code
     assert not accesses and not events
 
 
