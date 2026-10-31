@@ -149,10 +149,20 @@ def test_archive_source_recapture_rejects_drift_and_restoration_recovers(tmp_pat
     target.write_bytes(original + b"\nchanged\n")
     result = intake_skill_package(target.parent, context)
     assert result.status == "blocked" and result.blocker.code == "saved_source_candidate_mismatch"
+    assert result.schema_version == "skill-package-intake/v3"
+    (finding,) = result.validation.findings
+    assert finding.code == result.blocker.code
+    assert finding.message == result.blocker.message
+    assert "archive" in finding.message.lower() and "saved-release" not in finding.message.lower()
+    assert "saved_source_candidate_mismatch" in result.decision.blocker_codes
+    assert result.source is None and result.normalized_package is None
+    SchemaRegistry().validate("skill-package-intake.v3", result.model_dump(mode="json"))
     target.write_bytes(original)
     restored = intake_skill_package(target.parent, context)
     assert restored.status == "normalized"
     assert restored.candidate == context.source.candidate
+    assert restored.blocker is None and restored.validation.status == "pass"
+    assert not any("provenance" in item.message.lower() for item in restored.validation.findings)
 
 
 def test_old_source_contracts_reject_archive_shapes(tmp_path: Path) -> None:

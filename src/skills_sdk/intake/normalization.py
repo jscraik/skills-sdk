@@ -64,7 +64,11 @@ def intake_skill_package(
                     SkillPackageFinding(
                         code="saved_source_candidate_mismatch",
                         severity=ValidationSeverity.BLOCKER,
-                        message="Saved-release provenance does not bind the freshly captured child.",
+                        message=(
+                            "Archive-source provenance does not bind the freshly captured child."
+                            if archive
+                            else "Saved-release provenance does not bind the freshly captured child."
+                        ),
                     ).model_dump(mode="json")
                 ],
             }
