@@ -453,9 +453,13 @@ def test_repair_preserves_target_permissions(tmp_path: Path, mode: int) -> None:
     """Verify repair and backup retain the target permission bits."""
     _source, target, backup, args = _fixture(tmp_path)
     target.chmod(mode)
+    before = target.read_bytes()
     assert main([*args, "--apply"]) == 0
     assert stat.S_IMODE(target.stat().st_mode) == mode
-    assert all(stat.S_IMODE(path.stat().st_mode) == mode for path in _backup_files(backup))
+    backups = _backup_files(backup)
+    assert len(backups) == 2
+    assert all(path.read_bytes() == before for path in backups)
+    assert all(stat.S_IMODE(path.stat().st_mode) == mode for path in backups)
 
 
 def test_backup_sync_failure_prevents_publication(
@@ -620,9 +624,12 @@ def test_supporting_document_rejects_unsafe_content(tmp_path: Path, fault: str) 
 def test_special_permission_bits_are_not_republished(tmp_path: Path) -> None:
     _source, target, backup, args = _fixture(tmp_path)
     target.chmod(0o4755)
+    before = target.read_bytes()
     assert main([*args, "--apply"]) == 0
     assert stat.S_IMODE(target.stat().st_mode) == 0o755
     snapshots = [path for path in _backup_files(backup) if path.suffix == ".bak"]
+    assert len(snapshots) == 1
+    assert snapshots[0].read_bytes() == before
     assert all(stat.S_IMODE(path.stat().st_mode) == 0o755 for path in snapshots)
 
 

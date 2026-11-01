@@ -11,14 +11,83 @@ from typing import Literal
 import pytest
 
 from skills_sdk.providers import (
+    ProviderAdapterChunk,
     ProviderAdapterComplete,
     ProviderAdapterStreamItem,
     ProviderAdapterTerminal,
     ProviderCallLimits,
+    ProviderCallOutcome,
     execute_provider_call,
 )
 from skills_sdk.providers.types import AsyncioProviderCallClock
 from tests.test_provider_call import FakeAdapter, _provider_request
+
+
+async def _assert_caller_cancellation(
+    task: asyncio.Task[ProviderCallOutcome], started: asyncio.Event, release: asyncio.Event
+) -> None:
+    """Bound phase entry and cancellation, releasing owned work even on failure."""
+    phase = asyncio.create_task(started.wait())
+    try:
+        done, _ = await asyncio.wait({task, phase}, timeout=1, return_when=asyncio.FIRST_COMPLETED)
+        assert phase in done and not task.done(), "provider call did not remain active at the expected phase"
+        task.cancel()
+        done, _ = await asyncio.wait({task}, timeout=1)
+        assert task in done, "caller cancellation did not finish within the test deadline"
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    finally:
+        release.set()
+        phase.cancel()
+        task.cancel()
+        done, _ = await asyncio.wait({task, phase}, timeout=1)
+        assert done == {task, phase}, "owned test tasks did not finish during teardown"
+        for owned in done:
+            if not owned.cancelled():
+                owned.exception()
+
+
+def test_caller_cancellation_during_cleanup_is_not_swallowed() -> None:
+    async def scenario() -> None:
+        request = _provider_request(None)
+        started, release = asyncio.Event(), asyncio.Event()
+
+        class SlowCleanupAdapter(FakeAdapter):
+            async def cleanup(self) -> None:
+                self.cleanup_calls += 1
+                started.set()
+                await release.wait()
+
+        adapter = SlowCleanupAdapter(request)
+        task = asyncio.create_task(execute_provider_call(request, None, adapter))
+        await _assert_caller_cancellation(task, started, release)
+        assert adapter.cleanup_calls == 1
+
+    asyncio.run(scenario())
+
+
+def test_caller_cancellation_during_stalled_stream_stops_pulls_and_cleans_up() -> None:
+    async def scenario() -> None:
+        request = _provider_request(None)
+        started, release = asyncio.Event(), asyncio.Event()
+
+        class StalledStreamAdapter(FakeAdapter):
+            async def _stalled(self) -> AsyncIterator[ProviderAdapterStreamItem]:
+                self.stream_pulls += 1
+                started.set()
+                await release.wait()
+                yield ProviderAdapterChunk("late")
+
+            async def stream(self, request: object, input_payload: object) -> AsyncIterator[ProviderAdapterStreamItem]:
+                return self._stalled()
+
+        adapter = StalledStreamAdapter(request, mode="stream")
+        task = asyncio.create_task(execute_provider_call(request, None, adapter))
+        await _assert_caller_cancellation(task, started, release)
+        assert adapter.stream_pulls == 1
+        assert adapter.cleanup_calls == 1
+
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize("phase", ["factory", "complete", "cleanup"])
