@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from skills_sdk.models.advisory import FMAdvisoryRequest, FMAdvisoryResult
 from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
 from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
 from skills_sdk.models.evaluation import (
@@ -151,11 +152,13 @@ def provider_execution_schema_models() -> tuple[tuple[type[Any], str], ...]:
 
 
 def provider_call_schema_models() -> tuple[tuple[type[Any], str], ...]:
-    """Return additive provider-call schemas in dependency order."""
+    """Return provider-call and separate advisory schemas in dependency order."""
 
     return (
         (TextProviderAdapterDescriptor, "provider-call-adapter.v1.schema.json"),
         (ProviderCallPublicResult, "provider-call-result.v1.schema.json"),
+        (FMAdvisoryRequest, "fm-advisory-request.v1.schema.json"),
+        (FMAdvisoryResult, "fm-advisory.v1.schema.json"),
     )
 
 

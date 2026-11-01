@@ -19,6 +19,7 @@ See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledge
 
 Contents:
 
+- [Optional Apple FM advisory](fm-advisory.md)
 - [Plugin presentation assessment](#plugin-presentation-assessment)
 - [Whole-plugin quality composition](#whole-plugin-quality-composition)
 - [Portable plugin validation](#portable-plugin-validation)

@@ -18,6 +18,7 @@ mise exec -- uv venv --python 3.12 "$smoke_venv_dir"
 mise exec -- uv pip install --python "$smoke_venv_dir/bin/python" "${sdk_built_wheels[0]}"
 "$smoke_venv_dir/bin/python" tests/installed_pr_sweep_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_codex_judge_smoke.py
+"$smoke_venv_dir/bin/python" tests/installed_fm_advisory_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_package_quality_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_plugin_intake_smoke.py
 "$smoke_venv_dir/bin/python" tests/installed_plugin_presentation_smoke.py --without-images

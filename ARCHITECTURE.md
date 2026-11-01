@@ -1,5 +1,12 @@
 # Architecture
 
+The local optional [Apple FM advisory](docs/fm-advisory.md) lives in
+`providers/fm_advisory.py`, with separate portable diagnostic models and an
+explicit `advise-fm` CLI. It reuses the existing owned-process supervisor
+without adding FM to validation or acceptance. It consumes caller-supplied
+snapshots and identities; it does not discover host package paths or establish
+source authenticity, calibrated judging or release clearance.
+
 Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines versioned contract models for caller-provided
 inventory, intake, evaluation, risk, and security data, and consumes package
