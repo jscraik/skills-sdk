@@ -514,8 +514,10 @@ def _verify_normalization_output_closure(root: Path, source: Path, context_paylo
     registry.validate("plugin-normalization.v1", recovered.model_dump(mode="json"))
 
 
-def _verify_normalization_capture_limit(command: list[str], source: Path, root: Path) -> None:
-    """Retain a real capture-limit CLI blocker, correct its input and prove fresh candidate binding."""
+def _verify_normalization_capture_limit(
+    command: list[str], source: Path, root: Path, baseline_candidate: dict[str, object]
+) -> None:
+    """Prove early intake rejection and recovery to the independently captured valid candidate."""
     from skills_sdk.core.schema_registry import SchemaRegistry
 
     oversized = source / "oversized.md"
@@ -526,8 +528,11 @@ def _verify_normalization_capture_limit(command: list[str], source: Path, root: 
     assert completed.returncode == 2, completed.stderr + completed.stdout
     rejected = json.loads(completed.stdout)
     assert rejected["status"] == "blocked" and not rejected["candidate_created"]
-    assert rejected["blocker"]["code"] == "standalone_source_capture_blocked"
-    assert rejected["source_intake"]["status"] == "normalized" and not (root / "capture-blocked-plugin").exists()
+    assert rejected["blocker"]["code"] == "package_resource_limit"
+    assert rejected["source_intake"]["status"] == "blocked" and not (root / "capture-blocked-plugin").exists()
+    assert rejected["source_intake"]["blocker"]["code"] == "package_resource_limit"
+    assert rejected["plugin_validation"] is None and rejected["normalized_package"] is None
+    assert oversized.stat().st_size == 16 * 1024 * 1024 + 1
     SchemaRegistry().validate("plugin-normalization.v1", rejected)
     oversized.unlink()
     recovered_command = list(command)
@@ -537,7 +542,8 @@ def _verify_normalization_capture_limit(command: list[str], source: Path, root: 
     recovered = json.loads(completed.stdout)
     assert (
         recovered["status"] == "prepared"
-        and recovered["source_intake"]["candidate"] != rejected["source_intake"]["candidate"]
+        and recovered["source_intake"]["status"] == "normalized"
+        and recovered["source_intake"]["candidate"] == baseline_candidate
     )
     assert (
         recovered["plugin_validation"]["skills"][0]["validation"]["candidate"]
@@ -729,7 +735,7 @@ def _verify_standalone_normalization(root: Path) -> None:
     _reject_blocked_normalization_validation(cli_receipt, foreign_validation)
     _verify_normalization_metadata_budget(root, source, context.model_dump(mode="json"))
     _verify_normalization_output_closure(root, source, context.model_dump(mode="json"))
-    _verify_normalization_capture_limit(command, source, root)
+    _verify_normalization_capture_limit(command, source, root, cli_receipt["source_intake"]["candidate"])
     _verify_normalization_loop(command, root)
     _verify_normalization_file_capacity(command, root, source)
     _verify_normalization_alias(command, root, source)
