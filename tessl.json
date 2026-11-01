@@ -2,7 +2,7 @@
   "name": "skills-sdk-lab/skills-sdk",
   "actions": {
     "trial-pr109-shepherd": {
-      "skill": "tessl-labs/factory@0.7.1#shepherd",
+      "skill": "tessl-labs/factory@0.7.2#shepherd",
       "environment": "skills-sdk-factory-test",
       "agent": "claude-code",
       "model": "claude-opus-5-5",
@@ -12,6 +12,31 @@
         "GITHUB_PR_NUMBER": "109"
       },
       "instructions": "Bounded PR109 assessment only. Keep the PR open and auto-merge disabled. Confirm the live PR, source issue and head before every write. Use the project's separately provisioned worker setup and native signer; verify setup before source changes. Missing helpers, signing capability or authority stop the dependent operation, never waive it. Follow repository validation and receipt contracts before commit, publication or metadata changes. A create receipt does not replace required validation. Preserve original failures and distinguish local checks, hosted checks, review execution and final acceptance. Never describe an agent-chosen process kill as platform enforcement. Do not start paid reviewers, downstream agents or another run. Report remaining blockers accurately and preserve evidence."
+    },
+    "trial-issue98-implement": {
+      "skill": "tessl-labs/factory@0.7.2#implement-github-issue",
+      "environment": "skills-sdk-factory-test",
+      "agent": "claude-code",
+      "model": "deepseek-v4.1-flash",
+      "timeout": "2h",
+      "baseBranch": "main",
+      "inputs": {
+        "GITHUB_ISSUE_NUMBER": "98",
+        "GITHUB_ISSUE_LABEL": "tessl"
+      },
+      "instructions": "Prepared issue98 trial only; invocation requires separate paid-execution approval and verified worker setup. Follow the live issue98 documentation scope and repository contracts. The historical issue text's 5000-credit stop is superseded by the owner's current 10000-credit remaining stop; it is not a new spending allowance. Use only docs/agent-entrypoint.md for product changes. Verify the toolchain, approved helper delivery and authorised native signer before edits. Recheck current main and any existing branch/PR; do not duplicate or overwrite work. Execute the exact documented rejection, explicit author edit and recovery on disposable synthetic input, proving validation preserves bytes. Keep structural validation separate from execution or release authority. Use the prose-only validation route only when the exact-change classifier admits the candidate. Obtain required receipts before publication and report incomplete evidence truthfully. Keep the PR open with auto-merge disabled. Start no downstream run or paid reviewer."
+    },
+    "trial-issue98-shepherd": {
+      "skill": "tessl-labs/factory@0.7.2#shepherd",
+      "environment": "skills-sdk-factory-test",
+      "agent": "claude-code",
+      "model": "deepseek-v4.1-flash",
+      "timeout": "2h",
+      "baseBranch": "main",
+      "params": {
+        "GITHUB_PR_NUMBER": "string"
+      },
+      "instructions": "Prepared issue98 follow-up only; invocation requires separate paid-execution approval and verified worker setup. Resolve the supplied PR number and verify that its source is issue98 in this repository before any write; stop if it is not. Never act on PR109 or another issue. Preserve the one-file docs/agent-entrypoint.md product scope and exact published-command proof. Verify approved helpers, toolchain and authorised native signer before edits. Follow current validation, reviewer and receipt contracts; skipped, stale or missing evidence is not clearance. Keep the PR open, never merge or enable auto-merge, and start no downstream run or paid reviewer. The current owner stop is 10000 credits remaining; no allowance or automatic continuation is granted by this declaration."
     }
   },
   "triggers": {},
