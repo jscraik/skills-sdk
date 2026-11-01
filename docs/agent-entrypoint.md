@@ -75,3 +75,37 @@ are separate checks. Validation does not execute the package or run a provider,
 and it grants no execution, admission, publication, installation, or release
 authority. The [authoring contract](workflow.md#skill-authoring-contract)
 separates these checks and keeps skill bodies task-specific.
+
+### Recover from a missing description
+
+For a package whose frontmatter declares a `name` but no `description`, work on
+a disposable synthetic copy outside the checkout, with a package directory name
+matching the declared `name`, and resolve the temporary path so the SDK's
+no-follow protection still applies. Do not edit the tracked fixture or a real
+package. The revision below is a synthetic placeholder with a digest's shape,
+not authenticated provenance.
+
+```bash
+demo_root="$(realpath "$(mktemp -d)")"
+mkdir -p "$demo_root/missing-description-demo"
+printf -- '---\nname: missing-description-demo\n---\n\n# Demo\n' \
+  > "$demo_root/missing-description-demo/SKILL.md"
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate "$demo_root/missing-description-demo" --source-revision deadbeefdeadbeefdeadbeefdeadbeefdeadbeef --json --robot
+```
+
+That returns `"status": "blocked"` and exit `2`, with a finding whose `code` is
+`missing_description` and whose `evidence_refs` name `SKILL.md`, alongside
+`"mutation_performed": false`. Validation reports the missing field; it does not
+repair the source. Add the description in the package yourself, then rerun the
+same command:
+
+```bash
+printf -- '---\nname: missing-description-demo\ndescription: Disposable synthetic package used only to demonstrate recovering from a missing description.\n---\n\n# Demo\n' \
+  > "$demo_root/missing-description-demo/SKILL.md"
+```
+
+The rerun returns `"status": "pass"` and exit `0`, with an `identity` and no
+findings, and leaves the package bytes unchanged: only your edit changed them.
+That pass is still structural, and the synthetic revision authenticates
+nothing. See [the authoring contract](workflow.md#skill-authoring-contract) for
+the semantic, execution and release checks it does not grant.
