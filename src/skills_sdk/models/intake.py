@@ -13,15 +13,21 @@ from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import MAX_JSON_NESTING_DEPTH
 from skills_sdk.models.inventory import GitRevision, NonEmptyText, PortablePath, _ContractModel
 from skills_sdk.models.package import (
+    ArchivePackageSource,
+    ArchiveSourceProvenance,
     IntakeChecks,
     IntakeDecision,
     IntakeDecisionStatus,
     NormalizedPackage,
+    NormalizedPackageV2,
+    NormalizedPackageV3,
     PackageCandidateIdentity,
     PackageLifecycleState,
     PackageOwner,
     PackageSource,
     PackageSourceKind,
+    SavedReleasePackageSource,
+    SavedReleaseProvenance,
 )
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.validation import SkillPackageValidation, ValidationSeverity
@@ -243,16 +249,7 @@ class SkillPackageIntakeReceipt(_ContractModel):
                 raise ValueError("normalized intake cannot assert dependency metadata")
             if self.source.package_id != self.candidate.package_id:
                 raise ValueError("intake source must bind the candidate package")
-            if self.source.provenance.revision != self.candidate.source_revision:
-                raise ValueError("intake source revision must bind the candidate")
-            if self.source.provenance.content_sha256 != self.candidate.content_sha256:
-                raise ValueError("intake source digest must bind the candidate")
-            if self.source.provenance.repository != self.context.source_repository:
-                raise ValueError("intake source repository must match the context")
-            if self.source.provenance.path != self.context.source_path:
-                raise ValueError("intake source path must match the context")
-            if self.source.source_kind != self.context.source_kind:
-                raise ValueError("intake source kind must match the context")
+            self._require_source_binding()
             if self.decision.candidate != self.candidate:
                 raise ValueError("intake decision must bind the candidate")
             if self.decision.checks != self.context.checks:
@@ -298,5 +295,95 @@ class SkillPackageIntakeReceipt(_ContractModel):
                     raise ValueError("blocked intake decision must match its persisted evidence")
         return self
 
+    def _require_source_binding(self) -> None:
+        """Preserve the frozen repository-backed intake source comparisons."""
+        assert self.source is not None and self.candidate is not None
+        if self.source.provenance.revision != self.candidate.source_revision:
+            raise ValueError("intake source revision must bind the candidate")
+        if self.source.provenance.content_sha256 != self.candidate.content_sha256:
+            raise ValueError("intake source digest must bind the candidate")
+        if self.source.provenance.repository != self.context.source_repository:
+            raise ValueError("intake source repository must match the context")
+        if self.source.provenance.path != self.context.source_path:
+            raise ValueError("intake source path must match the context")
+        if self.source.source_kind != self.context.source_kind:
+            raise ValueError("intake source kind must match the context")
 
-__all__ = ["SkillPackageIntakeContext", "SkillPackageIntakeReceipt", "build_intake_decision"]
+
+class SkillPackageIntakeContextV2(_ContractModel):
+    """Supplied saved-release provenance without a repository-shaped substitute."""
+
+    model_config = ConfigDict(revalidate_instances="always")
+    schema_version: Literal["skill-package-intake-context/v2"] = "skill-package-intake-context/v2"
+    source: SavedReleaseProvenance
+    owner: PackageOwner = Field(json_schema_extra=_OWNER_PUBLIC_SCHEMA)
+    checks: IntakeChecks
+
+    @model_validator(mode="before")
+    @classmethod
+    def evidence_must_be_bounded(cls, value: object) -> object:
+        """Reuse bounded raw-input and forged-instance revalidation."""
+        return _intake_evidence_data(value)
+
+    @field_validator("owner", mode="before")
+    @classmethod
+    def owner_must_be_public(cls, value: object) -> object:
+        """Keep legacy owner-text checks on the additive source route."""
+        return _public_owner_metadata(value)
+
+    @field_validator("checks", mode="before")
+    @classmethod
+    def checks_must_be_booleans(cls, value: object) -> object:
+        """Keep raw admission decisions strict without asserting they are verified."""
+        return SkillPackageIntakeContext.checks_must_be_booleans(value)
+
+    @property
+    def source_revision(self) -> str:
+        """Expose the selected snapshot revision to existing quality binding checks."""
+        return self.source.candidate.source_revision
+
+
+class SkillPackageIntakeReceiptV2(SkillPackageIntakeReceipt):
+    """Versioned saved-release intake with unchanged validation and admission semantics."""
+
+    schema_version: Literal["skill-package-intake/v2"] = "skill-package-intake/v2"
+    context: SkillPackageIntakeContextV2
+    source: SavedReleasePackageSource | None = None
+    normalized_package: NormalizedPackageV2 | None = Field(
+        default=None, json_schema_extra={"properties": {"owner": _OWNER_PUBLIC_SCHEMA}}
+    )
+
+    def _require_source_binding(self) -> None:
+        """Bind the retained source descriptor and child to the actual capture."""
+        assert self.source is not None
+        if self.source.provenance != self.context.source or self.candidate != self.context.source.candidate:
+            raise ValueError("saved intake source must match the selected child and context")
+
+
+class SkillPackageIntakeContextV3(SkillPackageIntakeContextV2):
+    """Local recovery archive with no claimed upstream release metadata."""
+
+    schema_version: Literal["skill-package-intake-context/v3"] = "skill-package-intake-context/v3"
+    source: ArchiveSourceProvenance
+
+
+class SkillPackageIntakeReceiptV3(SkillPackageIntakeReceiptV2):
+    """Archive intake retains the same source binding and fail-closed admission."""
+
+    schema_version: Literal["skill-package-intake/v3"] = "skill-package-intake/v3"
+    context: SkillPackageIntakeContextV3
+    source: ArchivePackageSource | None = None
+    normalized_package: NormalizedPackageV3 | None = Field(
+        default=None, json_schema_extra={"properties": {"owner": _OWNER_PUBLIC_SCHEMA}}
+    )
+
+
+__all__ = [
+    "SkillPackageIntakeContext",
+    "SkillPackageIntakeContextV2",
+    "SkillPackageIntakeContextV3",
+    "SkillPackageIntakeReceipt",
+    "SkillPackageIntakeReceiptV2",
+    "SkillPackageIntakeReceiptV3",
+    "build_intake_decision",
+]

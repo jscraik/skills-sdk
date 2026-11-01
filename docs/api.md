@@ -945,6 +945,75 @@ spending. See [CLI input boundaries](cli.md#matched-evaluation) and
 
 ## Read-only intake
 
+### Local recovery archive candidate
+
+The local repair adds explicit archive-source families for user-supplied recovery
+inputs whose upstream release identity is unknown. `ArchiveSourceSnapshot` binds
+the supplied archive SHA-256, plugin version, whole-plugin candidate and modes;
+`acquisition` is `user-supplied-recovery` and `upstream_release` is null. Its
+canonical `binding_sha256` checks descriptor consistency, not archive origin or
+issuer authority. The caller retains acquisition paths and owner decisions in
+private task evidence, outside portable receipts. No repository, HTTPS locator
+or remote release identifier is fabricated.
+
+`ArchiveSourceProvenance` binds the selected child to that snapshot.
+`SkillPackageIntakeContextV3` and `skill-package-intake/v3` use it through the
+existing `intake_skill_package` service. `PluginQualityRequestV3` uses
+`local-check-request/v4` children and the existing `check-plugin-quality` CLI;
+results are `plugin-quality/v3` with `local-check/v4` children. Source is freshly
+recaptured; whole-plugin version, modes, selected child and snapshot agreement
+remain mandatory. Supplied false admission checks still stop the workflow.
+
+These are local repair contracts pending full validation and delivery. They do
+not establish that an attached archive came from a saved platform release.
+Archive digest consistency does not verify the original ZIP against its source
+tree; the acquisition boundary must retain that mapping. A caller cannot make
+an unknown issuer authentic by recomputing a binding digest. Owner assertions,
+trusted safety ingress, semantic review, evaluation, publication and installed
+runtime proof remain separate. Existing repository and saved-release versions
+retain their original restrictions.
+
+### Saved-release source candidate
+
+The local saved-release implementation uses explicit new families rather than
+relaxing repository-backed intake. `SavedReleaseSnapshot` records a canonical
+HTTPS locator, source and release IDs, version, archive SHA-256, whole-plugin
+candidate and mode digest. Its `binding_sha256` is the canonical JSON digest of
+all its other fields, including `schema_version`. This detects inconsistent
+changes to a supplied descriptor; anyone can recompute it. It authenticates
+neither an issuer nor current remote state. A snapshot revision may identify a
+documented saved source state; it must not be described as an authoring Git
+commit unless that provenance was independently established.
+
+`SavedReleaseProvenance` adds the selected child path and candidate.
+`SkillPackageIntakeContextV2` uses `source`, `owner` and `checks`, with no
+`source_repository` field. `intake_skill_package` accepts this explicit context
+version and returns `skill-package-intake/v2` with a
+`saved-release-package-source/v1` and `normalized-package/v2`. It freshly
+captures the child and rejects a changed candidate. A normalized source can
+still have a blocked admission decision; supplied false checks remain false.
+
+For whole-plugin quality, `PluginQualityRequestV2` adds `source_snapshot` and
+uses `LocalCheckRequestV3` children containing the new intake context. The
+existing `check_plugin_quality` service and `check-plugin-quality` CLI dispatch
+on `plugin-quality-request/v2` and retain `plugin-quality/v2` output, with
+`local-check/v3` child results. Root identity, modes, manifest version and every
+selected child must agree before child checks. Existing validation, admission,
+scenario, scorer, content and presentation gates still apply. Unparseable input
+retains the existing generic blocked-output convention.
+
+These are local implementation candidates, not accepted release or live-provider
+proof. `SchemaRegistry.validate` applies model semantics to the new resources;
+plain JSON Schema cannot compare fingerprints and candidate bindings. Neither
+representation nor successful quality composition grants execution, publication,
+rights, authenticated-review or installation authority. The original intake v1,
+local-quality v2 and plugin-quality v1 contracts remain unchanged and reject
+these new versioned shapes. The standalone `intake` and `check-local` CLI routes
+continue to require their original v1 context; use the versioned quality route
+or the public intake API for saved-source inspection.
+
+### Repository-backed intake
+
 `source_repository` accepts a credential-free `owner/repository` slug, not a
 URL or a local checkout path. Raw intake checks must be actual booleans.
 Existing `IntakeChecks` instances are accepted using their current boolean
@@ -1283,6 +1352,62 @@ generic base receipt schema. Missing or non-string versions fail with
 Pydantic semantic validation but are not generic receipts: generic receipt
 parsing must not reinterpret intended runtime state or a non-mutating plan as
 evidence that installation occurred.
+
+### Trusted local review before matched execution
+
+`skills_sdk.evaluation.local_review_admission.execute_reviewed_matched_lane`
+is an additive Python entrypoint for hosts requiring independently authorised
+source review before the existing matched executor. Supply the normal plan,
+lane, calibrations and ten paired executions, plus keyword-only
+`authority=LocalReviewAuthority(policy, host)`. It returns the existing `MatchedExecutionReceipt` after
+all original execution gates; review-admission failures raise `ContractError`
+before provider or judge property access.
+
+The caller constructs `LocalReviewPolicy` and one `LocalReviewExpectation` per
+distinct whole-plugin candidate, covering both variants. These frozen Python
+dataclasses are host configuration, not portable receipts. Policy binds the
+plan digest, operation, purpose, complete file and mode commitments, exact
+native Codex thread/turn/final-message identities, completion time, event bytes
+and report text. Report hashing uses UTF-8 text followed by one newline.
+The host operation lasts at most 600 seconds; review age is at most 3600
+seconds from actual completion. Retrieval never resets that age.
+
+The trusted `LocalReviewHost` implements `resolve_review(expected)` and
+`consume(operation_id, policy_sha256)`. Resolution returns at most 256 KiB of
+the exact native event bytes. The host independently obtains the event and
+chooses issuer, scope and report disposition outside package data. The SDK
+checks the commitment; it does not decide whether natural-language findings
+have been resolved. A host must not authorise a report with outstanding
+applicable findings. Package metadata, a report file or a supplied boolean
+cannot select or substitute this host capability.
+
+The event must be a JSON object that meets these rules:
+- It has no duplicate keys at any level. The top-level object must not contain `policy` or `resolver`.
+- `thread.kind` must be `codex`, and `thread.id` must equal `thread_id`.
+- Exactly one turn must match `turn_id`. That turn must have status `completed`, a null `error`, and an integer `completedAt` equal to `completed_at`.
+- Exactly one item in that turn must match `message_id`. That item must have type `agentMessage`, phase `final_answer`, and string `text`.
+
+Consumption must atomically reject reused operations across process restarts.
+Only exact `True` admits first use. Missing, uncertain or failed consumption
+blocks the strict route. Host `OSError`, `RuntimeError`, `AttributeError`,
+`KeyError`, `IndexError`, `TypeError`, `ValueError` and `RecursionError`
+exceptions become `ContractError` with code `local_review_admission_failed`.
+An existing host `ContractError` passes through unchanged, including its code.
+Other host exceptions propagate without entering the executor.
+An operation stays spent when later checks fail; inspecting state
+and authorising a new operation belongs to the host. Do not clear consumption
+state merely to retry. Source is rechecked around host calls, including after
+consumption. Existing matched preflight still checks calibration, safety,
+settings, budgets and the complete batch.
+
+This interface does not provide native event retrieval, replay storage,
+credentials or a sandbox. Hosts must bound their callbacks and preserve the
+independent policy boundary. Static screening, scanner coverage, permission
+deltas and containment remain separate obligations. Success does not grant
+model execution, publication or installation authority, and does not accept a
+lifecycle stage. Direct `execute_matched_lane` and supplied safety APIs retain
+their existing unauthenticated-evidence semantics; they do not satisfy this
+strict review-authority requirement.
 
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test

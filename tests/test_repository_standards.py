@@ -4,12 +4,12 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
 
 from scripts.check_repository_standards import (
-    PR_TEMPLATE_BOOTSTRAP_BASE,
     PYTHON_ROOTS,
     REQUIRED_MYPY_FILES,
     _config_findings,
@@ -356,7 +356,7 @@ def test_tool_pin_drift_is_rejected() -> None:
             ]
         },
     }
-    mise = {"tools": {"python": "3.12", "uv": "0.11.3", "ruff": "0.15.22", "vale": "3.18.0"}}
+    mise = {"tools": {"python": "3.12", "uv": "0.13.5", "ruff": "0.15.22", "vale": "3.18.0"}}
     lock = {
         "package": [
             {"name": "mypy", "version": "1.18.1"},
@@ -372,6 +372,19 @@ def test_tool_pin_drift_is_rejected() -> None:
     assert any(finding.code == "tool-pin" for finding in findings)
     assert any("vale" in finding.message for finding in findings)
     assert any(finding.code == "lock-pin" for finding in findings)
+
+
+@pytest.mark.parametrize(("uv_version", "rejected"), [("0.13.5", False), ("0.13.4", True), ("0.11.3", True)])
+def test_uv_cli_security_pin_is_enforced(uv_version: str, rejected: bool) -> None:
+    pyproject = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    mise = tomllib.loads((REPOSITORY_ROOT / ".mise.toml").read_text(encoding="utf-8"))
+    lock = tomllib.loads((REPOSITORY_ROOT / "uv.lock").read_text(encoding="utf-8"))
+    mise["tools"]["uv"] = uv_version
+
+    findings = _tool_pin_findings(pyproject, mise, lock)
+
+    assert any(finding.message == "uv must be pinned to 0.13.5" for finding in findings) is rejected
+    assert pyproject["build-system"]["requires"] == ["uv_build==0.11.3"]
 
 
 def test_ci_rejects_repository_validation_without_mise_vale_bootstrap(tmp_path: Path) -> None:
@@ -505,15 +518,14 @@ def test_ci_rejects_unenforced_pr_template_contract(tmp_path: Path) -> None:
 
 
 def test_ci_fetches_live_pr_body_for_template_validation() -> None:
-    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
-
-    assert "pull-requests: read" in workflow
-    assert 'gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"' in workflow
+    workflow = (REPOSITORY_ROOT / "scripts/circleci_pr_contract.sh").read_text(encoding="utf-8")
+    assert "GITHUB_PERSONAL_ACCESS_TOKEN" not in workflow
+    assert '"https://api.github.com/repos/$repo/pulls/$PR_NUMBER"' in workflow
     assert '--body-file "$body_file"' in workflow
     assert "for attempt in 1 2 3 4" in workflow
     assert "github.event.pull_request.body" not in workflow
-    assert 'install_args: "python uv ruff vale"' in workflow
-    assert "persist-credentials: false" in workflow
+    assert 'git show "$BASE_SHA:.github/scripts/validate_pr_template_body.py"' in workflow
+    assert 'git show "$BASE_SHA:.github/PULL_REQUEST_TEMPLATE.md"' in workflow
 
 
 def test_ci_rejects_trusted_base_left_in_validation_workspace(tmp_path: Path) -> None:
@@ -723,13 +735,6 @@ def test_ci_rejects_unbound_candidate_validator_bootstrap(tmp_path: Path) -> Non
     findings = _config_findings(tmp_path)
 
     assert any(finding.code == "pr-template-bootstrap" for finding in findings)
-
-
-def test_ci_binds_candidate_validator_fallback_to_approved_base() -> None:
-    workflow = (REPOSITORY_ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
-
-    assert f"bootstrap_base={PR_TEMPLATE_BOOTSTRAP_BASE}" in workflow
-    assert '${{ github.event.pull_request.base.sha }}" != "$bootstrap_base' in workflow
 
 
 def test_malformed_indentation_is_a_typed_tokenize_finding(tmp_path: Path) -> None:

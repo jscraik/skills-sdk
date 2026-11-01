@@ -476,6 +476,35 @@ instances cannot bypass the intake boundary or coerce non-boolean checks.
 Repository slugs are checked before whitespace stripping or byte decoding;
 direct model and service callers cannot normalize invalid raw locators.
 
+The local archive-source repair adds `archive-source-snapshot/v1`,
+`archive-source-provenance/v1`, `archive-package-source/v1`,
+`normalized-package/v3`, `skill-package-intake-context/v3`,
+`skill-package-intake/v3`, `local-check-request/v4`, `local-check/v4`,
+`plugin-quality-request/v3` and `plugin-quality/v3`. Unknown upstream release
+identity stays null; old saved-release and repository contracts reject these
+new shapes. The archive source reuses maintained read-only callers and does not
+grant admission, provider, registry or installation authority. The repair
+requires its own schema, focused, full-validation and delivery proof.
+
+The saved-release candidate preserves those v1 restrictions. It adds
+`saved-release-snapshot/v1`, `saved-release-provenance/v1`,
+`saved-release-package-source/v1`, `normalized-package/v2`,
+`skill-package-intake-context/v2` and `skill-package-intake/v2`. Nested quality
+contracts use `local-check-request/v3`, `local-check/v3`,
+`plugin-quality-request/v2` and `plugin-quality/v2`; older families reject the
+new shapes. No candidate identity or original repository-backed context is
+reinterpreted. Source locators remain locators, never fabricated repository
+slugs. A saved-source snapshot revision is not automatically a Git commit.
+
+The maintained quality caller dispatches only explicit versions and preserves
+first-stop ordering, raw boolean checks, owner-text screening and read-only
+source recapture. Local descriptor fingerprints detect inconsistent changes;
+recomputing one does not authenticate a release or refresh external evidence.
+Callers still own independently obtained provenance, rights and remote
+freshness. A source or mode change invalidates the affected binding. New schemas
+advertise required `SchemaRegistry.validate` semantic checks; structural schema
+validation alone cannot establish those comparisons or any live acceptance.
+
 `package-inventory/v2` and `package-inventory-set/v2` add the explicit
 `needs_review` value decision for candidates whose value evidence is still
 blocked. The corresponding `v1` models and schemas remain unchanged and reject
@@ -970,6 +999,24 @@ contained `.codex-plugin/plugin.json`, `assets/icon.txt`, and `scripts/mcp.js`;
 none appeared in that archive listing. This is an archive-content observation,
 not a claim that the existing Tessl-format wrapper for skill evaluation is
 absent or unusable.
+
+### Additive trusted-host local review
+
+`evaluation.local_review_admission` adds a strict Python caller before matched
+execution. It composes the existing executor without changing portable schema
+versions, safety authenticity flags, callback receipts or legacy supplied-evidence
+acceptance. Hosts adopting it must provide independently selected review policy,
+native-event resolution and restart-safe consumption; a candidate cannot supply
+those capabilities. A synthetic host tests the integration path, not real issuer
+authority. A previously retrieved review remains historical after expiry.
+
+The strict caller raises a typed admission error before execution capability
+access on invalid authority, and retains the original executor's blocked or
+completed result after admission. A consumed operation is not automatically
+refunded when later preflight blocks. Removing the additive caller is a local
+code rollback, not authority to run through the legacy route: a deployment
+requiring trusted review must remain blocked until an equivalent route exists.
+No new registry, native transport, scanner or installation behavior is implied.
 
 Compatibility question for Tessl: what documented manifest field or package
 layout includes *all* required plugin resources, including canonical root

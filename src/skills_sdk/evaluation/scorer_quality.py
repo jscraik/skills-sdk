@@ -9,11 +9,12 @@ from typing import cast
 
 import yaml
 
-from skills_sdk.evaluation.quality import _TOP_FIELDS, _ClosedLoader
+from skills_sdk.evaluation.quality import _TOP_FIELDS
 from skills_sdk.evaluation.scorer_artifacts import read_candidate_artifact
 from skills_sdk.models.scenario_quality import ScenarioQualityFinding
 from skills_sdk.models.scorer_quality import ScorerJudgeParameters, ScorerQualityReceipt
 from skills_sdk.validation import validate_skill_package
+from skills_sdk.validation.yaml_cache import load_closed_yaml
 
 _EVALS = "references/evals.yaml"
 _SCORER_TYPES = {"deterministic", "llm_judge", "hybrid", "external_tessl"}
@@ -235,7 +236,7 @@ def assess_scorer_quality(package_root: Path, *, source_revision: str) -> Scorer
     if validation.status == "pass":
         try:
             raw = read_candidate_artifact(package_root, validation, _EVALS)
-            payload = yaml.load(raw.decode("utf-8"), Loader=_ClosedLoader)
+            payload = load_closed_yaml(raw.decode("utf-8"))
             if isinstance(payload, Mapping):
                 if set(payload) - _TOP_FIELDS:
                     findings.append(_finding("unsupported_evals_field", "evals.yaml has unsupported fields"))

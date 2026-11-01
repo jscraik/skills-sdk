@@ -22,7 +22,7 @@ from skills_sdk.models.scenario_quality import (
 )
 from skills_sdk.models.validation import SkillPackageValidation
 from skills_sdk.validation import validate_skill_package
-from skills_sdk.validation.safe_yaml import _ClosedLoader
+from skills_sdk.validation.yaml_cache import load_closed_yaml
 
 _EVALS_PATH = "references/evals.yaml"
 _MAX_EVALS_BYTES = 1_048_576
@@ -329,7 +329,7 @@ def _load_evals_payload(
 ) -> object:
     try:
         raw = _capture_evals(package_root, expected_sha256)
-        return yaml.load(raw.decode("utf-8"), Loader=_ClosedLoader)
+        return load_closed_yaml(raw.decode("utf-8"))
     except UnicodeDecodeError:
         findings.append(_finding("invalid_evals_utf8", "evals.yaml must be UTF-8"))
     except ValueError as error:

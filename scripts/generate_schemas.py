@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import package_safety_schema
-from intake_schema import append_intake_constraints
+from intake_schema import append_intake_family_constraints
 from local_check_schema import append_local_check_constraints
 from package_archive_schema import append_package_archive_constraints
 from pre_execution_safety_schema import append_pre_execution_safety_constraints
@@ -725,8 +725,6 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         append_local_check_constraints(schema)
     elif filename in {"package-inventory.v2.schema.json", "package-inventory-set.v2.schema.json"}:
         _append_inventory_v2_constraints(schema, filename)
-    elif filename == "skill-package-intake.v1.schema.json":
-        append_intake_constraints(schema)
     elif filename == "package-archive-verification.v1.schema.json":
         append_package_archive_constraints(schema)
     elif filename == "registry-preparation.v1.schema.json":
@@ -744,6 +742,7 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
         "runtime-outcome.v1.schema.json",
     }:
         append_runtime_lifecycle_constraints(schema, filename)
+    append_intake_family_constraints(schema, filename)
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = f"https://schemas.skills-sdk.dev/{filename}"
     return json.dumps(schema, indent=2, sort_keys=True) + "\n"

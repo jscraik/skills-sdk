@@ -28,7 +28,15 @@ from skills_sdk.models.evaluation_v2 import (
     ScenarioObservationV2,
     ScenarioSetV2,
 )
-from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt, build_intake_decision
+from skills_sdk.models.intake import (
+    SkillPackageIntakeContext,
+    SkillPackageIntakeContextV2,
+    SkillPackageIntakeContextV3,
+    SkillPackageIntakeReceipt,
+    SkillPackageIntakeReceiptV2,
+    SkillPackageIntakeReceiptV3,
+    build_intake_decision,
+)
 from skills_sdk.models.inventory import (
     FormatChecks,
     MantraAssessment,
@@ -89,10 +97,15 @@ from skills_sdk.models.observed_calibration import (
     ObservedCalibrationReceipt,
 )
 from skills_sdk.models.package import (
+    ArchivePackageSource,
+    ArchiveSourceProvenance,
+    ArchiveSourceSnapshot,
     IntakeChecks,
     IntakeDecision,
     IntakeDecisionStatus,
     NormalizedPackage,
+    NormalizedPackageV2,
+    NormalizedPackageV3,
     OwnershipState,
     PackageCandidateIdentity,
     PackageLifecycleState,
@@ -100,6 +113,9 @@ from skills_sdk.models.package import (
     PackageSource,
     PackageSourceKind,
     PluginIdentity,
+    SavedReleasePackageSource,
+    SavedReleaseProvenance,
+    SavedReleaseSnapshot,
     SkillIdentity,
 )
 from skills_sdk.models.packaging import (
@@ -131,7 +147,14 @@ from skills_sdk.models.plugin_presentation import (
     PluginPresentationImage,
     PluginPresentationRequest,
 )
-from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityResult
+from skills_sdk.models.plugin_quality import (
+    PluginQualityRequest,
+    PluginQualityRequestV2,
+    PluginQualityRequestV3,
+    PluginQualityResult,
+    PluginQualityResultV2,
+    PluginQualityResultV3,
+)
 from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 from skills_sdk.models.pre_execution_safety import CapabilitySafetyReview, PreExecutionSafetyEvidence
@@ -150,7 +173,11 @@ from skills_sdk.models.provider_execution import (
 )
 from skills_sdk.models.quality_workflow import (
     LocalCheckRequestV2,
+    LocalCheckRequestV3,
+    LocalCheckRequestV4,
     LocalCheckResultV2,
+    LocalCheckResultV3,
+    LocalCheckResultV4,
     LocalQualityPolicy,
     LocalQualityStage,
 )
@@ -201,6 +228,9 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 
 __all__ = [
     "ActivationObservation",
+    "ArchivePackageSource",
+    "ArchiveSourceProvenance",
+    "ArchiveSourceSnapshot",
     "CalibrationJudgeVerdict",
     "CapabilitySafetyReview",
     "ClaimCoverage",
@@ -224,7 +254,11 @@ __all__ = [
     "IntakeDecision",
     "IntakeDecisionStatus",
     "LocalCheckRequestV2",
+    "LocalCheckRequestV3",
+    "LocalCheckRequestV4",
     "LocalCheckResultV2",
+    "LocalCheckResultV3",
+    "LocalCheckResultV4",
     "LocalQualityPolicy",
     "LocalQualityStage",
     "MantraAssessment",
@@ -256,6 +290,8 @@ __all__ = [
     "MatchedVariantJudgment",
     "MutationRaceEvidence",
     "NormalizedPackage",
+    "NormalizedPackageV2",
+    "NormalizedPackageV3",
     "ObservedCalibrationPlan",
     "ObservedCalibrationProbeResult",
     "ObservedCalibrationReceipt",
@@ -300,7 +336,11 @@ __all__ = [
     "PluginPresentationImage",
     "PluginPresentationRequest",
     "PluginQualityRequest",
+    "PluginQualityRequestV2",
+    "PluginQualityRequestV3",
     "PluginQualityResult",
+    "PluginQualityResultV2",
+    "PluginQualityResultV3",
     "PluginSkillBinding",
     "PluginValidationPolicy",
     "PortablePluginManifest",
@@ -339,6 +379,9 @@ __all__ = [
     "RuntimeOutcomeReceipt",
     "RuntimeTarget",
     "RuntimeVisibility",
+    "SavedReleasePackageSource",
+    "SavedReleaseProvenance",
+    "SavedReleaseSnapshot",
     "ScenarioCase",
     "ScenarioCaseResult",
     "ScenarioCaseResultV2",
@@ -367,7 +410,11 @@ __all__ = [
     "SkillIdentity",
     "SkillPackageFinding",
     "SkillPackageIntakeContext",
+    "SkillPackageIntakeContextV2",
+    "SkillPackageIntakeContextV3",
     "SkillPackageIntakeReceipt",
+    "SkillPackageIntakeReceiptV2",
+    "SkillPackageIntakeReceiptV3",
     "SkillPackageValidation",
     "SourceProvenance",
     "TextProviderAdapterDescriptor",

@@ -32,6 +32,7 @@ from skills_sdk.models.safety import PackageSafetyBlocker
 from skills_sdk.models.scorer_quality import ScorerJudgeParameters
 from skills_sdk.providers import JsonValue, ProviderAdapterComplete
 from skills_sdk.providers.types import ProviderAdapterStreamItem
+from skills_sdk.validation.yaml_cache import yaml_parse_scope
 
 
 @dataclass(slots=True)
@@ -303,6 +304,13 @@ async def execute_matched_lane(
     This route observes one model lane. It does not grant cloud handoff, registry
     admission or promotion; the local-before-cloud feedback route is separate.
     """
+    with yaml_parse_scope():
+        return await _execute_matched_lane(plan, lane, calibrations, executions)
+
+
+async def _execute_matched_lane(
+    plan: object, lane: str, calibrations: tuple[object, object], executions: tuple[MatchedCaseExecution, ...]
+) -> MatchedExecutionReceipt:
     parsed: MatchedComparisonPlan | None = None
     selected: Literal["local", "cloud"] | None = None
     try:

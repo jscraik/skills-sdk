@@ -17,7 +17,7 @@ from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.deterministic_v2 import evaluate_scenario_set_v2
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput, assess_pre_execution_safety
-from skills_sdk.evaluation.quality import _capture_evals, _ClosedLoader
+from skills_sdk.evaluation.quality import _capture_evals
 from skills_sdk.evaluation.selected_case_checks import _category, _check_contract_digest
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2, ScenarioCaseV2, ScenarioObservationV2, ScenarioSetV2
@@ -36,6 +36,7 @@ from skills_sdk.providers import (
 )
 from skills_sdk.providers.call import _normalize_json
 from skills_sdk.validation import validate_skill_package
+from skills_sdk.validation.yaml_cache import load_closed_yaml
 
 EvaluationMode = Literal["smoke", "release"]
 SemanticAssertion = tuple[str, str, tuple[str, ...], tuple[str, ...]]
@@ -121,7 +122,7 @@ def _evals_digest(validation_files: tuple[PackageManifestFile, ...]) -> str:
 def _load_cases(package_root: Path, expected_sha256: str, package_id: str) -> list[object]:
     """Load candidate-bound cases from the validated evaluation document."""
     try:
-        payload = yaml.load(_capture_evals(package_root, expected_sha256).decode("utf-8"), Loader=_ClosedLoader)
+        payload = load_closed_yaml(_capture_evals(package_root, expected_sha256).decode("utf-8"))
     except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
         raise _contract_error("invalid_eval_definitions", "package eval definitions could not be loaded") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("cases"), list):

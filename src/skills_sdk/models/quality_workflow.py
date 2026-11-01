@@ -16,7 +16,15 @@ from skills_sdk.models.content_review import (
     ContentReviewResult,
 )
 from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
-from skills_sdk.models.intake import SkillPackageIntakeContext, SkillPackageIntakeReceipt, _intake_evidence_data
+from skills_sdk.models.intake import (
+    SkillPackageIntakeContext,
+    SkillPackageIntakeContextV2,
+    SkillPackageIntakeContextV3,
+    SkillPackageIntakeReceipt,
+    SkillPackageIntakeReceiptV2,
+    SkillPackageIntakeReceiptV3,
+    _intake_evidence_data,
+)
 from skills_sdk.models.inventory import PortablePath, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import PackageReceiptBlocker
@@ -454,4 +462,102 @@ class LocalCheckResultV2(_ContractModel):
         return True
 
 
-__all__ = ["LocalCheckRequestV2", "LocalCheckResultV2", "LocalQualityPolicy", "LocalQualityStage"]
+class LocalCheckRequestV3(LocalCheckRequestV2):
+    """Explicit saved-release quality input; v2 retains repository-only intake."""
+
+    schema_version: Literal["local-check-request/v3"] = "local-check-request/v3"
+    intake: SkillPackageIntakeContextV2
+
+    @model_validator(mode="after")
+    def saved_child_matches(self) -> LocalCheckRequestV3:
+        """Reject another child or revision before any quality stage starts."""
+        if self.candidate != self.intake.source.candidate or self.intent != "external-check":
+            raise ValueError("saved-release quality requires its exact external-check child")
+        return self
+
+
+class LocalQualityStageV2(LocalQualityStage):
+    """Carry the new intake receipt without broadening old stage envelopes."""
+
+    receipt: (
+        SkillPackageValidation
+        | SkillPackageIntakeReceiptV2
+        | ScenarioCoverageResult
+        | ScorerQualityReceipt
+        | ScorerCalibrationReceipt
+        | ContentReviewResult
+        | ContentReviewExecutionResult
+    )
+
+    @model_validator(mode="after")
+    def receipt_matches_name(self) -> LocalQualityStageV2:
+        """Reuse all existing stage kinds except the explicitly versioned intake."""
+        expected = (SkillPackageIntakeReceiptV2,) if self.name == "intake" else _QUALITY_TYPES[self.name]
+        if type(self.receipt) not in expected:
+            raise ValueError("quality stage must use its canonical receipt type")
+        capture = self.receipt.validation if isinstance(self.receipt, SkillPackageIntakeReceiptV2) else self.receipt
+        if isinstance(capture, SkillPackageValidation):
+            _validation_manifest_matches(capture)
+        return self
+
+
+class LocalCheckResultV3(LocalCheckResultV2):
+    """Saved-release quality result preserving ordered checks and authority limits."""
+
+    schema_version: Literal["local-check/v3"] = "local-check/v3"
+    request: LocalCheckRequestV3 | None
+    stages: tuple[LocalQualityStageV2, ...] = ()
+
+
+class LocalCheckRequestV4(LocalCheckRequestV3):
+    """Archive-backed external check, preserving old request source boundaries."""
+
+    schema_version: Literal["local-check-request/v4"] = "local-check-request/v4"
+    intake: SkillPackageIntakeContextV3
+
+
+class LocalQualityStageV3(LocalQualityStageV2):
+    """Only the new archive intake receipt changes the stage envelope."""
+
+    receipt: (
+        SkillPackageValidation
+        | SkillPackageIntakeReceiptV3
+        | ScenarioCoverageResult
+        | ScorerQualityReceipt
+        | ScorerCalibrationReceipt
+        | ContentReviewResult
+        | ContentReviewExecutionResult
+    )
+
+    @model_validator(mode="after")
+    def receipt_matches_name(self) -> LocalQualityStageV3:
+        """Keep canonical receipt checks and captured manifest consistency."""
+        expected = (SkillPackageIntakeReceiptV3,) if self.name == "intake" else _QUALITY_TYPES[self.name]
+        if type(self.receipt) not in expected:
+            raise ValueError("quality stage must use its canonical receipt type")
+        capture = self.receipt.validation if isinstance(self.receipt, SkillPackageIntakeReceiptV3) else self.receipt
+        if isinstance(capture, SkillPackageValidation):
+            _validation_manifest_matches(capture)
+        return self
+
+
+class LocalCheckResultV4(LocalCheckResultV3):
+    """Archive quality result; never execution, publication or release clearance."""
+
+    schema_version: Literal["local-check/v4"] = "local-check/v4"
+    request: LocalCheckRequestV4 | None
+    stages: tuple[LocalQualityStageV3, ...] = ()
+
+
+__all__ = [
+    "LocalCheckRequestV2",
+    "LocalCheckRequestV3",
+    "LocalCheckRequestV4",
+    "LocalCheckResultV2",
+    "LocalCheckResultV3",
+    "LocalCheckResultV4",
+    "LocalQualityPolicy",
+    "LocalQualityStage",
+    "LocalQualityStageV2",
+    "LocalQualityStageV3",
+]

@@ -64,8 +64,10 @@ examine named failure mechanisms and the complete candidate; a clean focused
 repair review proves only its inspected scope.
 
 Complete known in-scope corrections before requesting fresh hosted review.
-Run focused proof during repair and the required aggregate on the final
-candidate. Repeat checks only after relevant changes, failures, or uncovered
+Run focused proof during repair and require the appropriate hosted aggregate
+on the final candidate or verified merge result before merge. A full local run
+is optional when permitted, not a prerequisite to commit or PR creation.
+Repeat checks only after relevant changes, failures, or uncovered
 risks. Keep one writer per branch. A signing, CI, or review blocker stops only
 dependent actions; continue independent authorized diagnosis and local work.
 
@@ -86,14 +88,53 @@ After merge, reconcile the accepted revision in the task record before selecting
 the next slice. Unmerged work remains labelled separately. Link and entrypoint
 checks must not infer semantic completeness, live execution or migration parity.
 
-Run:
+Prepare the pinned environment when needed, within the task's installation,
+network and cache authority:
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
-bash scripts/validate-codestyle.sh
-bash scripts/validate-repository.sh
 ```
+
+### Before commit and PR
+
+Run the smallest checks that prove the changed behaviour, its rejected and
+boundary cases, applicable schema/compatibility checks, and diff hygiene.
+Run applicable codestyle checks through permitted maintained entrypoints.
+Use `bash scripts/validate-codestyle.sh` when that route is available. Select
+configuration checks by their operational effect: validate structure and any
+changed triggers, permissions, destinations, dependencies or spending controls.
+Do not treat arbitrary configuration as ordinary prose.
+
+Record exact commands and outcomes in the PR. A missing local tool or denied
+wrapper is a blocked evidence lane, not a test failure or a passing result.
+Do not bypass the restriction or make manual terminal execution a delivery
+prerequisite. A reviewable PR may proceed through normal signing and create
+readiness gates, within its remote/CI authority, with blocked local checks
+stated and corresponding hosted checks required. This order needs no separate
+full-before-commit exception. Known in-scope defects still need correction;
+publishing a PR does not clear them or grant acceptance.
+
+### Before merge
+
+Require passing current hosted validation for the exact PR candidate or
+verified merge result, independent review, zero unresolved findings and the
+normal update/readiness receipt. Code, configuration, policy and unknown scopes
+retain full validation. Use the existing prose classifier only for its
+explicit ordinary-documentation scope. Accepted-main CI remains full.
+
+The full contract remains `bash scripts/validate-repository.sh`. A permitted
+local full run can provide extra diagnosis, but does not replace hosted proof.
+Do not routinely run the complete suite both locally and in CI just to open a
+PR, or repeat a successful unchanged aggregate without a relevant change,
+failure or unresolved concern. Source, dependencies, policy, test inputs or
+merge-base changes invalidate affected proof; retain prior results as history.
+Separate passing components do not turn a failed aggregate into a pass.
+
+Remote publication, CI runs, signing, review and merge retain their own
+authority requirements. This validation order grants no spending, guard
+changes, permission changes or merge authority. See
+[validation order and evidence](docs/standards.md#validation-order-and-evidence).
 
 The codestyle wrapper runs the pinned Vale release with the SDK-owned prose
 rules. Repair prose findings in the owning document; do not add inline
