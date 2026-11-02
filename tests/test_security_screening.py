@@ -26,10 +26,10 @@ def test_download_scanning_has_bounded_work_for_repeated_prefixes() -> None:
         [
             "from time import process_time",
             "from skills_sdk.validation.security_signatures import source_security_indicators",
-            "texts = ('curl ' * 100000, 'https://example.invalid/' * 30000)",
+            "texts = (b'curl ' * 100000, b'https://example.invalid/' * 30000)",
             "started = process_time()",
             "for text in texts:",
-            "    found = source_security_indicators('references/fixture.md', text.encode())",
+            "    found = source_security_indicators('references/fixture.md', text)",
             "    codes = {item.code for item in found}",
             "    if codes & {'pipe_to_shell_download', 'suspicious_download_url'}:",
             "        raise AssertionError(f'unexpected download indicators: {codes}')",
