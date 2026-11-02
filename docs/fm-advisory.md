@@ -51,8 +51,12 @@ document is invalid input, rather than a completed review. Whitespace in valid
 source snapshots is preserved. The check never discovers files, fetches missing
 references or changes the package.
 
-Requests are limited to 16 KiB of canonical JSON, 12,000 UTF-8 source bytes,
-128 source lines and 32 documents. The request file itself is limited to
+Requests are limited to 16 KiB of model-serialized UTF-8 JSON (including default
+fields, preserving non-ASCII characters), 12,000 UTF-8 source bytes, 128 source
+lines and 32 documents. This differs from the escaped canonical JSON used for
+digest binding. The model prompt, including document grouping, has a separate
+16 KiB limit; exceeding it returns an execution error without generation.
+The request file itself is limited to
 16 KiB and read through the CLI's existing regular-file, no-symlink boundary.
 The executable adapter requires macOS and `/usr/bin/fm`. It checks that the
 default custom provider is absent before sending source text. It explicitly
@@ -106,6 +110,9 @@ checks UTF-8 workload limits, duplicate document IDs, state relationships and
 public-safe explanations. Source-reference meaning is verified only against
 the supplied request during execution, not by a standalone result schema.
 Unknown or duplicate evidence IDs are rejected rather than silently repaired.
+The prompt preserves document IDs, roles and source-atom grouping so assertions
+can distinguish named references such as current and legacy policies. All these
+labels and source text remain untrusted data.
 
 Live model quality is not measured. False alarms and incorrect missing-context
 decisions remain possible. A valid source reference does not prove that the

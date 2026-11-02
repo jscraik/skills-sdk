@@ -812,6 +812,21 @@ callback side effects cannot be claimed absent from its invocation receipt.
 Security, executed evaluations, matched local/cloud improvement, registry
 publication and runtime installation remain separate incomplete lanes.
 
+## Optional Apple FM advisory
+
+`skills-sdk advise-fm --request advisory-request.json --json` runs a separate
+Apple on-device advisory on explicit candidate-bound source snapshots. It emits
+an `fm-advisory/v1` JSON result; omit `--json` for a text summary.
+`--timeout-seconds` accepts a value greater than zero and at most 30.
+
+Exit `0` means a completed advisory or a skip for missing required context;
+findings and no findings both use `0`. Exit `2` means invalid input, execution
+failure, timeout or invalid model output. Exit `3` means an unsupported host,
+missing FM executable or configured custom provider. These statuses never grant
+or deny SDK acceptance. See the [FM advisory guide](fm-advisory.md) for request
+construction, evidence boundaries and limits. Required context missing from the
+request skips generation; no validation or release route calls FM automatically.
+
 ## Supplied content-review evidence
 
 `mise exec -- uv run --frozen skills-sdk review-content '<package>' --source-revision '<revision>' --assessment '<assessment.json>' --json`

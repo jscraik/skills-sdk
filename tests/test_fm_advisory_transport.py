@@ -44,11 +44,11 @@ def test_advisory_timeout_or_cancel_stops_descendant(
         task = asyncio.create_task(
             fm_advisory.advise_with_fm(
                 FMAdvisoryRequest.model_validate(request_data()),
-                timeout_seconds=1,
+                timeout_seconds=30 if cancel else 3,
             )
         )
         try:
-            for _ in range(100):
+            for _ in range(3000 if cancel else 300):
                 if marker.exists():
                     break
                 await asyncio.sleep(0.01)

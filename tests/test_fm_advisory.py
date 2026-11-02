@@ -15,6 +15,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.advisory import FMAdvisoryRequest, FMAdvisoryResult
 from skills_sdk.packaging.manifest import build_skill_package
+from skills_sdk.providers import _fm_advisory_protocol as protocol
 from skills_sdk.providers import fm_advisory
 from skills_sdk.providers.fm_advisory import advise_with_fm
 from skills_sdk.validation import validate_skill_package
@@ -45,6 +46,41 @@ def _verdict(result: str = "Fail") -> bytes:
             "response_evidence_ids": ["R1"],
         }
     ).encode()
+
+
+def test_prompt_preserves_named_document_identity_and_grouping() -> None:
+    """Swapping policy names must change the context seen by the reviewer."""
+    data = request_data() | {
+        "kind": "semantic",
+        "assertion": "The response must satisfy current-policy.",
+        "required_context": ["current-policy", "legacy-policy", "response"],
+        "documents": [
+            {"document_id": "current-policy", "role": "specification", "text": "Required value is 1.\nUse it."},
+            {"document_id": "legacy-policy", "role": "specification", "text": "Required value is 2."},
+            {"document_id": "response", "role": "response", "text": "The value is 1."},
+        ],
+    }
+    request = FMAdvisoryRequest.model_validate(data)
+    atoms = protocol.source_atoms(request)
+    instructions, payload = protocol.prompt(request, atoms)
+    swapped = request.model_copy(
+        update={
+            "documents": (
+                request.documents[0].model_copy(update={"document_id": "legacy-policy"}),
+                request.documents[1].model_copy(update={"document_id": "current-policy"}),
+                request.documents[2],
+            )
+        }
+    )
+    _, swapped_payload = protocol.prompt(swapped, protocol.source_atoms(swapped))
+    assert payload != swapped_payload
+    visible = json.loads(payload)
+    assert visible["source_documents"]["current-policy"] == {"role": "specification", "source_atom_ids": ["S1", "S2"]}
+    assert visible["source_documents"]["response"] == {"role": "response", "source_atom_ids": ["R1"]}
+    assert "untrusted" in instructions and "document" in instructions
+    result = protocol.decode(request, atoms, _verdict())
+    assert result.evidence[0].document_id == "current-policy"
+    assert result.acceptance_authorized is False
 
 
 def _driver(monkeypatch: pytest.MonkeyPatch, output: bytes) -> list[tuple[str, ...]]:
