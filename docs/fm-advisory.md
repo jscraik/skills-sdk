@@ -107,8 +107,8 @@ public-safe explanations. Source-reference meaning is verified only against
 the supplied request during execution, not by a standalone result schema.
 Unknown or duplicate evidence IDs are rejected rather than silently repaired.
 
-The pilot found plausible contradictions, but also false alarms and incorrect
-missing-context decisions. A valid source reference does not prove that the
+Live model quality is not measured. False alarms and incorrect missing-context
+decisions remain possible. A valid source reference does not prove that the
 model's interpretation is correct. Greedy sampling is not recorded as a numeric
 temperature, and a system-model label is not an authenticated weights digest.
 Human calibration and all existing acceptance requirements remain separate.
