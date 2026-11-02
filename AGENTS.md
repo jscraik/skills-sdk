@@ -131,7 +131,7 @@ operate the Tessl registry, or claim an installed runtime from local receipts.
   full. Keep each required hosted check; do not repeat a successful unchanged
   local aggregate merely to open a PR. See the validation-order contract in
   `docs/standards.md` for blocked local checks and evidence invalidation.
-  Two isolated pytest workers retain all collected tests and print the slowest
+  Four isolated pytest workers retain all collected tests and print the slowest
   cases. Named CI phases expose timings; one phase alone is not aggregate proof.
 - Report exact validation commands as `pass`, `fail`, or `blocked`, including
   the blocker when the exact production or provider path cannot run.

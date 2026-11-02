@@ -5,8 +5,10 @@ from typing import Any
 
 
 def validation_commands(config: Any) -> list[str]:
-    """Read active shell commands from the canonical validation job."""
-    steps = config.get("jobs", {}).get("validate", {}).get("steps", []) if isinstance(config, dict) else []
+    """Read active shell commands in the required validation dependency order."""
+    jobs = config.get("jobs", {}) if isinstance(config, dict) else {}
+    names = ("prepare", "tests", "installed", "validate") if "prepare" in jobs else ("validate",)
+    steps = [step for name in names for step in jobs.get(name, {}).get("steps", [])]
     return [
         step["run"].get("command", "")
         for step in steps
@@ -90,14 +92,43 @@ def command_contract_findings(config: Any) -> list[tuple[str, str]]:
     for phase in ("quality", "docs-tests", "tests", "build", "installed", "diff"):
         if not any(_invokes(command, f"bash scripts/validate-repository.sh {phase}") for command in commands):
             findings.append(("ci-validation", f"missing validation phase: {phase}"))
+    if isinstance(config, dict) and "prepare" in config.get("jobs", {}):
+        jobs = config["jobs"]
+        if jobs.get("tests", {}).get("parallelism") != 2:
+            findings.append(("ci-validation", "full tests require both native shards"))
+        join = jobs.get("validate", {}).get("steps", [])
+        results = "/".join(("", "tmp", "sdk-ci", "test-results"))
+        expected = (
+            'if [[ "$SDK_CI_SCOPE" != docs ]]; then\n'
+            "  env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- "
+            f"uv run --frozen python scripts/ci_test_shards.py verify --output {results}\nfi"
+        )
+        if not any(
+            isinstance(step, dict)
+            and step.get("run", {}).get("command", "").strip() == expected
+            and step["run"].get("when", "on_success") in {"on_success", "always"}
+            for step in join
+        ):
+            findings.append(("ci-validation", "missing complete shard evidence verification"))
     return findings
 
 
 def validation_scheduled(config: Any) -> bool:
-    """Require a validate invocation without branch, event or dependency gates."""
+    """Require unconditional validation or its complete success-only dependency graph."""
     workflows = config.get("workflows", {}) if isinstance(config, dict) else {}
     if not isinstance(workflows, dict):
         return False
+    if "prepare" in config.get("jobs", {}):
+        required = [
+            "prepare",
+            {"tests": {"requires": ["prepare"]}},
+            {"installed": {"requires": ["prepare"]}},
+            {"validate": {"requires": ["tests", "installed"]}},
+        ]
+        return any(
+            isinstance(definition, dict) and set(definition) == {"jobs"} and definition["jobs"] == required
+            for definition in workflows.values()
+        )
     return any(
         entry == "validate"
         or (

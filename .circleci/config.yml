@@ -1,15 +1,16 @@
 version: 2.1
 
 jobs:
-  validate:
+  prepare:
     docker:
       - image: cimg/python:3.12.12
+    resource_class: large
     steps:
       - checkout
       - run:
           name: Validate trusted PR contract and prepare merge result
           command: bash scripts/circleci_pr_contract.sh
-      - run:
+      - run: &install-tools
           name: Install pinned repository tools
           command: |
             curl --fail --location --retry 3 --max-time 120 https://github.com/jdx/mise/releases/download/v2026.8.14/mise-v2026.8.14-linux-x64.tar.gz -o /tmp/mise.tar.gz
@@ -31,7 +32,59 @@ jobs:
               env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh docs-tests
             fi
       - run:
-          name: Full tests (two isolated workers and slow-test report)
+          name: Build source and wheel
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh build
+            fi
+      - run:
+          name: Diff hygiene
+          command: env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh diff
+      - run:
+          name: Preserve the validated merge and built wheel
+          command: |
+            mkdir -p /tmp/sdk-ci
+            mkdir -p /tmp/sdk-ci/dist
+            mkdir -p /tmp/sdk-ci/test-results
+            touch /tmp/sdk-ci/wheel.sha256
+            git bundle create /tmp/sdk-ci/source.bundle HEAD
+            git rev-parse HEAD > /tmp/sdk-ci/revision
+            printf '%s\n' "$SDK_CI_SCOPE" > /tmp/sdk-ci/scope
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- uv run --frozen --extra images python scripts/ci_test_shards.py collect --output /tmp/sdk-ci/test-results
+              cp dist/* /tmp/sdk-ci/dist/
+              (cd /tmp/sdk-ci && sha256sum dist/* > wheel.sha256)
+            fi
+      - persist_to_workspace:
+          root: /tmp/sdk-ci
+          paths: [source.bundle, revision, scope, dist, wheel.sha256, test-results]
+
+  tests:
+    docker:
+      - image: cimg/python:3.12.12
+    resource_class: large
+    parallelism: 2
+    steps:
+      - attach_workspace: &attach-source
+          at: /tmp/sdk-ci
+      - run: &restore-source
+          name: Restore the exact prepared revision
+          command: |
+            git init .
+            git fetch /tmp/sdk-ci/source.bundle HEAD
+            git checkout --detach FETCH_HEAD
+            test "$(git rev-parse HEAD)" = "$(cat /tmp/sdk-ci/revision)"
+            scope="$(cat /tmp/sdk-ci/scope)"
+            [[ "$scope" == full || "$scope" == docs ]]
+            printf 'export SDK_CI_SCOPE=%q\n' "$scope" >> "$BASH_ENV"
+            printf 'export SDK_CI_CATALOG=/tmp/sdk-ci/test-results/collection.json\n' >> "$BASH_ENV"
+            if [[ "$scope" != docs ]]; then
+              (cd /tmp/sdk-ci && sha256sum -c wheel.sha256)
+              cp -R /tmp/sdk-ci/dist .
+            fi
+      - run: *install-tools
+      - run:
+          name: Full tests (two shards, four workers each)
           command: |
             if [[ "$SDK_CI_SCOPE" != docs ]]; then
               env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh tests
@@ -40,11 +93,20 @@ jobs:
       - store_test_results:
           path: test-results
       - run:
-          name: Build source and wheel
-          command: |
-            if [[ "$SDK_CI_SCOPE" != docs ]]; then
-              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh build
-            fi
+          name: Ensure workspace directory exists for docs scope
+          command: mkdir -p test-results
+      - persist_to_workspace:
+          root: .
+          paths: [test-results]
+
+  installed:
+    docker:
+      - image: cimg/python:3.12.12
+    resource_class: large
+    steps:
+      - attach_workspace: *attach-source
+      - run: *restore-source
+      - run: *install-tools
       - run:
           name: Installed public API and CLI proof
           command: |
@@ -52,11 +114,29 @@ jobs:
               env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh installed
             fi
           no_output_timeout: 20m
+
+  validate:
+    docker:
+      - image: cimg/python:3.12.12
+    resource_class: small
+    steps:
+      - attach_workspace: *attach-source
+      - run: *restore-source
+      - run: *install-tools
       - run:
-          name: Diff hygiene
-          command: env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh diff
+          name: Verify complete test coverage for the prepared revision
+          command: |
+            if [[ "$SDK_CI_SCOPE" != docs ]]; then
+              env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- uv run --frozen python scripts/ci_test_shards.py verify --output /tmp/sdk-ci/test-results
+            fi
 
 workflows:
   validation:
     jobs:
-      - validate
+      - prepare
+      - tests:
+          requires: [prepare]
+      - installed:
+          requires: [prepare]
+      - validate:
+          requires: [tests, installed]

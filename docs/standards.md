@@ -59,10 +59,18 @@ as separate steps; its successful result still requires every applicable step.
 The same wrapper accepts `quality`, `docs-tests`, `tests`, `build`, `installed` or `diff`
 for those steps. Running one phase does not establish aggregate completion.
 
-The test phase uses pinned pytest-xdist with two independent worker processes,
+The test phase uses pinned pytest-xdist with four independent worker processes,
 retains all collected tests, and prints the 25 slowest cases. Temporary fixture
-paths and environment changes remain worker-local. Package builds and installed
-smokes remain sequential after tests. Runtime source recapture, calibration,
+paths and environment changes remain worker-local. CircleCI pins the existing
+`large` Docker resource class, with four vCPUs and 8 GB of memory, so worker count
+does not depend on the provider's default resource class. CircleCI prepares the
+trusted merge once, runs quality checks and builds the wheel, then distributes
+that exact revision and wheel to two test containers and one installed-proof
+container. Each test container runs a disjoint half of the complete collection
+with four workers. Installed proof retains its `large` allocation and runs concurrently.
+The required `validate` check waits for both lanes and verifies complete,
+successful test receipts against the prepared revision. The full local wrapper
+retains sequential phases. Runtime source recapture, calibration,
 drift, failure and recovery checks are not cached or removed for speed.
 
 Matched-lane execution may reuse closed YAML parsing within its own operation.
@@ -75,7 +83,8 @@ failure or cancellation; child tasks and threads cannot use a parent's cache.
 Both test routes write JUnit results under `test-results/`. CircleCI uploads
 these results to expose per-test timings and failures in its Tests tab. The XML
 includes test file names for timing-based splitting. Test uploads do not enable
-test selection, automatic retries or additional parallel containers.
+paid test selection or automatic retries. Static sharding retains every test;
+missing, failed, stale or inconsistent shard evidence fails validation.
 
 The documentation-only route is
 `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`.

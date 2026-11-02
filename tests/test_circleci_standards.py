@@ -85,7 +85,7 @@ def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
             "false-checksum": "sha256sum -c -",
             "false-phase": "bash scripts/validate-repository.sh installed",
         }[damage]
-        for step in parsed["jobs"]["validate"]["steps"]:
+        for step in [step for job in parsed["jobs"].values() for step in job["steps"]]:
             if isinstance(step, dict) and isinstance(step.get("run"), dict):
                 run = step["run"]
                 if fragment in run["command"]:
@@ -113,7 +113,7 @@ def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
             "comment-phase": "bash scripts/validate-repository.sh installed",
         }[damage]
         parsed = yaml.safe_load(text)
-        for step in parsed["jobs"]["validate"]["steps"]:
+        for step in [step for job in parsed["jobs"].values() for step in job["steps"]]:
             if isinstance(step, dict) and isinstance(step.get("run"), dict):
                 command = step["run"]["command"]
                 step["run"]["command"] = "\n".join(
@@ -122,7 +122,7 @@ def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
         text = yaml.safe_dump(parsed)
     else:
         parsed = yaml.safe_load(text)
-        steps = parsed["jobs"]["validate"]["steps"]
+        steps = parsed["jobs"]["prepare"]["steps"]
         steps[1], steps[3] = steps[3], steps[1]
         text = yaml.safe_dump(parsed)
     config.write_text(text)

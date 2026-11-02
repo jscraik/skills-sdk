@@ -375,7 +375,7 @@ def test_unknown_phase_is_rejected(argument: str) -> None:
 
 
 def test_parallel_workers_preserve_isolation_and_propagate_failure(tmp_path: Path) -> None:
-    """Verify two workers isolate paths and environment changes and propagate test failure."""
+    """Verify four workers isolate paths and environment changes and propagate test failure."""
     source = tmp_path / "test_isolation.py"
     source.write_text(
         "import os\nimport pytest\n"
@@ -388,7 +388,7 @@ def test_parallel_workers_preserve_isolation_and_propagate_failure(tmp_path: Pat
         "    path.write_text(str(number))\n"
         "    assert path.read_text() == str(number)\n"
     )
-    command = [sys.executable, "-m", "pytest", "-n", "2", "--dist", "load", "-q", str(source)]
+    command = [sys.executable, "-m", "pytest", "-n", "4", "--dist", "load", "-q", str(source)]
     passed = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, check=False)
     assert passed.returncode == 0 and "8 passed" in passed.stdout
     source.write_text(source.read_text() + "\ndef test_failure():\n    assert False\n")
@@ -400,7 +400,8 @@ def test_parallel_workers_preserve_isolation_and_propagate_failure(tmp_path: Pat
 def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> None:
     """Check trusted-base workflow routing and preservation of the full validation phases."""
     workflow = (ROOT / ".circleci/config.yml").read_text()
-    steps = yaml.safe_load(workflow)["jobs"]["validate"]["steps"]
+    assert yaml.safe_load(workflow)["jobs"]["tests"]["resource_class"] == "large"
+    steps = yaml.safe_load(workflow)["jobs"]["prepare"]["steps"]
     docs_step = next(
         step["run"]
         for step in steps
@@ -415,7 +416,7 @@ def test_hosted_docs_classification_uses_trusted_base_and_pushes_run_full() -> N
         assert f"bash scripts/validate-repository.sh {phase}" in workflow
     assert "bash scripts/validate-repository.sh docs-tests" in workflow
     wrapper = (ROOT / "scripts/validate-repository.sh").read_text()
-    assert 'phase="${1:-all}"' in wrapper and "pytest -n 2 --dist load --durations=25" in wrapper
+    assert 'phase="${1:-all}"' in wrapper and "pytest -n 4 --dist load --durations=25" in wrapper
     assert "tests/test_public_repository_boundary.py tests/test_skill_validation_architecture.py" in wrapper
 
 

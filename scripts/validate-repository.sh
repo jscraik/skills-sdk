@@ -32,8 +32,13 @@ if [[ "$phase" == docs-tests ]]; then
     --junitxml=test-results/docs.xml -o junit_family=xunit1
 fi
 if [[ "$phase" == all || "$phase" == tests ]]; then
-  run_timed tests mise exec -- uv run --frozen --extra images pytest -n 2 --dist load --durations=25 \
-    --durations-min=0.1 --junitxml=test-results/full.xml -o junit_family=xunit1
+  if [[ -n "${CIRCLE_NODE_TOTAL:-}" && "${CIRCLE_NODE_TOTAL}" != 1 ]]; then
+    run_timed tests mise exec -- uv run --frozen --extra images python scripts/ci_test_shards.py run \
+      --index "$CIRCLE_NODE_INDEX" --total "$CIRCLE_NODE_TOTAL" --catalog "${SDK_CI_CATALOG:?}"
+  else
+    run_timed tests mise exec -- uv run --frozen --extra images pytest -n 4 --dist load --durations=25 \
+      --durations-min=0.1 --junitxml=test-results/full.xml -o junit_family=xunit1
+  fi
 fi
 if [[ "$phase" == all || "$phase" == build ]]; then
   run_timed build mise exec -- uv build
