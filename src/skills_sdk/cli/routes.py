@@ -31,6 +31,7 @@ class RouteCapability(StrEnum):
 # tests/test_cli_route_capabilities.py fails when argparse grows a route
 # that is missing here, or when a discovery-only route gains a silent handler.
 ROUTE_CAPABILITIES: Final[dict[str, RouteCapability]] = {
+    "advise-fm": RouteCapability.IMPLEMENTED,
     "inventory": RouteCapability.DISCOVERY_ONLY,
     "package": RouteCapability.DISCOVERY_ONLY,
     "project": RouteCapability.DISCOVERY_ONLY,

@@ -20,6 +20,8 @@ MAX_JSON_NESTING_DEPTH = 100
 
 SCHEMA_NAMES = frozenset(
     {
+        "fm-advisory-request.v1",
+        "fm-advisory.v1",
         "pr-sweep-recurring-findings.v1",
         "pr-sweep-validation.v1",
         "blocker.v1",
@@ -572,6 +574,10 @@ class SchemaRegistry:
                 "content-review.v1": ContentReviewResult,
                 "content-review-execution.v1": ContentReviewExecutionResult,
             }[name]
+        elif name in {"fm-advisory-request.v1", "fm-advisory.v1"}:
+            from skills_sdk.models.advisory import FMAdvisoryRequest, FMAdvisoryResult
+
+            model = FMAdvisoryRequest if name == "fm-advisory-request.v1" else FMAdvisoryResult
         elif name == "local-check.v1":
             from skills_sdk.models.local_check import LocalCheckResult
 

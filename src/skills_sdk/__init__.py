@@ -5,12 +5,16 @@ from skills_sdk.evaluation import evaluate_scenario_set, evaluate_scenario_set_v
 from skills_sdk.lifecycle import plan_runtime_install
 from skills_sdk.models import (
     ActivationObservation,
+    AdvisoryDocument,
+    AdvisoryEvidence,
     ArchivePackageSource,
     ArchiveSourceProvenance,
     ArchiveSourceSnapshot,
     DiscoveryObservation,
     EvaluationReceipt,
     EvaluationReceiptV2,
+    FMAdvisoryRequest,
+    FMAdvisoryResult,
     InstallationResult,
     InstallPlan,
     LocalCheckRequestV3,
@@ -164,12 +168,16 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     "ActivationObservation",
+    "AdvisoryDocument",
+    "AdvisoryEvidence",
     "ArchivePackageSource",
     "ArchiveSourceProvenance",
     "ArchiveSourceSnapshot",
     "DiscoveryObservation",
     "EvaluationReceipt",
     "EvaluationReceiptV2",
+    "FMAdvisoryRequest",
+    "FMAdvisoryResult",
     "InstallPlan",
     "InstallationResult",
     "LocalCheckRequestV3",
