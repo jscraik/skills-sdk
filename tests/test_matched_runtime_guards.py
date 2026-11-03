@@ -7,12 +7,53 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 from test_matched_execution import _matched
 
 import skills_sdk.evaluation.matched_execution as matched_execution
 import skills_sdk.evaluation.plugin_safety as plugin_safety
+from skills_sdk.core.errors import ContractError
 from skills_sdk.models.plugin_safety import PluginPreExecutionSafetyEvidence
 from skills_sdk.models.safety import PackageSafetyBlocker
+from skills_sdk.validation.safe_yaml import _ClosedLoader
+from skills_sdk.validation.yaml_cache import yaml_parse_scope
+
+
+def test_child_callback_guard_reuses_parsing_but_recaptures_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Child callbacks parse identical documents once and still reject later drift."""
+    _, _, batch, _ = _matched(tmp_path)
+    item = batch[0].candidate
+    guard = matched_execution._PluginGuard(item)
+    parsed: list[str] = []
+    original_load = yaml.load
+
+    def counted(text: str, Loader: object) -> object:
+        if Loader is _ClosedLoader:
+            parsed.append(text)
+        return original_load(text, Loader=Loader)
+
+    monkeypatch.setattr(yaml, "load", counted)
+
+    async def callback() -> None:
+        guard.check()
+        first = list(parsed)
+        assert first and len(first) == len(set(first))
+        parsed.clear()
+        guard.check()
+        assert parsed == first
+        source = item.plugin_context.root / "shared.md"
+        source.write_bytes(source.read_bytes() + b"\nchanged after callback\n")
+        with pytest.raises(ContractError, match="unchanged plugin source"):
+            guard.check()
+        assert guard.blocker_code == "matched_plugin_source_changed"
+
+    async def run() -> None:
+        with yaml_parse_scope():
+            await asyncio.create_task(callback())
+
+    asyncio.run(run())
 
 
 class _CapabilityTrap:

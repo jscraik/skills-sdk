@@ -485,15 +485,21 @@ surfaces. The repository wrapper is the aggregate local proof for those lanes.
 
 ## Validation route
 
-Use the pinned environment and the repository wrapper before a commit or pull
-request:
+Use the pinned environment for focused proof before a commit or pull request:
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
-bash scripts/validate-repository.sh
 ```
 
-The wrapper checks generated-schema drift, Ruff, the full pytest suite, source
+Select checks for the changed maintained caller and relevant contract
+boundaries. Full local validation is optional when permitted; the appropriate
+current hosted aggregate, independent review and readiness are required before
+merge. A denied local wrapper is a blocked lane, not a reason to bypass a guard
+or require manual execution. Follow the
+[validation order](docs/standards.md#validation-order-and-evidence).
+
+The full `bash scripts/validate-repository.sh` contract checks generated-schema
+drift, Ruff, the full pytest suite, source
 and wheel builds, and `git diff --check`. For an executable change, also run
 the exact CLI or Python path touched and record whether the result was `pass`,
 `fail`, or `blocked`; local evidence does not substitute for hosted, provider,

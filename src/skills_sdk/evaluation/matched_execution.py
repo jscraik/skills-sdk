@@ -251,11 +251,21 @@ class _PluginGuard:
         return True
 
     def check(self) -> None:
-        self.matches(self.item.definition, self.item.request, self.item.inputs.payload)
-        try:
-            _require_plugin_safety(self.item)
-        except (AttributeError, TypeError, ValueError, ContractError):
-            self._fail("matched_plugin_safety_changed")
+        # Provider scheduling can enter a different task from the lane owner.
+        # Retain parsing only for this synchronous guard, never a source verdict.
+        failure: ContractError | None = None
+        with yaml_parse_scope(reuse_current=True):
+            try:
+                self.matches(self.item.definition, self.item.request, self.item.inputs.payload)
+                try:
+                    _require_plugin_safety(self.item)
+                except (AttributeError, TypeError, ValueError, ContractError):
+                    self._fail("matched_plugin_safety_changed")
+            except ContractError as error:
+                # contextlib rewrites tracebacks; ContractError is frozen.
+                failure = error
+        if failure is not None:
+            raise failure
 
 
 def _receipt(

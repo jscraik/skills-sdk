@@ -46,12 +46,19 @@ runtime policy are not dependencies of this SDK.
 - MyPy semantically checks the repository-standards implementation and its
   regressions. The repository-wide AST gate separately requires typed public
   interfaces without reinterpreting frozen Pydantic v1/v2 inheritance.
-- Run `bash scripts/validate-repository.sh` before a commit or pull request.
+- Before a commit or pull request, run focused checks for the changed behaviour,
+  applicable static/contract checks, and diff hygiene. Use permitted maintained
+  entrypoints; record blocked local lanes rather than bypassing guards or
+  requiring manual execution. A full local run is optional when permitted.
+  Require the appropriate current hosted aggregate, independent review and
+  readiness evidence before merge. Opening a PR does not establish acceptance.
+  `bash scripts/validate-repository.sh` remains the full validation contract.
   Ordinary prose-only changes may use
   `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`
   after its exact-change classifier confirms that scope. Agent instructions,
   validation policy, templates, code, configuration and symlinks require full
-  validation. Accepted-main CI always runs the full route.
+  hosted validation. Accepted-main CI always runs the full route. Do not rerun
+  an unchanged successful local aggregate solely to create or update a PR.
   The prose route retains documentation-dependent contract tests as well as
   schema, codestyle and diff checks; it does not prove the full behavioural suite.
   Both validation wrappers bind trust to this checkout's plain-version

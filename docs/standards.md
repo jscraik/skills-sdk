@@ -16,23 +16,64 @@ silently change the proof path.
 
 Run `bash scripts/validate-codestyle.sh` while editing. It checks Ruff formatting
 and lint, semantic typing for the standards tooling, and the repository-wide
-structural standards program. Run
-`bash scripts/validate-repository.sh` before a commit or pull request; it adds
-schema drift, the full test suite, package builds, and diff hygiene.
+structural standards program, where local execution is permitted.
+`bash scripts/validate-repository.sh` is the full contract for schema drift,
+codestyle, the full test suite, package builds, installed-package proof and
+diff hygiene. A full local run is optional, not required before every commit
+or pull request. Required hosted validation and review remain merge gates.
+
+## Validation order and evidence
+
+Before committing or opening a PR, run focused caller-visible proof for the
+owned change, rejected and boundary cases, applicable schema/compatibility and
+static checks, and diff hygiene. Choose checks by risk and the maintained
+consumer. Configuration that changes automation, permissions or spending needs
+the relevant structural and operational checks; it is not automatically prose.
+
+If a local wrapper is denied or its toolchain is unavailable, record that lane
+as blocked. Do not change command spelling, use another executor or request
+manual terminal execution to evade the restriction. The normal signed PR route
+may obtain required hosted proof without a per-task validation-order exception,
+subject to its create receipt and explicit remote/CI authority. An unsatisfied
+publication gate still blocks that action; this document does not waive it.
+
+Before merge, require every applicable hosted phase to pass for the current
+candidate or verified base/head merge result, qualifying independent review,
+zero unresolved findings and the normal readiness receipt. The CI scope rules
+below still determine full versus ordinary-prose validation. Local proof does
+not replace hosted proof, and opening a PR is not stage or product acceptance.
+
+Reuse a successful full run only while its assessed inputs and receiving
+contract remain unchanged. Relevant source, dependency, test, policy or base
+changes invalidate affected evidence. Do not repeat an unchanged successful
+local aggregate merely to publish a PR. Preserve failed and interrupted runs;
+focused passes cannot relabel them successful. Required full hosted gates are
+not removed to reduce latency, and no numeric speed improvement is assumed.
 
 ## Validation scope and phases
 
 The default aggregate runs every phase and stops at the first failure. Each
-phase prints its start, exit status and elapsed seconds. The hosted `validate`
-job exposes quality, tests, build, installed-entrypoint proof and diff hygiene
-as separate steps; its successful result still requires every applicable step.
+phase prints its start, exit status and elapsed seconds. The hosted `prepare`,
+`tests` and `installed` jobs run quality, build, diff hygiene, test shards and
+installed-entrypoint proof. For full scope, the `validate` job succeeds only after
+the applicable jobs succeed and complete source-bound shard evidence passes
+verification. For docs scope, downstream jobs halt before test-shard and
+installed-package execution; this does not establish full-suite proof.
 The same wrapper accepts `quality`, `docs-tests`, `tests`, `build`, `installed` or `diff`
 for those steps. Running one phase does not establish aggregate completion.
 
-The test phase uses pinned pytest-xdist with two independent worker processes,
+The test phase uses pinned pytest-xdist with four independent worker processes,
 retains all collected tests, and prints the 25 slowest cases. Temporary fixture
-paths and environment changes remain worker-local. Package builds and installed
-smokes remain sequential after tests. Runtime source recapture, calibration,
+paths and environment changes remain worker-local. CircleCI pins the existing
+`large` Docker resource class, with four vCPUs and 8 GB of memory, so worker count
+does not depend on the provider's default resource class. CircleCI prepares the
+trusted merge once, runs quality checks and builds the wheel, then distributes
+that exact revision and wheel to two test containers and one installed-proof
+container. Each test container runs a disjoint half of the complete collection
+with four workers. Installed proof retains its `large` allocation and runs concurrently.
+The required `validate` check waits for both lanes and verifies complete,
+successful test receipts against the prepared revision. The full local wrapper
+retains sequential phases. Runtime source recapture, calibration,
 drift, failure and recovery checks are not cached or removed for speed.
 
 Matched-lane execution may reuse closed YAML parsing within its own operation.
@@ -45,7 +86,8 @@ failure or cancellation; child tasks and threads cannot use a parent's cache.
 Both test routes write JUnit results under `test-results/`. CircleCI uploads
 these results to expose per-test timings and failures in its Tests tab. The XML
 includes test file names for timing-based splitting. Test uploads do not enable
-test selection, automatic retries or additional parallel containers.
+paid test selection or automatic retries. Static sharding retains every test;
+missing, failed, stale or inconsistent shard evidence fails validation.
 
 The documentation-only route is
 `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`.

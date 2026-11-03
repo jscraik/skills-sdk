@@ -415,14 +415,21 @@ scripts/                 Schema generation and repository validation wrappers
 
 ## Development and validation
 
-Install the pinned environment and run the repository gate before a commit or
-pull request:
+Prepare the pinned environment within the task's installation and network
+authority:
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
-bash scripts/validate-repository.sh
 ```
+
+Before a commit or pull request, run focused checks for the changed behaviour,
+applicable static/contract checks and diff hygiene through permitted routes.
+The full `bash scripts/validate-repository.sh` run is optional locally;
+appropriate current hosted validation, independent review and readiness remain
+required before merge. Record blocked local checks rather than bypassing a
+guard or requiring manual terminal execution. See
+[validation order and evidence](docs/standards.md#validation-order-and-evidence).
 
 The canonical focused route for the hand-maintained schema subset is:
 
