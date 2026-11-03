@@ -1,0 +1,226 @@
+{
+  "$defs": {
+    "AdvisoryEvidence": {
+      "additionalProperties": false,
+      "description": "A reference to supplied bytes, without exporting the raw quotation.",
+      "properties": {
+        "document_id": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "line": {
+          "minimum": 1,
+          "title": "Line",
+          "type": "integer"
+        },
+        "line_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Line Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_id",
+        "line",
+        "line_sha256"
+      ],
+      "title": "AdvisoryEvidence",
+      "type": "object"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/fm-advisory.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Neutral advisory observation, deliberately incompatible with SDK receipts.",
+  "properties": {
+    "acceptance_authorized": {
+      "const": false,
+      "default": false,
+      "title": "Acceptance Authorized",
+      "type": "boolean"
+    },
+    "advisory_only": {
+      "const": true,
+      "default": true,
+      "title": "Advisory Only",
+      "type": "boolean"
+    },
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "evidence": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AdvisoryEvidence"
+      },
+      "maxItems": 8,
+      "title": "Evidence",
+      "type": "array"
+    },
+    "explanation": {
+      "anyOf": [
+        {
+          "maxLength": 1200,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Explanation"
+    },
+    "generation_attempted": {
+      "default": false,
+      "title": "Generation Attempted",
+      "type": "boolean"
+    },
+    "judgement": {
+      "anyOf": [
+        {
+          "enum": [
+            "no_finding",
+            "finding",
+            "insufficient_evidence"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Judgement"
+    },
+    "missing_context_ids": {
+      "default": [],
+      "items": {
+        "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+        "type": "string"
+      },
+      "title": "Missing Context Ids",
+      "type": "array"
+    },
+    "missing_context_note": {
+      "anyOf": [
+        {
+          "maxLength": 1200,
+          "minLength": 1,
+          "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Missing Context Note"
+    },
+    "model_output_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Output Sha256"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "missing_required_context",
+            "unsupported_platform",
+            "fm_unavailable",
+            "custom_provider_configured",
+            "execution_timeout",
+            "execution_failed",
+            "invalid_model_output",
+            "input_limit"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "request_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Request Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fm-advisory/v1",
+      "default": "fm-advisory/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_binding": {
+      "const": "caller_supplied",
+      "default": "caller_supplied",
+      "title": "Source Binding",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "skipped",
+        "unavailable",
+        "error"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate",
+    "request_sha256",
+    "status"
+  ],
+  "title": "FMAdvisoryResult",
+  "type": "object"
+}

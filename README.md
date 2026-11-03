@@ -463,6 +463,7 @@ than one lane. For a coarse-grained map of the code and its invariants, see
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — bird's-eye code map, boundaries, and invariants.
 - [`docs/cli.md`](docs/cli.md) — implemented commands, reserved routes, output, and exit codes.
 - [`docs/api.md`](docs/api.md) — public Python contract families and schema validation.
+- [`docs/fm-advisory.md`](docs/fm-advisory.md) — optional on-device advisory, separate from SDK acceptance.
 - [`docs/compatibility.md`](docs/compatibility.md) — runtime floor, schema evolution, and evidence separation.
 - [`docs/agent-entrypoint.md`](docs/agent-entrypoint.md) — minimal first-run route.
 - [`SUPPORT.md`](SUPPORT.md) — safe reproduction and support requests.

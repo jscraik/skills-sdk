@@ -1,5 +1,6 @@
 """Typed package and plugin inventory contracts."""
 
+from skills_sdk.models.advisory import AdvisoryDocument, AdvisoryEvidence, FMAdvisoryRequest, FMAdvisoryResult
 from skills_sdk.models.content_review import (
     ContentReviewAssessment,
     ContentReviewExecutionResult,
@@ -228,6 +229,8 @@ from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValida
 
 __all__ = [
     "ActivationObservation",
+    "AdvisoryDocument",
+    "AdvisoryEvidence",
     "ArchivePackageSource",
     "ArchiveSourceProvenance",
     "ArchiveSourceSnapshot",
@@ -246,6 +249,8 @@ __all__ = [
     "EntrypointMaintenanceResult",
     "EvaluationReceipt",
     "EvaluationReceiptV2",
+    "FMAdvisoryRequest",
+    "FMAdvisoryResult",
     "FormatChecks",
     "HeldOutCalibrationProbe",
     "InstallPlan",

@@ -1,5 +1,13 @@
 # Compatibility
 
+The local [optional Apple FM advisory](fm-advisory.md) adds separate
+`fm-advisory-request/v1` and `fm-advisory/v1` families. These caller-bound
+diagnostics are not acceptance receipts or calibrated judge evidence. No
+existing validation, build, quality, calibration or release contract consumes
+them. Missing declared context skips before provider execution. The public
+model and `SchemaRegistry` enforce semantic state constraints beyond the
+structural wire schemas; existing receipt versions retain their meaning.
+
 This reference describes accepted contracts and their evidence limits. Issue
 #92's whole-plugin quality additions merged via PR #93 at `93526d6`.
 The optional native judge/settings increment is a separately labelled delivery
