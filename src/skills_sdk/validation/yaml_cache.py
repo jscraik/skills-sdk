@@ -104,8 +104,12 @@ _CURRENT: ContextVar[_YamlCache | None] = ContextVar("sdk_yaml_operation", defau
 
 
 @contextmanager
-def yaml_parse_scope() -> Iterator[None]:
-    """Own one parse cache and release retained input on every exit path."""
+def yaml_parse_scope(*, reuse_current: bool = False) -> Iterator[None]:
+    """Own a parse cache, or explicitly borrow the current owner's live scope."""
+    current = _CURRENT.get()
+    if reuse_current and current is not None and current.active and current.owner == _owner():
+        yield
+        return
     cache = _YamlCache()
     token = _CURRENT.set(cache)
     try:
