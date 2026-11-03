@@ -83,6 +83,32 @@ def test_prompt_preserves_named_document_identity_and_grouping() -> None:
     assert result.acceptance_authorized is False
 
 
+@pytest.mark.parametrize("phase", ["config", "respond"])
+@pytest.mark.parametrize("code", ["codex_judge_start_failed", "codex_judge_process_failed"])
+def test_subprocess_failures_preserve_attempt_provenance(
+    monkeypatch: pytest.MonkeyPatch, phase: str, code: str
+) -> None:
+    """Execution failures must stay distinct from model judgements at either phase."""
+    calls = []
+
+    async def failing(argv: tuple[str, ...], cwd: Path, payload: bytes, seconds: float) -> bytes:
+        calls.append(argv[1])
+        if argv[1] == phase:
+            raise ContractError(code, "controlled process failure")
+        assert argv[1] == "config"
+        return b"(none)"
+
+    monkeypatch.setattr(fm_advisory, "_availability", lambda: None)
+    monkeypatch.setattr(fm_advisory, "_run", failing)
+    result = asyncio.run(advise_with_fm(FMAdvisoryRequest.model_validate(request_data())))
+    assert calls == (["config"] if phase == "config" else ["config", "respond"])
+    assert result.status == "error" and result.reason == "execution_failed"
+    assert result.generation_attempted is (phase == "respond")
+    assert result.judgement is None and result.evidence == ()
+    assert result.advisory_only and not result.acceptance_authorized
+    SchemaRegistry().validate("fm-advisory.v1", result.model_dump(mode="json"))
+
+
 def test_prompt_preserves_source_line_and_document_order() -> None:
     """Multi-digit atom IDs must not reorder a rule and its following exception."""
     data = request_data() | {
