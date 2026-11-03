@@ -31,6 +31,8 @@ jobs:
             if [[ "$SDK_CI_SCOPE" == docs ]]; then
               env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh docs-tests
             fi
+      - store_test_results:
+          path: test-results
       - run:
           name: Build source and wheel
           command: |
@@ -78,6 +80,9 @@ jobs:
             [[ "$scope" == full || "$scope" == docs ]]
             printf 'export SDK_CI_SCOPE=%q\n' "$scope" >> "$BASH_ENV"
             printf 'export SDK_CI_CATALOG=/tmp/sdk-ci/test-results/collection.json\n' >> "$BASH_ENV"
+            if [[ "$scope" == docs ]]; then
+              circleci-agent step halt
+            fi
             if [[ "$scope" != docs ]]; then
               (cd /tmp/sdk-ci && sha256sum -c wheel.sha256)
               cp -R /tmp/sdk-ci/dist .

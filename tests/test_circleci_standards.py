@@ -6,9 +6,52 @@ import pytest
 import yaml
 
 from scripts.check_repository_standards import _circleci_findings
-from scripts.circleci_standards import _invokes
+from scripts.circleci_standards import _invokes, command_contract_findings
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_short_form_join_step_does_not_crash_or_replace_verification() -> None:
+    """Accept valid CircleCI shorthand while still rejecting a missing join."""
+    config = yaml.safe_load((REPOSITORY_ROOT / ".circleci/config.yml").read_text())
+    steps = config["jobs"]["validate"]["steps"]
+    steps.insert(0, {"run": 'echo "Checking evidence"'})
+    assert command_contract_findings(config) == []
+    steps.pop()
+    assert ("ci-validation", "missing complete shard evidence verification") in command_contract_findings(config)
+
+
+@pytest.mark.parametrize("job", ["prepare", "tests", "installed", "validate"])
+def test_each_isolated_job_requires_its_own_pinned_tooling(job: str) -> None:
+    """Another job's installation cannot satisfy this execution environment."""
+    config = yaml.safe_load((REPOSITORY_ROOT / ".circleci/config.yml").read_text())
+    config["jobs"][job]["steps"] = [
+        step
+        for step in config["jobs"][job]["steps"]
+        if not (
+            isinstance(step, dict)
+            and isinstance(step.get("run"), dict)
+            and step["run"].get("name") == "Install pinned repository tools"
+        )
+    ]
+    assert ("ci-tooling", f"missing executable pinned tooling in {job}") in command_contract_findings(config)
+
+
+def test_docs_results_upload_in_the_producing_job_and_downstream_tools_are_skipped() -> None:
+    """Retain docs evidence even on failure and halt only docs downstream work."""
+    config = yaml.safe_load((REPOSITORY_ROOT / ".circleci/config.yml").read_text())
+    steps = config["jobs"]["prepare"]["steps"]
+    docs_index = next(
+        i
+        for i, step in enumerate(steps)
+        if isinstance(step, dict)
+        and isinstance(step.get("run"), dict)
+        and step["run"].get("name") == "Documentation-dependent contract tests"
+    )
+    assert steps[docs_index + 1] == {"store_test_results": {"path": "test-results"}}
+    for name in ("tests", "installed", "validate"):
+        commands = config["jobs"][name]["steps"][1]["run"]["command"]
+        assert 'if [[ "$scope" == docs ]]; then\n  circleci-agent step halt\nfi' in commands
 
 
 @pytest.mark.parametrize("terminator", ["exit 0", "exec true"])

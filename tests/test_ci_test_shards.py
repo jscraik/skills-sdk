@@ -161,7 +161,13 @@ def test_partition_is_complete_balanced_and_rejects_ambiguous_inputs() -> None:
 def test_collection_errors_in_junit_are_not_success(tmp_path: Path) -> None:
     """Reject setup or collection errors even with a matching test count."""
     path = tmp_path / "result.xml"
-    path.write_text("<testsuites><testsuite><testcase><error/></testcase></testsuite></testsuites>")
+    document = (
+        '<testsuites><testsuite><testcase classname="test_fixture" name="test_value">'
+        "{}</testcase></testsuite></testsuites>"
+    )
+    path.write_text(document.format(""))
+    check_results(path, ["test_fixture.py::test_value"])
+    path.write_text(document.format("<error/>"))
     with pytest.raises(ValueError):
         check_results(path, ["test_fixture.py::test_value"])
 

@@ -4,10 +4,12 @@ import shlex
 from typing import Any
 
 
-def validation_commands(config: Any) -> list[str]:
+def validation_commands(config: Any, job_name: str | None = None) -> list[str]:
     """Read active shell commands in the required validation dependency order."""
     jobs = config.get("jobs", {}) if isinstance(config, dict) else {}
     names = ("prepare", "tests", "installed", "validate") if "prepare" in jobs else ("validate",)
+    if job_name is not None:
+        names = (job_name,)
     steps = [step for name in names for step in jobs.get(name, {}).get("steps", [])]
     return [
         step["run"].get("command", "")
@@ -86,9 +88,13 @@ def command_contract_findings(config: Any) -> list[tuple[str, str]]:
         f'echo "64d5f34aeb7a4e0e327dc1c9be66cd8162e14899a47b11901154a100285a3d61  {archive}" | sha256sum -c -',
         "uv sync --frozen",
     )
-    for step in tooling:
-        if not any(_invokes(command, step) for command in commands):
-            findings.append(("ci-tooling", "missing executable pinned tooling"))
+    jobs = config.get("jobs", {}) if isinstance(config, dict) else {}
+    names = ("prepare", "tests", "installed", "validate") if "prepare" in jobs else ("validate",)
+    for name in names:
+        local_commands = validation_commands(config, name)
+        for step in tooling:
+            if not any(_invokes(command, step) for command in local_commands):
+                findings.append(("ci-tooling", f"missing executable pinned tooling in {name}"))
     for phase in ("quality", "docs-tests", "tests", "build", "installed", "diff"):
         if not any(_invokes(command, f"bash scripts/validate-repository.sh {phase}") for command in commands):
             findings.append(("ci-validation", f"missing validation phase: {phase}"))
@@ -105,6 +111,7 @@ def command_contract_findings(config: Any) -> list[tuple[str, str]]:
         )
         if not any(
             isinstance(step, dict)
+            and isinstance(step.get("run"), dict)
             and step.get("run", {}).get("command", "").strip() == expected
             and step["run"].get("when", "on_success") in {"on_success", "always"}
             for step in join
