@@ -55,8 +55,10 @@ not removed to reduce latency, and no numeric speed improvement is assumed.
 The default aggregate runs every phase and stops at the first failure. Each
 phase prints its start, exit status and elapsed seconds. The hosted `prepare`,
 `tests` and `installed` jobs run quality, build, diff hygiene, test shards and
-installed-entrypoint proof. The `validate` job succeeds only after the applicable
-jobs succeed and complete source-bound shard evidence passes verification.
+installed-entrypoint proof. For full scope, the `validate` job succeeds only after
+the applicable jobs succeed and complete source-bound shard evidence passes
+verification. For docs scope, downstream jobs halt before test-shard and
+installed-package execution; this does not establish full-suite proof.
 The same wrapper accepts `quality`, `docs-tests`, `tests`, `build`, `installed` or `diff`
 for those steps. Running one phase does not establish aggregate completion.
 
