@@ -86,7 +86,6 @@ def prompt(request: FMAdvisoryRequest, atoms: dict[str, SourceAtom]) -> tuple[st
                 for document in request.documents
             },
         },
-        sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
     ).encode("utf-8")

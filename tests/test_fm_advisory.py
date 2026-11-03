@@ -83,6 +83,24 @@ def test_prompt_preserves_named_document_identity_and_grouping() -> None:
     assert result.acceptance_authorized is False
 
 
+def test_prompt_preserves_source_line_and_document_order() -> None:
+    """Multi-digit atom IDs must not reorder a rule and its following exception."""
+    data = request_data() | {
+        "documents": [
+            {"document_id": "z-policy", "role": "specification", "text": "\n".join(f"Rule {i}" for i in range(11))},
+            {"document_id": "a-response", "role": "response", "text": "Observed response."},
+        ]
+    }
+    request = FMAdvisoryRequest.model_validate(data)
+    atoms = protocol.source_atoms(request)
+    _, payload = protocol.prompt(request, atoms)
+    visible = json.loads(payload)
+    assert list(visible["source_atoms"]) == [*(f"S{i}" for i in range(1, 12)), "R1"]
+    assert list(visible["source_documents"]) == ["z-policy", "a-response"]
+    assert visible["source_documents"]["z-policy"]["source_atom_ids"] == list(atoms)[:-1]
+    assert protocol.prompt(request, atoms)[1] == payload
+
+
 def _driver(monkeypatch: pytest.MonkeyPatch, output: bytes) -> list[tuple[str, ...]]:
     calls = []
 
