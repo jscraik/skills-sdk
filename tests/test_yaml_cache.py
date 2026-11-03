@@ -97,6 +97,39 @@ def test_nested_scope_and_exception_restore_and_clear(monkeypatch: pytest.Monkey
     assert cache_module._CURRENT.get() is None
 
 
+def test_optional_reuse_keeps_owner_cache_until_outer_exit(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _observe(monkeypatch)
+    with yaml_parse_scope():
+        outer = cache_module._CURRENT.get()
+        load_closed_yaml("a: 1")
+        with pytest.raises(RuntimeError), yaml_parse_scope(reuse_current=True):
+            assert cache_module._CURRENT.get() is outer
+            load_closed_yaml("a: 1")
+            raise RuntimeError("stop")
+        assert outer.active
+        load_closed_yaml("a: 1")
+    assert len(calls) == 1
+    assert not outer.active and not outer.entries and outer.owner is None
+
+
+def test_optional_reuse_does_not_borrow_parent_task_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _observe(monkeypatch)
+
+    async def child() -> None:
+        with yaml_parse_scope(reuse_current=True):
+            load_closed_yaml("a: 1")
+            load_closed_yaml("a: 1")
+
+    async def run() -> None:
+        with yaml_parse_scope():
+            load_closed_yaml("a: 1")
+            await asyncio.create_task(child())
+            load_closed_yaml("a: 1")
+
+    asyncio.run(run())
+    assert len(calls) == 2
+
+
 def test_byte_budget_evicts_before_entry_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = _observe(monkeypatch)
     monkeypatch.setattr(cache_module, "_MAX_RETAINED_BYTES", 2048)

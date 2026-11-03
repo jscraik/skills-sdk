@@ -141,9 +141,10 @@ rules. Repair prose findings in the owning document; do not add inline
 suppression comments or exclusions.
 
 The full wrapper reports elapsed seconds and failure status for schemas,
-codestyle, tests, build, installed proof and diff hygiene. Tests run in two
-isolated pytest-xdist workers with no test-selection exclusions and a slow-test
-report. Use serial focused pytest when investigating a worker-sensitive failure;
+codestyle, tests, build, installed proof and diff hygiene. Local tests use four
+isolated pytest-xdist workers. Hosted CircleCI tests use two native shards with
+four workers each, complete collection accounting and a slow-test report.
+Use serial focused pytest when investigating a worker-sensitive failure;
 do not relabel that narrower result as full proof.
 
 For ordinary documentation-only changes, run
