@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "export_authorised": true,
+  "installation_authorised": true,
+  "exclusive_config_custody": true,
+  "native_canary_authorised": true,
+  "ephemeral_key_authorised": true,
+  "bind_runtime_paths": true,
+  "bind_checkout_head_from_controller": true,
+  "capture_platform_claude": true,
+  "project_id": "01a149ae-ddc1-7745-a495-2bd911adc052",
+  "workspace": "skills-sdk-lab",
+  "reserve_tessl_credits": 20000,
+  "sdk_revision": "07634a7e066e0906c388a8aa0f07373801da4293",
+  "packet_sha256": "89c80daa092d0e81ef1ae6b612fc04bb027e660798a459e64907d30bb4ba0e48",
+  "checkout": null,
+  "checkout_head": null,
+  "claude_path": null,
+  "claude_sha256": null,
+  "nonce": "control-canary-20261105-one",
+  "author": {
+    "name": "Jamie Scott Craik",
+    "email": "jscraik@brainwav.io"
+  },
+  "files": {
+    "admission_adapter.py": {
+      "size": 4329,
+      "sha256": "1077a0297ddcd2cebde3dff17e1d1a02d882ff70cdecf4e090088917020fb8c7"
+    },
+    "canary_executor.py": {
+      "size": 7113,
+      "sha256": "c7725de45bf3ec00eb61c0fc739f42b15575f03130c4158f5e2eb6543ae9bc9c"
+    },
+    "hosted_bootstrap.py": {
+      "size": 8965,
+      "sha256": "76e2b307ed51e95eb61b0141ca6dbaac6a99212a86c7c63c0878b9afd6bc414a"
+    },
+    "native_controls.py": {
+      "size": 9384,
+      "sha256": "2160a707d7938f8f0a045f36b13a70ebe1a95554ee5364fcd21ba4b1e6e49d9f"
+    },
+    "packet-manifest.json": {
+      "size": 3810,
+      "sha256": "89c80daa092d0e81ef1ae6b612fc04bb027e660798a459e64907d30bb4ba0e48"
+    },
+    "packet/ADMISSION.md": {
+      "size": 2878,
+      "sha256": "e653b950ef07a34c5dfd227a3387935e65a436d55b8375ca2fe26f30d7a85890"
+    },
+    "packet/adapted/implement-github-issue/SKILL.md": {
+      "size": 4480,
+      "sha256": "62bed28f5bffe3cb679e17a943418de1ea2cd70ebde7cda5b182558e049b0ee0"
+    },
+    "packet/adapted/implement-github-issue/schemas/inputs.schema.json": {
+      "size": 545,
+      "sha256": "6b8d4d7f28bb4ed9351c58a4d882eb717b0df09e0c5beb4c3aae4f41192a98df"
+    },
+    "packet/adapted/shepherd/SKILL.md": {
+      "size": 4435,
+      "sha256": "9af6be0a5ac6ae9518031116fbb150aa2db158cfbb95a6ca37cb4a448c01c9ce"
+    },
+    "packet/adapted/shepherd/schemas/inputs.schema.json": {
+      "size": 352,
+      "sha256": "9f55ae21cb047e0aa1c93cf5d6672e428785c9dcdeff5e7eba3b2e9654733977"
+    },
+    "packet/binding.json": {
+      "size": 700,
+      "sha256": "b4983e2502f7691c964e5d5b3ef066bf2d0ad1dde824862cbdca1b3adbf21f76"
+    },
+    "packet/bootstrap.py": {
+      "size": 4564,
+      "sha256": "6bfffd2140a2d01e9f364e5c2cf886182d88155c7a7b0ead15b995d115a5fdc9"
+    },
+    "packet/control.py": {
+      "size": 5666,
+      "sha256": "d9ab222f6023db74397cc121cf031785af6736aca40db1849728b7f06777e6c1"
+    },
+    "packet/installer.py": {
+      "size": 9083,
+      "sha256": "70fc72d389532332fabd6a33da92a840fceb0f9d961b7a5d2d37b157d9d82df5"
+    },
+    "packet/parser_probe.py": {
+      "size": 2227,
+      "sha256": "05fe855f774267cf3ceb410644da8ae82fa80461ce2f786e7baebb78801f0d9f"
+    },
+    "packet/raw_metadata_guard.py": {
+      "size": 2877,
+      "sha256": "62799c03d4e96e3b26189cdbec0fa27af411a729cf58765f975d05edcf66f444"
+    },
+    "packet/runtime/hooks/pr-readiness-guard.sh": {
+      "size": 12690,
+      "sha256": "f29647371bf978add9878e93a039dccb839e47f8d23723978d3bae13081d4fbb"
+    },
+    "packet/runtime/scripts/codex-validation-python-uv.sh": {
+      "size": 1209,
+      "sha256": "fa3adceb2a66d852c9b710169bcbc6a5584ad75f3309a08c91db63b9eb7b3fd0"
+    },
+    "packet/runtime/scripts/pr-body-refresh.py": {
+      "size": 23042,
+      "sha256": "37a56c2c014a61def2b717451a3df45de4cc0e749fec35e220f3848eb054a2dd"
+    },
+    "packet/runtime/scripts/pr-readiness.py": {
+      "size": 191183,
+      "sha256": "100014a0b8a7acc35c2a09d890a03413bb9953dae7ccd40807af4cef3e486af7"
+    },
+    "packet/runtime/scripts/pr-reconciliation.py": {
+      "size": 15843,
+      "sha256": "dd2827c7559edfbe275100e3e5af73fbe13cfe23128aa4bf9d601afd2fab47b8"
+    },
+    "packet/runtime/scripts/pr_repair_ci.py": {
+      "size": 7426,
+      "sha256": "63112eca64b6d547211ef6d9336b722fe710e02b4fc5821954af4d64bf6c10c7"
+    },
+    "packet/runtime/scripts/pr_repair_endorsement.py": {
+      "size": 8781,
+      "sha256": "3d37f987d3afda988615a54e6ce2a5014f7bedcf22f1de6936c02dc7b99cb46f"
+    },
+    "packet/runtime/scripts/pr_review_clearance.py": {
+      "size": 7577,
+      "sha256": "e6a0c79f7932729075d535d1bf2d3c3b79adea7d365fda2f5a8e26e0a74f1f22"
+    },
+    "packet/runtime/scripts/pr_review_risk.py": {
+      "size": 4240,
+      "sha256": "5baefe5d97ef259ea472cea6f9b581bd1a1d36f199e206b6ad713ccbf577bac3"
+    },
+    "packet/signing_canary.py": {
+      "size": 5971,
+      "sha256": "4d74fcb753af2b86118ba763b50b1f036e3afd979970dfb624f774827d6d70ac"
+    },
+    "packet/upstream/implement-github-issue/SKILL.md": {
+      "size": 8271,
+      "sha256": "9e547cd0b524ef2c25336dbea3b891cc525ab376470f6ac9878c67e19f934816"
+    },
+    "packet/upstream/implement-github-issue/schemas/inputs.schema.json": {
+      "size": 545,
+      "sha256": "6b8d4d7f28bb4ed9351c58a4d882eb717b0df09e0c5beb4c3aae4f41192a98df"
+    },
+    "packet/upstream/shepherd/SKILL.md": {
+      "size": 10380,
+      "sha256": "292388af8cd832b2149c35cebea8f7f6f475a6c5cb3b0ee6038b8a544a9e2a89"
+    },
+    "packet/upstream/shepherd/schemas/inputs.schema.json": {
+      "size": 352,
+      "sha256": "9f55ae21cb047e0aa1c93cf5d6672e428785c9dcdeff5e7eba3b2e9654733977"
+    },
+    "sdk-source.json": {
+      "size": 58532,
+      "sha256": "866b9e9e7a357cb36c156534730febe1b45f621473e6c3d35627e44f69d2053f"
+    }
+  },
+  "chunk_count": 47,
+  "delivery_sha256": "287fe7bba714ed6858ea43a6f5b140c769a98819e4d280f712f3067abd3f6edc"
+}

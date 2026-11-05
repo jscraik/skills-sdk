@@ -1,0 +1,7 @@
+{
+  "name": "skills-sdk-lab/control-canary",
+  "version": "0.1.0",
+  "description": "Run the explicitly approved disposable worker control proof once.",
+  "private": true,
+  "skills": "./skills/"
+}
