@@ -1,7 +1,7 @@
 {
   "name": "skills-sdk-lab/standard-smoke",
-  "version": "0.1.0",
-  "description": "One-off read-only hosted worker smoke test.",
+  "version": "0.2.0",
+  "description": "Bounded hosted SDK smoke and contract validation tasks.",
   "private": true,
   "skills": "./skills/"
 }
