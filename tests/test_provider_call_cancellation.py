@@ -124,7 +124,10 @@ async def _resistant_cancellation_scenario() -> None:
 def test_cancellation_scenario_deadline_stops_resistant_task() -> None:
     with pytest.raises(subprocess.TimeoutExpired) as exc:
         _run_cancellation_scenario("_resistant_cancellation_scenario")
-    assert (exc.value.stdout or b"").count(b"resistant task ignored cancellation") >= 2
+    output = exc.value.stdout or b""
+    if isinstance(output, str):
+        output = output.encode()
+    assert output.count(b"resistant task ignored cancellation") >= 2
 
 
 @pytest.mark.parametrize("phase", ["factory", "complete", "cleanup"])
