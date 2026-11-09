@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import median
+from time import process_time_ns
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -21,17 +26,107 @@ from tests.test_pre_execution_safety import _bound
 from tests.test_selected_case_evaluation import REVISION, _skill
 
 
+class _ScanWorkBudget:
+    """Count requested regex search spans for the repeated-prefix fixtures."""
+
+    def __init__(self) -> None:
+        self.limit = 0
+        self.total = 0
+
+    def reset(self, size: int) -> None:
+        # Allow many complete passes, but reject repeated scans of growing tails.
+        self.limit = 32 * size
+        self.total = 0
+
+    def charge(self, text: str, pos: int = 0, endpos: int | None = None) -> None:
+        """Reject excessive aggregate spans at the instrumented search calls."""
+        # Count the requested search span, not the regex engine's internal operations.
+        end = len(text) if endpos is None else min(max(endpos, 0), len(text))
+        start = min(max(pos, 0), len(text))
+        self.total += max(end - start, 0)
+        if self.total > self.limit:
+            raise AssertionError("download scan exceeded the input-span work budget")
+
+
+class _CountedPattern:
+    """Forward compiled-pattern calls while charging search and iteration spans."""
+
+    def __init__(self, pattern: re.Pattern[str], budget: _ScanWorkBudget) -> None:
+        self._wrapped = pattern
+        self.budget = budget
+
+    def finditer(self, text: str, pos: int = 0, endpos: int | None = None) -> Iterator[re.Match[str]]:
+        self.budget.charge(text, pos, endpos)
+        return self._wrapped.finditer(text, pos, len(text) if endpos is None else endpos)
+
+    def search(self, text: str, pos: int = 0, endpos: int | None = None) -> re.Match[str] | None:
+        self.budget.charge(text, pos, endpos)
+        return self._wrapped.search(text, pos, len(text) if endpos is None else endpos)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._wrapped, name)
+
+
+class _CountedRegex:
+    """Forward module-level regex calls while charging search and iteration spans."""
+
+    def __init__(self, budget: _ScanWorkBudget) -> None:
+        self.budget = budget
+
+    def search(self, pattern: str, text: str, flags: int = 0) -> re.Match[str] | None:
+        self.budget.charge(text)
+        return re.search(pattern, text, flags)
+
+    def finditer(self, pattern: str, text: str, flags: int = 0) -> Iterator[re.Match[str]]:
+        self.budget.charge(text)
+        return re.finditer(pattern, text, flags)
+
+    def compile(self, pattern: str, flags: int = 0) -> _CountedPattern:
+        return _CountedPattern(re.compile(pattern, flags), self.budget)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(re, name)
+
+
+def _check_download_scan_work() -> None:
+    """Exercise real scanner calls with span and same-runner CPU controls."""
+    from skills_sdk.validation import security_signatures
+
+    budget = _ScanWorkBudget()
+    with pytest.MonkeyPatch.context() as patch:
+        for name in ("_PIPE_TOKENS", "_SHELL_AFTER_PIPE", "_URL_TOKENS", "_DOWNLOAD_MARKERS"):
+            patch.setattr(security_signatures, name, _CountedPattern(getattr(security_signatures, name), budget))
+        patch.setattr(security_signatures, "re", _CountedRegex(budget))
+        for content in (b"curl " * 100000, b"https://example.invalid/" * 30000):
+            reference_times = []
+            scan_times = []
+            for _ in range(3):
+                started = process_time_ns()
+                ascii_bytes = sum(byte < 128 for byte in content)
+                reference_times.append(process_time_ns() - started)
+                if ascii_bytes != len(content):
+                    raise AssertionError("calibration input must contain only ASCII bytes")
+                budget.reset(len(content))
+                started = process_time_ns()
+                found = security_signatures.source_security_indicators("references/fixture.md", content)
+                scan_times.append(process_time_ns() - started)
+                codes = {item.code for item in found}
+                if codes & {"pipe_to_shell_download", "suspicious_download_url"}:
+                    raise AssertionError(f"unexpected download indicators: {codes}")
+            scan_cpu = median(scan_times)
+            reference_cpu = median(reference_times)
+            # A generous ratio tolerates runner speed but cannot eliminate all timing variation.
+            if scan_cpu > 256 * reference_cpu:
+                raise AssertionError(f"download scan used {scan_cpu} ns CPU; calibration used {reference_cpu} ns")
+
+
 def test_download_scanning_has_bounded_work_for_repeated_prefixes() -> None:
-    program = "\n".join(
-        [
-            "from skills_sdk.validation.security_signatures import source_security_indicators",
-            "for text in ('curl ' * 100000, 'https://example.invalid/' * 30000):",
-            "    found = source_security_indicators('references/fixture.md', text.encode())",
-            "    assert 'pipe_to_shell_download' not in {item.code for item in found}",
-            "    assert 'suspicious_download_url' not in {item.code for item in found}",
-        ]
+    """Keep the scan guard independent of a fixed CPU deadline."""
+    program = "from tests.test_security_screening import _check_download_scan_work; _check_download_scan_work()"
+    # The watchdog bounds a hung child; CPU work is calibrated to this runner.
+    completed = subprocess.run(
+        [sys.executable, "-c", program], capture_output=True, text=True, timeout=120, check=False
     )
-    completed = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=5, check=False)
     assert completed.returncode == 0, completed.stderr
 
 
@@ -166,6 +261,21 @@ def test_symlink_capture_blocks_without_reading_target(tmp_path: Path) -> None:
     (root / "references/linked.md").symlink_to(tmp_path / "absent-private-input")
     blocker = screen_package_security(root, upstream)
     assert isinstance(blocker, PackageSafetyBlocker) and blocker.code == "security_source_changed"
+
+
+def test_security_capture_limit_is_not_reported_as_source_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.validation import skill_package
+
+    root = _skill(tmp_path / "simplify")
+    upstream = build_skill_package(root, source_revision=REVISION)
+    assert upstream.status == "built"
+    with monkeypatch.context() as scoped:
+        scoped.setattr(skill_package, "_MAX_PACKAGE_FILE_BYTES", 1)
+        blocker = screen_package_security(root, upstream)
+    assert isinstance(blocker, PackageSafetyBlocker) and blocker.code == "package_resource_limit"
+    assert isinstance(screen_package_security(root, upstream), SecurityScreeningResult)
 
 
 @pytest.mark.parametrize("mutation", ["missing", "duplicate", "version", "not_applicable", "digest", "unknown"])

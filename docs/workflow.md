@@ -1,5 +1,10 @@
 # Skills SDK workflow
 
+The local optional [Apple FM advisory](fm-advisory.md) is a separate diagnostic
+delivery candidate. `advise-fm` skips missing declared context and keeps its
+findings outside SDK acceptance. It is not a required workflow stage and does
+not change the accepted gate sequence or calibration policy.
+
 Owner: Skills SDK maintainers. Consumers: agents creating, updating, checking,
 or adopting skills and plugins. This document records the owner-approved target
 workflow and its current implementation boundaries. Maintain it with each

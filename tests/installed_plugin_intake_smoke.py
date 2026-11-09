@@ -522,9 +522,11 @@ def _verify_normalization_capture_limit(
 
     oversized = source / "oversized.md"
     oversized.write_bytes(b"x" * (16 * 1024 * 1024 + 1))
+    with oversized.open("rb") as original:
+        original_digest = hashlib.file_digest(original, "sha256").digest()
     rejected_command = list(command)
     rejected_command[3] = str(root / "capture-blocked-plugin")
-    completed = subprocess.run(rejected_command, cwd=root, capture_output=True, text=True, check=False)
+    completed = subprocess.run(rejected_command, cwd=root, capture_output=True, text=True, check=False, timeout=60)
     assert completed.returncode == 2, completed.stderr + completed.stdout
     rejected = json.loads(completed.stdout)
     assert rejected["status"] == "blocked" and not rejected["candidate_created"]
@@ -533,11 +535,13 @@ def _verify_normalization_capture_limit(
     assert rejected["source_intake"]["blocker"]["code"] == "package_resource_limit"
     assert rejected["plugin_validation"] is None and rejected["normalized_package"] is None
     assert oversized.stat().st_size == 16 * 1024 * 1024 + 1
+    with oversized.open("rb") as observed:
+        assert hashlib.file_digest(observed, "sha256").digest() == original_digest, "oversized source bytes changed"
     SchemaRegistry().validate("plugin-normalization.v1", rejected)
     oversized.unlink()
     recovered_command = list(command)
     recovered_command[3] = str(root / "capture-recovered-plugin")
-    completed = subprocess.run(recovered_command, cwd=root, capture_output=True, text=True, check=False)
+    completed = subprocess.run(recovered_command, cwd=root, capture_output=True, text=True, check=False, timeout=60)
     assert completed.returncode == 0, completed.stderr + completed.stdout
     recovered = json.loads(completed.stdout)
     assert (

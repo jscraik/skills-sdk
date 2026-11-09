@@ -76,6 +76,25 @@ def test_complete_capture_schema_and_standalone_compatibility(tmp_path: Path) ->
     assert result.skills[0].validation == standalone
 
 
+def test_plugin_child_frontmatter_alias_is_blocked_and_recovers(tmp_path: Path) -> None:
+    root, _ = _fixture(tmp_path)
+    skill = root / "skills" / "fixture-skill" / "SKILL.md"
+    valid = skill.read_bytes()
+    skill.write_text(
+        "---\nname: fixture-skill\ndescription: Safe fixture.\n"
+        "metadata: {one: &shared value, two: *shared}\n---\nDo work.\n",
+        encoding="utf-8",
+    )
+    rejected = validate_plugin_package(root, source_revision=REVISION)
+    assert rejected.status == "blocked"
+    assert "plugin_child_blocked" in {finding.code for finding in rejected.findings}
+    assert "invalid_frontmatter" in {finding.code for finding in rejected.skills[0].validation.findings}
+    SchemaRegistry().validate("plugin-package-validation.v1", rejected.model_dump(mode="json"))
+
+    skill.write_bytes(valid)
+    _valid(root)
+
+
 def test_optional_metadata_and_explicit_release_policy_recovery(tmp_path: Path) -> None:
     """Require optional metadata only under explicit policy and accept corrected input."""
     root, payload = _fixture(tmp_path)

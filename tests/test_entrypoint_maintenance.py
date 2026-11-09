@@ -75,6 +75,23 @@ def test_real_cli_preview_apply_backup_and_idempotence(tmp_path: Path, capsys: p
     assert sorted(path.name for path in target.parent.iterdir()) == ["SKILL.md", "guide.md"]
 
 
+def test_entrypoint_alias_frontmatter_is_blocked_and_recovers(tmp_path: Path) -> None:
+    source, target, backup, args = _fixture(tmp_path)
+    valid = source.read_bytes()
+    target_before = target.read_bytes()
+    source.write_text(
+        "---\nname: example\ndescription: Safe fixture.\nmetadata: {one: &shared value, two: *shared}\n---\nDo work.\n"
+    )
+    args[args.index("--expected-source") + 1] = hashlib.sha256(source.read_bytes()).hexdigest()
+    assert main([*args, "--apply", "--json"]) == 2
+    assert target.read_bytes() == target_before and _backup_files(backup) == []
+
+    source.write_bytes(valid)
+    args[args.index("--expected-source") + 1] = hashlib.sha256(valid).hexdigest()
+    assert main([*args, "--apply", "--json"]) == 0
+    assert target.read_bytes() == valid
+
+
 @pytest.mark.parametrize("fault", ["source-drift", "target-drift", "malformed", "symlink", "missing"])
 def test_real_cli_refuses_unapproved_or_invalid_state(tmp_path: Path, fault: str) -> None:
     """Verify maintenance refuses drift, malformed paths, locks, and absence."""

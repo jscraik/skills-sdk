@@ -19,6 +19,7 @@ See the [delivery ledger](projects/sdk-workflow/tasks.md#accepted-delivery-ledge
 
 Contents:
 
+- [Optional Apple FM advisory](fm-advisory.md)
 - [Plugin presentation assessment](#plugin-presentation-assessment)
 - [Whole-plugin quality composition](#whole-plugin-quality-composition)
 - [Portable plugin validation](#portable-plugin-validation)
@@ -352,8 +353,8 @@ suffixes are `.md`, `.markdown`, `.mdown`, `.mkd`, `.mkdn`, `.mdwn`, `.mdtxt` an
 `.mdtext`; suffix matching is case-insensitive. A leading UTF-8 BOM is ignored
 when checking textual content. Each textual reference is limited to eight MiB
 before decoding or parsing; larger inputs return `reference_content_limit`.
-This bounds the syntax parser input, not the earlier package byte capture or
-total host memory usage.
+This bounds the syntax parser input, not total host memory usage. Standalone
+package capture has separate limits described below.
 JSON rejects non-standard constants such as `NaN` and `Infinity`. YAML syntax
 validation accepts application-defined tags and multiple documents without
 constructing tagged objects; it does not establish application validity or safety.
@@ -362,11 +363,24 @@ events and returns `reference_content_limit`. These work budgets are not a
 wall-clock deadline or a total host memory guarantee.
 
 Apply the policy to `validate_skill_package`, `build_skill_package`, or
-`intake_skill_package`. Defaults are unchanged. Invalid applicable-file policy
+`intake_skill_package`. Optional policy defaults are unchanged. Invalid applicable-file policy
 returns `invalid_validation_policy`; missing required files and invalid textual
 references return finding-specific blockers. These are deterministic checks,
 not proof of accuracy, relevance, link freshness, semantic description quality,
 or completed reviewer execution.
+
+Standalone validation and build capture at most 16 MiB per file, 64 MiB in
+total and 2,048 filesystem resources, including directories. A limit exceeded
+during capture returns `package_resource_limit`. Frontmatter rejects YAML
+aliases and merge keys and is limited to 20,000 nodes and 128 composed nodes
+along any path, including the root and scalar nodes. Unsupported or excessive
+frontmatter returns `invalid_frontmatter`. These
+limits apply with the default policy as well. A package accepted before these
+limits may now be blocked; the validation and build receipt schemas are unchanged.
+For an incomplete blocked capture, the existing candidate digest can describe
+only the captured subset; it does not establish a complete package identity.
+The frontmatter rules are shared with plugin-child validation and entrypoint
+maintenance. Complete-plugin capture has its own separate resource limits.
 
 - **Archive verification:** import `verify_package_archive` from
   `skills_sdk.packaging`, and `PackageArchiveVerificationPolicy` and
@@ -523,7 +537,9 @@ or completed reviewer execution.
   artifacts. `skills_sdk.validation.screen_package_security` uses the existing
   safe package capture to inspect manifested bytes without running the package,
   scanner subprocesses, network requests or credentials. Indicators select
-  relevant reviews; they are not proof of exploitability. The canonical
+  relevant reviews; they are not proof of exploitability. If recapture exceeds
+  a package resource limit, screening returns `package_resource_limit` rather
+  than asserting that the source changed. The canonical
   `sdk-capability-checklist/v1` covers content/injection, secrets/privacy,
   filesystem/subprocess, network/external writes, dependencies/binaries and
   tools/privileges. Content and privacy always require review. Script presence

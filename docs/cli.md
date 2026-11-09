@@ -27,6 +27,15 @@ A missing command, including `skills-sdk tessl` without a subcommand, is a
 usage error: exit `2` with a diagnostic on stderr. Help requests still exit `0`.
 Named discovery-only routes use exit `3` with their explicit diagnostic.
 
+Standalone `validate` and `build` limit capture to 16 MiB per file, 64 MiB
+in total and 2,048 filesystem resources, including directories. Exceeding a
+limit returns a `package_resource_limit` finding, including if a file grows
+while being read. `SKILL.md` frontmatter rejects YAML aliases and merge keys
+and is limited to 20,000 nodes and 128 composed nodes along any path, including
+the root and scalar nodes. Unsupported or excessive frontmatter returns
+`invalid_frontmatter`. The frontmatter rules
+also apply to plugin children and to `maintain-entrypoint` validation.
+
 ### Distinguishing usage errors from typed blockers
 
 Exit `2` alone does not show that a versioned result exists. Check stdout and
@@ -811,6 +820,21 @@ The observed API lane retains its separate callback receipt; caller-owned
 callback side effects cannot be claimed absent from its invocation receipt.
 Security, executed evaluations, matched local/cloud improvement, registry
 publication and runtime installation remain separate incomplete lanes.
+
+## Optional Apple FM advisory
+
+`skills-sdk advise-fm --request advisory-request.json --json` runs a separate
+Apple on-device advisory on explicit candidate-bound source snapshots. It emits
+an `fm-advisory/v1` JSON result; omit `--json` for a text summary.
+`--timeout-seconds` accepts a value greater than zero and at most 30.
+
+Exit `0` means a completed advisory or a skip for missing required context;
+findings and no findings both use `0`. Exit `2` means invalid input, execution
+failure, timeout or invalid model output. Exit `3` means an unsupported host,
+missing FM executable or configured custom provider. These statuses never grant
+or deny SDK acceptance. See the [FM advisory guide](fm-advisory.md) for request
+construction, evidence boundaries and limits. Required context missing from the
+request skips generation; no validation or release route calls FM automatically.
 
 ## Supplied content-review evidence
 

@@ -17,18 +17,57 @@ else
     curl --fail --silent --show-error --retry 3 --connect-timeout 10 --max-time 30 \
       --header 'Accept: application/vnd.github+json' "https://api.github.com/repos/$repo/pulls/$PR_NUMBER"
   }
+  main_metadata() {
+    curl --fail --silent --show-error --retry 3 --connect-timeout 10 --max-time 30 \
+      --header 'Accept: application/vnd.github+json' "https://api.github.com/repos/$repo/git/ref/heads/main"
+  }
+  main_sha() {
+    jq -ser 'select(length == 1 and .[0].ref == "refs/heads/main" and .[0].object.type == "commit") | .[0].object.sha' "$1"
+  }
+  verify_pr_identity() {
+    jq -se --arg head "$HEAD_SHA" --arg repo "$repo" \
+      'length == 1 and .[0].head.sha == $head and .[0].state == "open" and .[0].base.ref == "main" and
+       ((.[0].base.repo.full_name | ascii_downcase) == ($repo | ascii_downcase))' "$1"
+  }
   metadata="$(mktemp -d)"
   trap 'rm -rf -- "$metadata"' EXIT
-  pr_metadata > "$metadata/pr.json"
-  jq -e --arg head "$CIRCLE_SHA1" '.head.sha == $head and .state == "open"' "$metadata/pr.json"
-  BASE_SHA="$(jq -r .base.sha "$metadata/pr.json")"
   HEAD_SHA="$CIRCLE_SHA1"
-  [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-  git fetch --no-tags origin "$BASE_SHA" "$HEAD_SHA" \
+  [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+  # GitHub may calculate its test merge asynchronously after the PR lookup.
+  for attempt in 1 2 3 4; do
+    pr_metadata > "$metadata/pr.json"
+    verify_pr_identity "$metadata/pr.json"
+    if jq -e '.mergeable == true and (.merge_commit_sha | type == "string" and test("^[0-9a-f]{40}$"))' \
+      "$metadata/pr.json" >/dev/null; then
+      break
+    fi
+    if [[ "$(jq -r '.mergeable' "$metadata/pr.json")" != null || "$attempt" == 4 ]]; then
+      echo "GitHub has not supplied a usable test merge" >&2
+      exit 1
+    fi
+    sleep 2
+  done
+  canonical_merge="$(jq -r .merge_commit_sha "$metadata/pr.json")"
+  main_metadata > "$metadata/main.json"
+  canonical_main="$(main_sha "$metadata/main.json")"
+  [[ "$canonical_main" =~ ^[0-9a-f]{40}$ ]]
+  git fetch --no-tags origin "$HEAD_SHA" \
     "+refs/heads/main:refs/remotes/origin/main" "+refs/pull/$PR_NUMBER/merge:refs/ci/pr-merge"
+  BASE_SHA="$(git rev-parse --verify 'refs/remotes/origin/main^{commit}')"
+  merge_sha="$(git rev-parse --verify 'refs/ci/pr-merge^{commit}')"
+  [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$merge_sha" =~ ^[0-9a-f]{40}$ ]]
   if ! merge_base="$(git rev-parse --verify refs/ci/pr-merge^1)"; then exit 1; fi
   if ! merge_head="$(git rev-parse --verify refs/ci/pr-merge^2)"; then exit 1; fi
-  if [[ "$merge_base" != "$BASE_SHA" || "$merge_head" != "$HEAD_SHA" ]]; then
+  if [[ "$BASE_SHA" != "$canonical_main" ]]; then
+    echo "Fetched main does not match GitHub main" >&2
+    exit 1
+  fi
+  if [[ "$merge_sha" != "$canonical_merge" ]]; then
+    echo "Fetched merge does not match GitHub test merge" >&2
+    exit 1
+  fi
+  if [[ "$merge_base" != "$BASE_SHA" || "$merge_head" != "$HEAD_SHA" ]] || \
+    git rev-parse --verify 'refs/ci/pr-merge^3' >/dev/null 2>&1; then
     echo "PR merge parents do not match live base and head" >&2
     exit 1
   fi
@@ -60,10 +99,24 @@ else
   echo "scope=$scope"
   # Recheck live identity after fetching the merge tree and validating the body.
   pr_metadata > "$metadata/final.json"
-  jq -e --arg head "$HEAD_SHA" --arg base "$BASE_SHA" \
-    '.head.sha == $head and .base.sha == $base and .state == "open"' "$metadata/final.json"
+  verify_pr_identity "$metadata/final.json"
+  jq -e --arg merge "$merge_sha" \
+    '.mergeable == true and .merge_commit_sha == $merge' "$metadata/final.json"
   jq -r '.body // ""' "$metadata/final.json" > "$body_file"
   python3 "$validator" --template "$template" --body-file "$body_file"
+  main_metadata > "$metadata/final-main.json"
+  final_main="$(main_sha "$metadata/final-main.json")"
+  if [[ "$final_main" != "$BASE_SHA" ]]; then
+    echo "GitHub main changed during validation preparation" >&2
+    exit 1
+  fi
+  git fetch --no-tags origin "+refs/heads/main:refs/ci/final-main" \
+    "+refs/pull/$PR_NUMBER/merge:refs/ci/final-merge"
+  if [[ "$(git rev-parse --verify 'refs/ci/final-main^{commit}')" != "$BASE_SHA" || \
+    "$(git rev-parse --verify 'refs/ci/final-merge^{commit}')" != "$merge_sha" ]]; then
+    echo "PR base or merge changed during validation preparation" >&2
+    exit 1
+  fi
   git checkout --detach refs/ci/pr-merge
 fi
 [[ "$scope" == full || "$scope" == docs ]]

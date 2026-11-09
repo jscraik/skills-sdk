@@ -22,6 +22,48 @@ codestyle, the full test suite, package builds, installed-package proof and
 diff hygiene. A full local run is optional, not required before every commit
 or pull request. Required hosted validation and review remain merge gates.
 
+### Optional external readiness-parser probe
+
+The `readiness-integration` dependency group supports a caller-authorised
+synthetic parser probe against an external readiness helper. The default
+developer group also includes this dependency so the normal test suite can
+exercise its controls. Prepare the explicit group in
+the checkout with
+`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen --group readiness-integration`.
+Then run the probe without resolving or downloading dependencies:
+
+```sh
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" \
+  mise exec -- uv run --frozen --no-sync --offline --no-python-downloads \
+  --group readiness-integration python -I scripts/verify_external_readiness.py \
+  --probe <authorised-probe> --probe-sha256 <probe-sha256> \
+  --helper <authorised-helper> --helper-sha256 <helper-sha256>
+```
+
+The caller must independently inspect and authorise both Python inputs, trust
+the selected Python environment, and obtain expected digests from its own
+trusted source. The command checks parser package versions and imports,
+snapshots matching regular-file bytes, then runs
+the probe with Python isolated mode, a limited environment and a 30-second
+direct-child timeout. Probe output is suppressed; the JSON result records its
+exit status and reports missing prerequisites, rejected inputs, failure or
+timeout separately. Its result records verified input digests as byte identity,
+not trust or environment-file attestation. `probe_attempted` is conservative:
+a storage or cleanup error after an attempt can return a blocker after code
+may already have run, so inspect before any retry. Exit zero means only that
+the supplied probe exited zero.
+The caller remains responsible for the probe's actual coverage. Digest matching
+does not authenticate its author or prevent the authorised probe from changing
+its own behaviour.
+
+This command executes external code and is not a security sandbox. Filesystem
+and network access remain subject to the host's effective controls; Python's
+isolated mode does not provide containment. The timeout does not guarantee
+cleanup of descendants created by a probe. Use only inputs that do not spawn
+uncontrolled children. The external readiness policy stays with its owner;
+this test cannot establish a hosted review, current-head receipt or merge
+readiness, and does not change the default SDK runtime dependencies.
+
 ## Validation order and evidence
 
 Before committing or opening a PR, run focused caller-visible proof for the
@@ -53,16 +95,27 @@ not removed to reduce latency, and no numeric speed improvement is assumed.
 ## Validation scope and phases
 
 The default aggregate runs every phase and stops at the first failure. Each
-phase prints its start, exit status and elapsed seconds. The hosted `validate`
-job exposes quality, tests, build, installed-entrypoint proof and diff hygiene
-as separate steps; its successful result still requires every applicable step.
+phase prints its start, exit status and elapsed seconds. The hosted `prepare`,
+`tests` and `installed` jobs run quality, build, diff hygiene, test shards and
+installed-entrypoint proof. For full scope, the `validate` job succeeds only after
+the applicable jobs succeed and complete source-bound shard evidence passes
+verification. For docs scope, downstream jobs halt before test-shard and
+installed-package execution; this does not establish full-suite proof.
 The same wrapper accepts `quality`, `docs-tests`, `tests`, `build`, `installed` or `diff`
 for those steps. Running one phase does not establish aggregate completion.
 
-The test phase uses pinned pytest-xdist with two independent worker processes,
+The test phase uses pinned pytest-xdist with four independent worker processes,
 retains all collected tests, and prints the 25 slowest cases. Temporary fixture
-paths and environment changes remain worker-local. Package builds and installed
-smokes remain sequential after tests. Runtime source recapture, calibration,
+paths and environment changes remain worker-local. CircleCI pins the existing
+`large` Docker resource class, with four vCPUs and 8 GB of memory, so worker count
+does not depend on the provider's default resource class. CircleCI prepares the
+trusted merge once, runs quality checks and builds the wheel, then distributes
+that exact revision and wheel to two test containers and one installed-proof
+container. Each test container runs a disjoint half of the complete collection
+with four workers. Installed proof retains its `large` allocation and runs concurrently.
+The required `validate` check waits for both lanes and verifies complete,
+successful test receipts against the prepared revision. The full local wrapper
+retains sequential phases. Runtime source recapture, calibration,
 drift, failure and recovery checks are not cached or removed for speed.
 
 Matched-lane execution may reuse closed YAML parsing within its own operation.
@@ -75,7 +128,8 @@ failure or cancellation; child tasks and threads cannot use a parent's cache.
 Both test routes write JUnit results under `test-results/`. CircleCI uploads
 these results to expose per-test timings and failures in its Tests tab. The XML
 includes test file names for timing-based splitting. Test uploads do not enable
-test selection, automatic retries or additional parallel containers.
+paid test selection or automatic retries. Static sharding retains every test;
+missing, failed, stale or inconsistent shard evidence fails validation.
 
 The documentation-only route is
 `bash scripts/validate-docs.sh --base <accepted-base> --head <current-head>`.

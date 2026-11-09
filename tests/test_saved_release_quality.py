@@ -128,10 +128,21 @@ def test_saved_release_stale_source_blocks_at_actual_intake(tmp_path: Path) -> N
     child = request["children"][0]
     context = SkillPackageIntakeContextV2.model_validate(child["request"]["intake"])
     target = root / child["path"] / "SKILL.md"
-    target.write_text(target.read_text() + "\nChanged source.\n")
+    original = target.read_text()
+    target.write_text(original + "\nChanged source.\n")
     result = intake_skill_package(root / child["path"], context)
     assert result.status == "blocked" and result.blocker.code == "saved_source_candidate_mismatch"
     assert result.execution_performed is result.network_used is result.mutation_performed is False
+    assert result.schema_version == "skill-package-intake/v2"
+    (finding,) = result.validation.findings
+    assert finding.message == result.blocker.message
+    assert finding.message == "Saved-release provenance does not bind the freshly captured child."
+    assert "saved_source_candidate_mismatch" in result.decision.blocker_codes
+    SchemaRegistry().validate("skill-package-intake.v2", result.model_dump(mode="json"))
+    target.write_text(original)
+    restored = intake_skill_package(root / child["path"], context)
+    assert restored.status == "normalized" and restored.blocker is None
+    assert restored.candidate == context.source.candidate
 
 
 def test_old_intake_keeps_url_rejection(tmp_path: Path) -> None:

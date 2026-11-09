@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import gc
 import io
+import subprocess
+import sys
 import weakref
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -47,47 +49,82 @@ async def _assert_caller_cancellation(
                 owned.exception()
 
 
+def _run_cancellation_scenario(name: str, *, timeout: float = 15) -> None:
+    script = (
+        "import asyncio, sys; "
+        "from tests import test_provider_call_cancellation as cases; "
+        "asyncio.run(getattr(cases, sys.argv[1])())"
+    )
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", script, name], capture_output=True, text=True, timeout=timeout, check=False
+    )
+    assert result.returncode == 0, f"{name} failed:\n{result.stdout}\n{result.stderr}"
+
+
+async def _cleanup_cancellation_scenario() -> None:
+    request = _provider_request(None)
+    started, release = asyncio.Event(), asyncio.Event()
+
+    class SlowCleanupAdapter(FakeAdapter):
+        async def cleanup(self) -> None:
+            self.cleanup_calls += 1
+            started.set()
+            await release.wait()
+
+    adapter = SlowCleanupAdapter(request)
+    task = asyncio.create_task(execute_provider_call(request, None, adapter))
+    await _assert_caller_cancellation(task, started, release)
+    assert adapter.cleanup_calls == 1
+
+
+async def _stream_cancellation_scenario() -> None:
+    request = _provider_request(None)
+    started, release = asyncio.Event(), asyncio.Event()
+
+    class StalledStreamAdapter(FakeAdapter):
+        async def _stalled(self) -> AsyncIterator[ProviderAdapterStreamItem]:
+            self.stream_pulls += 1
+            started.set()
+            await release.wait()
+            yield ProviderAdapterChunk("late")
+
+        async def stream(self, request: object, input_payload: object) -> AsyncIterator[ProviderAdapterStreamItem]:
+            return self._stalled()
+
+    adapter = StalledStreamAdapter(request, mode="stream")
+    task = asyncio.create_task(execute_provider_call(request, None, adapter))
+    await _assert_caller_cancellation(task, started, release)
+    assert adapter.stream_pulls == 1
+    assert adapter.cleanup_calls == 1
+
+
 def test_caller_cancellation_during_cleanup_is_not_swallowed() -> None:
-    async def scenario() -> None:
-        request = _provider_request(None)
-        started, release = asyncio.Event(), asyncio.Event()
-
-        class SlowCleanupAdapter(FakeAdapter):
-            async def cleanup(self) -> None:
-                self.cleanup_calls += 1
-                started.set()
-                await release.wait()
-
-        adapter = SlowCleanupAdapter(request)
-        task = asyncio.create_task(execute_provider_call(request, None, adapter))
-        await _assert_caller_cancellation(task, started, release)
-        assert adapter.cleanup_calls == 1
-
-    asyncio.run(scenario())
+    _run_cancellation_scenario("_cleanup_cancellation_scenario")
 
 
 def test_caller_cancellation_during_stalled_stream_stops_pulls_and_cleans_up() -> None:
-    async def scenario() -> None:
-        request = _provider_request(None)
-        started, release = asyncio.Event(), asyncio.Event()
+    _run_cancellation_scenario("_stream_cancellation_scenario")
 
-        class StalledStreamAdapter(FakeAdapter):
-            async def _stalled(self) -> AsyncIterator[ProviderAdapterStreamItem]:
-                self.stream_pulls += 1
-                started.set()
-                await release.wait()
-                yield ProviderAdapterChunk("late")
 
-            async def stream(self, request: object, input_payload: object) -> AsyncIterator[ProviderAdapterStreamItem]:
-                return self._stalled()
+async def _resistant_cancellation_scenario() -> None:
+    started, release = asyncio.Event(), asyncio.Event()
 
-        adapter = StalledStreamAdapter(request, mode="stream")
-        task = asyncio.create_task(execute_provider_call(request, None, adapter))
-        await _assert_caller_cancellation(task, started, release)
-        assert adapter.stream_pulls == 1
-        assert adapter.cleanup_calls == 1
+    async def resistant() -> ProviderCallOutcome:
+        started.set()
+        while True:
+            try:
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                print("resistant task ignored cancellation", flush=True)
 
-    asyncio.run(scenario())
+    task = asyncio.create_task(resistant())
+    await _assert_caller_cancellation(task, started, release)
+
+
+def test_cancellation_scenario_deadline_stops_resistant_task() -> None:
+    with pytest.raises(subprocess.TimeoutExpired) as exc:
+        _run_cancellation_scenario("_resistant_cancellation_scenario")
+    assert (exc.value.stdout or b"").count(b"resistant task ignored cancellation") >= 2
 
 
 @pytest.mark.parametrize("phase", ["factory", "complete", "cleanup"])
