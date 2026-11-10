@@ -371,7 +371,9 @@ or completed reviewer execution.
 
 Standalone validation and build capture at most 16 MiB per file, 64 MiB in
 total and 2,048 filesystem resources, including directories. A limit exceeded
-during capture returns `package_resource_limit`. Frontmatter rejects YAML
+during capture adds a `package_resource_limit` validation finding. A blocked
+build returns only the first validation finding as its receipt blocker, so an
+earlier finding can take precedence. Frontmatter rejects YAML
 aliases and merge keys and is limited to 20,000 nodes and 128 composed nodes
 along any path, including the root and scalar nodes. Unsupported or excessive
 frontmatter returns `invalid_frontmatter`. These

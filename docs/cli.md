@@ -28,9 +28,12 @@ usage error: exit `2` with a diagnostic on stderr. Help requests still exit `0`.
 Named discovery-only routes use exit `3` with their explicit diagnostic.
 
 Standalone `validate` and `build` limit capture to 16 MiB per file, 64 MiB
-in total and 2,048 filesystem resources, including directories. Exceeding a
-limit returns a `package_resource_limit` finding, including if a file grows
-while being read. `SKILL.md` frontmatter rejects YAML aliases and merge keys
+in total and 2,048 filesystem resources, including directories. When capture
+detects an exceeded limit, including a file growing while being read,
+`validate --json` includes a `package_resource_limit` finding in `findings`.
+`build --json` returns a blocked receipt whose `blocker.code` is the code of the
+first validation finding; an earlier finding can take precedence over the limit.
+`SKILL.md` frontmatter rejects YAML aliases and merge keys
 and is limited to 20,000 nodes and 128 composed nodes along any path, including
 the root and scalar nodes. Unsupported or excessive frontmatter returns
 `invalid_frontmatter`. The frontmatter rules
