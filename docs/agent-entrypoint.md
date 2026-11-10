@@ -137,9 +137,10 @@ MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise ex
 ```
 
 The rerun returns `"status": "pass"` and exit `0`, with no findings, and
-`SKILL.md` is byte-identical before and after. The directory name is the
-`package_id`, so the rename changes package identity: do not reuse a
-candidate-bound receipt from the old path. The pass is structural only, and the
+`SKILL.md` is byte-identical before and after. For the valid slug names in this
+example, the directory name supplies `package_id`. The rename therefore changes
+package identity: do not reuse a candidate-bound receipt from the old path.
+The pass is structural only, and the
 synthetic revision authenticates nothing; it grants no semantic review,
 execution, admission, installation or release clearance. See
 [the authoring contract](workflow.md#skill-authoring-contract).
