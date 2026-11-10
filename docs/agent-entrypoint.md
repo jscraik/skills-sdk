@@ -109,3 +109,38 @@ findings, and leaves the package bytes unchanged: only your edit changed them.
 That pass is still structural, and the synthetic revision authenticates
 nothing. See [the authoring contract](workflow.md#skill-authoring-contract) for
 the semantic, execution and release checks it does not grant.
+
+### Recover from a name mismatch
+
+A skill copied into a differently named directory is blocked even when its
+frontmatter is valid. Use a disposable synthetic copy outside the checkout, as
+above, with `name: recovery-demo` and a description, placed in
+`copied-directory`. The revision is again a synthetic placeholder.
+
+```bash
+demo_root="$(realpath "$(mktemp -d)")"
+mkdir -p "$demo_root/copied-directory"
+printf -- '---\nname: recovery-demo\ndescription: Disposable synthetic package used only to demonstrate directory-name recovery.\n---\n\n# Demo\n' \
+  > "$demo_root/copied-directory/SKILL.md"
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate "$demo_root/copied-directory" --source-revision deadbeefdeadbeefdeadbeefdeadbeefdeadbeef --json --robot
+```
+
+That returns `"status": "blocked"` and exit `2`, with a finding whose `code` is
+`name_mismatch` and whose `evidence_refs` name `SKILL.md`, alongside
+`"mutation_performed": false` and `"identity": null`. Validation does not
+rename anything. Rename the directory to the declared name yourself, then rerun
+against the new path:
+
+```bash
+mv "$demo_root/copied-directory" "$demo_root/recovery-demo"
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate "$demo_root/recovery-demo" --source-revision deadbeefdeadbeefdeadbeefdeadbeefdeadbeef --json --robot
+```
+
+The rerun returns `"status": "pass"` and exit `0`, with no findings, and
+`SKILL.md` is byte-identical before and after. For the valid slug names in this
+example, the directory name supplies `package_id`. The rename therefore changes
+package identity: do not reuse a candidate-bound receipt from the old path.
+The pass is structural only, and the
+synthetic revision authenticates nothing; it grants no semantic review,
+execution, admission, installation or release clearance. See
+[the authoring contract](workflow.md#skill-authoring-contract).
