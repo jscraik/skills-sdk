@@ -23,6 +23,10 @@ def screen_package_security(
         if receipt.status != "built" or receipt.manifest is None or receipt.candidate is None:
             raise ValueError("built upstream required")
         files, capture_findings, captured = _scan_files(package_root, SkillValidationPolicy())
+        if any(finding.code == "package_resource_limit" for finding in capture_findings):
+            return PackageSafetyBlocker(
+                code="package_resource_limit", message="Security capture exceeded the package resource limit."
+            )
         if capture_findings or tuple(files) != receipt.manifest.files:
             return PackageSafetyBlocker(
                 code="security_source_changed", message="Security capture must match the built package."

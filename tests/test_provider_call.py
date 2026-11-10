@@ -551,59 +551,6 @@ def test_cancellation_stops_and_cleans_up_once() -> None:
     assert adapter.cleanup_calls == 1
 
 
-def test_caller_cancellation_during_cleanup_is_not_swallowed() -> None:
-    async def scenario() -> None:
-        request = _provider_request(None)
-        cleanup_started = asyncio.Event()
-
-        class SlowCleanupAdapter(FakeAdapter):
-            async def cleanup(self) -> None:
-                self.cleanup_calls += 1
-                cleanup_started.set()
-                await asyncio.Event().wait()
-
-        adapter = SlowCleanupAdapter(request)
-        task = asyncio.create_task(execute_provider_call(request, None, adapter))
-        await cleanup_started.wait()
-        task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
-        assert adapter.cleanup_calls == 1
-
-    asyncio.run(scenario())
-
-
-def test_caller_cancellation_during_stalled_stream_stops_pulls_and_cleans_up() -> None:
-    async def scenario() -> None:
-        request = _provider_request(None)
-        pull_started = asyncio.Event()
-
-        class StalledStreamAdapter(FakeAdapter):
-            async def _stalled(self) -> AsyncIterator[ProviderAdapterStreamItem]:
-                self.stream_pulls += 1
-                pull_started.set()
-                await asyncio.Event().wait()
-                yield ProviderAdapterChunk("late")
-
-            async def stream(
-                self,
-                request: ProviderExecutionRequest,
-                input_payload: object,
-            ) -> AsyncIterator[ProviderAdapterStreamItem]:
-                return self._stalled()
-
-        adapter = StalledStreamAdapter(request, mode="stream")
-        task = asyncio.create_task(execute_provider_call(request, None, adapter))
-        await pull_started.wait()
-        task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
-        assert adapter.stream_pulls == 1
-        assert adapter.cleanup_calls == 1
-
-    asyncio.run(scenario())
-
-
 def test_usage_and_decimal_cost_are_preserved_as_adapter_observations() -> None:
     request = _provider_request(None)
     adapter = FakeAdapter(request)

@@ -22,7 +22,7 @@ def read_linux_process(pid: int, proc: Path = Path("/proc")) -> ProcessObservati
         raise ValueError("observation requires a positive process id")
     try:
         record = (proc / str(pid) / "stat").read_text()
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         if not proc.is_dir():
             raise OSError("process identity source unavailable") from None
         return None

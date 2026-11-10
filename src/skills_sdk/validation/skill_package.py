@@ -28,6 +28,9 @@ _ALLOWED_FRONTMATTER: Final[frozenset[str]] = frozenset(
 _PACKAGE_ID_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _SOURCE_REVISION_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{40}$")
 _MAX_PACKAGE_DIRECTORY_DEPTH: Final[int] = 64
+_MAX_PACKAGE_FILE_BYTES: Final[int] = 16 * 1024 * 1024
+_MAX_PACKAGE_TOTAL_BYTES: Final[int] = 64 * 1024 * 1024
+_MAX_PACKAGE_RESOURCES: Final[int] = 2048
 _MAX_REFERENCE_TEXT_BYTES: Final[int] = 8_388_608
 _MAX_YAML_COLLECTION_DEPTH: Final[int] = 128
 _MAX_YAML_EVENTS: Final[int] = 100_000
@@ -38,6 +41,10 @@ _TEXT_REFERENCE_SUFFIXES: Final[frozenset[str]] = frozenset(
 
 class _UnsupportedSafeTraversal(OSError):
     """The host cannot enforce descriptor-relative no-follow traversal."""
+
+
+class _CaptureBudgetExceeded(OSError):
+    """Untrusted capture would exceed the standalone resource budget."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,12 +121,14 @@ def _reference_findings(path: str, payload: bytes) -> list[SkillPackageFinding]:
     return []
 
 
-def _package_policy_findings(captured: dict[str, bytes], policy: SkillValidationPolicy) -> list[SkillPackageFinding]:
+def _package_policy_findings(
+    captured: dict[str, bytes], policy: SkillValidationPolicy, *, capture_complete: bool = True
+) -> list[SkillPackageFinding]:
     """Apply policy to the same safely captured bytes that bind the candidate."""
     findings = [
         _finding("required_file_missing", "selected policy requires a readable regular file", path)
         for path in policy.required_files
-        if path not in captured
+        if capture_complete and path not in captured
     ]
     if policy.check_reference_content:
         for path, payload in sorted(captured.items()):
@@ -128,19 +137,28 @@ def _package_policy_findings(captured: dict[str, bytes], policy: SkillValidation
     return findings
 
 
-def _read_regular_bytes(parent_fd: int, name: str) -> tuple[bytes, bool]:
+def _read_regular_bytes(parent_fd: int, name: str, *, byte_limit: int | None = None) -> tuple[bytes, bool]:
     """Reject known special entries before opening and verify the opened descriptor."""
     value = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
     if not stat.S_ISREG(value.st_mode):
         raise OSError(f"not a regular file: {name}")
+    limit = _MAX_PACKAGE_FILE_BYTES if byte_limit is None else min(byte_limit, _MAX_PACKAGE_FILE_BYTES)
+    if value.st_size > limit:
+        raise _CaptureBudgetExceeded("package file exceeds capture byte budget")
     flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(name, flags, dir_fd=parent_fd)
     try:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
             raise OSError(f"not a regular file: {name}")
+        if before.st_size > limit:
+            raise _CaptureBudgetExceeded("package file exceeds capture byte budget")
         chunks: list[bytes] = []
-        while chunk := os.read(descriptor, 1024 * 1024):
+        size = 0
+        while chunk := os.read(descriptor, min(1024 * 1024, limit - size + 1)):
+            size += len(chunk)
+            if size > limit:
+                raise _CaptureBudgetExceeded("package file exceeds capture byte budget")
             chunks.append(chunk)
         after = os.fstat(descriptor)
         stable = (before.st_size, before.st_mtime_ns, before.st_ino) == (
@@ -200,7 +218,7 @@ def _candidate(package_root: Path, source_revision: str, files: list[PackageMani
 
 
 def _regular_file(
-    parent_fd: int, relative: Path, role: PackageFileRole
+    parent_fd: int, relative: Path, role: PackageFileRole, *, byte_limit: int | None = None
 ) -> tuple[PackageManifestFile | None, SkillPackageFinding | None, bytes | None]:
     relative_text = relative.as_posix()
     try:
@@ -216,7 +234,12 @@ def _regular_file(
             None,
         )
     try:
-        payload, stable = _read_regular_bytes(parent_fd, name)
+        if byte_limit is not None and byte_limit < _MAX_PACKAGE_FILE_BYTES:
+            payload, stable = _read_regular_bytes(parent_fd, name, byte_limit=byte_limit)
+        else:
+            payload, stable = _read_regular_bytes(parent_fd, name)
+    except _CaptureBudgetExceeded:
+        return None, _finding("package_resource_limit", "package exceeds capture byte budget", relative_text), None
     except OSError:
         return (
             None,
@@ -244,6 +267,9 @@ def _scan_files(
     files: list[PackageManifestFile] = []
     findings: list[SkillPackageFinding] = []
     captured: dict[str, bytes] = {}
+    resource_count = 0
+    total_bytes = 0
+    capture_stopped = False
     try:
         root_fd = _open_directory_tree(package_root)
     except _UnsupportedSafeTraversal:
@@ -261,9 +287,19 @@ def _scan_files(
 
     def visit(directory_fd: int, relative_directory: Path, depth: int) -> None:
         """Walk one directory safely, accumulating captured files and policy or source-drift findings."""
+        nonlocal resource_count, total_bytes, capture_stopped
         before = os.fstat(directory_fd)
         try:
-            entries = sorted(os.scandir(directory_fd), key=lambda entry: entry.name)
+            entries = []
+            with os.scandir(directory_fd) as iterator:
+                for entry in iterator:
+                    resource_count += 1
+                    if resource_count > _MAX_PACKAGE_RESOURCES:
+                        findings.append(_finding("package_resource_limit", "package exceeds capture resource budget"))
+                        capture_stopped = True
+                        return
+                    entries.append(entry)
+            entries.sort(key=lambda entry: entry.name)
         except OSError:
             findings.append(
                 _finding(
@@ -274,6 +310,8 @@ def _scan_files(
             )
             return
         for entry in entries:
+            if capture_stopped:
+                return
             relative_path = relative_directory / entry.name
             relative = relative_path.as_posix()
             try:
@@ -333,12 +371,21 @@ def _scan_files(
                         relative,
                     )
                 )
-            record, finding, payload = _regular_file(directory_fd, relative_path, _file_role(relative_path.as_posix()))
+            record, finding, payload = _regular_file(
+                directory_fd,
+                relative_path,
+                _file_role(relative_path.as_posix()),
+                byte_limit=_MAX_PACKAGE_TOTAL_BYTES - total_bytes,
+            )
             if record is not None and payload is not None:
+                total_bytes += len(payload)
                 files.append(record)
                 captured[relative] = payload
             if finding is not None:
                 findings.append(finding)
+                if finding.code in {"package_resource_limit", "source_changed", "unreadable_package_file"}:
+                    capture_stopped = True
+                    return
         after = os.fstat(directory_fd)
         if (before.st_mtime_ns, before.st_ino) != (after.st_mtime_ns, after.st_ino):
             findings.append(_source_changed_finding(relative_directory))
@@ -406,7 +453,7 @@ def _captured_skill_identity(
         return None, [_finding("invalid_utf8", "SKILL.md must be UTF-8", "SKILL.md")]
     except OSError:
         return None, [_finding("unreadable_skill_md", "SKILL.md must remain a readable regular file", "SKILL.md")]
-    except (ValueError, yaml.YAMLError):
+    except (ValueError, yaml.YAMLError, RecursionError):
         return None, [_finding("invalid_frontmatter", "SKILL.md frontmatter must be valid YAML", "SKILL.md")]
 
 
@@ -448,9 +495,14 @@ def validate_skill_package(
         else:
             files, file_findings, captured = _scan_files(root, active_policy)
             findings.extend(file_findings)
-            findings.extend(_package_policy_findings(captured, active_policy))
-            identity, ir_findings = _captured_skill_identity(root, captured.get("SKILL.md"), active_policy)
-            findings.extend(ir_findings)
+            capture_incomplete = any(
+                finding.code in {"package_resource_limit", "source_changed", "unreadable_package_file"}
+                for finding in file_findings
+            )
+            findings.extend(_package_policy_findings(captured, active_policy, capture_complete=not capture_incomplete))
+            if "SKILL.md" in captured or not capture_incomplete:
+                identity, ir_findings = _captured_skill_identity(root, captured.get("SKILL.md"), active_policy)
+                findings.extend(ir_findings)
     candidate = _candidate(root, source_revision, files) if revision_is_valid else None
     status: Literal["pass", "blocked"] = (
         "blocked" if any(item.severity is ValidationSeverity.BLOCKER for item in findings) else "pass"

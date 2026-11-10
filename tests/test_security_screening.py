@@ -263,6 +263,21 @@ def test_symlink_capture_blocks_without_reading_target(tmp_path: Path) -> None:
     assert isinstance(blocker, PackageSafetyBlocker) and blocker.code == "security_source_changed"
 
 
+def test_security_capture_limit_is_not_reported_as_source_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.validation import skill_package
+
+    root = _skill(tmp_path / "simplify")
+    upstream = build_skill_package(root, source_revision=REVISION)
+    assert upstream.status == "built"
+    with monkeypatch.context() as scoped:
+        scoped.setattr(skill_package, "_MAX_PACKAGE_FILE_BYTES", 1)
+        blocker = screen_package_security(root, upstream)
+    assert isinstance(blocker, PackageSafetyBlocker) and blocker.code == "package_resource_limit"
+    assert isinstance(screen_package_security(root, upstream), SecurityScreeningResult)
+
+
 @pytest.mark.parametrize("mutation", ["missing", "duplicate", "version", "not_applicable", "digest", "unknown"])
 def test_checklist_contradictions_block_and_recover(mutation: str) -> None:
     request, evidence = _bound()

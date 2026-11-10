@@ -6,38 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-from yaml.constructor import ConstructorError
-
-
-class _UniqueKeyLoader(yaml.SafeLoader):
-    """Safe YAML loader that rejects ambiguous duplicate mapping keys."""
-
-
-def _construct_unique_mapping(loader: _UniqueKeyLoader, node: yaml.MappingNode, deep: bool = False) -> dict[str, Any]:
-    loader.flatten_mapping(node)
-    mapping: dict[str, Any] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        if not isinstance(key, str):
-            raise ConstructorError(
-                "while constructing frontmatter",
-                node.start_mark,
-                "keys must be strings",
-                key_node.start_mark,
-            )
-        if key in mapping:
-            raise ConstructorError(
-                "while constructing frontmatter",
-                node.start_mark,
-                f"duplicate key: {key}",
-                key_node.start_mark,
-            )
-        mapping[key] = loader.construct_object(value_node, deep=deep)
-    return mapping
-
-
-_UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping)
+from skills_sdk.validation.yaml_cache import load_closed_yaml
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +31,7 @@ def read_frontmatter(text: str) -> tuple[dict[str, Any], str, bool]:
     if closing_index is None:
         return {}, "", False
     frontmatter_text = "\n".join(lines[1:closing_index])
-    loaded = yaml.load(frontmatter_text, Loader=_UniqueKeyLoader) if frontmatter_text.strip() else {}
+    loaded = load_closed_yaml(frontmatter_text) if frontmatter_text.strip() else {}
     if not isinstance(loaded, dict) or any(not isinstance(key, str) for key in loaded):
         raise ValueError("SKILL.md frontmatter must be a string-keyed mapping")
     return loaded, "\n".join(lines[closing_index + 1 :]).strip(), True
