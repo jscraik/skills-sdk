@@ -23,6 +23,7 @@ skills-sdk = "skills_sdk.cli.main:main"
 
 [dependency-groups]
 dev = [
+  "markdown-it-py==4.2.0",
   "mypy==1.18.1",
   "pytest==9.1.1",
   "pytest-xdist==3.8.0",
@@ -30,6 +31,7 @@ dev = [
   "types-jsonschema==4.26.0.20260518",
   "types-pyyaml==6.0.12.20250822",
 ]
+readiness-integration = ["markdown-it-py==4.2.0"]
 
 [tool.uv]
 default-groups = ["dev"]

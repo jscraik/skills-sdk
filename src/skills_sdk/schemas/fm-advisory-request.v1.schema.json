@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "AdvisoryDocument": {
+      "additionalProperties": false,
+      "description": "Explicit caller-supplied text, not a filesystem path to discover.",
+      "properties": {
+        "document_id": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "Document Id",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "specification",
+            "response"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 12000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_id",
+        "role",
+        "text"
+      ],
+      "title": "AdvisoryDocument",
+      "type": "object"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/fm-advisory-request.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A caller-bound optional check, not verified source or execution evidence.",
+  "properties": {
+    "assertion": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Assertion",
+      "type": "string"
+    },
+    "candidate": {
+      "$ref": "#/$defs/PackageCandidateIdentity"
+    },
+    "documents": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AdvisoryDocument"
+      },
+      "maxItems": 32,
+      "title": "Documents",
+      "type": "array"
+    },
+    "kind": {
+      "enum": [
+        "contradiction",
+        "semantic"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "required_context": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "minItems": 2,
+      "title": "Required Context",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "fm-advisory-request/v1",
+      "default": "fm-advisory-request/v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate",
+    "kind",
+    "assertion",
+    "required_context"
+  ],
+  "title": "FMAdvisoryRequest",
+  "type": "object"
+}

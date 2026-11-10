@@ -11,6 +11,8 @@ from typing import Any, cast
 
 from skills_sdk import __version__
 from skills_sdk.cli import COMMAND_HELP
+from skills_sdk.cli._quality_parsers import _add_content_review_parser, _add_coverage_parser, _add_quality_parser
+from skills_sdk.cli.fm_advisory import add_parser as add_fm_advisory_parser
 from skills_sdk.cli.plugin import PLUGIN_COMMANDS, add_plugin_parsers, run_plugin_command
 from skills_sdk.cli.routes import DISCOVERY_ONLY_EXIT, reject_discovery_only
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput
@@ -96,36 +98,6 @@ def _read_intake_context(path: Path, *, max_bytes: int = _MAX_INTAKE_CONTEXT_BYT
         os.close(descriptor)
 
 
-def _add_coverage_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
-    coverage = commands.add_parser("scenario-coverage", help="audit declared claims against active cases and gaps")
-    coverage.add_argument("package_root", type=Path)
-    coverage.add_argument("--source-revision", required=True)
-    coverage.add_argument("--scenario-set", required=True)
-    coverage.add_argument("--coverage-plan", type=Path, required=True)
-    coverage.add_argument("--json", action="store_true", dest="json_output")
-    coverage.add_argument("--robot", action="store_true")
-
-
-def _add_content_review_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
-    review = commands.add_parser("review-content", help="bind supplied content review to the current package")
-    review.add_argument("package_root", type=Path)
-    review.add_argument("--source-revision", required=True)
-    review.add_argument("--assessment", type=Path, required=True)
-    review.add_argument("--json", action="store_true", dest="json_output")
-    review.add_argument("--robot", action="store_true")
-
-
-def _add_quality_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
-    """Register the v2 quality command and its request, baseline, and assessment inputs."""
-    quality = commands.add_parser("check-quality", help="run explicit v2 intent, policy and content quality checks")
-    quality.add_argument("package_root", type=Path)
-    quality.add_argument("--request", type=Path, required=True)
-    quality.add_argument("--baseline-root", type=Path)
-    quality.add_argument("--assessment", type=Path)
-    quality.add_argument("--json", action="store_true", dest="json_output")
-    quality.add_argument("--robot", action="store_true")
-
-
 def _add_scorer_parsers(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     """Register read-only assessments and the explicitly offline execution route."""
     from skills_sdk.cli.matched import add_parsers as add_evidence_parsers
@@ -150,6 +122,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", title="commands", required=True)
+    add_fm_advisory_parser(commands)
     _add_content_review_parser(commands)
     _add_quality_parser(commands)
     add_plugin_parsers(commands)
@@ -695,6 +668,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run implemented commands and reject discovery-only routes explicitly."""
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.command == "advise-fm":
+        from skills_sdk.cli.fm_advisory import run
+
+        return run(arguments, _read_intake_context)
     discovery_status = reject_discovery_only(arguments)
     if discovery_status is not None:
         return discovery_status

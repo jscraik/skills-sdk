@@ -22,6 +22,48 @@ codestyle, the full test suite, package builds, installed-package proof and
 diff hygiene. A full local run is optional, not required before every commit
 or pull request. Required hosted validation and review remain merge gates.
 
+### Optional external readiness-parser probe
+
+The `readiness-integration` dependency group supports a caller-authorised
+synthetic parser probe against an external readiness helper. The default
+developer group also includes this dependency so the normal test suite can
+exercise its controls. Prepare the explicit group in
+the checkout with
+`MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen --group readiness-integration`.
+Then run the probe without resolving or downloading dependencies:
+
+```sh
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" \
+  mise exec -- uv run --frozen --no-sync --offline --no-python-downloads \
+  --group readiness-integration python -I scripts/verify_external_readiness.py \
+  --probe <authorised-probe> --probe-sha256 <probe-sha256> \
+  --helper <authorised-helper> --helper-sha256 <helper-sha256>
+```
+
+The caller must independently inspect and authorise both Python inputs, trust
+the selected Python environment, and obtain expected digests from its own
+trusted source. The command checks parser package versions and imports,
+snapshots matching regular-file bytes, then runs
+the probe with Python isolated mode, a limited environment and a 30-second
+direct-child timeout. Probe output is suppressed; the JSON result records its
+exit status and reports missing prerequisites, rejected inputs, failure or
+timeout separately. Its result records verified input digests as byte identity,
+not trust or environment-file attestation. `probe_attempted` is conservative:
+a storage or cleanup error after an attempt can return a blocker after code
+may already have run, so inspect before any retry. Exit zero means only that
+the supplied probe exited zero.
+The caller remains responsible for the probe's actual coverage. Digest matching
+does not authenticate its author or prevent the authorised probe from changing
+its own behaviour.
+
+This command executes external code and is not a security sandbox. Filesystem
+and network access remain subject to the host's effective controls; Python's
+isolated mode does not provide containment. The timeout does not guarantee
+cleanup of descendants created by a probe. Use only inputs that do not spawn
+uncontrolled children. The external readiness policy stays with its owner;
+this test cannot establish a hosted review, current-head receipt or merge
+readiness, and does not change the default SDK runtime dependencies.
+
 ## Validation order and evidence
 
 Before committing or opening a PR, run focused caller-visible proof for the
