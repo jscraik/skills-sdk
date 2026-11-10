@@ -118,6 +118,10 @@ above, with `name: recovery-demo` and a description, placed in
 `copied-directory`. The revision is again a synthetic placeholder.
 
 ```bash
+demo_root="$(realpath "$(mktemp -d)")"
+mkdir -p "$demo_root/copied-directory"
+printf -- '---\nname: recovery-demo\ndescription: Disposable synthetic package used only to demonstrate directory-name recovery.\n---\n\n# Demo\n' \
+  > "$demo_root/copied-directory/SKILL.md"
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate "$demo_root/copied-directory" --source-revision deadbeefdeadbeefdeadbeefdeadbeefdeadbeef --json --robot
 ```
 
