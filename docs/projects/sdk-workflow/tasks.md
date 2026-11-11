@@ -27,6 +27,37 @@ Current navigation: [current proof lanes and resume point](#proof-lanes-and-resu
 below retain their original proof limits; local candidate results do not
 change the accepted ledger.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:8a0e739b4a8856632c54a846086cf708e56ea4e7194f1eb74c8026a242672d44 -->
+
+### Installed native calibration proof
+
+The review reports an earlier `bash scripts/validate-installed.sh` attempt as
+blocked. Its blocker and tested revision are unavailable in this checkout; the
+wrapper result remains unverified here and is separate from the direct checks
+below.
+
+On 11 November 2026, the following commands passed with exit 0 from a clean
+checkout of `b245ad00da8d33ccfed07b282921ab80478c92aa` using Python 3.12.16
+and uv 0.13.5. The wheel SHA-256 was
+`010580d8da4778154092f3b3c8bdf61a385f0cd03d4e4aa79836c49375e764ac`.
+The isolated wheel check used synthetic inputs and controlled executables; it
+covered acceptance, rejection before dispatch and fresh recovery.
+
+- `mkdir -p .tmp/native-proof`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv build --wheel --out-dir .tmp/native-proof/dist`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv venv --python 3.12 .tmp/native-proof/venv`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv pip install --python .tmp/native-proof/venv/bin/python .tmp/native-proof/dist/skills_sdk-0.1.0-py3-none-any.whl`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python tests/installed_native_calibration_smoke.py --prepare .tmp/native-proof/inputs`
+- `.tmp/native-proof/venv/bin/python tests/installed_native_calibration_smoke.py --check .tmp/native-proof/inputs`
+
+These direct checks cover the native calibration lane only; they do not establish
+the full installed wrapper result, live provider authenticity or host runtime
+installation.
+
+<!-- /coderabbit-ai-generated:v1 -->
+
 ## Goal and constraints
 
 Deliver an independent, agent-accessible create/update/external-check workflow,
