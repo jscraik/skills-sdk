@@ -131,6 +131,24 @@ def test_native_wrappers_cannot_hide_single_use_delegate_alias(tmp_path: Path, b
     assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
 
 
+@pytest.mark.parametrize("bare_index", [0, 1])
+def test_native_bare_judge_rejected_before_dispatch(tmp_path: Path, bare_index: int) -> None:
+    """Matching settings cannot admit a judge without numeric calibration verdicts."""
+    plan, executions, events = _native_batch(tmp_path)
+    delegate = executions[bare_index].judge.capability_owner()
+    assert delegate.identity == plan.judge and delegate.parameters == plan.parameters
+    frames = tuple(
+        replace(execution, judge=delegate) if index == bare_index else execution
+        for index, execution in enumerate(executions)
+    )
+    result = asyncio.run(execute_native_calibration(plan, frames))
+    assert result.status == "blocked" and result.blocker.code == "invalid_calibration_execution"
+    assert not result.judge_execution_performed and result.judge_invocation_count == 0
+    assert events == []
+    # Admission leaves every original adapter available for a valid run.
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
 def test_native_mcp_public_names_remain_accepted(tmp_path: Path) -> None:
     """Ordinary disabled-server keys remain usable with an updated identity."""
     plan, _, _ = _native_batch(tmp_path)

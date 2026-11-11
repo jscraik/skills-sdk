@@ -34,7 +34,7 @@ from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.safety import PackageSafetyBlocker
 from skills_sdk.models.scorer_quality import ScorerJudgeParameters
 from skills_sdk.providers.call import TextProviderAdapter
-from skills_sdk.providers.codex_judge import CodexCalibrationJudgeAdapter
+from skills_sdk.providers.codex_judge import CodexCalibrationJudgeAdapter, CodexJudgeAdapter
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +86,8 @@ def _capability_schedule_problem(
                 if owner is None or id(owner) in seen:
                     return "calibration_capability_reuse"
                 seen.add(id(owner))
+            if type(plan) is NativeCalibrationPlan and issubclass(type(pair.judge), CodexJudgeAdapter):
+                return "invalid_calibration_execution"
     return None
 
 
