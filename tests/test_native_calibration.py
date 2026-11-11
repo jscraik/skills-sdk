@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 from test_codex_judge import _events, _executable
-from test_observed_calibration import _batch
+from test_observed_calibration import NumericJudge, _batch
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -89,6 +89,152 @@ def test_native_settings_drift_and_reuse_block_before_judgment(tmp_path: Path) -
     assert result.blocker.code == "calibration_capability_reuse" and events == []
     old = asyncio.run(execute_scorer_calibration(plan, executions))
     assert old.blocker.code == "invalid_calibration_input" and events == []
+
+
+@pytest.mark.parametrize("drift_index", [0, 1])
+@pytest.mark.parametrize("change", ["settings", "rubric"])
+def test_native_batch_metadata_rejected_before_dispatch(tmp_path: Path, drift_index: int, change: str) -> None:
+    """Reject every pre-existing judge mismatch without consuming an earlier probe."""
+    plan, executions, events = _native_batch(tmp_path)
+    folder = tmp_path / ("judge" + str(drift_index))
+    settings = CodexJudgeSettings("gpt-6.1-sol", "0.153.4", (), timeout_seconds=60 if change == "settings" else 120)
+    delegate = CodexJudgeAdapter(
+        folder / "codex-fixture",
+        folder,
+        settings,
+        "Changed rubric" if change == "rubric" else "Rubric",
+        retain_result=_retain,
+    )
+    frames = tuple(
+        replace(item, judge=CodexCalibrationJudgeAdapter(delegate)) if index == drift_index else item
+        for index, item in enumerate(executions)
+    )
+    result = asyncio.run(execute_native_calibration(plan, frames))
+    assert result.judge_invocation_count == 0 and events == []
+    assert result.status == "blocked" and result.blocker.code == "invalid_calibration_input"
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+def test_native_batch_parameters_cannot_hide_behind_matching_identity(tmp_path: Path) -> None:
+    """Judge identity agreement cannot substitute for matching requested controls."""
+    plan, executions, events = _native_batch(tmp_path)
+    last = executions[1]
+    judge = NumericJudge(last.definition, last.request, 0.1, events)
+    judge.parameters = plan.parameters.model_copy(update={"timeout_seconds": 60})
+    assert judge.identity == plan.judge
+    result = asyncio.run(execute_native_calibration(plan, (executions[0], replace(last, judge=judge))))
+    assert result.blocker.code == "invalid_calibration_input"
+    assert result.judge_invocation_count == 0 and events == []
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+def test_native_batch_safety_precedes_all_judge_properties(tmp_path: Path) -> None:
+    """A later unsafe probe prevents even the first judge's metadata access."""
+    plan, executions, events = _native_batch(tmp_path)
+
+    class UnreadableJudge:
+        """Observe any capability attribute access before whole-batch admission."""
+
+        def __getattribute__(self, name: str) -> object:
+            events.append("judge_attribute")
+            raise AssertionError(f"unexpected judge attribute access: {name}")
+
+    first = replace(executions[0], judge=UnreadableJudge())
+    last = replace(executions[1], inputs=replace(executions[1].inputs, safety_evidence=None))
+    rejected = asyncio.run(execute_native_calibration(plan, (first, last)))
+    assert rejected.status == "blocked" and rejected.blocker.code != "invalid_calibration_input"
+    assert rejected.judge_invocation_count == 0 and events == []
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+@pytest.mark.parametrize("drift_index", [0, 1])
+@pytest.mark.parametrize("field", ["identity", "parameters"])
+@pytest.mark.parametrize("error_type", [RuntimeError, AssertionError])
+def test_native_batch_metadata_failure_is_a_blocker(
+    tmp_path: Path, drift_index: int, field: str, error_type: type[Exception]
+) -> None:
+    """Host property exceptions stay private and cannot escape a blocked receipt."""
+    plan, executions, events = _native_batch(tmp_path)
+
+    class FailingJudge:
+        """Raise an inert private exception from the selected metadata property."""
+
+        @property
+        def identity(self) -> object:
+            if field == "identity":
+                raise error_type("synthetic-private-detail")
+            return plan.judge
+
+        @property
+        def parameters(self) -> object:
+            raise error_type("synthetic-private-detail")
+
+    frames = tuple(
+        replace(item, judge=FailingJudge()) if index == drift_index else item for index, item in enumerate(executions)
+    )
+    rejected = asyncio.run(execute_native_calibration(plan, frames))
+    assert rejected.status == "blocked" and rejected.judge_invocation_count == 0 and events == []
+    assert "synthetic-private-detail" not in rejected.model_dump_json()
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+def test_native_batch_admission_preserves_caller_cancellation(tmp_path: Path) -> None:
+    """Cancellation of the caller cannot become an ordinary blocked receipt."""
+    plan, executions, events = _native_batch(tmp_path)
+
+    async def cancel_during_admission() -> None:
+        """Request cancellation while metadata is read through the normal boundary."""
+        task: asyncio.Task[NativeCalibrationReceipt]
+
+        class CancellingJudge:
+            """Cancel the outer caller without dispatching any provider work."""
+
+            @property
+            def identity(self) -> object:
+                task.cancel()
+                return plan.judge
+
+            @property
+            def parameters(self) -> object:
+                return plan.parameters
+
+        frames = (replace(executions[0], judge=CancellingJudge()), executions[1])
+        task = asyncio.create_task(execute_native_calibration(plan, frames))
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert task.cancelled()
+
+    asyncio.run(cancel_during_admission())
+    assert events == []
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+@pytest.mark.parametrize("change", ["identity", "parameters"])
+def test_native_judge_drift_after_batch_admission_still_blocks(tmp_path: Path, change: str) -> None:
+    """Whole-batch admission does not replace the later per-probe drift guard."""
+    plan, executions, events = _native_batch(tmp_path)
+    first, last = executions
+    judge = NumericJudge(last.definition, last.request, 0.1, events)
+    judge.parameters = plan.parameters
+    complete = first.provider.complete
+
+    async def change_after_dispatch(request: object, payload: object) -> object:
+        """Simulate a host capability changing after the first provider request."""
+        result = await complete(request, payload)
+        if change == "identity":
+            judge.identity = judge.identity.model_copy(update={"model_id": "changed-model"})
+        else:
+            judge.parameters = plan.parameters.model_copy(update={"timeout_seconds": 60})
+        return result
+
+    first.provider.complete = change_after_dispatch
+    rejected = asyncio.run(execute_native_calibration(plan, (first, replace(last, judge=judge))))
+    assert rejected.status == "blocked" and rejected.judge_invocation_count == 1
+    assert events.count("provider") == 1 and "numeric_judge" not in events
+    recovery = tmp_path / "recovery"
+    recovery.mkdir()
+    fresh_plan, fresh, _ = _native_batch(recovery)
+    assert asyncio.run(execute_native_calibration(fresh_plan, fresh)).status == "pass"
 
 
 @pytest.mark.parametrize("representation", ["raw", "typed", "copied"])

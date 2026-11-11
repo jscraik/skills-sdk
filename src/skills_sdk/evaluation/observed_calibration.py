@@ -11,6 +11,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.live_selected_case import (
     SelectedCaseJudgeAdapter,
     SelectedCaseJudgeInput,
+    _judge_bindings,
     execute_selected_case_with_judge,
 )
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput, assess_pre_execution_safety
@@ -240,6 +241,12 @@ async def _execute_calibration(
         return _blocked("invalid_calibration_input", parsed, native=native)
     if problem is not None:
         return _blocked(problem, parsed, native=native)
+    if native:
+        for probe, item in zip(parsed.probes, executions, strict=True):
+            for trial, adapters in enumerate(_trial_schedule(item)):
+                frame = _CalibrationJudge(adapters.judge, parsed, probe, trial)
+                if await _judge_bindings(frame) is None:
+                    return _blocked("invalid_calibration_input", parsed, native=True)
     results: list[ObservedCalibrationProbeResult] = []
     invocation_count = 0
     expanded = [
