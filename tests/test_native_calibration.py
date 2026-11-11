@@ -149,6 +149,42 @@ def test_native_bare_judge_rejected_before_dispatch(tmp_path: Path, bare_index: 
     assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
 
 
+@pytest.mark.parametrize("nested_index", [0, 1])
+def test_native_nested_wrapper_rejected_before_dispatch(tmp_path: Path, nested_index: int) -> None:
+    """Reject unsupported nested delegates before any probe consumes provider work."""
+    plan, executions, events = _native_batch(tmp_path)
+    nested = CodexCalibrationJudgeAdapter(delegate=executions[nested_index].judge)
+    # The unsupported nesting forwards matching metadata; identity alone cannot reject it.
+    assert nested.identity == plan.judge and nested.parameters == plan.parameters
+    frames = tuple(
+        replace(execution, judge=nested) if index == nested_index else execution
+        for index, execution in enumerate(executions)
+    )
+    result = asyncio.run(execute_native_calibration(plan, frames))
+    assert result.status == "blocked" and result.blocker.code == "invalid_calibration_execution"
+    assert result.judge_invocation_count == 0 and not result.judge_execution_performed
+    assert events == []
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+def test_native_wrapper_owner_rejected_without_attribute_access(tmp_path: Path) -> None:
+    """Malformed wrapped owners cannot execute attributes during admission."""
+    plan, executions, events = _native_batch(tmp_path)
+
+    class UnreadableOwner:
+        """Make even class-identity fallback observable to the regression."""
+
+        def __getattribute__(self, name: str) -> object:
+            events.append("owner_attribute")
+            raise AssertionError(f"unexpected owner attribute access: {name}")
+
+    wrapped = CodexCalibrationJudgeAdapter(delegate=UnreadableOwner())
+    result = asyncio.run(execute_native_calibration(plan, (replace(executions[0], judge=wrapped), executions[1])))
+    assert result.blocker.code == "invalid_calibration_execution" and events == []
+    assert result.judge_invocation_count == 0 and not result.judge_execution_performed
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
 def test_native_mcp_public_names_remain_accepted(tmp_path: Path) -> None:
     """Ordinary disabled-server keys remain usable with an updated identity."""
     plan, _, _ = _native_batch(tmp_path)

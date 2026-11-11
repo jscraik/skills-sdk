@@ -83,6 +83,8 @@ def _capability_schedule_problem(
                     if type(capability) is not CodexCalibrationJudgeAdapter:
                         return "invalid_calibration_execution"
                     owner = CodexCalibrationJudgeAdapter.capability_owner(capability)
+                    if not issubclass(type(owner), CodexJudgeAdapter):
+                        return "invalid_calibration_execution"
                 if owner is None or id(owner) in seen:
                     return "calibration_capability_reuse"
                 seen.add(id(owner))

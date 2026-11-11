@@ -33,10 +33,10 @@ change the accepted ledger.
 
 ### Installed native calibration proof
 
-The review reports an earlier `bash scripts/validate-installed.sh` attempt as
-blocked. Its blocker and tested revision are unavailable in this checkout; the
-wrapper result remains unverified here and is separate from the direct checks
-below.
+The local `bash scripts/validate-codestyle.sh` entrypoint was blocked before
+execution. The full local `bash scripts/validate-installed.sh` wrapper was not
+attempted. Those local results are separate from the direct wheel checks below
+and the later successful full hosted installed-package validation.
 
 On 11 November 2026, the following commands passed with exit 0 from a clean
 checkout of `b245ad00da8d33ccfed07b282921ab80478c92aa` using Python 3.12.16
