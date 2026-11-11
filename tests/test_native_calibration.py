@@ -7,6 +7,7 @@ import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -169,6 +170,12 @@ def test_native_batch_metadata_failure_is_a_blocker(
         def parameters(self) -> object:
             raise error_type("synthetic-private-detail")
 
+        async def judge(self, inputs: object) -> object:
+            raise AssertionError("metadata rejection must precede judgment")
+
+        async def cleanup(self) -> None:
+            raise AssertionError("metadata rejection must precede cleanup")
+
     frames = tuple(
         replace(item, judge=FailingJudge()) if index == drift_index else item for index, item in enumerate(executions)
     )
@@ -198,6 +205,12 @@ def test_native_batch_admission_preserves_caller_cancellation(tmp_path: Path) ->
             def parameters(self) -> object:
                 return plan.parameters
 
+            async def judge(self, inputs: object) -> object:
+                raise AssertionError("caller cancellation must precede judgment")
+
+            async def cleanup(self) -> None:
+                raise AssertionError("caller cancellation must precede cleanup")
+
         frames = (replace(executions[0], judge=CancellingJudge()), executions[1])
         task = asyncio.create_task(execute_native_calibration(plan, frames))
         with pytest.raises(asyncio.CancelledError):
@@ -206,6 +219,74 @@ def test_native_batch_admission_preserves_caller_cancellation(tmp_path: Path) ->
 
     asyncio.run(cancel_during_admission())
     assert events == []
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+@pytest.mark.parametrize("target", ["direct", "owner"])
+@pytest.mark.parametrize("index", [0, 1])
+@pytest.mark.parametrize("callback", ["judge", "cleanup"])
+@pytest.mark.parametrize("fault", ["missing", "noncallable", "synchronous", "signature", "valid"])
+def test_native_batch_rejects_actual_callbacks(
+    tmp_path: Path, target: str, index: int, callback: str, fault: str
+) -> None:
+    """Reject malformed real capabilities, not merely their valid facade methods."""
+    plan, executions, events = _native_batch(tmp_path)
+    item = executions[index]
+    if target == "direct":
+        numeric = NumericJudge(item.definition, item.request, 0.9 if index == 0 else 0.1, events)
+        capability = SimpleNamespace(
+            identity=plan.judge, parameters=plan.parameters, judge=numeric.judge, cleanup=numeric.cleanup
+        )
+        if fault == "missing":
+            delattr(capability, callback)
+        judge = capability
+    else:
+
+        class CallbackOwner(CodexJudgeAdapter):
+            """Represent a supported owner whose selected callback is unavailable."""
+
+            def __getattribute__(self, name: str) -> object:
+                if fault == "missing" and name == callback:
+                    raise AttributeError("synthetic missing callback")
+                return super().__getattribute__(name)
+
+        folder = tmp_path / ("judge" + str(index))
+        capability = CallbackOwner(
+            folder / "codex-fixture",
+            folder,
+            CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()),
+            "Rubric",
+            retain_result=_retain,
+        )
+        judge = CodexCalibrationJudgeAdapter(capability)
+
+    def synchronous(*args: object) -> None:
+        """A callable with compatible arguments still lacks asynchronous semantics."""
+        return None
+
+    async def wrong_judge() -> None:
+        """Judges must accept their execution input."""
+
+    async def wrong_cleanup(required: object) -> None:
+        """Cleanup must accept no arguments."""
+
+    if fault not in {"missing", "valid"}:
+        malformed = {
+            "noncallable": None,
+            "synchronous": synchronous,
+            "signature": wrong_judge if callback == "judge" else wrong_cleanup,
+        }
+        setattr(capability, callback, malformed[fault])
+    frames = tuple(
+        replace(frame, judge=judge) if position == index else frame for position, frame in enumerate(executions)
+    )
+    rejected = asyncio.run(execute_native_calibration(plan, frames))
+    if fault == "valid":
+        assert rejected.status == "pass" and rejected.judge_invocation_count == 2
+        assert events.count("provider") == 2
+        return
+    assert rejected.judge_invocation_count == 0 and events == []
+    assert rejected.status == "blocked" and rejected.blocker.code == "invalid_calibration_input"
     assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
 
 

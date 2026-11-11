@@ -244,6 +244,12 @@ async def _execute_calibration(
     if native:
         for probe, item in zip(parsed.probes, executions, strict=True):
             for trial, adapters in enumerate(_trial_schedule(item)):
+                if await _judge_bindings(adapters.judge) is None:
+                    return _blocked("invalid_calibration_input", parsed, native=True)
+                if type(adapters.judge) is CodexCalibrationJudgeAdapter:
+                    owner = CodexCalibrationJudgeAdapter.capability_owner(adapters.judge)
+                    if await _judge_bindings(owner) is None:
+                        return _blocked("invalid_calibration_input", parsed, native=True)
                 frame = _CalibrationJudge(adapters.judge, parsed, probe, trial)
                 if await _judge_bindings(frame) is None:
                     return _blocked("invalid_calibration_input", parsed, native=True)
