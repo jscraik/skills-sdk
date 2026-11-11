@@ -1,5 +1,17 @@
 # Skills SDK workflow delivery
 
+## Native calibration recovery candidate, 11 November 2026
+
+Recover the preserved native plan, receipt and guarded calibration service
+against accepted main, retaining current judge identity, result retention and
+cleanup behaviour. Owned scope excludes the old pilot-specific calibration
+runner and native matched/quality joins. The new public service consumes
+explicit host capabilities and emits native calibration evidence without
+fabricated temperature control. Current numeric-temperature contracts remain
+unchanged. Local implementation and verification are authorised; delivery,
+hosted acceptance and live provider execution remain pending. This slice does
+not establish a calibrated No AI Slop scorer or complete local evaluation.
+
 Owner: Skills SDK maintainers. This task record tracks the owner-approved
 workflow in [workflow.md](../../workflow.md). The capability inventory in
 [migration-map.md](../../migration-map.md) replaces conversation-only migration
@@ -14,6 +26,37 @@ Current navigation: [current proof lanes and resume point](#proof-lanes-and-resu
 [remaining integration gaps](#explicit-integration-gaps). Dated observations
 below retain their original proof limits; local candidate results do not
 change the accepted ledger.
+
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:8a0e739b4a8856632c54a846086cf708e56ea4e7194f1eb74c8026a242672d44 -->
+
+### Installed native calibration proof
+
+The local `bash scripts/validate-codestyle.sh` entrypoint was blocked before
+execution. The full local `bash scripts/validate-installed.sh` wrapper was not
+attempted. Those local results are separate from the direct wheel checks below
+and the later successful full hosted installed-package validation.
+
+On 11 November 2026, the following commands passed with exit 0 from a clean
+checkout of `b245ad00da8d33ccfed07b282921ab80478c92aa` using Python 3.12.16
+and uv 0.13.5. The wheel SHA-256 was
+`010580d8da4778154092f3b3c8bdf61a385f0cd03d4e4aa79836c49375e764ac`.
+The isolated wheel check used synthetic inputs and controlled executables; it
+covered acceptance, rejection before dispatch and fresh recovery.
+
+- `mkdir -p .tmp/native-proof`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv build --wheel --out-dir .tmp/native-proof/dist`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv venv --python 3.12 .tmp/native-proof/venv`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv pip install --python .tmp/native-proof/venv/bin/python .tmp/native-proof/dist/skills_sdk-0.1.0-py3-none-any.whl`
+- `MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen python tests/installed_native_calibration_smoke.py --prepare .tmp/native-proof/inputs`
+- `.tmp/native-proof/venv/bin/python tests/installed_native_calibration_smoke.py --check .tmp/native-proof/inputs`
+
+These direct checks cover the native calibration lane only; they do not establish
+the full installed wrapper result, live provider authenticity or host runtime
+installation.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Goal and constraints
 

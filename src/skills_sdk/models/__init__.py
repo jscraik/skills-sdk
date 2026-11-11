@@ -93,6 +93,8 @@ from skills_sdk.models.native_judge import CodexNativeJudgeParameters
 from skills_sdk.models.observed_calibration import (
     CalibrationJudgeVerdict,
     HeldOutCalibrationProbe,
+    NativeCalibrationPlan,
+    NativeCalibrationReceipt,
     ObservedCalibrationPlan,
     ObservedCalibrationProbeResult,
     ObservedCalibrationReceipt,
@@ -294,6 +296,8 @@ __all__ = [
     "MatchedVariantCalibrationBundle",
     "MatchedVariantJudgment",
     "MutationRaceEvidence",
+    "NativeCalibrationPlan",
+    "NativeCalibrationReceipt",
     "NormalizedPackage",
     "NormalizedPackageV2",
     "NormalizedPackageV3",

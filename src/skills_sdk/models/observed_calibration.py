@@ -8,8 +8,10 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ModelWrapValidatorHandler, field_validator, model_validator
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.inventory import NonEmptyText, Sha256, _ContractModel
+from skills_sdk.models.native_judge import CodexNativeJudgeParameters
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import ProviderExecutionBlocker, ProviderExecutionRequest, _identity_is_public
@@ -108,14 +110,13 @@ class HeldOutCalibrationProbe(_ObservedContractModel):
     expected_label: Literal["pass", "fail"]
 
 
-class ObservedCalibrationPlan(_ObservedContractModel):
+class _CalibrationPlanBase[Parameters: (ScorerJudgeParameters, CodexNativeJudgeParameters)](_ObservedContractModel):
     """Freeze candidate, judge, parameters, scorer, held-out outputs and policy."""
 
-    schema_version: Literal["observed-calibration-plan/v1"] = "observed-calibration-plan/v1"
     candidate: PackageCandidateIdentity
     scorer: ScorerProfile
     judge: ProviderIdentityV2
-    parameters: ScorerJudgeParameters
+    parameters: Parameters
     policy: ScorerCalibrationAppliedPolicy
     assertion_contract_sha256: Sha256
     probes: tuple[HeldOutCalibrationProbe, ...] = Field(min_length=2, max_length=64)
@@ -127,7 +128,7 @@ class ObservedCalibrationPlan(_ObservedContractModel):
         return _canonical_calibration_input(value)
 
     @model_validator(mode="after")
-    def bindings_and_coverage(self) -> ObservedCalibrationPlan:
+    def bindings_and_coverage(self) -> Self:
         """Reject contradictory coverage rather than accepting caller completion IDs."""
         public_values = [
             *self.candidate.model_dump(mode="json").values(),
@@ -158,6 +159,40 @@ class ObservedCalibrationPlan(_ObservedContractModel):
         return self
 
 
+class ObservedCalibrationPlan(_CalibrationPlanBase[ScorerJudgeParameters]):
+    """Freeze candidate, judge, parameters, scorer, held-out outputs and policy."""
+
+    schema_version: Literal["observed-calibration-plan/v1"] = "observed-calibration-plan/v1"
+
+
+class NativeCalibrationPlan(_CalibrationPlanBase[CodexNativeJudgeParameters]):
+    """Separate native family; preserve all existing candidate and safety gates."""
+
+    schema_version: Literal["native-calibration-plan/v1"] = "native-calibration-plan/v1"
+    rubric_sha256: Sha256
+
+    @model_validator(mode="after")
+    def native_identity_binding(self) -> Self:
+        """Bind the CLI revision and complete requested settings into judge identity."""
+        if any(not _identity_is_public(name) for name in self.parameters.disabled_mcp_servers):
+            raise ValueError("native calibration MCP names must be public identities")
+        if (
+            self.judge.provider_id != "codex"
+            or self.judge.provider_kind != "agent"
+            or self.judge.adapter_id != "codex-cli-judge"
+            or self.judge.version_or_digest != self.parameters.cli_version
+            or self.judge.adapter_version_or_digest
+            != canonical_json_sha256(
+                {
+                    "settings": self.parameters.model_dump(mode="json", exclude={"schema_version"}),
+                    "rubric_sha256": self.rubric_sha256,
+                }
+            )
+        ):
+            raise ValueError("native calibration requires exact Codex CLI/settings binding")
+        return self
+
+
 class CalibrationJudgeVerdict(_ObservedContractModel):
     """Numeric judgment from an invoked adapter, bound to its actual output."""
 
@@ -183,11 +218,10 @@ class ObservedCalibrationProbeResult(_ObservedContractModel):
     judge_result_sha256: Sha256
 
 
-class ObservedCalibrationReceipt(_ObservedContractModel):
+class _CalibrationReceiptBase[Plan: (ObservedCalibrationPlan, NativeCalibrationPlan)](_ObservedContractModel):
     """Observed callback proof, not authenticated external judge or promotion proof."""
 
-    schema_version: Literal["observed-calibration/v1"] = "observed-calibration/v1"
-    plan: ObservedCalibrationPlan | None = None
+    plan: Plan | None = None
     status: Literal["pass", "blocked"]
     results: tuple[ObservedCalibrationProbeResult, ...] = ()
     blocker: PackageSafetyBlocker | None = None
@@ -213,7 +247,7 @@ class ObservedCalibrationReceipt(_ObservedContractModel):
         return ObservedCalibrationPlan.normalize_nested_models(value)
 
     @model_validator(mode="after")
-    def completed_results_bind_plan(self) -> ObservedCalibrationReceipt:
+    def completed_results_bind_plan(self) -> Self:
         """Require full ordered execution coverage and confusion-matrix policy."""
         if (
             self.judge_execution_performed != (self.judge_invocation_count > 0)
@@ -283,6 +317,18 @@ class ObservedCalibrationReceipt(_ObservedContractModel):
             raise ValueError("pre-execution blockers cannot retain judge invocations")
 
 
+class ObservedCalibrationReceipt(_CalibrationReceiptBase[ObservedCalibrationPlan]):
+    """Observed callback proof, not authenticated external judge or promotion proof."""
+
+    schema_version: Literal["observed-calibration/v1"] = "observed-calibration/v1"
+
+
+class NativeCalibrationReceipt(_CalibrationReceiptBase[NativeCalibrationPlan]):
+    """Native callback proof; never external authenticity or release clearance."""
+
+    schema_version: Literal["native-calibration/v1"] = "native-calibration/v1"
+
+
 _CANONICAL_CALIBRATION_MODELS = frozenset(
     {
         CalibrationJudgeVerdict,
@@ -290,6 +336,9 @@ _CANONICAL_CALIBRATION_MODELS = frozenset(
         ObservedCalibrationPlan,
         ObservedCalibrationProbeResult,
         ObservedCalibrationReceipt,
+        NativeCalibrationPlan,
+        NativeCalibrationReceipt,
+        CodexNativeJudgeParameters,
         PackageCandidateIdentity,
         ScorerProfile,
         ProviderIdentityV2,

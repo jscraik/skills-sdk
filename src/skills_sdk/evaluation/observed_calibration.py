@@ -11,6 +11,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.evaluation.live_selected_case import (
     SelectedCaseJudgeAdapter,
     SelectedCaseJudgeInput,
+    _judge_bindings,
     execute_selected_case_with_judge,
 )
 from skills_sdk.evaluation.pre_execution_safety import SelectedCaseExecutionInput, assess_pre_execution_safety
@@ -19,9 +20,12 @@ from skills_sdk.evaluation.selected_case import (
     _request_matches_definition,
     _revalidate_definition,
 )
+from skills_sdk.models.native_judge import CodexNativeJudgeParameters
 from skills_sdk.models.observed_calibration import (
     CalibrationJudgeVerdict,
     HeldOutCalibrationProbe,
+    NativeCalibrationPlan,
+    NativeCalibrationReceipt,
     ObservedCalibrationPlan,
     ObservedCalibrationProbeResult,
     ObservedCalibrationReceipt,
@@ -31,6 +35,7 @@ from skills_sdk.models.provider_execution import ProviderExecutionRequest
 from skills_sdk.models.safety import PackageSafetyBlocker
 from skills_sdk.models.scorer_quality import ScorerJudgeParameters
 from skills_sdk.providers.call import TextProviderAdapter
+from skills_sdk.providers.codex_judge import CodexCalibrationJudgeAdapter, CodexJudgeAdapter
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +64,7 @@ def _trial_schedule(item: CalibrationProbeExecution) -> tuple[CalibrationTrialAd
 
 
 def _capability_schedule_problem(
-    plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]
+    plan: ObservedCalibrationPlan | NativeCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]
 ) -> str | None:
     """Reject missing or aliased capabilities without reading adapter properties."""
     if type(executions) is not tuple or len(executions) != len(plan.probes):
@@ -74,9 +79,18 @@ def _capability_schedule_problem(
             return "invalid_calibration_execution"
         for pair in _trial_schedule(item):
             for capability in (pair.provider, pair.judge):
-                if capability is None or id(capability) in seen:
+                owner = capability
+                if issubclass(type(capability), CodexCalibrationJudgeAdapter):
+                    if type(capability) is not CodexCalibrationJudgeAdapter:
+                        return "invalid_calibration_execution"
+                    owner = CodexCalibrationJudgeAdapter.capability_owner(capability)
+                    if not issubclass(type(owner), CodexJudgeAdapter):
+                        return "invalid_calibration_execution"
+                if owner is None or id(owner) in seen:
                     return "calibration_capability_reuse"
-                seen.add(id(capability))
+                seen.add(id(owner))
+            if type(plan) is NativeCalibrationPlan and issubclass(type(pair.judge), CodexJudgeAdapter):
+                return "invalid_calibration_execution"
     return None
 
 
@@ -86,7 +100,7 @@ class _CalibrationJudge:
     def __init__(
         self,
         delegate: SelectedCaseJudgeAdapter,
-        plan: ObservedCalibrationPlan,
+        plan: ObservedCalibrationPlan | NativeCalibrationPlan,
         probe: HeldOutCalibrationProbe,
         trial: int,
     ) -> None:
@@ -104,9 +118,10 @@ class _CalibrationJudge:
             ObservedCalibrationPlan.normalize_nested_models(self.delegate.identity)
         )
         raw_parameters = getattr(self.delegate, "parameters", None)
-        parameters = ScorerJudgeParameters.model_validate(
-            ObservedCalibrationPlan.normalize_nested_models(raw_parameters)
+        parameter_model = (
+            CodexNativeJudgeParameters if type(self.plan) is NativeCalibrationPlan else ScorerJudgeParameters
         )
+        parameters = parameter_model.model_validate(ObservedCalibrationPlan.normalize_nested_models(raw_parameters))
         if identity != self.plan.judge or parameters != self.plan.parameters:
             raise ValueError("calibration judge identity or settings drifted")
         return identity
@@ -143,11 +158,13 @@ class _CalibrationJudge:
 
 def _blocked(
     code: str,
-    plan: ObservedCalibrationPlan | None,
+    plan: ObservedCalibrationPlan | NativeCalibrationPlan | None,
     results: tuple[ObservedCalibrationProbeResult, ...] = (),
     invocation_count: int = 0,
-) -> ObservedCalibrationReceipt:
-    return ObservedCalibrationReceipt(
+    native: bool = False,
+) -> ObservedCalibrationReceipt | NativeCalibrationReceipt:
+    receipt_model = NativeCalibrationReceipt if native else ObservedCalibrationReceipt
+    return receipt_model(
         plan=plan,
         status="blocked",
         results=results,
@@ -159,7 +176,9 @@ def _blocked(
     )
 
 
-def _preflight(plan: ObservedCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]) -> str | None:
+def _preflight(
+    plan: ObservedCalibrationPlan | NativeCalibrationPlan, executions: tuple[CalibrationProbeExecution, ...]
+) -> str | None:
     """Validate the whole batch before accessing any host capability properties."""
     problem = _capability_schedule_problem(plan, executions)
     if problem is not None:
@@ -195,14 +214,45 @@ async def execute_scorer_calibration(
     Adapters may be controlled offline implementations. Invocation is observed,
     not external authenticity; no receipt from this route authorises promotion.
     """
-    parsed: ObservedCalibrationPlan | None = None
+    result = await _execute_calibration(plan, executions, native=False)
+    assert type(result) is ObservedCalibrationReceipt
+    return result
+
+
+async def execute_native_calibration(
+    plan: object, executions: tuple[CalibrationProbeExecution, ...]
+) -> NativeCalibrationReceipt:
+    """Execute explicit native adapters through the same safety and first-stop gates."""
+    result = await _execute_calibration(plan, executions, native=True)
+    assert type(result) is NativeCalibrationReceipt
+    return result
+
+
+async def _execute_calibration(
+    plan: object, executions: tuple[CalibrationProbeExecution, ...], *, native: bool
+) -> ObservedCalibrationReceipt | NativeCalibrationReceipt:
+    parsed: ObservedCalibrationPlan | NativeCalibrationPlan | None = None
+    plan_model = NativeCalibrationPlan if native else ObservedCalibrationPlan
+    receipt_model = NativeCalibrationReceipt if native else ObservedCalibrationReceipt
     try:
-        parsed = ObservedCalibrationPlan.model_validate(plan)
+        parsed = plan_model.model_validate(plan)
         problem = _preflight(parsed, executions)
     except (AttributeError, TypeError, ValueError, ContractError):
-        return _blocked("invalid_calibration_input", parsed)
+        return _blocked("invalid_calibration_input", parsed, native=native)
     if problem is not None:
-        return _blocked(problem, parsed)
+        return _blocked(problem, parsed, native=native)
+    if native:
+        for probe, item in zip(parsed.probes, executions, strict=True):
+            for trial, adapters in enumerate(_trial_schedule(item)):
+                if await _judge_bindings(adapters.judge) is None:
+                    return _blocked("invalid_calibration_input", parsed, native=True)
+                if type(adapters.judge) is CodexCalibrationJudgeAdapter:
+                    owner = CodexCalibrationJudgeAdapter.capability_owner(adapters.judge)
+                    if await _judge_bindings(owner) is None:
+                        return _blocked("invalid_calibration_input", parsed, native=True)
+                frame = _CalibrationJudge(adapters.judge, parsed, probe, trial)
+                if await _judge_bindings(frame) is None:
+                    return _blocked("invalid_calibration_input", parsed, native=True)
     results: list[ObservedCalibrationProbeResult] = []
     invocation_count = 0
     expanded = [
@@ -218,14 +268,14 @@ async def execute_scorer_calibration(
             )
         except (AttributeError, TypeError, ValueError, ContractError):
             return _blocked(
-                "calibration_execution_failed", parsed, tuple(results), invocation_count + int(frame.invoked)
+                "calibration_execution_failed", parsed, tuple(results), invocation_count + int(frame.invoked), native
             )
         invocation_count += int(frame.invoked)
         if evaluation.status == "blocked" or frame.result is None:
-            return _blocked("calibration_execution_incomplete", parsed, tuple(results), invocation_count)
+            return _blocked("calibration_execution_incomplete", parsed, tuple(results), invocation_count, native)
         results.append(frame.result)
     try:
-        return ObservedCalibrationReceipt(
+        return receipt_model(
             plan=parsed,
             status="pass",
             results=tuple(results),
@@ -233,4 +283,4 @@ async def execute_scorer_calibration(
             judge_invocation_count=invocation_count,
         )
     except ValidationError:
-        return _blocked("calibration_policy_failed", parsed, tuple(results), invocation_count)
+        return _blocked("calibration_policy_failed", parsed, tuple(results), invocation_count, native)

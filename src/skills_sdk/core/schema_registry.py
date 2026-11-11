@@ -73,6 +73,8 @@ SCHEMA_NAMES = frozenset(
         "scorer-calibration.v1",
         "observed-calibration-plan.v1",
         "observed-calibration.v1",
+        "native-calibration-plan.v1",
+        "native-calibration.v1",
         "matched-comparison-plan.v1",
         "matched-pair-assessment.v1",
         "matched-calibration.v1",
@@ -558,6 +560,10 @@ class SchemaRegistry:
             from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 
             model = ObservedCalibrationPlan if name == "observed-calibration-plan.v1" else ObservedCalibrationReceipt
+        elif name in {"native-calibration-plan.v1", "native-calibration.v1"}:
+            from skills_sdk.models.observed_calibration import NativeCalibrationPlan, NativeCalibrationReceipt
+
+            model = NativeCalibrationPlan if name == "native-calibration-plan.v1" else NativeCalibrationReceipt
         elif name in {"scenario-coverage-plan.v1", "scenario-coverage.v1"}:
             from skills_sdk.models.coverage import ScenarioCoveragePlan, ScenarioCoverageResult
 
