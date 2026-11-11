@@ -1,5 +1,15 @@
 # Compatibility
 
+Native calibration rejects credential-shaped disabled MCP server names before
+retaining either a passing or blocked plan. The numeric-temperature family and
+provider-owned native parameter schema remain unchanged. The concrete
+`CodexCalibrationJudgeAdapter` fixes its delegate at construction and preserves
+the `delegate` keyword. Calibration admission identifies that delegate before
+dispatch, rejecting aliases through multiple wrappers or a bare delegate.
+Wrapper subclasses are rejected by calibration admission rather than invoking
+overridable ownership code before safety checks. Custom independent adapters
+continue through the existing guarded protocol.
+
 ## Local native calibration recovery candidate
 
 The proposed native calibration API has separate plan and receipt families.

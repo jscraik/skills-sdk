@@ -759,30 +759,34 @@ class CodexJudgeAdapter:
             raise ContractError(self._cleanup_error, "Active judgment process cleanup failed")
 
 
+@dataclass(frozen=True, slots=True)
 class CodexCalibrationJudgeAdapter:
     """Expose observed scores while retaining the delegate's evidence lifecycle."""
 
-    def __init__(self, delegate: CodexJudgeAdapter) -> None:
-        self._delegate = delegate
+    delegate: CodexJudgeAdapter
+
+    def capability_owner(self) -> CodexJudgeAdapter:
+        """Expose single-use ownership without reading delegate identity or settings."""
+        return self.delegate
 
     @property
     def identity(self) -> ProviderIdentityV2:
         """Bind the current delegate's CLI and requested settings."""
-        return self._delegate.identity
+        return self.delegate.identity
 
     @property
     def parameters(self) -> CodexNativeJudgeParameters:
         """Retain the native declaration of unavailable temperature control."""
-        return self._delegate.parameters
+        return self.delegate.parameters
 
     async def judge(self, inputs: SelectedCaseJudgeInput) -> CalibrationJudgeVerdict:
         """Join the actual numeric observation to retained selected-case evidence."""
-        evidence = await self._delegate.judge(inputs)
-        observation = self._delegate.last_observation
+        evidence = await self.delegate.judge(inputs)
+        observation = self.delegate.last_observation
         if observation is None:
             raise ContractError("codex_judge_incomplete", "Calibration requires an actual numeric observation")
         return CalibrationJudgeVerdict(evidence=evidence, score=observation.score)
 
     async def cleanup(self) -> None:
         """Delegate single-use closure and bounded active-process cleanup."""
-        await self._delegate.cleanup()
+        await self.delegate.cleanup()

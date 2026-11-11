@@ -91,6 +91,87 @@ def test_native_settings_drift_and_reuse_block_before_judgment(tmp_path: Path) -
     assert old.blocker.code == "invalid_calibration_input" and events == []
 
 
+@pytest.mark.parametrize("representation", ["raw", "typed", "copied"])
+def test_native_mcp_names_reject_credentials_before_receipt_retention(tmp_path: Path, representation: str) -> None:
+    """Credential-shaped configuration names cannot enter public native receipts."""
+    plan, executions, events = _native_batch(tmp_path)
+    name = "ghp_" + "a" * 36  # Inert synthetic pattern; no real credential.
+    parameters = plan.parameters.model_copy(update={"disabled_mcp_servers": (name,)})
+    raw = plan.model_dump(mode="json")
+    raw["parameters"] = parameters.model_dump(mode="json")
+    raw["judge"]["adapter_version_or_digest"] = canonical_json_sha256(
+        {
+            "settings": parameters.model_dump(mode="json", exclude={"schema_version"}),
+            "rubric_sha256": plan.rubric_sha256,
+        }
+    )
+    candidate: object = raw
+    if representation != "raw":
+        candidate = plan.model_copy(update={"parameters": parameters, "judge": plan.judge.model_validate(raw["judge"])})
+        if representation == "typed":
+            with pytest.raises(ValidationError):
+                NativeCalibrationPlan.model_validate(candidate)
+    result = asyncio.run(execute_native_calibration(candidate, executions))
+    assert result.status == "blocked" and result.blocker.code == "invalid_calibration_input"
+    assert result.plan is None and name not in result.model_dump_json()
+    assert result.judge_invocation_count == 0 and events == []
+
+
+@pytest.mark.parametrize("bare_delegate", [False, True])
+def test_native_wrappers_cannot_hide_single_use_delegate_alias(tmp_path: Path, bare_delegate: bool) -> None:
+    """Reject delegate aliases across the whole schedule before any provider work."""
+    plan, executions, events = _native_batch(tmp_path)
+    delegate = executions[0].judge.capability_owner()
+    alias = delegate if bare_delegate else CodexCalibrationJudgeAdapter(delegate)
+    aliased = (executions[0], replace(executions[1], judge=alias))
+    result = asyncio.run(execute_native_calibration(plan, aliased))
+    assert result.status == "blocked" and result.blocker.code == "calibration_capability_reuse"
+    assert result.judge_invocation_count == 0 and events == []
+    # Rejection must leave the original independent schedule usable.
+    assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
+
+
+def test_native_mcp_public_names_remain_accepted(tmp_path: Path) -> None:
+    """Ordinary disabled-server keys remain usable with an updated identity."""
+    plan, _, _ = _native_batch(tmp_path)
+    parameters = plan.parameters.model_copy(update={"disabled_mcp_servers": ("docs-local", "tools_01")})
+    raw = plan.model_dump(mode="json")
+    raw["parameters"] = parameters.model_dump(mode="json")
+    raw["judge"]["adapter_version_or_digest"] = canonical_json_sha256(
+        {
+            "settings": parameters.model_dump(mode="json", exclude={"schema_version"}),
+            "rubric_sha256": plan.rubric_sha256,
+        }
+    )
+    assert NativeCalibrationPlan.model_validate(raw).parameters.disabled_mcp_servers == ("docs-local", "tools_01")
+
+
+def test_native_wrapper_subclass_cannot_invoke_properties_during_admission(tmp_path: Path) -> None:
+    """Only the concrete ownership record is inspected before safety admission."""
+    plan, executions, events = _native_batch(tmp_path)
+
+    class UnsafeWrapper(CodexCalibrationJudgeAdapter):
+        """Fail if admission invokes an overridable ownership callback."""
+
+        def capability_owner(self) -> CodexJudgeAdapter:
+            events.append("ownership_callback")
+            raise AssertionError("admission must not invoke this callback")
+
+    alias = UnsafeWrapper(executions[0].judge.capability_owner())
+    result = asyncio.run(execute_native_calibration(plan, (replace(executions[0], judge=alias), executions[1])))
+    assert result.blocker.code == "invalid_calibration_execution" and events == []
+
+
+def test_native_wrapper_retains_keyword_construction_and_fixed_owner(tmp_path: Path) -> None:
+    """Preserve the delegate keyword while preventing ownership reassignment."""
+    _, executions, _ = _native_batch(tmp_path)
+    delegate = executions[0].judge.capability_owner()
+    wrapped = CodexCalibrationJudgeAdapter(delegate=delegate)
+    assert wrapped.capability_owner() is delegate
+    with pytest.raises(AttributeError):
+        wrapped.delegate = executions[1].judge.capability_owner()
+
+
 def test_native_forged_parameters_and_partial_receipt_are_rejected(tmp_path: Path) -> None:
     plan, executions, events = _native_batch(tmp_path)
     forged = plan.model_copy(update={"parameters": plan.parameters.model_copy(update={"temperature": 0.0})})

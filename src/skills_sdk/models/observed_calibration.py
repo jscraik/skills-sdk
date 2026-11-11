@@ -9,7 +9,6 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, ModelWrapValidatorHandler, field_validator, model_validator
 
 from skills_sdk.core.digests import canonical_json_sha256
-
 from skills_sdk.models.evaluation import ScorerProfile
 from skills_sdk.models.inventory import NonEmptyText, Sha256, _ContractModel
 from skills_sdk.models.native_judge import CodexNativeJudgeParameters
@@ -175,6 +174,8 @@ class NativeCalibrationPlan(_CalibrationPlanBase[CodexNativeJudgeParameters]):
     @model_validator(mode="after")
     def native_identity_binding(self) -> Self:
         """Bind the CLI revision and complete requested settings into judge identity."""
+        if any(not _identity_is_public(name) for name in self.parameters.disabled_mcp_servers):
+            raise ValueError("native calibration MCP names must be public identities")
         if (
             self.judge.provider_id != "codex"
             or self.judge.provider_kind != "agent"
