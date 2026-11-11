@@ -290,6 +290,72 @@ def test_native_batch_rejects_actual_callbacks(
     assert asyncio.run(execute_native_calibration(plan, executions)).status == "pass"
 
 
+@pytest.mark.parametrize("index", [0, 1])
+@pytest.mark.parametrize("cleanup_result", [None, False, 0, "synthetic-invalid-cleanup"])
+def test_native_wrapper_cleanup_result_is_not_discarded(tmp_path: Path, index: int, cleanup_result: object) -> None:
+    """Keep runtime cleanup violations visible with honest partial-execution evidence."""
+    plan, executions, events = _native_batch(tmp_path)
+
+    class CleanupResultOwner(CodexJudgeAdapter):
+        """Close actual controlled resources before returning the selected result."""
+
+        async def cleanup(self) -> object:
+            await super().cleanup()
+            return cleanup_result
+
+    folder = tmp_path / ("judge" + str(index))
+    owner = CleanupResultOwner(
+        folder / "codex-fixture",
+        folder,
+        CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()),
+        "Rubric",
+        retain_result=_retain,
+    )
+    frames = tuple(
+        replace(item, judge=CodexCalibrationJudgeAdapter(owner)) if position == index else item
+        for position, item in enumerate(executions)
+    )
+    result = asyncio.run(execute_native_calibration(plan, frames))
+    if cleanup_result is None:
+        assert result.status == "pass" and result.judge_invocation_count == 2
+        assert events.count("provider") == 2
+        return
+    assert result.status == "blocked" and result.blocker.code == "calibration_execution_incomplete"
+    assert result.judge_execution_performed and result.judge_invocation_count == index + 1
+    assert len(result.results) == index and events.count("provider") == index + 1
+    assert "synthetic-invalid-cleanup" not in result.model_dump_json()
+    recovery = tmp_path / "recovery"
+    recovery.mkdir()
+    fresh_plan, fresh, _ = _native_batch(recovery)
+    assert asyncio.run(execute_native_calibration(fresh_plan, fresh)).status == "pass"
+
+
+@pytest.mark.parametrize("error_type", [RuntimeError, asyncio.CancelledError])
+def test_native_wrapper_cleanup_preserves_raised_failure(tmp_path: Path, error_type: type[BaseException]) -> None:
+    """Return validation cannot replace an owner's exception or cancellation."""
+    _native_batch(tmp_path)
+    failure = error_type("synthetic-cleanup-control")
+
+    class FailingCleanupOwner(CodexJudgeAdapter):
+        """Close controlled resources before raising the original failure."""
+
+        async def cleanup(self) -> None:
+            await super().cleanup()
+            raise failure
+
+    folder = tmp_path / "judge0"
+    owner = FailingCleanupOwner(
+        folder / "codex-fixture",
+        folder,
+        CodexJudgeSettings("gpt-6.1-sol", "0.153.4", ()),
+        "Rubric",
+        retain_result=_retain,
+    )
+    with pytest.raises(error_type) as raised:
+        asyncio.run(CodexCalibrationJudgeAdapter(owner).cleanup())
+    assert raised.value is failure
+
+
 @pytest.mark.parametrize("change", ["identity", "parameters"])
 def test_native_judge_drift_after_batch_admission_still_blocks(tmp_path: Path, change: str) -> None:
     """Whole-batch admission does not replace the later per-probe drift guard."""

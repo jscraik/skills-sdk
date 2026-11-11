@@ -789,4 +789,5 @@ class CodexCalibrationJudgeAdapter:
 
     async def cleanup(self) -> None:
         """Delegate single-use closure and bounded active-process cleanup."""
-        await self.delegate.cleanup()
+        if await self.delegate.cleanup() is not None:
+            raise ContractError("codex_judge_cleanup_failed", "Calibration delegate cleanup must return None")
