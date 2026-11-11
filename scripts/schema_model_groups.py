@@ -38,7 +38,12 @@ from skills_sdk.models.matched_feedback import MatchedCloudRegressionReceipt, Ma
 from skills_sdk.models.matched_handoff import MatchedCloudExecutionReceipt, MatchedCloudHandoff
 from skills_sdk.models.matched_plugin_calibration import MatchedVariantCalibrationBundle
 from skills_sdk.models.native_judge import CodexNativeJudgeParameters
-from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
+from skills_sdk.models.observed_calibration import (
+    NativeCalibrationPlan,
+    NativeCalibrationReceipt,
+    ObservedCalibrationPlan,
+    ObservedCalibrationReceipt,
+)
 from skills_sdk.models.package import (
     ArchivePackageSource,
     ArchiveSourceProvenance,
@@ -117,6 +122,8 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ScorerCalibrationReceipt, "scorer-calibration.v1.schema.json"),
         (ObservedCalibrationPlan, "observed-calibration-plan.v1.schema.json"),
         (ObservedCalibrationReceipt, "observed-calibration.v1.schema.json"),
+        (NativeCalibrationPlan, "native-calibration-plan.v1.schema.json"),
+        (NativeCalibrationReceipt, "native-calibration.v1.schema.json"),
         (MatchedComparisonPlan, "matched-comparison-plan.v1.schema.json"),
         (MatchedPairAssessment, "matched-pair-assessment.v1.schema.json"),
         (MatchedCalibrationReceipt, "matched-calibration.v1.schema.json"),

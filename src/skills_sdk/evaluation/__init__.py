@@ -41,6 +41,7 @@ __all__ = [
     "execute_matched_cloud_regression",
     "execute_matched_lane",
     "execute_matched_regression",
+    "execute_native_calibration",
     "execute_scorer_calibration",
     "execute_selected_case",
     "execute_selected_case_with_judge",
@@ -101,7 +102,12 @@ def __getattr__(name: str) -> object:
         from skills_sdk.evaluation.skill_context import prepare_selected_case_context
 
         return prepare_selected_case_context
-    if name in {"CalibrationProbeExecution", "CalibrationTrialAdapters", "execute_scorer_calibration"}:
+    if name in {
+        "CalibrationProbeExecution",
+        "CalibrationTrialAdapters",
+        "execute_scorer_calibration",
+        "execute_native_calibration",
+    }:
         from skills_sdk.evaluation import observed_calibration
 
         return getattr(observed_calibration, name)

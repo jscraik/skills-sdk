@@ -282,6 +282,30 @@ before they are documented as available here.
 
 ## Contract families
 
+### Native calibration recovery candidate
+
+The local recovery candidate adds `NativeCalibrationPlan` and
+`NativeCalibrationReceipt` in `skills_sdk.models`, plus
+`execute_native_calibration` in `skills_sdk.evaluation`. These separate
+`native-calibration-plan/v1` and `native-calibration/v1` families preserve the
+existing numeric-temperature calibration API. The native plan binds the
+candidate, assertions, held-out outputs, requested CLI controls and rubric
+digest to the judge identity. Its temperature remains explicitly unavailable.
+
+`CodexCalibrationJudgeAdapter` in `skills_sdk.providers.codex_judge` wraps the
+current `CodexJudgeAdapter`. It joins the actual numeric observation to retained
+selected-case evidence and delegates cleanup. The delegate still requires its
+host result-retention callback. Batch safety admission and candidate/settings
+checks precede dispatch; incomplete or failed observations remain blocked.
+Policy failures retain completed observations without authorising promotion.
+
+The packaged calibration schemas support structural checks through
+`SchemaRegistry` and semantic model validation. Native judge parameters retain
+their provider-owned schema boundary. This local candidate does not add live
+generator, native matched, whole-plugin quality, authenticated scanner or host
+containment proof. Controlled executable results do not establish model quality
+or a release decision. Delivery and hosted acceptance remain pending.
+
 **Supplied content review:** `assess_content_review` from `skills_sdk.validation`
 checks a `ContentReviewAssessment` against the safely captured current package.
 Import that model and `ContentReviewResult` from `skills_sdk.models`. The supplied

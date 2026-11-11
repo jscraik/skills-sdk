@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.models.native_judge import _MCP_NAME_LIMIT, _MCP_SERVER_LIMIT, CodexNativeJudgeParameters
+from skills_sdk.models.observed_calibration import CalibrationJudgeVerdict
 from skills_sdk.models.provider import ProviderIdentityV2
 from skills_sdk.models.provider_execution import _identity_is_public
 from skills_sdk.models.safety import _public_text_is_redaction_safe
@@ -756,3 +757,32 @@ class CodexJudgeAdapter:
                 raise ContractError("codex_judge_cleanup_failed", "Active judgment failed during cleanup")
         if self._cleanup_error is not None:
             raise ContractError(self._cleanup_error, "Active judgment process cleanup failed")
+
+
+class CodexCalibrationJudgeAdapter:
+    """Expose observed scores while retaining the delegate's evidence lifecycle."""
+
+    def __init__(self, delegate: CodexJudgeAdapter) -> None:
+        self._delegate = delegate
+
+    @property
+    def identity(self) -> ProviderIdentityV2:
+        """Bind the current delegate's CLI and requested settings."""
+        return self._delegate.identity
+
+    @property
+    def parameters(self) -> CodexNativeJudgeParameters:
+        """Retain the native declaration of unavailable temperature control."""
+        return self._delegate.parameters
+
+    async def judge(self, inputs: SelectedCaseJudgeInput) -> CalibrationJudgeVerdict:
+        """Join the actual numeric observation to retained selected-case evidence."""
+        evidence = await self._delegate.judge(inputs)
+        observation = self._delegate.last_observation
+        if observation is None:
+            raise ContractError("codex_judge_incomplete", "Calibration requires an actual numeric observation")
+        return CalibrationJudgeVerdict(evidence=evidence, score=observation.score)
+
+    async def cleanup(self) -> None:
+        """Delegate single-use closure and bounded active-process cleanup."""
+        await self._delegate.cleanup()

@@ -1,5 +1,17 @@
 # Skills SDK workflow delivery
 
+## Native calibration recovery candidate, 11 November 2026
+
+Recover the preserved native plan, receipt and guarded calibration service
+against accepted main, retaining current judge identity, result retention and
+cleanup behaviour. Owned scope excludes the old pilot-specific calibration
+runner and native matched/quality joins. The new public service consumes
+explicit host capabilities and emits native calibration evidence without
+fabricated temperature control. Current numeric-temperature contracts remain
+unchanged. Local implementation and verification are authorised; delivery,
+hosted acceptance and live provider execution remain pending. This slice does
+not establish a calibrated No AI Slop scorer or complete local evaluation.
+
 Owner: Skills SDK maintainers. This task record tracks the owner-approved
 workflow in [workflow.md](../../workflow.md). The capability inventory in
 [migration-map.md](../../migration-map.md) replaces conversation-only migration
