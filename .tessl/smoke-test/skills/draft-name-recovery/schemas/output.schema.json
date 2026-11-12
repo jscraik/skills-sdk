@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["base_head", "changed_path", "before_sha256", "after_sha256", "patch", "proof", "checks"],
+  "properties": {
+    "base_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "changed_path": {"const": "docs/agent-entrypoint.md"},
+    "before_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "after_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "patch": {"type": "string", "minLength": 1, "maxLength": 65536},
+    "proof": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "allOf": [
+        {"contains": {"type": "object", "required": ["phase"], "properties": {"phase": {"const": "mismatch"}}}},
+        {"contains": {"type": "object", "required": ["phase"], "properties": {"phase": {"const": "recovery"}}}}
+      ],
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["phase", "command", "exit_code", "status", "finding_codes", "before_sha256", "after_sha256", "mutation_performed", "stdout", "stderr"],
+        "properties": {
+          "phase": {"enum": ["mismatch", "recovery"]},
+          "command": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "stdout": {"type": "string", "minLength": 1, "maxLength": 16384},
+          "stderr": {"type": "string", "maxLength": 4096},
+          "exit_code": {"type": "integer"},
+          "status": {"enum": ["blocked", "pass"]},
+          "finding_codes": {"type": "array", "items": {"type": "string"}, "maxItems": 16},
+          "before_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "after_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "mutation_performed": {"const": false}
+        }
+      }
+    },
+    "checks": {
+      "type": "array", "maxItems": 16,
+      "items": {"type": "object", "additionalProperties": false,
+        "required": ["command", "outcome", "detail"],
+        "properties": {
+          "command": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "outcome": {"enum": ["pass", "fail", "blocked"]},
+          "detail": {"type": "string", "maxLength": 4096}
+        }
+      }
+    }
+  }
+}

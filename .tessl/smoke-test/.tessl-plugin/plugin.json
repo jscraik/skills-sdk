@@ -1,0 +1,7 @@
+{
+  "name": "skills-sdk-lab/standard-smoke",
+  "version": "0.3.0",
+  "description": "Bounded hosted SDK smoke, validation and split documentation tasks.",
+  "private": true,
+  "skills": "./skills/"
+}
