@@ -1479,9 +1479,11 @@ generator's required repeated-case coverage or establish that it ran.
 
 `skills_sdk.evaluation.assess_native_matched_pair(plan, lane, calibrations, baseline, candidate)`
 accepts baseline and candidate bundles in that order and two supplied dimensional
-judgments. It returns `NativeMatchedPairAssessment` only after exact plugin,
-mode, target, scorer, rubric, settings and bundle-digest joins. The retained
-judgment digest binds every dimensional row and its underlying evidence.
+judgments. It returns `NativeMatchedPairAssessment` with `status="assessed"`
+only after exact plugin, mode, target, scorer, rubric, settings and bundle-digest
+joins. Rejected inputs return `status="blocked"`; the return type alone does not
+establish that those joins passed. The retained judgment digest binds every
+dimensional row and its underlying evidence.
 
 The four additive `native-matched-*/v1` families have packaged schemas and
 explicit `SchemaRegistry` semantic validation. They are not generic receipt
