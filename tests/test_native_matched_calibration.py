@@ -301,6 +301,29 @@ def test_later_invalid_provider_blocks_all_dispatch(tmp_path: Path, member: str)
     assert asyncio.run(execute_native_matched_calibration(plan, _plan().rubric, frames)).status == "pass"
 
 
+def test_callback_invalidated_after_admission_records_no_dispatch(tmp_path: Path) -> None:
+    plan, frames, events = _native_dimensions(tmp_path)
+    first = frames[0]
+    original_complete = first.provider.complete
+
+    async def invalidate_callback(request: object, payload: object) -> object:
+        result = await original_complete(request, payload)
+        first.judge.judge = None
+        return result
+
+    first.provider.complete = invalidate_callback
+    result = asyncio.run(execute_native_matched_calibration(plan, _plan().rubric, frames))
+    assert result.status == "blocked"
+    assert result.calibration is not None
+    assert result.calibration.blocker.code == "calibration_execution_incomplete"
+    assert result.calibration.judge_invocation_count == 0
+    assert result.calibration.judge_execution_performed is False
+    assert result.calibration.results == result.judgments == ()
+    assert events.count("provider") == 1
+    assert events.count("dimensional_judge") == 0
+    assert NativeMatchedCalibrationReceipt.model_validate_json(result.model_dump_json()) == result
+
+
 @pytest.mark.parametrize("failure", ["cleanup", "private_error", "cancelled", "scalar", "missing_dimensions"])
 def test_failure_retains_honest_partial_counts_then_recovers(tmp_path: Path, failure: str) -> None:
     plan, frames, events = _native_dimensions(tmp_path)

@@ -21,7 +21,7 @@ from skills_sdk.models.native_matched import (
     NativeMatchedComparisonPlan,
     NativeMatchedPairAssessment,
 )
-from skills_sdk.models.observed_calibration import NativeCalibrationPlan
+from skills_sdk.models.observed_calibration import NativeCalibrationPlan, NativeCalibrationReceipt
 from skills_sdk.models.safety import PackageSafetyBlocker
 from skills_sdk.providers.call import _read_adapter
 from skills_sdk.providers.codex_judge import CodexCalibrationJudgeAdapter, CodexJudgeAdapter
@@ -64,6 +64,15 @@ async def execute_native_matched_calibration(
             ),
         )
     observed = await execute_native_calibration(parsed, batch)
+    invocation_count = sum(wrapper.invocations for wrapper in wrappers)
+    observed = NativeCalibrationReceipt.model_validate(
+        observed.model_copy(
+            update={
+                "judge_invocation_count": invocation_count,
+                "judge_execution_performed": invocation_count > 0,
+            }
+        )
+    )
     retained = tuple(judgment for wrapper in wrappers for judgment in wrapper.judgments)[: len(observed.results)]
     return NativeMatchedCalibrationReceipt(
         rubric=scoring, calibration=observed, judgments=retained, status=observed.status, blocker=observed.blocker
