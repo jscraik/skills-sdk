@@ -1058,3 +1058,20 @@ Tessl pack, SDK receipt, or install plan must not be labelled native-plugin
 preservation, Codex discovery, private-registry installation, or execution
 proof. Do not move unrelated resources into a synthetic skill merely to make
 the archive appear complete.
+# Whole-plugin local preparation families
+
+`plugin-build/v1` and `plugin-hardening/v1` are additive local evidence
+families. They retain the existing `PluginPackageValidation` capture instead
+of relabelling a standalone child receipt. A content-stable mode change leaves
+the candidate content identity unchanged but changes the captured mode digest
+and whole-plugin build digest. Hardening compares the complete fresh capture
+with the built one and blocks stale bytes, modes, child scopes or metadata.
+
+Existing `package-receipt/v1`, `package-receipt/v2`, skill manifest/hardening
+and registry-preparation/v1 semantics are unchanged. In particular these new
+receipts cannot be passed off as a supported registry preparation, archive or
+installation. The 71-character plugin candidate identity is preserved; the
+registry-specific coordinate mapping remains separate work. Generic receipt
+parsing supports the new families without asserting archive or release status.
+The local API/schema/rejection/recovery tests do not establish migration parity
+for all legacy packaging/emitter callers.

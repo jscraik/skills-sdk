@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -24,6 +25,8 @@ _RECEIPT_SCHEMAS = {
     "discovery-observation/v1": "discovery-observation.v1",
     "activation-observation/v1": "activation-observation.v1",
     "runtime-outcome/v1": "runtime-outcome.v1",
+    "plugin-build/v1": "plugin-build.v1",
+    "plugin-hardening/v1": "plugin-hardening.v1",
 }
 _PACKAGE_RECEIPT_VERSIONS = frozenset({"package-receipt/v1", "package-receipt/v2"})
 _EVALUATION_RECEIPT_VERSIONS = frozenset({"evaluation-receipt/v1", "evaluation-receipt/v2"})
@@ -125,6 +128,8 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
     # Concrete receipt families validate their richer invariants before the
     # stable generic Receipt API is exposed to callers.
     active_registry.validate(receipt_schema, payload)
+    if schema_version in {"plugin-build/v1", "plugin-hardening/v1"}:
+        return _parse_plugin_local_receipt(payload)
     candidate_payload = payload.get("candidate")
     known_candidate_receipt = any(
         (package_receipt, evaluation_receipt, registry_receipt, safety_receipt, runtime_evidence_receipt)
@@ -200,5 +205,42 @@ def parse_receipt(payload: Mapping[str, Any], registry: SchemaRegistry | None = 
         artifact_status=artifact_status,
         evidence=evidence,
         blocker=_parse_blocker(blocker_payload),
+        payload=_freeze_payload(payload),
+    )
+
+
+def _parse_plugin_local_receipt(payload: Mapping[str, Any]) -> Receipt:
+    """Project validated local plugin families without inventing export or release evidence."""
+    hardening = payload["schema_version"] == "plugin-hardening/v1"
+    build = payload["build"] if hardening else payload
+    capture = build["validation"]
+    identity = capture.get("candidate")
+    status = str(payload["status"])
+    code = None
+    if status == "blocked":
+        code = (
+            payload["blockers"][0]
+            if hardening
+            else next(
+                (item["code"] for item in capture.get("findings", ()) if item["severity"] == "blocker"),
+                "plugin_build_blocked",
+            )
+        )
+    return Receipt(
+        receipt_id="plugin-local-" + canonical_json_sha256(dict(payload)),
+        candidate=(
+            CandidateIdentity(
+                package_id=identity["package_id"],
+                source_revision=identity["source_revision"],
+                content_sha256=identity["content_sha256"],
+            )
+            if identity is not None
+            else None
+        ),
+        lane="hardening" if hardening else "validation",
+        status="blocked" if status == "blocked" else "pass",
+        artifact_status=status,
+        evidence=tuple(item["path"] for item in capture.get("files", ())),
+        blocker=Blocker(code=code, message="Local whole-plugin operation blocked.", evidence_refs=()) if code else None,
         payload=_freeze_payload(payload),
     )

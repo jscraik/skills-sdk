@@ -1454,3 +1454,38 @@ strict review-authority requirement.
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test
 and update the schema when changing a public contract.
+# Whole-plugin local build and hardening
+
+The additive `skills_sdk.packaging.build_plugin_package(root,
+source_revision=...)` API captures a versioned root `plugin.json`, every
+included file, direct child skill scopes and ordinary permission modes. It
+returns `PluginBuildReceipt` (`plugin-build/v1`). Its `build_digest` binds the
+complete validation envelope, including the separate mode ledger. It is a
+local manifest build, not an emitted archive. Missing version, invalid source
+or blocked child validation produces a blocked receipt with retained findings.
+
+`harden_plugin_package(root, build_receipt, presentation_request=..., policy=...)`
+recaptures source, runs the existing presentation checker over exact supplied
+image/copy approvals, then confirms the capture again. It returns
+`PluginHardeningReceipt` (`plugin-hardening/v1`), retaining its build, fresh
+capture, policy, presentation result and all derived blockers. Changed source,
+stale approvals, private paths, exceeded budgets, group/world-writable files
+and a missing required root README block this local path. The default policy
+requires README; only that documentation check and numeric budgets are
+configurable. Presentation and its supplied rights assertions cannot be waived
+through this policy. These checks do not authenticate the approval producer.
+
+Both families are packaged schemas with semantic `SchemaRegistry` validation
+and generic `parse_receipt` projection. Structural JSON Schema alone cannot
+recompute digests or cross-bind every nested record. Typed or copied objects
+are revalidated at supported ingress boundaries. Source freshness is observed
+at the captures; this is not a filesystem lock or a promise against changes
+after the operation returns.
+
+All mutation, archive-emission, publication, execution and release flags remain
+false, including after hardening passes. This path does not establish quality,
+security/evaluation acceptance, independent artwork/rights review, archive
+round-trip, registry coordinates/readback or installation. Those require their
+own evidence. Standalone `build_skill_package` and `harden_skill_package` and
+their frozen receipt families retain their existing behaviour. No whole-plugin
+CLI, exporter or registry adapter is added by these APIs.
