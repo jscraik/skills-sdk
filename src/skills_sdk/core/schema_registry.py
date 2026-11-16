@@ -75,6 +75,10 @@ SCHEMA_NAMES = frozenset(
         "observed-calibration.v1",
         "native-calibration-plan.v1",
         "native-calibration.v1",
+        "native-matched-calibration.v1",
+        "native-matched-variant-calibration.v1",
+        "native-matched-comparison-plan.v1",
+        "native-matched-pair-assessment.v1",
         "matched-comparison-plan.v1",
         "matched-pair-assessment.v1",
         "matched-calibration.v1",
@@ -555,6 +559,25 @@ class SchemaRegistry:
                 "matched-cloud-execution.v1": MatchedCloudExecutionReceipt,
                 "matched-regression.v1": MatchedRegressionReceipt,
                 "matched-cloud-regression.v1": MatchedCloudRegressionReceipt,
+            }[name]
+        elif name in {
+            "native-matched-calibration.v1",
+            "native-matched-variant-calibration.v1",
+            "native-matched-comparison-plan.v1",
+            "native-matched-pair-assessment.v1",
+        }:
+            from skills_sdk.models.native_matched import (
+                NativeMatchedCalibrationReceipt,
+                NativeMatchedComparisonPlan,
+                NativeMatchedPairAssessment,
+                NativeMatchedVariantCalibrationBundle,
+            )
+
+            model = {
+                "native-matched-calibration.v1": NativeMatchedCalibrationReceipt,
+                "native-matched-variant-calibration.v1": NativeMatchedVariantCalibrationBundle,
+                "native-matched-comparison-plan.v1": NativeMatchedComparisonPlan,
+                "native-matched-pair-assessment.v1": NativeMatchedPairAssessment,
             }[name]
         elif name in {"observed-calibration-plan.v1", "observed-calibration.v1"}:
             from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt

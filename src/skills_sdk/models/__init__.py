@@ -90,6 +90,14 @@ from skills_sdk.models.matched_policy import (
     MatchedSelectionPolicy,
 )
 from skills_sdk.models.native_judge import CodexNativeJudgeParameters
+from skills_sdk.models.native_matched import (
+    NativeMatchedCalibrationReceipt,
+    NativeMatchedCalibrationTarget,
+    NativeMatchedComparisonPlan,
+    NativeMatchedLaneSpec,
+    NativeMatchedPairAssessment,
+    NativeMatchedVariantCalibrationBundle,
+)
 from skills_sdk.models.observed_calibration import (
     CalibrationJudgeVerdict,
     HeldOutCalibrationProbe,
@@ -298,6 +306,12 @@ __all__ = [
     "MutationRaceEvidence",
     "NativeCalibrationPlan",
     "NativeCalibrationReceipt",
+    "NativeMatchedCalibrationReceipt",
+    "NativeMatchedCalibrationTarget",
+    "NativeMatchedComparisonPlan",
+    "NativeMatchedLaneSpec",
+    "NativeMatchedPairAssessment",
+    "NativeMatchedVariantCalibrationBundle",
     "NormalizedPackage",
     "NormalizedPackageV2",
     "NormalizedPackageV3",

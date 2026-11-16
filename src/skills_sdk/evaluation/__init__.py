@@ -25,6 +25,7 @@ __all__ = [
     "SelectedCaseJudgeInput",
     "SuppliedTextProviderAdapter",
     "assess_matched_pair",
+    "assess_native_matched_pair",
     "assess_plugin_pre_execution_safety",
     "assess_pre_execution_safety",
     "assess_scenario_coverage",
@@ -42,6 +43,7 @@ __all__ = [
     "execute_matched_lane",
     "execute_matched_regression",
     "execute_native_calibration",
+    "execute_native_matched_calibration",
     "execute_scorer_calibration",
     "execute_selected_case",
     "execute_selected_case_with_judge",
@@ -55,6 +57,10 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     """Load optional evaluation services only when requested."""
+    if name in {"assess_native_matched_pair", "execute_native_matched_calibration"}:
+        from skills_sdk.evaluation import native_matched
+
+        return getattr(native_matched, name)
     if name in {"PluginExecutionContext", "prepare_matched_plugin_context"}:
         from skills_sdk.evaluation import matched_plugin_context
 
