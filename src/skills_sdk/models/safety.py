@@ -33,12 +33,13 @@ _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
 )
 _CAMEL_CASE_SECRET_ASSIGNMENT = re.compile(
     r"[a-z][A-Z](?:piKey|ccessToken|uthToken|assword|rivateKey|ecret|oken)"
+    r"(?:[_-][A-Za-z0-9]+)*"
     r"[\"']?\s*[:=]"
 )
 _MACHINE_PATH_PATTERN = re.compile(
     r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\$[A-Za-z_][A-Za-z0-9_]*/|"
     r"(?:^|[^A-Za-z0-9._-])(?:[A-Za-z0-9._-]+\\)+[A-Za-z0-9._-]+|"
-    r"(?:^|[^A-Za-z0-9])\\|(?:^|[\s\[(=:;'\"])/(?!/)|"
+    r"(?:^|[^A-Za-z0-9])\\|(?:^|[\s\[(=:;'\"`])/(?!/)|(?:^|[\s\[(=;'\"`])//|"
     r"(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|"
     r"[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|"
     r"[Rr][Oo][Oo][Tt])/|"
