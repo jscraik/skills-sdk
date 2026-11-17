@@ -10,7 +10,10 @@ _NONBLANK_RATIONALE_PATTERN = (
     r"[^\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a"
     r"\u2028\u2029\u202f\u205f\u3000]"
 )
-_RATIONALE_CREDENTIAL_PATTERN = PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN.replace(r"\s", r"\u0009-\u000d ")
+_RATIONALE_CREDENTIAL_PATTERN = PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN.replace(r"\s*", r"[\u0009-\u000d ]*").replace(
+    r"\s", r"\u0009-\u000d "
+)
+_RATIONALE_MACHINE_PATH_PATTERN = MACHINE_PATH_SCHEMA_PATTERN.replace(r"\s", r"\u0009-\u000d ")
 
 
 def append_pre_execution_safety_constraints(schema: dict[str, Any]) -> None:
@@ -33,7 +36,7 @@ def append_pre_execution_safety_constraints(schema: dict[str, Any]) -> None:
         (
             {"pattern": _NONBLANK_RATIONALE_PATTERN},
             {"not": {"pattern": _RATIONALE_CREDENTIAL_PATTERN}},
-            {"not": {"pattern": MACHINE_PATH_SCHEMA_PATTERN}},
+            {"not": {"pattern": _RATIONALE_MACHINE_PATH_PATTERN}},
         )
     )
     schema["$comment"] = (

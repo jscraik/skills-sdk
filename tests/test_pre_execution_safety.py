@@ -138,6 +138,17 @@ def test_packaged_schema_and_registry_reject_upstream_contradictions() -> None:
     registry.validate("pre-execution-safety-evidence.v1", evidence.model_dump(mode="json"))
 
 
+def test_checklist_rationale_rejects_camel_case_secret_assignment_in_model_and_schema() -> None:
+    _, evidence = _bound()
+    payload = evidence.model_dump(mode="json")
+    payload["checklist"][0]["rationale"] = "dbPassword=opaque-value"
+
+    with pytest.raises(ValidationError):
+        PreExecutionSafetyEvidence.model_validate(payload)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("pre-execution-safety-evidence.v1", payload)
+
+
 def _changed_checklist_payload(change: str) -> dict[str, object]:
     _, evidence = _bound()
     payload = evidence.model_dump(mode="json")

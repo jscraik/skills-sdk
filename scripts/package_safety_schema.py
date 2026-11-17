@@ -19,6 +19,8 @@ PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN = (
     r"-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|"
     r"[eE][yY][jJ][A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|"
     r"(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|"
+    r"[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)(?:[_-][A-Za-z0-9]+)*(?![A-Za-z0-9_-])|"
+    r"(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|"
     r"[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)"
     r"(?:[_-][A-Za-z0-9]+)*[\"']?[\s\u001c-\u001f\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=]|"
     r"(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|"

@@ -23,6 +23,7 @@ _PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
     rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
     r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
     r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|"
+    r"(?:client|access)[_-]?(?:secret|token|key(?:[_-]?id)?)(?:[_-][A-Za-z0-9]+)*(?![A-Za-z0-9_-])|"
     r"(?:client|access)[_-]?(?:secret|token|key(?:[_-]?id)?)(?:[_-][A-Za-z0-9]+)*"
     r"[\"']?[\s\u001c-\u001f\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=]|"
     r"(?:(?:ssh_)?private[_-]?key|api[_-]?key|credential|password|secret|token)"

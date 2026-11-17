@@ -20,6 +20,8 @@ from skills_sdk.models.registry import (
 _UNSAFE_PUBLIC_TEXTS = (
     "password=opaque-value",
     "dbPassword=opaque-value",
+    "client_secret opaque-value",
+    "evidence/client_secret.json",
     "client_key_prod=opaque-value",
     "AWS_ACCESS_KEY_ID_PROD=opaque-value",
     'source="/opt/company/config.json"',
