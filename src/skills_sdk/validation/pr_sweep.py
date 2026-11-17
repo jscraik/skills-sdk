@@ -362,13 +362,16 @@ def validate_pr_sweep_dirty_closeout(
         return _failure(
             "dirty_closeout", "blocked", "git_status_unavailable", "Git status failed in the supplied repository root"
         )
-    state = _parse_porcelain(completed.stdout)
-    state = PrSweepDirtyState(
-        staged_paths=state.staged_paths,
-        unstaged_paths=tuple(sorted(set(state.unstaged_paths) | content_dirty)),
-        untracked_paths=state.untracked_paths,
-        dirty_paths=tuple(sorted(set(state.dirty_paths) | content_dirty)),
-    )
+    try:
+        state = _parse_porcelain(completed.stdout)
+        state = PrSweepDirtyState(
+            staged_paths=state.staged_paths,
+            unstaged_paths=tuple(sorted(set(state.unstaged_paths) | content_dirty)),
+            untracked_paths=state.untracked_paths,
+            dirty_paths=tuple(sorted(set(state.dirty_paths) | content_dirty)),
+        )
+    except (ValueError, ContractError):
+        return _failure("dirty_closeout", "blocked", "git_status_unavailable", "could not verify Git dirty paths")
     ledgered: set[str] = set()
     findings: list[PrSweepFinding] = []
     if ledger_path is not None:

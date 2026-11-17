@@ -14,6 +14,7 @@ import pytest
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepValidationResult
+from skills_sdk.validation import pr_sweep as pr_sweep_validation
 from skills_sdk.validation import validate_pr_sweep_dirty_closeout, validate_recurring_findings
 
 
@@ -225,6 +226,14 @@ def test_dirty_closeout_git_failure_is_typed_blocker(tmp_path: Path) -> None:
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
     assert str(tmp_path) not in result.model_dump_json()
+
+
+def test_dirty_closeout_blocks_unsafe_combined_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(pr_sweep_validation, "_content_dirty_paths", lambda _repo: {"report:old.txt"})
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
 
 
 def test_dirty_closeout_requires_worktree_top_level(tmp_path: Path) -> None:
