@@ -211,6 +211,7 @@ def _git_environment(*, isolated: bool = False) -> dict[str, str]:
     environment = {
         key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key in discovery_keys
     }
+    environment["LC_ALL"] = "C"
     if isolated:
         environment["GIT_ATTR_NOSYSTEM"] = "1"
         environment["GIT_CONFIG_GLOBAL"] = os.devnull
@@ -319,8 +320,12 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
                 os.close(descriptor)
         if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
             source_path = Path(source)
-            if source_path.is_relative_to(repo_root) and source_path.relative_to(repo_root).as_posix() in tracked:
-                raise OSError("tracked special file cannot be represented in private snapshot")
+            if source_path.is_relative_to(repo_root):
+                relative = source_path.relative_to(repo_root)
+                if relative.as_posix() in tracked or any(
+                    (repo_root / parent / ".git").exists() for parent in relative.parents if parent != Path(".")
+                ):
+                    raise OSError("tracked or submodule special file cannot be represented in private snapshot")
             Path(destination).touch()
             return destination
         raise OSError("unsupported snapshot entry type")
@@ -364,6 +369,19 @@ def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
             path.resolve().relative_to(private_root)
         except (OSError, RuntimeError, ValueError):
             return False
+
+    def reject_walk_error(error: OSError) -> None:
+        raise error
+
+    try:
+        for metadata_root in metadata_roots:
+            for directory, names, files in os.walk(metadata_root, followlinks=False, onerror=reject_walk_error):
+                for name in names + files:
+                    entry = Path(directory) / name
+                    if entry.is_symlink() and not entry.resolve().is_relative_to(private_root):
+                        return False
+    except (OSError, RuntimeError):
+        return False
     return True
 
 
@@ -395,7 +413,7 @@ def _ambient_status_config_is_supported(repo_root: Path) -> bool:
         "core.filemode",
         "core.ignorecase",
     }
-    xdg_root = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    xdg_root = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     if any((xdg_root / "git" / name).exists() for name in ("ignore", "attributes")):
         return False
     config_sources = (

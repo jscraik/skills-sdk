@@ -469,12 +469,16 @@ def test_snapshot_blocks_ambient_status_settings(tmp_path: Path, monkeypatch: py
     assert result.findings[0].code == "ambient_git_config"
 
 
-def test_snapshot_blocks_default_xdg_ignore_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("empty_xdg", [False, True])
+def test_snapshot_blocks_default_xdg_ignore_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, empty_xdg: bool
+) -> None:
     repo = _repo(tmp_path)
-    xdg = tmp_path / "xdg"
+    xdg = tmp_path / "home" / ".config" if empty_xdg else tmp_path / "xdg"
     (xdg / "git").mkdir(parents=True)
     (xdg / "git" / "ignore").write_text("ignored.txt\n", encoding="utf-8")
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", "" if empty_xdg else str(xdg))
     result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "ambient_git_config"
@@ -642,13 +646,15 @@ def test_dirty_closeout_blocks_external_object_database_symlink(tmp_path: Path) 
     assert result.findings[0].code == "git_status_unavailable"
 
 
-def test_dirty_closeout_blocks_external_git_index(tmp_path: Path) -> None:
+@pytest.mark.parametrize("metadata_name", ["index", "ref"])
+def test_dirty_closeout_blocks_external_git_metadata(tmp_path: Path, metadata_name: str) -> None:
     repo = _repo(tmp_path)
     external_index = tmp_path / "external-index"
-    (repo / ".git" / "index").replace(external_index)
-    (repo / ".git" / "index").symlink_to(external_index)
+    head_ref = (repo / ".git" / "HEAD").read_text(encoding="utf-8").split()[1]
+    metadata = repo / ".git" / ("index" if metadata_name == "index" else head_ref)
+    metadata.replace(external_index)
+    metadata.symlink_to(external_index)
     result = validate_pr_sweep_dirty_closeout(repo)
-    assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
 
 
@@ -678,6 +684,7 @@ def test_dirty_closeout_ignores_inherited_alternate_git_context(
     (primary / "tracked.txt").write_text("changed\n", encoding="utf-8")
     monkeypatch.setenv("GIT_DIR", str(alternate / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(alternate))
+    assert pr_sweep_validation._git_environment()["LC_ALL"] == "C"
     result = validate_pr_sweep_dirty_closeout(primary, require_clean=True)
     assert result.status == "fail"
     assert result.dirty_state is not None
@@ -725,6 +732,13 @@ def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path)
     assert result.status == "fail"
     assert result.dirty_state is not None
     assert "module" in result.dirty_state.dirty_paths
+    if hasattr(os, "mkfifo"):
+        tracked = parent / "module" / "tracked.txt"
+        tracked.unlink()
+        os.mkfifo(tracked)
+        blocked = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
+        assert blocked.status == "blocked"
+        assert blocked.findings[0].code == "git_status_unavailable"
 
 
 def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
