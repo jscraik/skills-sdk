@@ -11,6 +11,7 @@ from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.models.inventory import NonEmptyText, PackageId, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import ReceiptId
+from skills_sdk.models.safety import _public_text_is_redaction_safe
 
 RegistryIdentifier = Annotated[
     str,
@@ -30,16 +31,12 @@ _CREDENTIAL_COMPONENT_PATTERN = re.compile(
     rf"(?:^|[._-])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)})",
     re.IGNORECASE,
 )
-_PUBLIC_TEXT_CREDENTIAL_PATTERN = re.compile(
-    rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)})",
-    re.IGNORECASE,
-)
 
 
 def registry_evidence_is_redaction_safe(value: str) -> bool:
-    """Return whether text avoids the configured credential-prefix components."""
+    """Return whether registry text satisfies the shared public-text boundary."""
 
-    return _PUBLIC_TEXT_CREDENTIAL_PATTERN.search(value) is None
+    return _public_text_is_redaction_safe(value)
 
 
 class RegistryIdentity(_ContractModel):
@@ -76,7 +73,7 @@ class RegistryPreparationRequest(_ContractModel):
         if not isinstance(value, str):
             raise ValueError("registry package name must be a string")
         if not registry_evidence_is_redaction_safe(value):
-            raise ValueError("registry package name must not contain credential-shaped values")
+            raise ValueError("registry package name must not contain credential-shaped or machine-path values")
         return value
 
     @field_validator("version", mode="before")
@@ -86,7 +83,7 @@ class RegistryPreparationRequest(_ContractModel):
             if value != value.strip():
                 raise ValueError("registry version must not contain surrounding whitespace")
             if not registry_evidence_is_redaction_safe(value):
-                raise ValueError("registry version must not contain credential-shaped values")
+                raise ValueError("registry version must not contain credential-shaped or machine-path values")
         return value
 
     @field_validator("evidence")
@@ -97,7 +94,9 @@ class RegistryPreparationRequest(_ContractModel):
         for value in values:
             require_portable_relative_path(value)
             if not registry_evidence_is_redaction_safe(value):
-                raise ValueError("registry preparation evidence must not contain credential-shaped values")
+                raise ValueError(
+                    "registry preparation evidence must not contain credential-shaped or machine-path values"
+                )
         return values
 
 
@@ -114,7 +113,7 @@ class RegistryPreparationBlocker(_ContractModel):
     @classmethod
     def public_text_is_redaction_safe(cls, value: object) -> object:
         if isinstance(value, str) and not registry_evidence_is_redaction_safe(value):
-            raise ValueError("registry blocker text must not contain credential-shaped values")
+            raise ValueError("registry blocker text must not contain credential-shaped or machine-path values")
         return value
 
     @field_validator("evidence_refs")
@@ -125,7 +124,7 @@ class RegistryPreparationBlocker(_ContractModel):
         for value in values:
             require_portable_relative_path(value)
             if not registry_evidence_is_redaction_safe(value):
-                raise ValueError("registry blocker evidence must not contain credential-shaped values")
+                raise ValueError("registry blocker evidence must not contain credential-shaped or machine-path values")
         return values
 
 
@@ -145,7 +144,7 @@ class RegistryPreparationWarning(_ContractModel):
         for value in values:
             require_portable_relative_path(value)
             if not registry_evidence_is_redaction_safe(value):
-                raise ValueError("registry warning evidence must not contain credential-shaped values")
+                raise ValueError("registry warning evidence must not contain credential-shaped or machine-path values")
         return values
 
 
@@ -177,7 +176,7 @@ class RegistryPreparationReceipt(_ContractModel):
         if not isinstance(value, str):
             raise ValueError("registry package name must be a string")
         if not registry_evidence_is_redaction_safe(value):
-            raise ValueError("registry package name must not contain credential-shaped values")
+            raise ValueError("registry package name must not contain credential-shaped or machine-path values")
         return value
 
     @field_validator("version", mode="before")
@@ -187,7 +186,7 @@ class RegistryPreparationReceipt(_ContractModel):
             if value != value.strip():
                 raise ValueError("registry version must not contain surrounding whitespace")
             if not registry_evidence_is_redaction_safe(value):
-                raise ValueError("registry version must not contain credential-shaped values")
+                raise ValueError("registry version must not contain credential-shaped or machine-path values")
         return value
 
     @field_validator("evidence")
@@ -198,7 +197,7 @@ class RegistryPreparationReceipt(_ContractModel):
         for value in values:
             require_portable_relative_path(value)
             if not registry_evidence_is_redaction_safe(value):
-                raise ValueError("registry receipt evidence must not contain credential-shaped values")
+                raise ValueError("registry receipt evidence must not contain credential-shaped or machine-path values")
         return values
 
     @model_validator(mode="after")

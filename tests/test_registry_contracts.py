@@ -17,6 +17,16 @@ from skills_sdk.models.registry import (
     RegistryPreparationWarning,
 )
 
+_UNSAFE_PUBLIC_TEXTS = (
+    "password=opaque-value",
+    "-----BEGIN " + "PRIVATE KEY----- synthetic",
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.signaturevalue",
+    "source at file:///opt/tool/config",
+    "source at /home/alice/private.json",
+    "source at C:\\Users\\alice\\private.json",
+    "declared token\x1c=opaque-value",
+)
+
 
 def _identity_payload() -> dict[str, object]:
     return {
@@ -112,6 +122,18 @@ def test_registry_request_accepts_noncredential_substrings(value: str) -> None:
     assert list(Draft202012Validator(schema).iter_errors(payload)) == []
 
 
+@pytest.mark.parametrize("unsafe_text", _UNSAFE_PUBLIC_TEXTS)
+def test_registry_request_rejects_shared_unsafe_public_text(unsafe_text: str) -> None:
+    payload = _request_payload()
+    payload["version"] = unsafe_text
+    with pytest.raises(ValidationError, match="credential-shaped or machine-path"):
+        RegistryPreparationRequest.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("registry-preparation-request.v1", payload)
+    schema = SchemaRegistry().load("registry-preparation-request.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
 def test_registry_blocker_rejects_nonportable_evidence_refs_in_model_and_schema() -> None:
     payload = _prepared_payload()
     blocker = {
@@ -148,6 +170,34 @@ def test_registry_blocker_rejects_duplicate_evidence_refs_in_model_and_schema() 
         "source_evidence_sha256": [],
     }
     with pytest.raises(ValidationError, match="evidence references must be unique"):
+        RegistryPreparationBlocker.model_validate(blocker)
+
+    payload = _prepared_payload()
+    payload.update(
+        {
+            "status": "blocked",
+            "package_digest": None,
+            "manifest_digest": None,
+            "hardening_receipt_sha256": None,
+            "blocker": blocker,
+            "blockers": [blocker],
+        }
+    )
+    schema = SchemaRegistry().load("registry-preparation.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("registry-preparation.v1", payload)
+
+
+@pytest.mark.parametrize("unsafe_text", _UNSAFE_PUBLIC_TEXTS)
+def test_registry_blocker_rejects_unsafe_public_text_in_all_lanes(unsafe_text: str) -> None:
+    blocker = {
+        "code": "hardening_blocked",
+        "message": unsafe_text,
+        "evidence_refs": [],
+        "source_evidence_sha256": [],
+    }
+    with pytest.raises(ValidationError, match="credential-shaped or machine-path"):
         RegistryPreparationBlocker.model_validate(blocker)
 
     payload = _prepared_payload()

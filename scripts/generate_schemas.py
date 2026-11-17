@@ -63,6 +63,16 @@ _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN = (
     r"(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
+_REGISTRY_PUBLIC_TEXT_SCHEMA_DEFINITION = {
+    "allOf": [
+        {"not": {"pattern": package_safety_schema.PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN}},
+        {"not": {"pattern": package_safety_schema.MACHINE_PATH_SCHEMA_PATTERN}},
+    ]
+}
+_REGISTRY_PUBLIC_TEXT_SCHEMA_FILENAMES = {
+    "registry-preparation-request.v1.schema.json",
+    "registry-preparation.v1.schema.json",
+}
 _V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
@@ -109,9 +119,27 @@ def _append_provider_identity_constraints(schema: Any) -> None:
             _append_provider_identity_constraints(value)
 
 
-def _append_registry_identity_constraints(schema: Any) -> None:
+def _append_registry_public_text_constraint(
+    property_schema: dict[str, Any],
+    filename: str,
+) -> None:
+    if filename in _REGISTRY_PUBLIC_TEXT_SCHEMA_FILENAMES:
+        property_schema.setdefault("allOf", []).append({"$ref": "#/$defs/RegistryPublicText"})
+    else:
+        property_schema["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
+
+
+def _append_registry_identity_constraints(
+    schema: Any,
+    filename: str,
+    root_schema: dict[str, Any] | None = None,
+) -> None:
     """Project the secret-free contract into registry identity schemas."""
     if isinstance(schema, dict):
+        if root_schema is None:
+            root_schema = schema
+        if schema is root_schema and filename in _REGISTRY_PUBLIC_TEXT_SCHEMA_FILENAMES:
+            root_schema.setdefault("$defs", {})["RegistryPublicText"] = _REGISTRY_PUBLIC_TEXT_SCHEMA_DEFINITION
         title = schema.get("title")
         if title == "RegistryIdentity":
             properties = schema.get("properties", {})
@@ -120,26 +148,22 @@ def _append_registry_identity_constraints(schema: Any) -> None:
         elif title in {"RegistryPreparationRequest", "RegistryPreparationReceipt"}:
             properties = schema["properties"]
             for field in ("package_name", "version"):
-                properties[field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
+                _append_registry_public_text_constraint(properties[field], filename)
             properties["version"]["pattern"] = _NORMALIZED_TEXT_PATTERN
             if title == "RegistryPreparationRequest":
                 properties["evidence"]["uniqueItems"] = True
-            properties["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
+            _append_registry_public_text_constraint(properties["evidence"]["items"], filename)
         elif title == "RegistryPreparationBlocker":
             for field in ("code", "message"):
-                schema["properties"][field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
-            schema["properties"]["evidence_refs"]["items"]["not"] = {
-                "pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN
-            }
+                _append_registry_public_text_constraint(schema["properties"][field], filename)
+            _append_registry_public_text_constraint(schema["properties"]["evidence_refs"]["items"], filename)
         elif title == "RegistryPreparationWarning":
-            schema["properties"]["evidence_refs"]["items"]["not"] = {
-                "pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN
-            }
+            _append_registry_public_text_constraint(schema["properties"]["evidence_refs"]["items"], filename)
         for value in schema.values():
-            _append_registry_identity_constraints(value)
+            _append_registry_identity_constraints(value, filename, root_schema)
     elif isinstance(schema, list):
         for value in schema:
-            _append_registry_identity_constraints(value)
+            _append_registry_identity_constraints(value, filename, root_schema)
 
 
 def _append_registry_preparation_constraints(schema: dict[str, Any]) -> None:
@@ -625,7 +649,7 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
     _append_portable_path_constraints(schema)
     _append_provider_identity_constraints(schema)
     append_selected_case_constraints(schema, filename)
-    _append_registry_identity_constraints(schema)
+    _append_registry_identity_constraints(schema, filename)
     package_safety_schema.append_package_safety_schema_constraints(schema, filename)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:
         schema["allOf"] = [
