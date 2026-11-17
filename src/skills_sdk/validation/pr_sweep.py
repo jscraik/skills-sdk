@@ -278,15 +278,26 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
     repo_root = repo_root.resolve()
     if private_root.resolve().is_relative_to(repo_root.resolve()):
         raise OSError("private inspection directory is inside the supplied worktree")
-    ignored_result = _run_git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
-    if ignored_result.returncode != 0 or len(ignored_result.stdout) > 4 * 1024 * 1024:
+    ignored_result = _run_git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z")
+    tracked_result = _run_git(repo_root, "ls-files", "--cached", "-z")
+    if (
+        ignored_result.returncode != 0
+        or tracked_result.returncode != 0
+        or len(ignored_result.stdout) > 4 * 1024 * 1024
+        or len(tracked_result.stdout) > 4 * 1024 * 1024
+    ):
         raise OSError("could not enumerate ignored snapshot paths")
-    ignored = {path.rstrip("/") for path in ignored_result.stdout.split("\0") if path}
+    ignored = {path for path in ignored_result.stdout.split("\0") if path}
+    tracked = {path for path in tracked_result.stdout.split("\0") if path}
     copied_bytes = 0
 
     def skip_ignored(directory: str, names: list[str]) -> set[str]:
         relative = Path(directory).relative_to(repo_root)
-        return {name for name in names if (relative / name).as_posix() in ignored}
+        return {
+            name
+            for name in names
+            if name not in {".gitattributes", ".gitignore"} and (relative / name).as_posix() in ignored
+        }
 
     def copy_entry(source: str, destination: str) -> str:
         nonlocal copied_bytes
@@ -297,6 +308,8 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
                 raise OSError("private snapshot exceeds its copy budget")
             return shutil.copy2(source, destination)
         if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
+            if Path(source).relative_to(repo_root).as_posix() in tracked:
+                raise OSError("tracked special file cannot be represented in private snapshot")
             Path(destination).touch()
             return destination
         raise OSError("unsupported snapshot entry type")
@@ -372,7 +385,7 @@ def _ambient_status_config_is_supported(repo_root: Path) -> bool:
     }
     for scope in ("--global", "--system"):
         configured = _run_git(repo_root, "config", scope, "--name-only", "--list")
-        if scope == "--system" and configured.returncode != 0 and "No such file or directory" in configured.stderr:
+        if configured.returncode != 0 and "No such file or directory" in configured.stderr:
             continue
         if configured.returncode not in {0, 1}:
             return False

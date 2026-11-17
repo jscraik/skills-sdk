@@ -449,7 +449,7 @@ def test_snapshot_skips_ignored_bytes_and_preserves_untracked_special_path(tmp_p
 
     snapshot = pr_sweep_validation._snapshot_worktree(repo, private_root)
 
-    assert not (snapshot / "ignored-cache").exists()
+    assert not (snapshot / "ignored-cache" / "large.bin").exists()
     assert (snapshot / "service.pipe").is_file()
     result = validate_pr_sweep_dirty_closeout(repo)
     assert result.status == "fail"
@@ -478,6 +478,51 @@ def test_snapshot_copy_budget_blocks_without_touching_source(tmp_path: Path, mon
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
     assert (repo / "tracked.txt").read_bytes() == original
+
+
+def test_snapshot_preserves_ignored_attributes_that_change_tracked_status(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").write_bytes(b"initial\r\n")
+    _git(repo, "add", "tracked.txt")
+    _git(
+        repo,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.test",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "crlf baseline",
+    )
+    (repo / ".gitignore").write_text(".gitattributes\n", encoding="utf-8")
+    (repo / ".gitattributes").write_text("tracked.txt text\n", encoding="utf-8")
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert "tracked.txt" in result.dirty_state.unstaged_paths
+
+
+def test_snapshot_blocks_a_tracked_file_replaced_by_fifo(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    tracked.unlink()
+    os.mkfifo(tracked)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+    assert tracked.exists()
+
+
+def test_snapshot_accepts_missing_global_git_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    empty_home = tmp_path / "empty-home"
+    empty_home.mkdir()
+    monkeypatch.setenv("HOME", str(empty_home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(empty_home))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "pass"
 
 
 def test_dirty_closeout_blocks_included_git_configuration(tmp_path: Path) -> None:
