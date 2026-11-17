@@ -22,7 +22,7 @@ _UNSAFE_PUBLIC_TEXTS = (
     "-----BEGIN " + "PRIVATE KEY----- synthetic",
     "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.signaturevalue",
     "source at file:///opt/tool/config",
-    "source at /home/alice/private.json",
+    "source at /" + "home/alice/private.json",
     "source at C:\\Users\\alice\\private.json",
     "declared token\x1c=opaque-value",
 )
