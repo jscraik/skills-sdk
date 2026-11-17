@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -44,7 +45,10 @@ def test_snapshot_blocks_changed_ignored_inventory(tmp_path: Path, monkeypatch: 
     def restore_ignore_before_copy(src: Path, dst: Path, *args: object, **kwargs: object) -> Path:
         if Path(src) == repo:
             (repo / ".gitignore").write_text("", encoding="utf-8")
-        return original_copytree(src, dst, *args, **kwargs)
+        copied = original_copytree(src, dst, *args, **kwargs)
+        if Path(src) == repo:
+            (repo / ".gitignore").write_text("dirty.txt\n", encoding="utf-8")
+        return copied
 
     monkeypatch.setattr(pr_sweep_validation.shutil, "copytree", restore_ignore_before_copy)
     result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
@@ -57,6 +61,18 @@ def test_snapshot_blocks_external_object_alternates(tmp_path: Path) -> None:
     external = tmp_path / "external-objects"
     external.mkdir()
     (repo / ".git" / "objects" / "info" / "alternates").write_text(str(external) + "\n", encoding="utf-8")
+    result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
+def test_snapshot_blocks_symlinked_object_alternates_before_open(tmp_path: Path) -> None:
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO support is unavailable on this host")
+    repo = _repo(tmp_path)
+    external = tmp_path / "alternate-fifo"
+    os.mkfifo(external)
+    (repo / ".git" / "objects" / "info" / "alternates").symlink_to(external)
     result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"

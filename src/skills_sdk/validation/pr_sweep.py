@@ -333,6 +333,17 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
     snapshot_root = private_root / "worktree"
     shutil.copytree(repo_root, snapshot_root, symlinks=True, ignore=skip_ignored, copy_function=copy_entry)
     _materialize_git_metadata(repo_root, snapshot_root, private_root, copy_entry)
+    if ignored:
+        checked = _run_git(
+            snapshot_root,
+            "check-ignore",
+            "--stdin",
+            "-z",
+            input_text="\0".join(sorted(ignored)) + "\0",
+            force_worktree=True,
+        )
+        if checked.returncode != 0 or set(filter(None, checked.stdout.split("\0"))) != ignored:
+            raise OSError("ignored paths are not ignored by the private snapshot")
     current_ignored = _run_git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z")
     if (
         current_ignored.returncode != 0
@@ -378,13 +389,8 @@ def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
             return False
     for metadata_root in metadata_roots:
         alternates = metadata_root / "objects" / "info" / "alternates"
-        if alternates.exists():
-            try:
-                for line in alternates.read_text(encoding="utf-8").splitlines():
-                    if line and not (metadata_root / "objects" / line).resolve().is_relative_to(private_root):
-                        return False
-            except (OSError, UnicodeError, RuntimeError):
-                return False
+        if alternates.exists() or alternates.is_symlink():
+            return False
 
     def reject_walk_error(error: OSError) -> None:
         raise error
