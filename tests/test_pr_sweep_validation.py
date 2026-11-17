@@ -581,6 +581,38 @@ def test_dirty_closeout_reports_nested_file_when_parent_becomes_file(tmp_path: P
     assert "nested/tracked.txt" in result.dirty_state.dirty_paths
 
 
+def test_content_scan_records_a_tracked_file_deleted_after_status(tmp_path: Path) -> None:
+    from skills_sdk.validation import pr_sweep
+
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").unlink()
+    assert pr_sweep._content_dirty_paths(repo) == {"tracked.txt"}
+
+
+def test_dirty_closeout_accepts_unchanged_crlf_index_blob_after_autocrlf_change(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", "core.autocrlf", "false")
+    (repo / "tracked.txt").write_bytes(b"original\r\n")
+    _git(repo, "add", "tracked.txt")
+    _git(
+        repo,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.test",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "crlf baseline",
+    )
+    _git(repo, "config", "core.autocrlf", "input")
+
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+
+    assert result.status == "pass"
+
+
 def test_batched_hashing_preserves_a_leading_quote_and_does_not_run_filter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

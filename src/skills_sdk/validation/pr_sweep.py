@@ -296,7 +296,8 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
         try:
             file_mode = target.lstat().st_mode
         except (FileNotFoundError, NotADirectoryError):
-            continue  # Deletions are already reported by status.
+            dirty.add(path)  # The preflight has already rejected skip-worktree entries.
+            continue
         if mode == "120000" and stat.S_ISLNK(file_mode):
             hashed = _run_git(repo_root, "hash-object", "--stdin", input_text=os.readlink(target))
         elif mode in {"100644", "100755"} and stat.S_ISREG(file_mode):
@@ -319,7 +320,22 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
         object_ids = hashed.stdout.splitlines()
         if hashed.returncode != 0 or len(object_ids) != len(regular):
             raise OSError("could not hash tracked content")
-        dirty.update(path for (path, expected), actual in zip(regular, object_ids, strict=True) if actual != expected)
+        mismatched = [
+            (path, expected) for (path, expected), actual in zip(regular, object_ids, strict=True) if actual != expected
+        ]
+        if mismatched:
+            # Git preserves an index blob's raw CRLF bytes when autocrlf changes
+            # after staging. A raw match is clean even if a new conversion differs.
+            raw_paths = (
+                "\n".join('"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"' for path, _ in mismatched) + "\n"
+            )
+            raw = _run_git(repo_root, "hash-object", "--stdin-paths", "--no-filters", input_text=raw_paths)
+            raw_ids = raw.stdout.splitlines()
+            if raw.returncode != 0 or len(raw_ids) != len(mismatched):
+                raise OSError("could not hash tracked content without conversions")
+            dirty.update(
+                path for (path, expected), actual in zip(mismatched, raw_ids, strict=True) if actual != expected
+            )
     return dirty
 
 
