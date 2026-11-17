@@ -18,6 +18,10 @@ _REDACTED_BLOCKER_MESSAGE = "Source blocker metadata was redacted; use its diges
 _UNSAFE_PUBLIC_TEXTS = (
     "password=opaque-value",
     "dbPassword=opaque-value",
+    "client_key_prod=opaque-value",
+    "AWS_ACCESS_KEY_ID_PROD=opaque-value",
+    'source="/opt/company/config.json"',
+    "source=/etc/company/config.json",
     "-----BEGIN " + "PRIVATE KEY----- synthetic",
     "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.signaturevalue",
     "source at file:///opt/tool/config",

@@ -19,6 +19,11 @@ from skills_sdk.models.registry import (
 
 _UNSAFE_PUBLIC_TEXTS = (
     "password=opaque-value",
+    "dbPassword=opaque-value",
+    "client_key_prod=opaque-value",
+    "AWS_ACCESS_KEY_ID_PROD=opaque-value",
+    'source="/opt/company/config.json"',
+    "source=/etc/company/config.json",
     "-----BEGIN " + "PRIVATE KEY----- synthetic",
     "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.signaturevalue",
     "source at file:///opt/tool/config",
@@ -91,6 +96,16 @@ def test_registry_request_is_registered_and_rejects_duplicate_evidence() -> None
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("registry-preparation-request.v1", payload)
     assert list(Draft202012Validator(schema).iter_errors(payload))
+
+
+def test_safe_registry_name_and_relative_evidence_agree_in_all_lanes() -> None:
+    payload = _request_payload()
+    payload["package_name"] = "client-keyboard"
+    payload["evidence"] = ["evidence/build-/report.json"]
+    RegistryPreparationRequest.model_validate(payload)
+    SchemaRegistry().validate("registry-preparation-request.v1", payload)
+    schema = SchemaRegistry().load("registry-preparation-request.v1")
+    assert list(Draft202012Validator(schema).iter_errors(payload)) == []
 
 
 @pytest.mark.parametrize("delimiter", ["=", "@", "%", "#", "$"])
