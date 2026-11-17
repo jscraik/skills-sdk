@@ -19,6 +19,15 @@ from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
 
+_GIT_INSPECTION_CONFIG = (
+    "core.checkStat=default",
+    "core.fileMode=true",
+    "core.fsmonitor=false",
+    "core.ignoreStat=false",
+    "core.trustCtime=true",
+    "core.untrackedCache=false",
+)
+
 
 def _failure(kind: str, status: str, code: str, message: str) -> PrSweepValidationResult:
     return PrSweepValidationResult.model_validate(
@@ -207,8 +216,9 @@ def _git_environment() -> dict[str, str]:
 
 
 def _run_git(repo_root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+    config_args = [argument for setting in _GIT_INSPECTION_CONFIG for argument in ("-c", setting)]
     return subprocess.run(
-        ["git", "-c", "core.fsmonitor=false", "--no-optional-locks", *args],
+        ["git", *config_args, "--no-optional-locks", *args],
         cwd=repo_root,
         env=_git_environment(),
         input=input_text,

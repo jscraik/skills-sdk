@@ -324,6 +324,35 @@ def test_dirty_closeout_does_not_run_fsmonitor(tmp_path: Path) -> None:
     assert not sentinel.exists()
 
 
+def test_dirty_closeout_detects_mode_drift_ignored_by_repository_config(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    _git(repo, "config", "core.fileMode", "false")
+    tracked.chmod(0o755)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ("tracked.txt",)
+    tracked.chmod(0o644)
+    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "pass"
+
+
+def test_dirty_closeout_detects_content_drift_with_weakened_stat_config(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    original = tracked.stat()
+    _git(repo, "config", "core.checkStat", "minimal")
+    _git(repo, "config", "core.trustCtime", "false")
+    tracked.write_text("changed\n", encoding="utf-8")
+    os.utime(tracked, ns=(original.st_atime_ns, original.st_mtime_ns))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ("tracked.txt",)
+    tracked.write_text("initial\n", encoding="utf-8")
+    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "pass"
+
+
 def test_dirty_closeout_rename_with_unstaged_edit_reports_destination_only(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     _git(repo, "mv", "tracked.txt", "renamed.txt")
