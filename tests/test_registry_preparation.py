@@ -17,6 +17,7 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "package-receipts"
 _REDACTED_BLOCKER_MESSAGE = "Source blocker metadata was redacted; use its digest for identity."
 _UNSAFE_PUBLIC_TEXTS = (
     "password=opaque-value",
+    "dbPassword=opaque-value",
     "-----BEGIN " + "PRIVATE KEY----- synthetic",
     "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.signaturevalue",
     "source at file:///opt/tool/config",
@@ -24,6 +25,22 @@ _UNSAFE_PUBLIC_TEXTS = (
     "source at C:\\Users\\alice\\private.json",
     "declared token\x1c=opaque-value",
 )
+
+
+def test_safe_identifier_and_relative_evidence_survive_screening() -> None:
+    from skills_sdk.models.registry import registry_evidence_is_redaction_safe
+
+    assert registry_evidence_is_redaction_safe("client-keyboard")
+    assert RegistryPreparationRequest(
+        registry=RegistryIdentity(registry_id="private-registry", namespace="example-team"),
+        package_name="client-keyboard",
+        version="0.1.0",
+        evidence=("evidence/build-/report.json",),
+    ).package_name == "client-keyboard"
+    assert registry_evidence_is_redaction_safe("evidence/build-/report.json")
+    assert registry_evidence_is_redaction_safe("evidence/safe.json")
+    assert not registry_evidence_is_redaction_safe("/" + "home/alice/private.json")
+    assert registry_evidence_is_redaction_safe("a" * 65536)
 
 
 def _nested_strings(value: object) -> tuple[str, ...]:
