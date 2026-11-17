@@ -318,7 +318,8 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
             finally:
                 os.close(descriptor)
         if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
-            if Path(source).relative_to(repo_root).as_posix() in tracked:
+            source_path = Path(source)
+            if source_path.is_relative_to(repo_root) and source_path.relative_to(repo_root).as_posix() in tracked:
                 raise OSError("tracked special file cannot be represented in private snapshot")
             Path(destination).touch()
             return destination
