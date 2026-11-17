@@ -703,6 +703,19 @@ The skills' historical Agent-Skills commands are assessment references.
 Destination validation uses SDK-owned commands. The existing v1 scenario policy
 remains compatible; the managed v2 path retains ten active cases.
 
+## Local whole-plugin build/hardening candidate — 16 November 2026
+
+An isolated, unmerged candidate adds read-only `build_plugin_package` and
+`harden_plugin_package` APIs and `plugin-build/v1` / `plugin-hardening/v1`.
+Complete captured bytes, child scope, root metadata and permission modes bind
+the build; hardening requires fresh matching capture and supplied presentation
+approval checks. It does not emit archives or perform registry/runtime work.
+Review the focused tests and exact candidate evidence before accepting it;
+existing standalone contracts remain unchanged. Stage 07 is still incomplete
+without whole-plugin archive preparation/round-trip and final release-bound
+quality/security/evaluation evidence. Stages 08 and 09 retain their own missing
+adapters and execution evidence. No export, publication or paid run is implied.
+
 ## Native dimensional join: local candidate
 
 The native dimensional calibration candidate adds retained dimension evidence,

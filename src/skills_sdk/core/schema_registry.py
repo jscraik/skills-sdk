@@ -101,6 +101,8 @@ SCHEMA_NAMES = frozenset(
         "scorer-profile.v1",
         "skill-package-validation.v1",
         "plugin-package-validation.v1",
+        "plugin-build.v1",
+        "plugin-hardening.v1",
         "plugin-image-approval.v1",
         "plugin-presentation-copy-approval.v1",
         "plugin-presentation-request.v1",
@@ -655,6 +657,10 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
 
             model = EvaluationReceiptV2
+        elif name in {"plugin-build.v1", "plugin-hardening.v1"}:
+            from skills_sdk.models.plugin_build import PluginBuildReceipt, PluginHardeningReceipt
+
+            model = PluginBuildReceipt if name == "plugin-build.v1" else PluginHardeningReceipt
         elif name == "plugin-package-validation.v1":
             from skills_sdk.models.plugin import PluginPackageValidation
 
