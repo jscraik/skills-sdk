@@ -505,3 +505,53 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     assert result.status == "blocked"
     assert result.findings[0].code == "clean_filter_present"
     assert not sentinel.exists()
+
+
+@pytest.mark.parametrize("symlink", [False, True])
+def test_dirty_closeout_checks_blobs_when_status_stat_cache_matches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, symlink: bool
+) -> None:
+    from skills_sdk.validation import pr_sweep
+
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    if symlink:
+        tracked.unlink()
+        tracked.symlink_to("initial")
+        _git(repo, "add", "tracked.txt")
+    original = tracked.lstat()
+    index_before = (repo / ".git" / "index").read_bytes()
+    if symlink:
+        tracked.unlink()
+        tracked.symlink_to("changed")
+    else:
+        tracked.write_text("changed\n", encoding="utf-8")
+    os.utime(tracked, ns=(original.st_atime_ns, original.st_mtime_ns), follow_symlinks=False)
+    run_git = pr_sweep._run_git
+
+    def matching_stat_status(root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+        if args[0] == "status":
+            # Model a filesystem whose cached stat tuple, including ctime, matches.
+            return subprocess.CompletedProcess(args, 0, "", "")
+        return run_git(root, *args, input_text=input_text)
+
+    monkeypatch.setattr(pr_sweep, "_run_git", matching_stat_status)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ("tracked.txt",)
+    assert (repo / ".git" / "index").read_bytes() == index_before
+
+
+def test_dirty_closeout_hashes_staging_conversions_against_index(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".gitattributes").write_text("*.txt text eol=crlf\n", encoding="utf-8")
+    tracked = repo / "tracked.txt"
+    tracked.write_bytes(b"staged\r\n")
+    _git(repo, "add", ".")
+    index_before = (repo / ".git" / "index").read_bytes()
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "fail"  # Staged changes still need a ledger.
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ()
+    assert (repo / ".git" / "index").read_bytes() == index_before

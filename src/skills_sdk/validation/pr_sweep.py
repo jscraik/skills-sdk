@@ -270,6 +270,42 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
     return None, None
 
 
+def _content_dirty_paths(repo_root: Path) -> set[str]:
+    """Compare index blobs independently of Git's cached filesystem metadata."""
+    staged = _run_git(repo_root, "ls-files", "--stage", "-z")
+    if staged.returncode != 0:
+        raise OSError("could not inspect index objects")
+    dirty: set[str] = set()
+    for record in filter(None, staged.stdout.split("\0")):
+        metadata, path = record.split("\t", 1)
+        mode, object_id, stage = metadata.split()
+        if stage != "0":
+            continue  # Unmerged entries are already reported by status.
+        target = repo_root / path
+        if mode == "160000":
+            if (target / ".git").exists() and _content_dirty_paths(target):
+                dirty.add(path)
+            continue
+        try:
+            file_mode = target.lstat().st_mode
+        except FileNotFoundError:
+            continue  # Deletions are already reported by status.
+        if mode == "120000" and stat.S_ISLNK(file_mode):
+            hashed = _run_git(repo_root, "hash-object", "--stdin", input_text=os.readlink(target))
+        elif mode in {"100644", "100755"} and stat.S_ISREG(file_mode):
+            # --path applies staging conversions (e.g. text/eol and encoding).
+            # Preflight has rejected attributes that could execute a filter.
+            hashed = _run_git(repo_root, "hash-object", f"--path={path}", "--", path)
+        else:
+            dirty.add(path)
+            continue
+        if hashed.returncode != 0:
+            raise OSError("could not hash tracked content")
+        if hashed.stdout.strip() != object_id:
+            dirty.add(path)
+    return dirty
+
+
 def validate_pr_sweep_dirty_closeout(
     repo_root: Path, *, ledger_path: Path | None = None, require_clean: bool = False
 ) -> PrSweepValidationResult:
@@ -286,13 +322,20 @@ def validate_pr_sweep_dirty_closeout(
         completed = _run_git(
             repo_root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"
         )
-    except (OSError, UnicodeError, RuntimeError, subprocess.TimeoutExpired):
+        content_dirty = _content_dirty_paths(repo_root)
+    except (OSError, UnicodeError, ValueError, RuntimeError, subprocess.TimeoutExpired):
         return _failure("dirty_closeout", "blocked", "git_status_unavailable", "could not inspect Git dirty state")
     if completed.returncode != 0:
         return _failure(
             "dirty_closeout", "blocked", "git_status_unavailable", "Git status failed in the supplied repository root"
         )
     state = _parse_porcelain(completed.stdout)
+    state = PrSweepDirtyState(
+        staged_paths=state.staged_paths,
+        unstaged_paths=tuple(sorted(set(state.unstaged_paths) | content_dirty)),
+        untracked_paths=state.untracked_paths,
+        dirty_paths=tuple(sorted(set(state.dirty_paths) | content_dirty)),
+    )
     ledgered: set[str] = set()
     findings: list[PrSweepFinding] = []
     if ledger_path is not None:
