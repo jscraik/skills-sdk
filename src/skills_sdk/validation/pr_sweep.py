@@ -9,6 +9,7 @@ import re
 import shutil
 import stat
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -20,6 +21,8 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
+
+_MAX_SNAPSHOT_BYTES = 1024 * 1024 * 1024
 
 
 def _failure(kind: str, status: str, code: str, message: str) -> PrSweepValidationResult:
@@ -247,7 +250,9 @@ def _resolved_git_path(repo_root: Path, *args: str, force_worktree: bool = False
     return Path(completed.stdout.strip()).resolve()
 
 
-def _materialize_git_metadata(repo_root: Path, snapshot_root: Path, private_root: Path) -> None:
+def _materialize_git_metadata(
+    repo_root: Path, snapshot_root: Path, private_root: Path, copy_entry: Callable[[str, str], str]
+) -> None:
     marker = snapshot_root / ".git"
     if marker.is_dir() and not marker.is_symlink():
         return
@@ -255,21 +260,50 @@ def _materialize_git_metadata(repo_root: Path, snapshot_root: Path, private_root
     common_directory = _resolved_git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-common-dir")
     if marker.exists() or marker.is_symlink():
         marker.unlink()
-    shutil.copytree(git_directory, marker, symlinks=True)
+    shutil.copytree(git_directory, marker, symlinks=True, copy_function=copy_entry)
     if common_directory == git_directory:
         return
     common_snapshot = private_root / "common-git-dir"
-    shutil.copytree(common_directory, common_snapshot, symlinks=True)
-    (marker / "commondir").write_text(os.path.relpath(common_snapshot, marker) + "\n", encoding="utf-8")
+    shutil.copytree(common_directory, common_snapshot, symlinks=True, copy_function=copy_entry)
+    copied_commondir = marker / "commondir"
+    if copied_commondir.is_symlink():
+        copied_commondir.unlink()
+    copied_commondir.write_text(os.path.relpath(common_snapshot, marker) + "\n", encoding="utf-8")
     source_modules = common_snapshot / "modules"
     if source_modules.is_dir() and not (marker / "modules").exists():
-        shutil.copytree(source_modules, marker / "modules", symlinks=True)
+        shutil.copytree(source_modules, marker / "modules", symlinks=True, copy_function=copy_entry)
 
 
 def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
+    repo_root = repo_root.resolve()
+    if private_root.resolve().is_relative_to(repo_root.resolve()):
+        raise OSError("private inspection directory is inside the supplied worktree")
+    ignored_result = _run_git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
+    if ignored_result.returncode != 0 or len(ignored_result.stdout) > 4 * 1024 * 1024:
+        raise OSError("could not enumerate ignored snapshot paths")
+    ignored = {path.rstrip("/") for path in ignored_result.stdout.split("\0") if path}
+    copied_bytes = 0
+
+    def skip_ignored(directory: str, names: list[str]) -> set[str]:
+        relative = Path(directory).relative_to(repo_root)
+        return {name for name in names if (relative / name).as_posix() in ignored}
+
+    def copy_entry(source: str, destination: str) -> str:
+        nonlocal copied_bytes
+        mode = os.lstat(source).st_mode
+        if stat.S_ISREG(mode):
+            copied_bytes += os.lstat(source).st_size
+            if copied_bytes > _MAX_SNAPSHOT_BYTES:
+                raise OSError("private snapshot exceeds its copy budget")
+            return shutil.copy2(source, destination)
+        if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
+            Path(destination).touch()
+            return destination
+        raise OSError("unsupported snapshot entry type")
+
     snapshot_root = private_root / "worktree"
-    shutil.copytree(repo_root, snapshot_root, symlinks=True)
-    _materialize_git_metadata(repo_root, snapshot_root, private_root)
+    shutil.copytree(repo_root, snapshot_root, symlinks=True, ignore=skip_ignored, copy_function=copy_entry)
+    _materialize_git_metadata(repo_root, snapshot_root, private_root, copy_entry)
     return snapshot_root
 
 
@@ -310,19 +344,46 @@ def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
 
 
 def _git_config_has_includes(repo_root: Path) -> bool | None:
-    completed = _run_git(
-        repo_root,
-        "config",
-        "--local",
-        "--no-includes",
-        "--null",
-        "--list",
-        force_worktree=True,
+    worktree_config = _resolved_git_path(
+        repo_root, "rev-parse", "--path-format=absolute", "--git-path", "config.worktree", force_worktree=True
     )
-    if completed.returncode != 0:
-        return None
-    keys = (entry.partition("\n")[0].casefold() for entry in completed.stdout.split("\0") if entry)
-    return any(key == "include.path" or (key.startswith("includeif.") and key.endswith(".path")) for key in keys)
+    sources = [("--local",)]
+    if worktree_config.exists():
+        sources.append(("--file", str(worktree_config)))
+    for source in sources:
+        completed = _run_git(repo_root, "config", *source, "--no-includes", "--null", "--list", force_worktree=True)
+        if completed.returncode != 0:
+            return None
+        keys = (entry.partition("\n")[0].casefold() for entry in completed.stdout.split("\0") if entry)
+        if any(key == "include.path" or (key.startswith("includeif.") and key.endswith(".path")) for key in keys):
+            return True
+    return False
+
+
+def _ambient_status_config_is_supported(repo_root: Path) -> bool:
+    relevant = {
+        "core.autocrlf",
+        "core.eol",
+        "core.safecrlf",
+        "core.excludesfile",
+        "core.attributesfile",
+        "core.symlinks",
+        "core.filemode",
+    }
+    for scope in ("--global", "--system"):
+        configured = _run_git(repo_root, "config", scope, "--name-only", "--list")
+        if scope == "--system" and configured.returncode != 0 and "No such file or directory" in configured.stderr:
+            continue
+        if configured.returncode not in {0, 1}:
+            return False
+        keys = {key.casefold() for key in configured.stdout.splitlines()}
+        if (
+            keys & relevant
+            or "include.path" in keys
+            or any(key.startswith("includeif.") and key.endswith(".path") for key in keys)
+        ):
+            return False
+    return True
 
 
 def _git_status_preflight(
@@ -359,6 +420,15 @@ def _git_status_preflight(
         if submodule_root.is_symlink():
             return "git_status_unavailable", "submodule path is not safe to inspect"
         if (submodule_root / ".git").exists():
+            worktree = _run_git(submodule_root, "config", "--local", "--get", "core.worktree", force_worktree=True)
+            if worktree.returncode not in {0, 1}:
+                return "git_status_unavailable", "could not inspect submodule worktree configuration"
+            if worktree.returncode == 0:
+                git_directory = _resolved_git_path(
+                    submodule_root, "rev-parse", "--path-format=absolute", "--git-dir", force_worktree=True
+                )
+                if (git_directory / worktree.stdout.strip()).resolve() != submodule_root.resolve():
+                    return "submodule_worktree_escape", "submodule status would inspect outside the private snapshot"
             blocker_code, blocker_message = _git_status_preflight(
                 submodule_root, private_root=private_root, depth=depth + 1
             )
@@ -394,6 +464,13 @@ def validate_pr_sweep_dirty_closeout(
         if top_level.returncode != 0 or Path(top_level.stdout.strip()).resolve() != repo_root.resolve():
             return _failure(
                 "dirty_closeout", "blocked", "invalid_repo_root", "supplied root is not a worktree top level"
+            )
+        if not _ambient_status_config_is_supported(repo_root):
+            return _failure(
+                "dirty_closeout",
+                "blocked",
+                "ambient_git_config",
+                "ambient Git settings change isolated status semantics",
             )
         with TemporaryDirectory(prefix="skills-sdk-pr-sweep-") as directory:
             private_root = Path(directory)

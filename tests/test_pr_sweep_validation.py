@@ -382,9 +382,7 @@ def test_dirty_closeout_blocks_clean_filter_without_executing_it(tmp_path: Path)
     assert not sentinel.exists()
 
 
-def test_dirty_closeout_snapshot_closes_filter_activation_race(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_dirty_closeout_snapshot_closes_filter_activation_race(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path)
     sentinel = tmp_path / "raced-filter-ran"
     _git(repo, "config", "filter.evil.clean", f"touch {sentinel}")
@@ -409,11 +407,95 @@ def test_dirty_closeout_snapshot_closes_filter_activation_race(
     assert not sentinel.exists()
 
 
+def test_snapshot_rejects_an_in_checkout_destination(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    destination = repo / "snapshot-temp"
+    destination.mkdir()
+    with pytest.raises(OSError, match="inside the supplied worktree"):
+        pr_sweep_validation._snapshot_worktree(repo, destination)
+    assert not (destination / "worktree").exists()
+
+
+def test_snapshot_does_not_rewrite_a_symlinked_source_commondir(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    linked = tmp_path / "linked"
+    _git(repo, "worktree", "add", "-b", "linked", str(linked))
+    git_directory = Path((linked / ".git").read_text(encoding="utf-8").partition(": ")[2].strip())
+    source_commondir = git_directory / "commondir"
+    external_marker = tmp_path / "external-commondir"
+    external_marker.write_text(str(repo / ".git") + "\n", encoding="utf-8")
+    source_commondir.unlink()
+    source_commondir.symlink_to(external_marker)
+    private_root = tmp_path / "private"
+    private_root.mkdir()
+
+    snapshot = pr_sweep_validation._snapshot_worktree(linked, private_root)
+
+    assert external_marker.read_text(encoding="utf-8") == str(repo / ".git") + "\n"
+    assert (snapshot / ".git" / "commondir").is_file()
+    assert not (snapshot / ".git" / "commondir").is_symlink()
+
+
+def test_snapshot_skips_ignored_bytes_and_preserves_untracked_special_path(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".gitignore").write_text("ignored-cache/\n", encoding="utf-8")
+    cache = repo / "ignored-cache"
+    cache.mkdir()
+    (cache / "large.bin").write_bytes(b"x" * (1024 * 1024))
+    fifo = repo / "service.pipe"
+    os.mkfifo(fifo)
+    private_root = tmp_path / "private"
+    private_root.mkdir()
+
+    snapshot = pr_sweep_validation._snapshot_worktree(repo, private_root)
+
+    assert not (snapshot / "ignored-cache").exists()
+    assert (snapshot / "service.pipe").is_file()
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert "service.pipe" in result.dirty_state.untracked_paths
+
+
+def test_snapshot_blocks_ambient_autocrlf_that_would_change_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path)
+    alternate_home = tmp_path / "alternate-home"
+    alternate_home.mkdir()
+    (alternate_home / ".gitconfig").write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(alternate_home))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
+def test_snapshot_copy_budget_blocks_without_touching_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    original = (repo / "tracked.txt").read_bytes()
+    monkeypatch.setattr(pr_sweep_validation, "_MAX_SNAPSHOT_BYTES", 1)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+    assert (repo / "tracked.txt").read_bytes() == original
+
+
 def test_dirty_closeout_blocks_included_git_configuration(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     included_config = tmp_path / "included.conf"
-    included_config.write_text("[filter \"evil\"]\n\tclean = touch ignored\n", encoding="utf-8")
+    included_config.write_text('[filter "evil"]\n\tclean = touch ignored\n', encoding="utf-8")
     _git(repo, "config", "include.path", str(included_config))
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+def test_dirty_closeout_blocks_worktree_scoped_includes(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    included_config = tmp_path / "worktree-included.conf"
+    included_config.write_text("[core]\n\texcludesFile = ignored\n", encoding="utf-8")
+    _git(repo, "config", "extensions.worktreeConfig", "true")
+    _git(repo, "config", "--worktree", "include.path", str(included_config))
     result = validate_pr_sweep_dirty_closeout(repo)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_config_include"
@@ -524,3 +606,21 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     assert result.status == "blocked"
     assert result.findings[0].code == "clean_filter_present"
     assert not sentinel.exists()
+
+
+def test_dirty_closeout_blocks_external_submodule_worktree(tmp_path: Path) -> None:
+    source = _repo(tmp_path)
+    parent = tmp_path / "parent-external"
+    parent.mkdir()
+    _git(parent, "init")
+    subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
+        cwd=parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(parent / "module", "config", "core.worktree", str(source))
+    result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "submodule_worktree_escape"
