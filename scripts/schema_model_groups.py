@@ -68,6 +68,7 @@ from skills_sdk.models.packaging import (
     PackageReceiptV2,
 )
 from skills_sdk.models.plugin import PluginPackageValidation
+from skills_sdk.models.plugin_build import PluginBuildReceipt, PluginHardeningReceipt
 from skills_sdk.models.plugin_normalization import PluginNormalizationMetadata, PluginNormalizationReceipt
 from skills_sdk.models.plugin_presentation import (
     PluginImageApproval,
@@ -224,6 +225,8 @@ def packaging_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (PackageReceiptV2, "package-receipt.v2.schema.json"),
         (PackageArchiveVerificationReceipt, "package-archive-verification.v1.schema.json"),
         (PackageHardeningReceipt, "package-hardening.v1.schema.json"),
+        (PluginBuildReceipt, "plugin-build.v1.schema.json"),
+        (PluginHardeningReceipt, "plugin-hardening.v1.schema.json"),
     )
 
 

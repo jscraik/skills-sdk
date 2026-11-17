@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from collections import UserList
 from collections.abc import MutableMapping
 from importlib.resources import files
 from typing import Any, cast
@@ -63,6 +64,17 @@ def test_valid_receipt_is_immutable_and_candidate_bound() -> None:
     receipt.require_candidate(expected)
     with pytest.raises(TypeError):
         cast(MutableMapping[str, Any], receipt.payload)["status"] = "fail"
+
+
+def test_receipt_owns_user_sequence_evidence() -> None:
+    payload = _receipt()
+    evidence = UserList(["tests/fixtures/synthetic-skill/SKILL.md"])
+    payload["evidence"] = evidence
+    receipt = parse_receipt(payload)
+    evidence.append("tests/fixtures/later.md")
+    assert receipt.payload["evidence"] == receipt.evidence == ("tests/fixtures/synthetic-skill/SKILL.md",)
+    assert receipt.payload["status"] == "pass"
+    assert receipt.receipt_id == "synthetic-validation-1"
 
 
 def test_candidate_mismatch_is_typed() -> None:
