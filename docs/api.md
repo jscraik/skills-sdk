@@ -1454,7 +1454,8 @@ strict review-authority requirement.
 The package's `__all__` exports and the versioned files under
 `src/skills_sdk/schemas/` are the compatibility surface. Add a focused test
 and update the schema when changing a public contract.
-# Whole-plugin local build and hardening
+
+### Whole-plugin local build and hardening
 
 The additive `skills_sdk.packaging.build_plugin_package(root,
 source_revision=...)` API captures a versioned root `plugin.json`, every
@@ -1490,3 +1491,40 @@ round-trip, registry coordinates/readback or installation. Those require their
 own evidence. Standalone `build_skill_package` and `harden_skill_package` and
 their frozen receipt families retain their existing behaviour. No whole-plugin
 CLI, exporter or registry adapter is added by these APIs.
+
+### Native dimensional calibration and supplied comparison
+
+`skills_sdk.evaluation.execute_native_matched_calibration(plan, rubric, executions)`
+accepts a `NativeCalibrationPlan`, a `MatchedComparisonRubric` and fresh
+dimensional host callbacks. Each callback receives actual provider output and
+the frozen rubric, never held-out labels. Its result is a
+`NativeMatchedCalibrationReceipt`, binding complete dimensional rows, weighted
+scores, native settings and the canonical JSON rubric digest. Existing scalar
+Codex adapters do not implement this dimensional capability and are rejected.
+
+The service admits the whole source/request/safety batch before reading
+capability properties. It checks all provider and judge interfaces before
+dispatch. Reuse, stale settings, missing dimensions and cleanup failures block;
+partial results retain only completed observations and honest invocation counts.
+
+`NativeMatchedCalibrationTarget` and `NativeMatchedVariantCalibrationBundle`
+retain exact child, assertion and scorer targets for each captured plugin.
+`NativeMatchedComparisonPlan` freezes their digests, native judge identities,
+the ten active cases and the existing minimum repeated-case selection policy.
+Native settings describe one fresh judge call. They do not reduce the matched
+generator's required repeated-case coverage or establish that it ran.
+
+`skills_sdk.evaluation.assess_native_matched_pair(plan, lane, calibrations, baseline, candidate)`
+accepts baseline and candidate bundles in that order and two supplied dimensional
+judgments. It returns `NativeMatchedPairAssessment` with `status="assessed"`
+only after exact plugin, mode, target, scorer, rubric, settings and bundle-digest
+joins. Rejected inputs return `status="blocked"`; the return type alone does not
+establish that those joins passed. The retained judgment digest binds every
+dimensional row and its underlying evidence.
+
+The four additive `native-matched-*/v1` families have packaged schemas and
+explicit `SchemaRegistry` semantic validation. They are not generic receipt
+dispatch entries. Supplied assessment remains `execution_performed: false` and
+`promotion_authorized: false`. Inert callback proof does not establish a live
+Codex dimensional driver, authentic labels, matched live execution, cloud
+feedback, quality clearance, publication or installation.

@@ -183,3 +183,19 @@ evaluation, provider, packaging, and lifecycle services; select a new interface
 only when it simplifies a named consumer. Clean-room package tests must prove
 normal SDK paths work without either sibling checkout. Foundry handoff and
 Agent-Skills consumer retirement retain separate evidence.
+
+### Native dimensional calibration candidate
+
+The additive native dimensional path reuses accepted native scalar execution,
+dimension recomputation and exact plugin-target binding. Its immediate consumer
+is supplied-pair assessment through `assess_native_matched_pair`; both variants
+must retain their exact calibration bundles. Frozen numeric consumers remain
+unchanged and continue to reject native settings and scalar-only evidence.
+
+Controlled tests cover accepted dimensional observations, invalid later
+capabilities before dispatch, incomplete data, stale identities, target drift,
+partial cleanup failures and fresh recovery. The installed-wheel smoke uses
+synthetic source and inert callbacks, with no sibling checkout imports during
+its check phase. This is not legacy live-run parity or a real dimensional Codex
+driver. Native generation, matched live execution, cloud feedback and quality
+joins remain separate dependencies; no lifecycle stage or retirement gate closes.

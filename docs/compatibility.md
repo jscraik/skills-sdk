@@ -1058,7 +1058,8 @@ Tessl pack, SDK receipt, or install plan must not be labelled native-plugin
 preservation, Codex discovery, private-registry installation, or execution
 proof. Do not move unrelated resources into a synthetic skill merely to make
 the archive appear complete.
-# Whole-plugin local preparation families
+
+### Whole-plugin local preparation families
 
 `plugin-build/v1` and `plugin-hardening/v1` are additive local evidence
 families. They retain the existing `PluginPackageValidation` capture instead
@@ -1075,3 +1076,29 @@ registry-specific coordinate mapping remains separate work. Generic receipt
 parsing supports the new families without asserting archive or release status.
 The local API/schema/rejection/recovery tests do not establish migration parity
 for all legacy packaging/emitter callers.
+
+### Additive native dimensional joins
+
+The `native-matched-calibration/v1`, `native-matched-variant-calibration/v1`,
+`native-matched-comparison-plan/v1` and `native-matched-pair-assessment/v1`
+families reuse current dimensional recomputation, exact plugin-target joins,
+native scalar execution and supplied comparison rules. Numeric matched v1
+fields, schemas and consumers remain unchanged; native inputs still fail those
+numeric boundaries. Native scalar receipts alone lack dimensional evidence.
+
+The native comparison lane retains numeric generation parameters and native
+judge parameters without inventing temperature. A native parameter trial is
+one fresh judge invocation, distinct from the plan's minimum repeated-case
+coverage. Ten active cases and the existing selection minimum remain enforced.
+The supplied assessment proves neither those executions nor a selected release.
+
+The native service performs complete source admission before any capability
+property access, then validates all provider and judge interfaces before
+dispatch. Scalar Codex adapters remain unsupported dimensional capabilities.
+The comparison result retains both calibration bundles and revalidates every
+target, commitment and complete dimensional digest. Schema shape validation is
+separate from these semantic joins and external authenticity.
+
+Rollback retains the existing numeric and native scalar routes unchanged.
+Removing the additive family would remove this new consumer capability; it
+would not make a native scalar receipt acceptable to a numeric matched route.
