@@ -295,7 +295,7 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
             continue
         try:
             file_mode = target.lstat().st_mode
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):
             continue  # Deletions are already reported by status.
         if mode == "120000" and stat.S_ISLNK(file_mode):
             hashed = _run_git(repo_root, "hash-object", "--stdin", input_text=os.readlink(target))

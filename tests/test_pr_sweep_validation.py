@@ -564,6 +564,23 @@ def test_dirty_closeout_hashes_staging_conversions_against_index(tmp_path: Path)
     assert (repo / ".git" / "index").read_bytes() == index_before
 
 
+def test_dirty_closeout_reports_nested_file_when_parent_becomes_file(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    nested = repo / "nested"
+    nested.mkdir()
+    (nested / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    _git(repo, "add", "nested/tracked.txt")
+    nested.joinpath("tracked.txt").unlink()
+    nested.rmdir()
+    nested.write_text("replacement\n", encoding="utf-8")
+
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert "nested/tracked.txt" in result.dirty_state.dirty_paths
+
+
 def test_batched_hashing_preserves_a_leading_quote_and_does_not_run_filter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
