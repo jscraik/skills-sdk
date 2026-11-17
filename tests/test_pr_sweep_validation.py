@@ -470,6 +470,32 @@ def test_snapshot_blocks_ambient_autocrlf_that_would_change_status(
     assert result.findings[0].code == "ambient_git_config"
 
 
+def test_snapshot_blocks_default_xdg_ignore_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    xdg = tmp_path / "xdg"
+    (xdg / "git").mkdir(parents=True)
+    (xdg / "git" / "ignore").write_text("ignored.txt\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
+def test_snapshot_blocks_second_global_config_location(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    xdg = tmp_path / "xdg"
+    home.mkdir()
+    (xdg / "git").mkdir(parents=True)
+    (home / ".gitconfig").write_text("[user]\n\tname = Fixture\n", encoding="utf-8")
+    (xdg / "git" / "config").write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
 def test_snapshot_copy_budget_blocks_without_touching_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path)
     original = (repo / "tracked.txt").read_bytes()
@@ -544,6 +570,25 @@ def test_dirty_closeout_blocks_worktree_scoped_includes(tmp_path: Path) -> None:
     result = validate_pr_sweep_dirty_closeout(repo)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_config_include"
+
+
+def test_dirty_closeout_blocks_local_attribute_file(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", "core.attributesFile", str(tmp_path / "attributes"))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+def test_dirty_closeout_blocks_external_info_exclude_symlink(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    exclude = repo / ".git" / "info" / "exclude"
+    external = tmp_path / "external-exclude"
+    exclude.replace(external)
+    exclude.symlink_to(external)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
 
 
 def test_dirty_closeout_blocks_external_git_index(tmp_path: Path) -> None:
@@ -666,6 +711,25 @@ def test_dirty_closeout_blocks_external_submodule_worktree(tmp_path: Path) -> No
         text=True,
     )
     _git(parent / "module", "config", "core.worktree", str(source))
+    result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "submodule_worktree_escape"
+
+
+def test_dirty_closeout_blocks_worktree_scoped_external_submodule_worktree(tmp_path: Path) -> None:
+    source = _repo(tmp_path)
+    parent = tmp_path / "parent-worktree-external"
+    parent.mkdir()
+    _git(parent, "init")
+    subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
+        cwd=parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(parent / "module", "config", "extensions.worktreeConfig", "true")
+    _git(parent / "module", "config", "--worktree", "core.worktree", str(source))
     result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "submodule_worktree_escape"

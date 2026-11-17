@@ -303,10 +303,20 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
         nonlocal copied_bytes
         mode = os.lstat(source).st_mode
         if stat.S_ISREG(mode):
-            copied_bytes += os.lstat(source).st_size
-            if copied_bytes > _MAX_SNAPSHOT_BYTES:
-                raise OSError("private snapshot exceeds its copy budget")
-            return shutil.copy2(source, destination)
+            descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            try:
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise OSError("snapshot source changed type while copying")
+                with os.fdopen(descriptor, "rb", closefd=False) as input_file, open(destination, "xb") as output_file:
+                    while chunk := input_file.read(1024 * 1024):
+                        copied_bytes += len(chunk)
+                        if copied_bytes > _MAX_SNAPSHOT_BYTES:
+                            raise OSError("private snapshot exceeds its copy budget")
+                        output_file.write(chunk)
+                shutil.copystat(source, destination, follow_symlinks=False)
+                return destination
+            finally:
+                os.close(descriptor)
         if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
             if Path(source).relative_to(repo_root).as_posix() in tracked:
                 raise OSError("tracked special file cannot be represented in private snapshot")
@@ -336,7 +346,7 @@ def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
         except (OSError, ValueError):
             return False
         metadata_roots.append(metadata_root)
-    for name in ("index", "config", "config.worktree", "info/attributes"):
+    for name in ("index", "config", "config.worktree", "info/attributes", "info/exclude"):
         try:
             _resolved_git_path(
                 repo_root,
@@ -383,8 +393,18 @@ def _ambient_status_config_is_supported(repo_root: Path) -> bool:
         "core.symlinks",
         "core.filemode",
     }
-    for scope in ("--global", "--system"):
-        configured = _run_git(repo_root, "config", scope, "--name-only", "--list")
+    xdg_root = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    if (xdg_root / "git" / "ignore").exists():
+        return False
+    config_sources = (
+        ("--file", str(Path.home() / ".gitconfig")),
+        ("--file", str(xdg_root / "git" / "config")),
+        ("--system",),
+    )
+    for scope in config_sources:
+        if scope[0] == "--file" and not Path(scope[1]).exists():
+            continue
+        configured = _run_git(repo_root, "config", *scope, "--name-only", "--list")
         if configured.returncode != 0 and "No such file or directory" in configured.stderr:
             continue
         if configured.returncode not in {0, 1}:
@@ -412,6 +432,11 @@ def _git_status_preflight(
         return "git_status_unavailable", "could not inspect local Git configuration"
     if config_has_includes:
         return "git_config_include", "included Git configuration prevents isolated status inspection"
+    local_attributes = _run_git(repo_root, "config", "--local", "--get", "core.attributesFile")
+    if local_attributes.returncode not in {0, 1}:
+        return "git_status_unavailable", "could not inspect local attribute configuration"
+    if local_attributes.returncode == 0:
+        return "git_config_include", "local attribute configuration prevents isolated status inspection"
     tracked = _run_git(repo_root, "ls-files", "-v", "-z", force_worktree=private_root is not None)
     if tracked.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git paths"
@@ -433,7 +458,7 @@ def _git_status_preflight(
         if submodule_root.is_symlink():
             return "git_status_unavailable", "submodule path is not safe to inspect"
         if (submodule_root / ".git").exists():
-            worktree = _run_git(submodule_root, "config", "--local", "--get", "core.worktree", force_worktree=True)
+            worktree = _run_git(submodule_root, "config", "--get", "core.worktree", force_worktree=True)
             if worktree.returncode not in {0, 1}:
                 return "git_status_unavailable", "could not inspect submodule worktree configuration"
             if worktree.returncode == 0:
