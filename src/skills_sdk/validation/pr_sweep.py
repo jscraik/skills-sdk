@@ -346,7 +346,7 @@ def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
         except (OSError, ValueError):
             return False
         metadata_roots.append(metadata_root)
-    for name in ("index", "config", "config.worktree", "info/attributes", "info/exclude"):
+    for name in ("index", "config", "config.worktree", "objects", "info/attributes", "info/exclude"):
         try:
             _resolved_git_path(
                 repo_root,
@@ -394,7 +394,7 @@ def _ambient_status_config_is_supported(repo_root: Path) -> bool:
         "core.filemode",
     }
     xdg_root = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-    if (xdg_root / "git" / "ignore").exists():
+    if any((xdg_root / "git" / name).exists() for name in ("ignore", "attributes")):
         return False
     config_sources = (
         ("--file", str(Path.home() / ".gitconfig")),

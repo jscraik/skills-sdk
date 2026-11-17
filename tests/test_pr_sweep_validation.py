@@ -481,6 +481,17 @@ def test_snapshot_blocks_default_xdg_ignore_file(tmp_path: Path, monkeypatch: py
     assert result.findings[0].code == "ambient_git_config"
 
 
+def test_snapshot_blocks_default_xdg_attributes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    xdg = tmp_path / "xdg"
+    (xdg / "git").mkdir(parents=True)
+    (xdg / "git" / "attributes").write_text("tracked.txt text\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
 def test_snapshot_blocks_second_global_config_location(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path)
     home = tmp_path / "home"
@@ -586,6 +597,17 @@ def test_dirty_closeout_blocks_external_info_exclude_symlink(tmp_path: Path) -> 
     external = tmp_path / "external-exclude"
     exclude.replace(external)
     exclude.symlink_to(external)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
+def test_dirty_closeout_blocks_external_object_database_symlink(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    objects = repo / ".git" / "objects"
+    external = tmp_path / "external-objects"
+    objects.replace(external)
+    objects.symlink_to(external, target_is_directory=True)
     result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
