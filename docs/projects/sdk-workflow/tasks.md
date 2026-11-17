@@ -702,3 +702,18 @@ failure ownership. Simplify reviews each completed patch and may record
 The skills' historical Agent-Skills commands are assessment references.
 Destination validation uses SDK-owned commands. The existing v1 scenario policy
 remains compatible; the managed v2 path retains ten active cases.
+
+## Native dimensional join: local candidate
+
+The native dimensional calibration candidate adds retained dimension evidence,
+exact child/plugin calibration bundles and supplied matched-pair assessment.
+It reuses the accepted scalar executor and preserves frozen numeric contracts,
+ten active cases and the minimum repeated-case policy. Local proof is separate
+from remote review, hosted validation and acceptance. No delivery or lifecycle
+stage acceptance follows from this candidate.
+
+Remaining work includes an authentic dimensional provider driver, native
+generation, matched live execution, feedback/cloud/quality joins and separately
+authorized delivery. Supplied judgments and inert callback observations do not
+establish a real evaluation, scorer quality, promotion, publication or runtime
+installation. Keep the SDK programme and its open stage gates open.

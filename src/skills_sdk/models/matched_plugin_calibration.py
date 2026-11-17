@@ -108,6 +108,17 @@ def _require_plugin_calibration_bundle(
 ) -> MatchedVariantCalibrationBundle:
     """Join the complete required target set to a frozen plugin and lane digest."""
     bundle = MatchedVariantCalibrationBundle.model_validate(raw)
+    return _bind_plugin_calibration_bundle(bundle, plugin, rubric, lane_binding, targets)
+
+
+def _bind_plugin_calibration_bundle(
+    bundle: MatchedVariantCalibrationBundle,
+    plugin: PluginPackageValidation,
+    rubric: MatchedComparisonRubric,
+    lane_binding: tuple[MatchedLaneSpec, str],
+    targets: tuple[tuple[str, str, ScorerProfile], ...],
+) -> MatchedVariantCalibrationBundle:
+    """Share exact target binding after the family-specific canonical ingress."""
     lane, digest = lane_binding
     if (
         plugin.status != "pass"

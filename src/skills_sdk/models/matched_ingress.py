@@ -132,9 +132,35 @@ def _canonical_models() -> tuple[type[BaseModel], ...]:
     )
 
 
-def _canonical_matched_input(value: object, *, work_limit: int = 4096) -> object:
+def _native_models() -> tuple[type[BaseModel], ...]:
+    """Extend only the native family; frozen numeric ingress stays unchanged."""
+    from skills_sdk.models.native_judge import CodexNativeJudgeParameters
+    from skills_sdk.models.native_matched import (
+        NativeMatchedCalibrationReceipt,
+        NativeMatchedCalibrationTarget,
+        NativeMatchedComparisonPlan,
+        NativeMatchedLaneSpec,
+        NativeMatchedPairAssessment,
+        NativeMatchedVariantCalibrationBundle,
+    )
+    from skills_sdk.models.observed_calibration import NativeCalibrationPlan, NativeCalibrationReceipt
+
+    return (
+        CodexNativeJudgeParameters,
+        NativeMatchedCalibrationReceipt,
+        NativeMatchedCalibrationTarget,
+        NativeMatchedComparisonPlan,
+        NativeMatchedLaneSpec,
+        NativeMatchedPairAssessment,
+        NativeMatchedVariantCalibrationBundle,
+        NativeCalibrationPlan,
+        NativeCalibrationReceipt,
+    )
+
+
+def _canonical_matched_input(value: object, *, work_limit: int = 4096, native: bool = False) -> object:
     """Copy only bounded canonical members; never invoke a caller serializer."""
-    allowed = _canonical_models()
+    allowed = _canonical_models() + (_native_models() if native else ())
     boolean_fields = {
         name
         for model in allowed
@@ -198,9 +224,10 @@ class _MatchedContractModel(_ContractModel):
 
     model_config = ConfigDict(revalidate_instances="always")
     _ingress_work_limit: ClassVar[int] = 4096
+    _native_ingress: ClassVar[bool] = False
 
     @model_validator(mode="wrap")
     @classmethod
     def canonical_members(cls, value: object, handler: ModelWrapValidatorHandler[Self]) -> Self:
         """Retain raw scalar types and reject custom models before Pydantic."""
-        return handler(_canonical_matched_input(value, work_limit=cls._ingress_work_limit))
+        return handler(_canonical_matched_input(value, work_limit=cls._ingress_work_limit, native=cls._native_ingress))
