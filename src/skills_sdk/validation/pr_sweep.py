@@ -314,7 +314,7 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
     if regular:
         # --stdin-paths applies each path's staging conversions in one Git process.
         # Preflight has rejected attributes that could execute a filter.
-        paths = "\n".join(path for path, _ in regular) + "\n"
+        paths = "\n".join('"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"' for path, _ in regular) + "\n"
         hashed = _run_git(repo_root, "hash-object", "--stdin-paths", input_text=paths)
         object_ids = hashed.stdout.splitlines()
         if hashed.returncode != 0 or len(object_ids) != len(regular):

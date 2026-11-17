@@ -562,3 +562,35 @@ def test_dirty_closeout_hashes_staging_conversions_against_index(tmp_path: Path)
     assert result.dirty_state is not None
     assert result.dirty_state.unstaged_paths == ()
     assert (repo / ".git" / "index").read_bytes() == index_before
+
+
+def test_batched_hashing_preserves_a_leading_quote_and_does_not_run_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.validation import pr_sweep
+
+    repo = _repo(tmp_path)
+    sentinel = tmp_path / "filter-ran"
+    _git(repo, "config", "filter.evil.clean", f"touch {sentinel}")
+    (repo / ".gitattributes").write_text("payload filter=evil\n", encoding="utf-8")
+    (repo / ".gitignore").write_text("payload\n", encoding="utf-8")
+    (repo / "payload").write_text("ignored\n", encoding="utf-8")
+    quoted = repo / '"payload"'
+    quoted.write_text("start\n", encoding="utf-8")
+    _git(repo, "add", '"payload"')
+    original = quoted.stat()
+    quoted.write_text("other\n", encoding="utf-8")
+    os.utime(quoted, ns=(original.st_atime_ns, original.st_mtime_ns))
+    run_git = pr_sweep._run_git
+
+    def cached_status(root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+        if args[0] == "status":
+            return subprocess.CompletedProcess(args, 0, "", "")
+        return run_git(root, *args, input_text=input_text)
+
+    monkeypatch.setattr(pr_sweep, "_run_git", cached_status)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ('"payload"',)
+    assert not sentinel.exists()
