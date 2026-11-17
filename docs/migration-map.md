@@ -1,5 +1,13 @@
 # Workflow migration map
 
+Local whole-plugin build/hardening candidate (not accepted on main): additive
+`build_plugin_package` and `harden_plugin_package` bind complete capture and
+modes, fresh source and supplied presentation approvals without emission.
+Focused proof is in `tests/test_plugin_build.py`. This narrows the local
+producer gap under `package_identity`, `sdk_plugin_lifecycle` and
+`compiled_package_pipeline`; it does not implement archive emission, registry
+coordinate mapping, publication, installation or the full parent stage.
+
 Owner: Skills SDK maintainers. Consumer: the independent SDK workflow.
 This inventory maps all 52 ids from Agent-Skills
 `Infrastructure/config/skills-sdk/capability-matrix.v1.json` at source revision
