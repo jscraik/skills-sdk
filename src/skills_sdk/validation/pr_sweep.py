@@ -6,9 +6,11 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -201,16 +203,35 @@ def _recognized_paths(value: Any) -> set[str]:
     return set()
 
 
-def _git_environment() -> dict[str, str]:
+def _git_environment(*, isolated: bool = False) -> dict[str, str]:
     discovery_keys = {"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}
-    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key in discovery_keys}
+    environment = {
+        key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key in discovery_keys
+    }
+    if isolated:
+        environment["GIT_ATTR_NOSYSTEM"] = "1"
+        environment["GIT_CONFIG_GLOBAL"] = os.devnull
+        environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    return environment
 
 
-def _run_git(repo_root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+def _run_git(
+    repo_root: Path, *args: str, input_text: str | None = None, force_worktree: bool = False
+) -> subprocess.CompletedProcess[str]:
+    worktree_args = (f"--work-tree={repo_root}",) if force_worktree else ()
     return subprocess.run(
-        ["git", "-c", "core.fsmonitor=false", "--no-optional-locks", *args],
+        [
+            "git",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            f"core.attributesFile={os.devnull}",
+            "--no-optional-locks",
+            *worktree_args,
+            *args,
+        ],
         cwd=repo_root,
-        env=_git_environment(),
+        env=_git_environment(isolated=force_worktree),
         input=input_text,
         text=True,
         capture_output=True,
@@ -219,11 +240,105 @@ def _run_git(repo_root: Path, *args: str, input_text: str | None = None) -> subp
     )
 
 
-def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | None, str | None]:
+def _resolved_git_path(repo_root: Path, *args: str, force_worktree: bool = False) -> Path:
+    completed = _run_git(repo_root, *args, force_worktree=force_worktree)
+    if completed.returncode != 0 or not completed.stdout.strip():
+        raise OSError("could not resolve Git metadata")
+    return Path(completed.stdout.strip()).resolve()
+
+
+def _materialize_git_metadata(repo_root: Path, snapshot_root: Path, private_root: Path) -> None:
+    marker = snapshot_root / ".git"
+    if marker.is_dir() and not marker.is_symlink():
+        return
+    git_directory = _resolved_git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-dir")
+    common_directory = _resolved_git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if marker.exists() or marker.is_symlink():
+        marker.unlink()
+    shutil.copytree(git_directory, marker, symlinks=True)
+    if common_directory == git_directory:
+        return
+    common_snapshot = private_root / "common-git-dir"
+    shutil.copytree(common_directory, common_snapshot, symlinks=True)
+    (marker / "commondir").write_text(os.path.relpath(common_snapshot, marker) + "\n", encoding="utf-8")
+    source_modules = common_snapshot / "modules"
+    if source_modules.is_dir() and not (marker / "modules").exists():
+        shutil.copytree(source_modules, marker / "modules", symlinks=True)
+
+
+def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
+    snapshot_root = private_root / "worktree"
+    shutil.copytree(repo_root, snapshot_root, symlinks=True)
+    _materialize_git_metadata(repo_root, snapshot_root, private_root)
+    return snapshot_root
+
+
+def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
+    private_root = private_root.resolve()
+    metadata_roots: list[Path] = []
+    for argument in ("--git-dir", "--git-common-dir"):
+        try:
+            metadata_root = _resolved_git_path(
+                repo_root,
+                "rev-parse",
+                "--path-format=absolute",
+                argument,
+                force_worktree=True,
+            )
+            metadata_root.relative_to(private_root)
+        except (OSError, ValueError):
+            return False
+        metadata_roots.append(metadata_root)
+    for name in ("index", "config", "config.worktree", "info/attributes"):
+        try:
+            _resolved_git_path(
+                repo_root,
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-path",
+                name,
+                force_worktree=True,
+            ).relative_to(private_root)
+        except (OSError, ValueError):
+            return False
+    for path in metadata_roots[0].glob("sharedindex.*"):
+        try:
+            path.resolve().relative_to(private_root)
+        except (OSError, RuntimeError, ValueError):
+            return False
+    return True
+
+
+def _git_config_has_includes(repo_root: Path) -> bool | None:
+    completed = _run_git(
+        repo_root,
+        "config",
+        "--local",
+        "--no-includes",
+        "--null",
+        "--list",
+        force_worktree=True,
+    )
+    if completed.returncode != 0:
+        return None
+    keys = (entry.partition("\n")[0].casefold() for entry in completed.stdout.split("\0") if entry)
+    return any(key == "include.path" or (key.startswith("includeif.") and key.endswith(".path")) for key in keys)
+
+
+def _git_status_preflight(
+    repo_root: Path, *, private_root: Path | None = None, depth: int = 0
+) -> tuple[str | None, str | None]:
     """Reject index or attributes that can hide dirt or execute a clean filter."""
     if depth > 8:
         return "git_status_unavailable", "submodule nesting exceeds safe inspection depth"
-    tracked = _run_git(repo_root, "ls-files", "-v", "-z")
+    if private_root is not None and not _git_metadata_is_private(repo_root, private_root):
+        return "git_status_unavailable", "Git metadata escapes the private inspection snapshot"
+    config_has_includes = _git_config_has_includes(repo_root)
+    if config_has_includes is None:
+        return "git_status_unavailable", "could not inspect local Git configuration"
+    if config_has_includes:
+        return "git_config_include", "included Git configuration prevents isolated status inspection"
+    tracked = _run_git(repo_root, "ls-files", "-v", "-z", force_worktree=private_root is not None)
     if tracked.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git paths"
     records = [record for record in tracked.stdout.split("\0") if record]
@@ -231,7 +346,7 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
         return "git_status_unavailable", "could not parse tracked Git paths"
     if any(record[0].islower() or record[0] == "S" for record in records):
         return "index_visibility_flags", "index visibility flags prevent a trustworthy clean result"
-    staged = _run_git(repo_root, "ls-files", "--stage", "-z")
+    staged = _run_git(repo_root, "ls-files", "--stage", "-z", force_worktree=private_root is not None)
     if staged.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git modes"
     for record in staged.stdout.split("\0"):
@@ -244,12 +359,22 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
         if submodule_root.is_symlink():
             return "git_status_unavailable", "submodule path is not safe to inspect"
         if (submodule_root / ".git").exists():
-            blocker_code, blocker_message = _git_status_preflight(submodule_root, depth=depth + 1)
+            blocker_code, blocker_message = _git_status_preflight(
+                submodule_root, private_root=private_root, depth=depth + 1
+            )
             if blocker_code is not None:
                 return blocker_code, blocker_message
     paths = [record[2:] for record in records]
     if paths:
-        attributes = _run_git(repo_root, "check-attr", "-z", "--stdin", "filter", input_text="\0".join(paths) + "\0")
+        attributes = _run_git(
+            repo_root,
+            "check-attr",
+            "-z",
+            "--stdin",
+            "filter",
+            input_text="\0".join(paths) + "\0",
+            force_worktree=private_root is not None,
+        )
         if attributes.returncode != 0:
             return "git_status_unavailable", "could not inspect tracked Git attributes"
         fields = attributes.stdout.split("\0")
@@ -263,19 +388,28 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
 def validate_pr_sweep_dirty_closeout(
     repo_root: Path, *, ledger_path: Path | None = None, require_clean: bool = False
 ) -> PrSweepValidationResult:
-    """Account for primary-checkout dirt; never equate a ledger with cleanliness."""
+    """Account for primary-checkout dirt from a private snapshot; never waive cleanliness."""
     try:
         top_level = _run_git(repo_root, "rev-parse", "--show-toplevel")
         if top_level.returncode != 0 or Path(top_level.stdout.strip()).resolve() != repo_root.resolve():
             return _failure(
                 "dirty_closeout", "blocked", "invalid_repo_root", "supplied root is not a worktree top level"
             )
-        blocker_code, blocker_message = _git_status_preflight(repo_root)
-        if blocker_code is not None and blocker_message is not None:
-            return _failure("dirty_closeout", "blocked", blocker_code, blocker_message)
-        completed = _run_git(
-            repo_root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"
-        )
+        with TemporaryDirectory(prefix="skills-sdk-pr-sweep-") as directory:
+            private_root = Path(directory)
+            snapshot_root = _snapshot_worktree(repo_root, private_root)
+            blocker_code, blocker_message = _git_status_preflight(snapshot_root, private_root=private_root)
+            if blocker_code is not None and blocker_message is not None:
+                return _failure("dirty_closeout", "blocked", blocker_code, blocker_message)
+            completed = _run_git(
+                snapshot_root,
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+                "--ignore-submodules=none",
+                force_worktree=True,
+            )
     except (OSError, UnicodeError, RuntimeError, subprocess.TimeoutExpired):
         return _failure("dirty_closeout", "blocked", "git_status_unavailable", "could not inspect Git dirty state")
     if completed.returncode != 0:

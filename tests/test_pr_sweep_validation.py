@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import skills_sdk.validation.pr_sweep as pr_sweep_validation
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepValidationResult
@@ -379,6 +380,53 @@ def test_dirty_closeout_blocks_clean_filter_without_executing_it(tmp_path: Path)
     assert result.status == "blocked"
     assert result.findings[0].code == "clean_filter_present"
     assert not sentinel.exists()
+
+
+def test_dirty_closeout_snapshot_closes_filter_activation_race(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path)
+    sentinel = tmp_path / "raced-filter-ran"
+    _git(repo, "config", "filter.evil.clean", f"touch {sentinel}")
+    original_preflight = pr_sweep_validation._git_status_preflight
+    raced = False
+
+    def activate_filter(
+        snapshot_root: Path, *, private_root: Path | None = None, depth: int = 0
+    ) -> tuple[str | None, str | None]:
+        nonlocal raced
+        result = original_preflight(snapshot_root, private_root=private_root, depth=depth)
+        if not raced and result == (None, None):
+            (repo / ".gitattributes").write_text("tracked.txt filter=evil\n", encoding="utf-8")
+            (repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+            raced = True
+        return result
+
+    monkeypatch.setattr(pr_sweep_validation, "_git_status_preflight", activate_filter)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert raced
+    assert result.status == "pass"
+    assert not sentinel.exists()
+
+
+def test_dirty_closeout_blocks_included_git_configuration(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    included_config = tmp_path / "included.conf"
+    included_config.write_text("[filter \"evil\"]\n\tclean = touch ignored\n", encoding="utf-8")
+    _git(repo, "config", "include.path", str(included_config))
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+def test_dirty_closeout_blocks_external_git_index(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    external_index = tmp_path / "external-index"
+    (repo / ".git" / "index").replace(external_index)
+    (repo / ".git" / "index").symlink_to(external_index)
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
 
 
 @pytest.mark.parametrize(
