@@ -330,11 +330,18 @@ def test_dirty_closeout_detects_mode_drift_ignored_by_repository_config(tmp_path
     _git(repo, "config", "core.fileMode", "false")
     tracked.chmod(0o755)
     result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
-    assert result.status == "fail"
-    assert result.dirty_state is not None
-    assert result.dirty_state.unstaged_paths == ("tracked.txt",)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_filesystem_mode_unsupported"
     tracked.chmod(0o644)
-    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "pass"
+    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "blocked"
+
+
+def test_dirty_closeout_blocks_plain_file_symlink_representation(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", "core.symlinks", "false")
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_filesystem_mode_unsupported"
 
 
 def test_dirty_closeout_detects_content_drift_with_weakened_stat_config(tmp_path: Path) -> None:

@@ -233,6 +233,12 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
     """Reject index or attributes that can hide dirt or execute a clean filter."""
     if depth > 8:
         return "git_status_unavailable", "submodule nesting exceeds safe inspection depth"
+    for key in ("core.fileMode", "core.symlinks"):
+        configured = _run_git(repo_root, "config", "--local", "--bool", "--get", key)
+        if configured.returncode not in {0, 1}:
+            return "git_status_unavailable", "could not inspect local Git filesystem settings"
+        if configured.stdout.strip() == "false":
+            return "git_filesystem_mode_unsupported", "Git filesystem settings prevent trustworthy content inspection"
     tracked = _run_git(repo_root, "ls-files", "-v", "-z")
     if tracked.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git paths"
@@ -276,6 +282,7 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
     if staged.returncode != 0:
         raise OSError("could not inspect index objects")
     dirty: set[str] = set()
+    regular: list[tuple[str, str]] = []
     for record in filter(None, staged.stdout.split("\0")):
         metadata, path = record.split("\t", 1)
         mode, object_id, stage = metadata.split()
@@ -293,9 +300,10 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
         if mode == "120000" and stat.S_ISLNK(file_mode):
             hashed = _run_git(repo_root, "hash-object", "--stdin", input_text=os.readlink(target))
         elif mode in {"100644", "100755"} and stat.S_ISREG(file_mode):
-            # --path applies staging conversions (e.g. text/eol and encoding).
-            # Preflight has rejected attributes that could execute a filter.
-            hashed = _run_git(repo_root, "hash-object", f"--path={path}", "--", path)
+            if "\n" in path or "\r" in path:
+                raise OSError("tracked path cannot be safely batched for content inspection")
+            regular.append((path, object_id))
+            continue
         else:
             dirty.add(path)
             continue
@@ -303,6 +311,15 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
             raise OSError("could not hash tracked content")
         if hashed.stdout.strip() != object_id:
             dirty.add(path)
+    if regular:
+        # --stdin-paths applies each path's staging conversions in one Git process.
+        # Preflight has rejected attributes that could execute a filter.
+        paths = "\n".join(path for path, _ in regular) + "\n"
+        hashed = _run_git(repo_root, "hash-object", "--stdin-paths", input_text=paths)
+        object_ids = hashed.stdout.splitlines()
+        if hashed.returncode != 0 or len(object_ids) != len(regular):
+            raise OSError("could not hash tracked content")
+        dirty.update(path for (path, expected), actual in zip(regular, object_ids, strict=True) if actual != expected)
     return dirty
 
 
