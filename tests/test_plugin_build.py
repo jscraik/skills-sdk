@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import copy
 import json
+from collections import UserList
+from collections.abc import MutableSequence
 from pathlib import Path
 
 import pytest
@@ -227,6 +229,30 @@ def test_minimal_blocked_receipt_parses_with_unbound_candidate() -> None:
     result = parse_receipt(payload)
     assert result.status == "blocked" and result.candidate is None and result.evidence == ()
     assert result.blocker.code == "fixture_blocked"
+
+
+@pytest.mark.parametrize("container", [list, tuple, UserList])
+def test_plugin_receipt_owns_accepted_sequences(container: type) -> None:
+    finding = {"code": "fixture_blocked", "message": "Synthetic invalid source", "severity": "blocker"}
+    findings = container([finding])
+    payload = {
+        "schema_version": "plugin-build/v1",
+        "status": "blocked",
+        "validation": {"status": "blocked", "findings": findings},
+    }
+    expected = parse_receipt({**payload, "validation": {"status": "blocked", "findings": [finding.copy()]}})
+    result = parse_receipt(payload)
+    finding["code"] = "mutated_after_parsing"
+    if isinstance(findings, MutableSequence):
+        findings.append({"code": "later", "message": "Later finding", "severity": "blocker"})
+    frozen = result.payload["validation"]["findings"]
+    assert len(frozen) == 1
+    assert frozen[0]["code"] == result.blocker.code == "fixture_blocked"
+    assert frozen[0]["message"] == "Synthetic invalid source"
+    assert result.receipt_id == expected.receipt_id
+    assert parse_receipt(result.payload) == result
+    with pytest.raises(TypeError):
+        frozen[0]["code"] = "cannot_mutate_receipt"
 
 
 def test_forged_presentation_image_must_match_captured_file(tmp_path: Path) -> None:

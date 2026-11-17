@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
@@ -86,9 +86,7 @@ def _freeze_payload(value: Any) -> Any:
 
     if isinstance(value, Mapping):
         return MappingProxyType({key: _freeze_payload(item) for key, item in value.items()})
-    if isinstance(value, list):
-        return tuple(_freeze_payload(item) for item in value)
-    if isinstance(value, tuple):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray, memoryview)):
         return tuple(_freeze_payload(item) for item in value)
     if isinstance(value, set):
         return frozenset(_freeze_payload(item) for item in value)
@@ -100,7 +98,7 @@ def _json_payload(value: Any) -> Any:
 
     if isinstance(value, Mapping):
         return {key: _json_payload(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray, memoryview)):
         return [_json_payload(item) for item in value]
     return value
 
