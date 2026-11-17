@@ -147,6 +147,13 @@ def test_registry_request_accepts_noncredential_substrings(value: str) -> None:
     assert list(Draft202012Validator(schema).iter_errors(payload)) == []
 
 
+def test_registry_request_accepts_long_benign_credential_prefix() -> None:
+    payload = _request_payload()
+    payload["version"] = "clientSecret" + "a" * 256
+    RegistryPreparationRequest.model_validate(payload)
+    SchemaRegistry().validate("registry-preparation-request.v1", payload)
+
+
 @pytest.mark.parametrize("unsafe_text", _UNSAFE_PUBLIC_TEXTS)
 def test_registry_request_rejects_shared_unsafe_public_text(unsafe_text: str) -> None:
     payload = _request_payload()
