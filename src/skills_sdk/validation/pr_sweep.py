@@ -393,6 +393,7 @@ def _ambient_status_config_is_supported(repo_root: Path) -> bool:
         "core.attributesfile",
         "core.symlinks",
         "core.filemode",
+        "core.ignorecase",
     }
     xdg_root = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     if any((xdg_root / "git" / name).exists() for name in ("ignore", "attributes")):
@@ -440,11 +441,12 @@ def _git_status_preflight(
     if worktree_config.exists():
         attribute_scopes.append(("--worktree",))
     for scope in attribute_scopes:
-        configured_attributes = _run_git(repo_root, "config", *scope, "--get", "core.attributesFile")
-        if configured_attributes.returncode not in {0, 1}:
-            return "git_status_unavailable", "could not inspect local attribute configuration"
-        if configured_attributes.returncode == 0:
-            return "git_config_include", "local attribute configuration prevents isolated status inspection"
+        for setting in ("core.attributesFile", "core.excludesFile"):
+            configured = _run_git(repo_root, "config", *scope, "--get", setting)
+            if configured.returncode not in {0, 1}:
+                return "git_status_unavailable", "could not inspect local status configuration"
+            if configured.returncode == 0:
+                return "git_config_include", "local status configuration prevents isolated status inspection"
     tracked = _run_git(repo_root, "ls-files", "-v", "-z", force_worktree=private_root is not None)
     if tracked.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git paths"

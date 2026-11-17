@@ -457,13 +457,12 @@ def test_snapshot_skips_ignored_bytes_and_preserves_untracked_special_path(tmp_p
     assert "service.pipe" in result.dirty_state.untracked_paths
 
 
-def test_snapshot_blocks_ambient_autocrlf_that_would_change_status(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+@pytest.mark.parametrize("setting", ["autocrlf", "ignoreCase"])
+def test_snapshot_blocks_ambient_status_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, setting: str) -> None:
     repo = _repo(tmp_path)
     alternate_home = tmp_path / "alternate-home"
     alternate_home.mkdir()
-    (alternate_home / ".gitconfig").write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
+    (alternate_home / ".gitconfig").write_text(f"[core]\n\t{setting} = true\n", encoding="utf-8")
     monkeypatch.setenv("HOME", str(alternate_home))
     result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
@@ -583,9 +582,10 @@ def test_dirty_closeout_blocks_worktree_scoped_includes(tmp_path: Path) -> None:
     assert result.findings[0].code == "git_config_include"
 
 
-def test_dirty_closeout_blocks_local_attribute_file(tmp_path: Path) -> None:
+@pytest.mark.parametrize("setting", ["core.attributesFile", "core.excludesFile"])
+def test_dirty_closeout_blocks_local_status_file(tmp_path: Path, setting: str) -> None:
     repo = _repo(tmp_path)
-    _git(repo, "config", "core.attributesFile", str(tmp_path / "attributes"))
+    _git(repo, "config", setting, "../status-file")
     result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_config_include"
