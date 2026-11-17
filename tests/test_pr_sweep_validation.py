@@ -591,6 +591,35 @@ def test_dirty_closeout_blocks_local_attribute_file(tmp_path: Path) -> None:
     assert result.findings[0].code == "git_config_include"
 
 
+def test_dirty_closeout_blocks_worktree_attribute_file(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", "extensions.worktreeConfig", "true")
+    _git(repo, "config", "--worktree", "core.attributesFile", str(tmp_path / "attributes"))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+def test_snapshot_rejects_file_replaced_by_fifo_before_open(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    if not hasattr(os, "O_NONBLOCK") or not hasattr(os, "mkfifo"):
+        pytest.skip("nonblocking FIFO inspection is unavailable on this host")
+    repo = _repo(tmp_path)
+    original_open = os.open
+    tracked = repo / "tracked.txt"
+
+    def replace_before_open(path: str | os.PathLike[str], flags: int, *args: object, **kwargs: object) -> int:
+        if Path(path) == tracked:
+            assert flags & os.O_NONBLOCK
+            tracked.unlink()
+            os.mkfifo(tracked)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", replace_before_open)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
 def test_dirty_closeout_blocks_external_info_exclude_symlink(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     exclude = repo / ".git" / "info" / "exclude"

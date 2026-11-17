@@ -303,7 +303,7 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
         nonlocal copied_bytes
         mode = os.lstat(source).st_mode
         if stat.S_ISREG(mode):
-            descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
             try:
                 if not stat.S_ISREG(os.fstat(descriptor).st_mode):
                     raise OSError("snapshot source changed type while copying")
@@ -432,11 +432,18 @@ def _git_status_preflight(
         return "git_status_unavailable", "could not inspect local Git configuration"
     if config_has_includes:
         return "git_config_include", "included Git configuration prevents isolated status inspection"
-    local_attributes = _run_git(repo_root, "config", "--local", "--get", "core.attributesFile")
-    if local_attributes.returncode not in {0, 1}:
-        return "git_status_unavailable", "could not inspect local attribute configuration"
-    if local_attributes.returncode == 0:
-        return "git_config_include", "local attribute configuration prevents isolated status inspection"
+    worktree_config = _resolved_git_path(
+        repo_root, "rev-parse", "--path-format=absolute", "--git-path", "config.worktree", force_worktree=True
+    )
+    attribute_scopes = [("--local",)]
+    if worktree_config.exists():
+        attribute_scopes.append(("--worktree",))
+    for scope in attribute_scopes:
+        configured_attributes = _run_git(repo_root, "config", *scope, "--get", "core.attributesFile")
+        if configured_attributes.returncode not in {0, 1}:
+            return "git_status_unavailable", "could not inspect local attribute configuration"
+        if configured_attributes.returncode == 0:
+            return "git_config_include", "local attribute configuration prevents isolated status inspection"
     tracked = _run_git(repo_root, "ls-files", "-v", "-z", force_worktree=private_root is not None)
     if tracked.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git paths"
