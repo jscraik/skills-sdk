@@ -1458,7 +1458,7 @@ and update the schema when changing a public contract.
 
 The additive `skills_sdk.packaging.build_plugin_package(root,
 source_revision=...)` API captures a versioned root `plugin.json`, every
-included file, direct child skill scopes and ordinary permission modes. It
+included file, direct child skill scopes and captured file permission modes. It
 returns `PluginBuildReceipt` (`plugin-build/v1`). Its `build_digest` binds the
 complete validation envelope, including the separate mode ledger. It is a
 local manifest build, not an emitted archive. Missing version, invalid source
@@ -1468,8 +1468,8 @@ or blocked child validation produces a blocked receipt with retained findings.
 recaptures source, runs the existing presentation checker over exact supplied
 image/copy approvals, then confirms the capture again. It returns
 `PluginHardeningReceipt` (`plugin-hardening/v1`), retaining its build, fresh
-capture, policy, presentation result and all derived blockers. Changed source,
-stale approvals, private paths, exceeded budgets, group/world-writable files
+capture, policy, presentation result and all derived blockers. Changed captured
+file contents or file modes, stale approvals, private paths, exceeded budgets, group/world-writable files
 and a missing required root README block this local path. The default policy
 requires README; only that documentation check and numeric budgets are
 configurable. Presentation and its supplied rights assertions cannot be waived
@@ -1480,7 +1480,8 @@ and generic `parse_receipt` projection. Structural JSON Schema alone cannot
 recompute digests or cross-bind every nested record. Typed or copied objects
 are revalidated at supported ingress boundaries. Source freshness is observed
 at the captures; this is not a filesystem lock or a promise against changes
-after the operation returns.
+after the operation returns. Ordinary directory permission modes are not retained
+by the capture and are outside this freshness check.
 
 All mutation, archive-emission, publication, execution and release flags remain
 false, including after hardening passes. This path does not establish quality,

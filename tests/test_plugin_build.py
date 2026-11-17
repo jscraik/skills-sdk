@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 from test_plugin_presentation import _fixture, _request
 
+from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
@@ -99,6 +100,29 @@ def test_mode_only_drift_binds_build_and_recovers(tmp_path: Path) -> None:
     assert _harden(root, build).status == "blocked"
     target.chmod(0o644)
     assert _harden(root, build).status == "pass"
+
+
+@pytest.mark.parametrize("family", ["build", "hardening"])
+@pytest.mark.parametrize("blocked", [False, True])
+def test_plugin_receipt_id_survives_immutable_payload_reparse(tmp_path: Path, family: str, blocked: bool) -> None:
+    root = _plugin(tmp_path)
+    if blocked and family == "build":
+        path = root / "plugin.json"
+        manifest = json.loads(path.read_text())
+        manifest.pop("version")
+        path.write_text(json.dumps(manifest))
+    build = build_plugin_package(root, source_revision=REVISION)
+    receipt = build
+    if family == "hardening":
+        receipt = harden_plugin_package(root, build) if blocked else _harden(root, build)
+    payload = receipt.model_dump(mode="json")
+    parsed = parse_receipt(payload)
+    assert parsed.receipt_id == "plugin-local-" + canonical_json_sha256(payload)
+    for _ in range(2):
+        reparsed = parse_receipt(parsed.payload)
+        assert reparsed == parsed
+        assert reparsed.receipt_id == parsed.receipt_id
+        parsed = reparsed
 
 
 @pytest.mark.parametrize(

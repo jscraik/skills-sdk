@@ -95,6 +95,16 @@ def _freeze_payload(value: Any) -> Any:
     return value
 
 
+def _json_payload(value: Any) -> Any:
+    """Restore validated immutable JSON containers before canonical hashing."""
+
+    if isinstance(value, Mapping):
+        return {key: _json_payload(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_payload(item) for item in value]
+    return value
+
+
 def _parse_blocker(payload: Mapping[str, Any] | None) -> Blocker | None:
     if payload is None:
         return None
@@ -227,7 +237,7 @@ def _parse_plugin_local_receipt(payload: Mapping[str, Any]) -> Receipt:
             )
         )
     return Receipt(
-        receipt_id="plugin-local-" + canonical_json_sha256(dict(payload)),
+        receipt_id="plugin-local-" + canonical_json_sha256(_json_payload(payload)),
         candidate=(
             CandidateIdentity(
                 package_id=identity["package_id"],
