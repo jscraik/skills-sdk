@@ -138,10 +138,13 @@ def test_packaged_schema_and_registry_reject_upstream_contradictions() -> None:
     registry.validate("pre-execution-safety-evidence.v1", evidence.model_dump(mode="json"))
 
 
-def test_checklist_rationale_rejects_camel_case_secret_assignment_in_model_and_schema() -> None:
+@pytest.mark.parametrize(
+    "rationale", ["dbPassword=opaque-value", "dbPassword\u00a0=opaque-value", "source at\u00a0/opt/company/config.json"]
+)
+def test_checklist_rationale_rejects_private_text_in_model_and_schema(rationale: str) -> None:
     _, evidence = _bound()
     payload = evidence.model_dump(mode="json")
-    payload["checklist"][0]["rationale"] = "dbPassword=opaque-value"
+    payload["checklist"][0]["rationale"] = rationale
 
     with pytest.raises(ValidationError):
         PreExecutionSafetyEvidence.model_validate(payload)
