@@ -21,6 +21,7 @@ _UNSAFE_PUBLIC_TEXTS = (
     "password=opaque-value",
     "dbPassword=opaque-value",
     "dbPassword_prod=opaque-value",
+    "dbPassword\u0085=opaque-value",
     "client_secret opaque-value",
     "evidence/client_secret.json",
     "client_key_prod=opaque-value",

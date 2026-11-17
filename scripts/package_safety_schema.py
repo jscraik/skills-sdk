@@ -29,7 +29,7 @@ PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN = (
     r"(?:[_-][A-Za-z0-9]+)*"
     r"[\"']?[\s\u001c-\u001f\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])|"
     r"[a-z][A-Z](?:piKey|ccessToken|uthToken|assword|rivateKey|ecret|oken)"
-    r"(?:[_-][A-Za-z0-9]+)*[\"']?\s*[:=]"
+    r"(?:[_-][A-Za-z0-9]+)*[\"']?[\s\u001c-\u001f\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=]"
 )
 MACHINE_PATH_SCHEMA_PATTERN = (
     r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\$[A-Za-z_][A-Za-z0-9_]*/|"
