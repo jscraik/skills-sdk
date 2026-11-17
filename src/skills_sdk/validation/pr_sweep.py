@@ -333,6 +333,13 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
     snapshot_root = private_root / "worktree"
     shutil.copytree(repo_root, snapshot_root, symlinks=True, ignore=skip_ignored, copy_function=copy_entry)
     _materialize_git_metadata(repo_root, snapshot_root, private_root, copy_entry)
+    current_ignored = _run_git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z")
+    if (
+        current_ignored.returncode != 0
+        or len(current_ignored.stdout) > 4 * 1024 * 1024
+        or set(filter(None, current_ignored.stdout.split("\0"))) != ignored
+    ):
+        raise OSError("ignored paths changed during private snapshot creation")
     return snapshot_root
 
 
@@ -369,6 +376,15 @@ def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
             path.resolve().relative_to(private_root)
         except (OSError, RuntimeError, ValueError):
             return False
+    for metadata_root in metadata_roots:
+        alternates = metadata_root / "objects" / "info" / "alternates"
+        if alternates.exists():
+            try:
+                for line in alternates.read_text(encoding="utf-8").splitlines():
+                    if line and not (metadata_root / "objects" / line).resolve().is_relative_to(private_root):
+                        return False
+            except (OSError, UnicodeError, RuntimeError):
+                return False
 
     def reject_walk_error(error: OSError) -> None:
         raise error
