@@ -396,8 +396,16 @@ def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
         raise error
 
     try:
+        inspected_directories: set[Path] = set()
         for metadata_root in metadata_roots:
-            for directory, names, files in os.walk(metadata_root, followlinks=False, onerror=reject_walk_error):
+            for directory, names, files in os.walk(metadata_root, followlinks=True, onerror=reject_walk_error):
+                resolved_directory = Path(directory).resolve()
+                if not resolved_directory.is_relative_to(private_root):
+                    return False
+                if resolved_directory in inspected_directories:
+                    names.clear()
+                    continue
+                inspected_directories.add(resolved_directory)
                 for name in names + files:
                     entry = Path(directory) / name
                     if entry.is_symlink() and not entry.resolve().is_relative_to(private_root):

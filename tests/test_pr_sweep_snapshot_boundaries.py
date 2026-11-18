@@ -76,3 +76,17 @@ def test_snapshot_blocks_symlinked_object_alternates_before_open(tmp_path: Path)
     result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
+
+
+def test_snapshot_inspects_contained_metadata_symlink_targets(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    objects = repo / ".git" / "objects"
+    contained = repo / ".git" / "private-objects"
+    objects.rename(contained)
+    objects.symlink_to(contained, target_is_directory=True)
+    external = tmp_path / "external-object"
+    external.write_text("outside\n", encoding="utf-8")
+    (contained / "unreferenced-object").symlink_to(external)
+    result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
