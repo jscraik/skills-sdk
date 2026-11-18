@@ -450,11 +450,11 @@ def test_snapshot_skips_ignored_bytes_and_preserves_untracked_special_path(tmp_p
     snapshot = pr_sweep_validation._snapshot_worktree(repo, private_root)
 
     assert not (snapshot / "ignored-cache" / "large.bin").exists()
-    assert (snapshot / "service.pipe").is_file()
+    assert not (snapshot / "service.pipe").exists()
     result = validate_pr_sweep_dirty_closeout(repo)
     assert result.status == "fail"
     assert result.dirty_state is not None
-    assert "service.pipe" in result.dirty_state.untracked_paths
+    assert "service.pipe" not in result.dirty_state.untracked_paths
 
 
 @pytest.mark.parametrize("setting", ["autocrlf", "ignoreCase"])

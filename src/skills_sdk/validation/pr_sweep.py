@@ -294,11 +294,20 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
 
     def skip_ignored(directory: str, names: list[str]) -> set[str]:
         relative = Path(directory).relative_to(repo_root)
-        return {
-            name
-            for name in names
-            if name not in {".gitattributes", ".gitignore"} and (relative / name).as_posix() in ignored
-        }
+        skipped: set[str] = set()
+        for name in names:
+            path = (relative / name).as_posix()
+            if name not in {".gitattributes", ".gitignore"} and path in ignored:
+                skipped.add(name)
+            elif path not in tracked and name != ".git":
+                mode = os.lstat(Path(directory) / name).st_mode
+                if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
+                    entry = relative / name
+                    if not any(
+                        (repo_root / parent / ".git").exists() for parent in entry.parents if parent != Path(".")
+                    ):
+                        skipped.add(name)
+        return skipped
 
     def copy_entry(source: str, destination: str) -> str:
         nonlocal copied_bytes
@@ -333,6 +342,15 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
     snapshot_root = private_root / "worktree"
     shutil.copytree(repo_root, snapshot_root, symlinks=True, ignore=skip_ignored, copy_function=copy_entry)
     _materialize_git_metadata(repo_root, snapshot_root, private_root, copy_entry)
+    snapshot_ignored = _run_git(
+        snapshot_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z", force_worktree=True
+    )
+    if (
+        snapshot_ignored.returncode != 0
+        or len(snapshot_ignored.stdout) > 4 * 1024 * 1024
+        or not set(filter(None, snapshot_ignored.stdout.split("\0"))).issubset(ignored)
+    ):
+        raise OSError("ignored paths differ in the private snapshot")
     if ignored:
         checked = _run_git(
             snapshot_root,
@@ -445,6 +463,11 @@ def _ambient_status_config_is_supported(repo_root: Path) -> bool:
     }
     xdg_root = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     if any((xdg_root / "git" / name).exists() for name in ("ignore", "attributes")):
+        return False
+    system_attributes = _run_git(repo_root, "var", "GIT_ATTR_SYSTEM")
+    if system_attributes.returncode != 0 or not system_attributes.stdout.strip():
+        return False
+    if Path(system_attributes.stdout.strip()).exists():
         return False
     config_sources = (
         ("--file", str(Path.home() / ".gitconfig")),
