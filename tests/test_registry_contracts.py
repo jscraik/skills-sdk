@@ -32,6 +32,8 @@ _UNSAFE_PUBLIC_TEXTS = (
     "AWS_ACCESS_KEY_ID_PROD=opaque-value",
     'source="/opt/company/config.json"',
     "source=</opt/company/config.json>",
+    "source at\u0085/opt/company/config.json",
+    "source at\u001c/opt/company/config.json",
     "source=/etc/company/config.json",
     "See `/opt/agent/private/report.json`",
     "See //opt/agent/private/report.json",
