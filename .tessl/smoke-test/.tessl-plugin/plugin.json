@@ -1,0 +1,7 @@
+{
+  "name": "skills-sdk-lab/standard-smoke",
+  "version": "0.1.0",
+  "description": "One-off read-only hosted worker smoke test.",
+  "private": true,
+  "skills": "./skills/"
+}
