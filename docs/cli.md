@@ -1230,6 +1230,9 @@ fingerprints, duplicate identities and occurrences, and the three-occurrence
 guardrail rule. The dirty-closeout command requires the explicit worktree top
 level, copies it to a private temporary snapshot, and reads `git status` there
 without optional Git locks after rejecting executable clean-filter attributes.
+The result describes the copied state. It does not lock the primary checkout
+or provide an atomic assertion about concurrent edits during or after copying;
+run validation again after those edits finish.
 A complete ledger permits non-destructive accounting only;
 `--require-clean` still fails if any staged, unstaged, or untracked path exists.
 Both commands return `pr-sweep-validation/v1`: exit `0` for `pass` and `2` for

@@ -11,8 +11,12 @@ import pytest
 from skills_sdk.validation import validate_pr_sweep_dirty_closeout
 
 
+def _fixture_git_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True, env=_fixture_git_environment())
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -36,6 +40,22 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
+def test_fixture_git_calls_preserve_inherited_repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    caller = _repo(tmp_path)
+    index_before = (caller / ".git" / "index").read_bytes()
+    head_before = (caller / ".git" / "HEAD").read_bytes()
+    monkeypatch.setenv("GIT_DIR", str(caller / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(caller))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(caller / ".git" / "index"))
+    fixture_parent = tmp_path / "fixture"
+    fixture_parent.mkdir()
+    fixture = _repo(fixture_parent)
+
+    assert (fixture / ".git" / "index").is_file()
+    assert (caller / ".git" / "index").read_bytes() == index_before
+    assert (caller / ".git" / "HEAD").read_bytes() == head_before
+
+
 def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path) -> None:
     source = _repo(tmp_path)
     parent = tmp_path / "parent"
@@ -44,6 +64,7 @@ def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path)
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_fixture_git_environment(),
         check=True,
         capture_output=True,
         text=True,
@@ -84,6 +105,7 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_fixture_git_environment(),
         check=True,
         capture_output=True,
         text=True,
@@ -107,6 +129,7 @@ def test_dirty_closeout_blocks_submodule_external_configuration(tmp_path: Path, 
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_fixture_git_environment(),
         check=True,
         capture_output=True,
         text=True,

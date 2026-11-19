@@ -210,7 +210,7 @@ def test_unsafe_package_blocker_metadata_is_redacted(unsafe_text: str) -> None:
         package_receipt.blocker.model_dump(mode="json")
     )
     assert result.blocker.message == _REDACTED_BLOCKER_MESSAGE
-    assert unsafe_text not in _nested_strings(result.model_dump(mode="json"))
+    assert all(unsafe_text not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
 def test_credential_shaped_package_blocker_code_is_redacted() -> None:
@@ -233,7 +233,7 @@ def test_credential_shaped_package_blocker_code_is_redacted() -> None:
     assert result.blocker.source_blocker_sha256 == canonical_json_sha256(
         package_receipt.blocker.model_dump(mode="json")
     )
-    assert "ghp_secret_marker" not in _nested_strings(result.model_dump(mode="json"))
+    assert all("ghp_secret_marker" not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
 def test_hardening_identity_mismatch_is_typed_and_identity_bound() -> None:
@@ -483,7 +483,7 @@ def test_unsafe_hardening_evidence_is_digest_bound_not_exposed(unsafe_evidence: 
     assert result.blocker is not None
     assert result.blocker.evidence_refs == ()
     assert result.blocker.source_evidence_sha256 == (canonical_json_sha256(unsafe_evidence),)
-    assert unsafe_evidence not in _nested_strings(result.model_dump(mode="json"))
+    assert all(unsafe_evidence not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
 @pytest.mark.parametrize("unsafe_text", _UNSAFE_PUBLIC_TEXTS)
@@ -519,7 +519,7 @@ def test_unsafe_hardening_blocker_metadata_is_redacted_and_digest_bound(unsafe_t
     assert result.blocker.message == _REDACTED_BLOCKER_MESSAGE
     assert result.blocker.source_blocker_sha256 == canonical_json_sha256(blocker.model_dump(mode="json"))
     assert result.blocker.evidence_refs == ("evidence/safe.json",)
-    assert unsafe_text not in _nested_strings(result.model_dump(mode="json"))
+    assert all(unsafe_text not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
 def test_credential_shaped_hardening_blocker_code_is_redacted() -> None:
@@ -553,7 +553,7 @@ def test_credential_shaped_hardening_blocker_code_is_redacted() -> None:
     assert result.blocker.code == "source_blocker_redacted"
     assert result.blocker.message == _REDACTED_BLOCKER_MESSAGE
     assert result.blocker.source_blocker_sha256 == canonical_json_sha256(blocker.model_dump(mode="json"))
-    assert "ghp_secret_marker" not in _nested_strings(result.model_dump(mode="json"))
+    assert all("ghp_secret_marker" not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
 def test_prepared_warning_is_digest_bound_and_secret_free() -> None:
