@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import skills_sdk.validation.pr_sweep as pr_sweep_validation
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepValidationResult
@@ -426,6 +427,282 @@ def test_dirty_closeout_blocks_clean_filter_without_executing_it(tmp_path: Path)
     assert not sentinel.exists()
 
 
+def test_dirty_closeout_snapshot_closes_filter_activation_race(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    sentinel = tmp_path / "raced-filter-ran"
+    _git(repo, "config", "filter.evil.clean", f"touch {sentinel}")
+    original_preflight = pr_sweep_validation._git_status_preflight
+    raced = False
+
+    def activate_filter(
+        snapshot_root: Path, *, private_root: Path | None = None, depth: int = 0
+    ) -> tuple[str | None, str | None]:
+        nonlocal raced
+        result = original_preflight(snapshot_root, private_root=private_root, depth=depth)
+        if not raced and result == (None, None):
+            (repo / ".gitattributes").write_text("tracked.txt filter=evil\n", encoding="utf-8")
+            (repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
+            raced = True
+        return result
+
+    monkeypatch.setattr(pr_sweep_validation, "_git_status_preflight", activate_filter)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert raced
+    assert result.status == "pass"
+    assert not sentinel.exists()
+
+
+def test_snapshot_rejects_an_in_checkout_destination(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    destination = repo / "snapshot-temp"
+    destination.mkdir()
+    with pytest.raises(OSError, match="inside the supplied worktree"):
+        pr_sweep_validation._snapshot_worktree(repo, destination)
+    assert not (destination / "worktree").exists()
+
+
+def test_snapshot_does_not_rewrite_a_symlinked_source_commondir(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    linked = tmp_path / "linked"
+    _git(repo, "worktree", "add", "-b", "linked", str(linked))
+    git_directory = Path((linked / ".git").read_text(encoding="utf-8").partition(": ")[2].strip())
+    source_commondir = git_directory / "commondir"
+    external_marker = tmp_path / "external-commondir"
+    external_marker.write_text(str(repo / ".git") + "\n", encoding="utf-8")
+    source_commondir.unlink()
+    source_commondir.symlink_to(external_marker)
+    private_root = tmp_path / "private"
+    private_root.mkdir()
+
+    snapshot = pr_sweep_validation._snapshot_worktree(linked, private_root)
+
+    assert external_marker.read_text(encoding="utf-8") == str(repo / ".git") + "\n"
+    assert (snapshot / ".git" / "commondir").is_file()
+    assert not (snapshot / ".git" / "commondir").is_symlink()
+
+
+def test_snapshot_skips_ignored_bytes_and_preserves_untracked_special_path(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".gitignore").write_text("ignored-cache/\n", encoding="utf-8")
+    cache = repo / "ignored-cache"
+    cache.mkdir()
+    (cache / "large.bin").write_bytes(b"x" * (1024 * 1024))
+    fifo = repo / "service.pipe"
+    os.mkfifo(fifo)
+    private_root = tmp_path / "private"
+    private_root.mkdir()
+
+    snapshot = pr_sweep_validation._snapshot_worktree(repo, private_root)
+
+    assert not (snapshot / "ignored-cache" / "large.bin").exists()
+    assert not (snapshot / "service.pipe").exists()
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert "service.pipe" not in result.dirty_state.untracked_paths
+
+
+@pytest.mark.parametrize("setting", ["autocrlf", "ignoreCase"])
+def test_snapshot_blocks_ambient_status_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, setting: str) -> None:
+    repo = _repo(tmp_path)
+    alternate_home = tmp_path / "alternate-home"
+    alternate_home.mkdir()
+    (alternate_home / ".gitconfig").write_text(f"[core]\n\t{setting} = true\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(alternate_home))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
+@pytest.mark.parametrize("empty_xdg", [False, True])
+def test_snapshot_blocks_default_xdg_ignore_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, empty_xdg: bool
+) -> None:
+    repo = _repo(tmp_path)
+    xdg = tmp_path / "home" / ".config" if empty_xdg else tmp_path / "xdg"
+    (xdg / "git").mkdir(parents=True)
+    (xdg / "git" / "ignore").write_text("ignored.txt\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", "" if empty_xdg else str(xdg))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
+def test_snapshot_blocks_default_xdg_attributes_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    xdg = tmp_path / "xdg"
+    (xdg / "git").mkdir(parents=True)
+    (xdg / "git" / "attributes").write_text("tracked.txt text\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
+def test_snapshot_blocks_second_global_config_location(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    home = tmp_path / "home"
+    xdg = tmp_path / "xdg"
+    home.mkdir()
+    (xdg / "git").mkdir(parents=True)
+    (home / ".gitconfig").write_text("[user]\n\tname = Fixture\n", encoding="utf-8")
+    (xdg / "git" / "config").write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "ambient_git_config"
+
+
+def test_snapshot_copy_budget_blocks_without_touching_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    original = (repo / "tracked.txt").read_bytes()
+    monkeypatch.setattr(pr_sweep_validation, "_MAX_SNAPSHOT_BYTES", 1)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+    assert (repo / "tracked.txt").read_bytes() == original
+
+
+def test_snapshot_preserves_ignored_attributes_that_change_tracked_status(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").write_bytes(b"initial\r\n")
+    _git(repo, "add", "tracked.txt")
+    _git(
+        repo,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.test",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "crlf baseline",
+    )
+    (repo / ".gitignore").write_text(".gitattributes\n", encoding="utf-8")
+    (repo / ".gitattributes").write_text("tracked.txt text\n", encoding="utf-8")
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert "tracked.txt" in result.dirty_state.unstaged_paths
+
+
+def test_snapshot_blocks_a_tracked_file_replaced_by_fifo(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    tracked.unlink()
+    os.mkfifo(tracked)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+    assert tracked.exists()
+
+
+def test_snapshot_accepts_missing_global_git_configuration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    empty_home = tmp_path / "empty-home"
+    empty_home.mkdir()
+    monkeypatch.setenv("HOME", str(empty_home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(empty_home))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "pass"
+
+
+def test_dirty_closeout_blocks_included_git_configuration(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    included_config = tmp_path / "included.conf"
+    included_config.write_text('[filter "evil"]\n\tclean = touch ignored\n', encoding="utf-8")
+    _git(repo, "config", "include.path", str(included_config))
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+def test_dirty_closeout_blocks_worktree_scoped_includes(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    included_config = tmp_path / "worktree-included.conf"
+    included_config.write_text("[core]\n\texcludesFile = ignored\n", encoding="utf-8")
+    _git(repo, "config", "extensions.worktreeConfig", "true")
+    _git(repo, "config", "--worktree", "include.path", str(included_config))
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+@pytest.mark.parametrize("setting", ["core.attributesFile", "core.excludesFile"])
+def test_dirty_closeout_blocks_local_status_file(tmp_path: Path, setting: str) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", setting, "../status-file")
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+def test_dirty_closeout_blocks_worktree_attribute_file(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", "extensions.worktreeConfig", "true")
+    _git(repo, "config", "--worktree", "core.attributesFile", str(tmp_path / "attributes"))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_config_include"
+
+
+def test_snapshot_rejects_file_replaced_by_fifo_before_open(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    if not hasattr(os, "O_NONBLOCK") or not hasattr(os, "mkfifo"):
+        pytest.skip("nonblocking FIFO inspection is unavailable on this host")
+    repo = _repo(tmp_path)
+    original_open = os.open
+    tracked = repo / "tracked.txt"
+
+    def replace_before_open(path: str | os.PathLike[str], flags: int, *args: object, **kwargs: object) -> int:
+        if Path(path) == tracked:
+            assert flags & os.O_NONBLOCK
+            tracked.unlink()
+            os.mkfifo(tracked)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", replace_before_open)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
+def test_dirty_closeout_blocks_external_info_exclude_symlink(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    exclude = repo / ".git" / "info" / "exclude"
+    external = tmp_path / "external-exclude"
+    exclude.replace(external)
+    exclude.symlink_to(external)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
+def test_dirty_closeout_blocks_external_object_database_symlink(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    objects = repo / ".git" / "objects"
+    external = tmp_path / "external-objects"
+    objects.replace(external)
+    objects.symlink_to(external, target_is_directory=True)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
+@pytest.mark.parametrize("metadata_name", ["index", "ref"])
+def test_dirty_closeout_blocks_external_git_metadata(tmp_path: Path, metadata_name: str) -> None:
+    repo = _repo(tmp_path)
+    external_index = tmp_path / "external-index"
+    head_ref = (repo / ".git" / "HEAD").read_text(encoding="utf-8").split()[1]
+    metadata = repo / ".git" / ("index" if metadata_name == "index" else head_ref)
+    metadata.replace(external_index)
+    metadata.symlink_to(external_index)
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.findings[0].code == "git_status_unavailable"
+
+
 @pytest.mark.parametrize(
     "flag,clear", [("--assume-unchanged", "--no-assume-unchanged"), ("--skip-worktree", "--no-skip-worktree")]
 )
@@ -452,6 +729,7 @@ def test_dirty_closeout_ignores_inherited_alternate_git_context(
     (primary / "tracked.txt").write_text("changed\n", encoding="utf-8")
     monkeypatch.setenv("GIT_DIR", str(alternate / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(alternate))
+    assert pr_sweep_validation._git_environment()["LC_ALL"] == "C"
     result = validate_pr_sweep_dirty_closeout(primary, require_clean=True)
     assert result.status == "fail"
     assert result.dirty_state is not None
@@ -499,6 +777,13 @@ def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path)
     assert result.status == "fail"
     assert result.dirty_state is not None
     assert "module" in result.dirty_state.dirty_paths
+    if hasattr(os, "mkfifo"):
+        tracked = parent / "module" / "tracked.txt"
+        tracked.unlink()
+        os.mkfifo(tracked)
+        blocked = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
+        assert blocked.status == "blocked"
+        assert blocked.findings[0].code == "git_status_unavailable"
 
 
 def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
