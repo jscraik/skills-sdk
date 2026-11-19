@@ -7,9 +7,23 @@ description: Run the approved synthetic Skills SDK archive validation on an exac
 
 Run only from the root of jscraik/skills-sdk. Before installing dependencies,
 require the launch instructions to supply EXPECTED_HEAD as a full commit SHA and
-verify both the current HEAD and its first parent. HEAD must equal EXPECTED_HEAD.
-The parent must equal b19c899a553023c2670c518f771d5826d319c067. The commit may
-change only .tessl/stage78-test/ files. Stop and report any mismatch.
+verify the current HEAD equals EXPECTED_HEAD. Require
+b19c899a553023c2670c518f771d5826d319c067 to be an ancestor. The complete diff
+from that SDK revision to HEAD may change only .tessl/stage78-test/ files.
+Stop and report any mismatch.
+
+Before running any checkout code, create a fresh private directory outside the
+checkout. Create a separate fresh bare clone from
+https://github.com/jscraik/skills-sdk.git, with system and global Git configuration
+disabled and no inherited GIT_* settings. Verify EXPECTED_HEAD is present there.
+Materialise the committed tree from that fresh bare clone with
+`git -c core.attributesFile=/dev/null archive --format=tar "$EXPECTED_HEAD" | tar -xf - -C "$RUN_ROOT"`,
+where RUN_ROOT is the newly created empty directory. Check both pipeline exit
+codes. Run dependency setup and pytest only inside RUN_ROOT. Never copy the
+original working tree, its ignored files or its untracked files into RUN_ROOT.
+Unset PYTHONPATH, PYTHONHOME and PYTEST_ADDOPTS for both commands, set
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1, and report those controls. Stop if the fresh
+directory already contains files or any archive extraction fails.
 
 Use the workspace's pinned Python 3.12 and uv 0.13.5. If mise is missing,
 use the checksum-verified Linux x64 mise bootstrap documented in the checkout's
