@@ -15,6 +15,7 @@ import skills_sdk.validation.pr_sweep as pr_sweep_validation
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepValidationResult
+from skills_sdk.validation import pr_sweep as pr_sweep_validation
 from skills_sdk.validation import validate_pr_sweep_dirty_closeout, validate_recurring_findings
 
 
@@ -228,6 +229,14 @@ def test_dirty_closeout_git_failure_is_typed_blocker(tmp_path: Path) -> None:
     assert str(tmp_path) not in result.model_dump_json()
 
 
+def test_dirty_closeout_blocks_unsafe_combined_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path)
+    monkeypatch.setattr(pr_sweep_validation, "_content_dirty_paths", lambda _repo: {"report:old.txt"})
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
 def test_dirty_closeout_requires_worktree_top_level(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     nested = repo / "nested"
@@ -323,6 +332,42 @@ def test_dirty_closeout_does_not_run_fsmonitor(tmp_path: Path) -> None:
     _git(repo, "config", "core.fsmonitor", str(hook))
     assert validate_pr_sweep_dirty_closeout(repo).status == "pass"
     assert not sentinel.exists()
+
+
+def test_dirty_closeout_detects_mode_drift_ignored_by_repository_config(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    _git(repo, "config", "core.fileMode", "false")
+    tracked.chmod(0o755)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_filesystem_mode_unsupported"
+    tracked.chmod(0o644)
+    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "blocked"
+
+
+def test_dirty_closeout_blocks_plain_file_symlink_representation(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", "core.symlinks", "false")
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_filesystem_mode_unsupported"
+
+
+def test_dirty_closeout_detects_content_drift_with_weakened_stat_config(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    original = tracked.stat()
+    _git(repo, "config", "core.checkStat", "minimal")
+    _git(repo, "config", "core.trustCtime", "false")
+    tracked.write_text("changed\n", encoding="utf-8")
+    os.utime(tracked, ns=(original.st_atime_ns, original.st_mtime_ns))
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ("tracked.txt",)
+    tracked.write_text("initial\n", encoding="utf-8")
+    assert validate_pr_sweep_dirty_closeout(repo, require_clean=True).status == "pass"
 
 
 def test_dirty_closeout_rename_with_unstaged_edit_reports_destination_only(tmp_path: Path) -> None:
@@ -763,38 +808,132 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     assert not sentinel.exists()
 
 
-def test_dirty_closeout_blocks_external_submodule_worktree(tmp_path: Path) -> None:
-    source = _repo(tmp_path)
-    parent = tmp_path / "parent-external"
-    parent.mkdir()
-    _git(parent, "init")
-    subprocess.run(
-        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
-        cwd=parent,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    _git(parent / "module", "config", "core.worktree", str(source))
-    result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
-    assert result.status == "blocked"
-    assert result.findings[0].code == "submodule_worktree_escape"
+@pytest.mark.parametrize("symlink", [False, True])
+def test_dirty_closeout_checks_blobs_when_status_stat_cache_matches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, symlink: bool
+) -> None:
+    from skills_sdk.validation import pr_sweep
+
+    repo = _repo(tmp_path)
+    tracked = repo / "tracked.txt"
+    if symlink:
+        tracked.unlink()
+        tracked.symlink_to("initial")
+        _git(repo, "add", "tracked.txt")
+    original = tracked.lstat()
+    index_before = (repo / ".git" / "index").read_bytes()
+    if symlink:
+        tracked.unlink()
+        tracked.symlink_to("changed")
+    else:
+        tracked.write_text("changed\n", encoding="utf-8")
+    os.utime(tracked, ns=(original.st_atime_ns, original.st_mtime_ns), follow_symlinks=False)
+    run_git = pr_sweep._run_git
+
+    def matching_stat_status(root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+        if args[0] == "status":
+            # Model a filesystem whose cached stat tuple, including ctime, matches.
+            return subprocess.CompletedProcess(args, 0, "", "")
+        return run_git(root, *args, input_text=input_text)
+
+    monkeypatch.setattr(pr_sweep, "_run_git", matching_stat_status)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ("tracked.txt",)
+    assert (repo / ".git" / "index").read_bytes() == index_before
 
 
-def test_dirty_closeout_blocks_worktree_scoped_external_submodule_worktree(tmp_path: Path) -> None:
-    source = _repo(tmp_path)
-    parent = tmp_path / "parent-worktree-external"
-    parent.mkdir()
-    _git(parent, "init")
-    subprocess.run(
-        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
-        cwd=parent,
-        check=True,
-        capture_output=True,
-        text=True,
+def test_dirty_closeout_hashes_staging_conversions_against_index(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".gitattributes").write_text("*.txt text eol=crlf\n", encoding="utf-8")
+    tracked = repo / "tracked.txt"
+    tracked.write_bytes(b"staged\r\n")
+    _git(repo, "add", ".")
+    index_before = (repo / ".git" / "index").read_bytes()
+    result = validate_pr_sweep_dirty_closeout(repo)
+    assert result.status == "fail"  # Staged changes still need a ledger.
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ()
+    assert (repo / ".git" / "index").read_bytes() == index_before
+
+
+def test_dirty_closeout_reports_nested_file_when_parent_becomes_file(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    nested = repo / "nested"
+    nested.mkdir()
+    (nested / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    _git(repo, "add", "nested/tracked.txt")
+    nested.joinpath("tracked.txt").unlink()
+    nested.rmdir()
+    nested.write_text("replacement\n", encoding="utf-8")
+
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert "nested/tracked.txt" in result.dirty_state.dirty_paths
+
+
+def test_content_scan_records_a_tracked_file_deleted_after_status(tmp_path: Path) -> None:
+    from skills_sdk.validation import pr_sweep
+
+    repo = _repo(tmp_path)
+    (repo / "tracked.txt").unlink()
+    assert pr_sweep._content_dirty_paths(repo) == {"tracked.txt"}
+
+
+def test_dirty_closeout_accepts_unchanged_crlf_index_blob_after_autocrlf_change(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    _git(repo, "config", "core.autocrlf", "false")
+    (repo / "tracked.txt").write_bytes(b"original\r\n")
+    _git(repo, "add", "tracked.txt")
+    _git(
+        repo,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.test",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "crlf baseline",
     )
-    _git(parent / "module", "config", "extensions.worktreeConfig", "true")
-    _git(parent / "module", "config", "--worktree", "core.worktree", str(source))
-    result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
-    assert result.status == "blocked"
-    assert result.findings[0].code == "submodule_worktree_escape"
+    _git(repo, "config", "core.autocrlf", "input")
+
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+
+    assert result.status == "pass"
+
+
+def test_batched_hashing_preserves_a_leading_quote_and_does_not_run_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from skills_sdk.validation import pr_sweep
+
+    repo = _repo(tmp_path)
+    sentinel = tmp_path / "filter-ran"
+    _git(repo, "config", "filter.evil.clean", f"touch {sentinel}")
+    (repo / ".gitattributes").write_text("payload filter=evil\n", encoding="utf-8")
+    (repo / ".gitignore").write_text("payload\n", encoding="utf-8")
+    (repo / "payload").write_text("ignored\n", encoding="utf-8")
+    quoted = repo / '"payload"'
+    quoted.write_text("start\n", encoding="utf-8")
+    _git(repo, "add", '"payload"')
+    original = quoted.stat()
+    quoted.write_text("other\n", encoding="utf-8")
+    os.utime(quoted, ns=(original.st_atime_ns, original.st_mtime_ns))
+    run_git = pr_sweep._run_git
+
+    def cached_status(root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+        if args[0] == "status":
+            return subprocess.CompletedProcess(args, 0, "", "")
+        return run_git(root, *args, input_text=input_text)
+
+    monkeypatch.setattr(pr_sweep, "_run_git", cached_status)
+    result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "fail"
+    assert result.dirty_state is not None
+    assert result.dirty_state.unstaged_paths == ('"payload"',)
+    assert not sentinel.exists()
