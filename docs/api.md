@@ -1492,6 +1492,17 @@ own evidence. Standalone `build_skill_package` and `harden_skill_package` and
 their frozen receipt families retain their existing behaviour. No whole-plugin
 CLI, exporter or registry adapter is added by these APIs.
 
+### Whole-plugin archive emission
+
+`skills_sdk.packaging.emit_plugin_archive(root, hardening_receipt)` returns
+deterministic, uncompressed ZIP bytes in memory. It requires a passing
+whole-plugin hardening receipt and checks the source file inventory, SHA-256
+digests and ordinary file permissions before and after emission. It preserves
+regular file bytes and modes, including executability. Empty directories are
+rejected because the receipt does not represent them. Paths that collide after Unicode normalisation and case folding are rejected.
+Directory permissions are outside the contract. A typed `ContractError` reports unsafe source,
+blocked hardening and drift. The bytes carry no release or publication authority.
+
 ### Native dimensional calibration and supplied comparison
 
 `skills_sdk.evaluation.execute_native_matched_calibration(plan, rubric, executions)`

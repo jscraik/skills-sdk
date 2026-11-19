@@ -18,6 +18,10 @@ from skills_sdk.models.registry import (
 )
 
 _UNSAFE_PUBLIC_TEXTS = (
+    "Failed to read **/opt/company/config.json**",
+    "Cannot read {/opt/acme/internal/config.json}",
+    "lookup failed@/opt/customer-a/config",
+    "lookup failed@//company/config",
     "password=opaque-value",
     "dbPassword=opaque-value",
     "dbPassword_prod=opaque-value",

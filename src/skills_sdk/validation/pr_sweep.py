@@ -636,7 +636,12 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
 def validate_pr_sweep_dirty_closeout(
     repo_root: Path, *, ledger_path: Path | None = None, require_clean: bool = False
 ) -> PrSweepValidationResult:
-    """Account for primary-checkout dirt from a private snapshot; never waive cleanliness."""
+    """Account for dirt observed in a private snapshot, never waive cleanliness.
+
+    The result describes the copied state, not a lock on the primary checkout.
+    Concurrent source edits during or after copying need a new validation run;
+    copying and inspection do not provide an atomic primary-checkout assertion.
+    """
     try:
         top_level = _run_git(repo_root, "rev-parse", "--show-toplevel")
         if top_level.returncode != 0 or Path(top_level.stdout.strip()).resolve() != repo_root.resolve():

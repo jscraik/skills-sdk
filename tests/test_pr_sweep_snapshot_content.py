@@ -27,7 +27,7 @@ _GIT_LOCATION_VARIABLES = frozenset(
 
 
 def _git_environment() -> dict[str, str]:
-    return {key: value for key, value in os.environ.items() if key not in _GIT_LOCATION_VARIABLES}
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -65,6 +65,22 @@ def test_fixture_git_ignores_repository_overrides(
     assert variable not in _git_environment()
     repo = _repo(tmp_path)
     assert (repo / ".git" / "index").is_file()
+
+
+def test_fixture_git_calls_preserve_inherited_repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    caller = _repo(tmp_path)
+    index_before = (caller / ".git" / "index").read_bytes()
+    head_before = (caller / ".git" / "HEAD").read_bytes()
+    monkeypatch.setenv("GIT_DIR", str(caller / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(caller))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(caller / ".git" / "index"))
+    fixture_parent = tmp_path / "fixture"
+    fixture_parent.mkdir()
+    fixture = _repo(fixture_parent)
+
+    assert (fixture / ".git" / "index").is_file()
+    assert (caller / ".git" / "index").read_bytes() == index_before
+    assert (caller / ".git" / "HEAD").read_bytes() == head_before
 
 
 def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path) -> None:

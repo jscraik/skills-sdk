@@ -144,6 +144,8 @@ def test_packaged_schema_and_registry_reject_upstream_contradictions() -> None:
         "dbPassword=opaque-value",
         "dbPassword\u00a0=opaque-value",
         "source at\u00a0/opt/company/config.json",
+        "Failed to read **/opt/company/config.json**",
+        "Cannot read {/opt/acme/internal/config.json}",
         "lookup failed@/opt/customer-a/config",
         "lookup failed@//opt/customer-a/config",
     ],
@@ -157,6 +159,7 @@ def test_checklist_rationale_rejects_private_text_in_model_and_schema(rationale:
         PreExecutionSafetyEvidence.model_validate(payload)
     with pytest.raises(ContractError):
         SchemaRegistry().validate("pre-execution-safety-evidence.v1", payload)
+    assert not Draft202012Validator(SchemaRegistry().load("pre-execution-safety-evidence.v1")).is_valid(payload)
 
 
 def _changed_checklist_payload(change: str) -> dict[str, object]:
