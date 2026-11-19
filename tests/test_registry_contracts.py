@@ -34,6 +34,12 @@ _UNSAFE_PUBLIC_TEXTS = (
     "source=</opt/company/config.json>",
     "source at\u0085/opt/company/config.json",
     "source at\u001c/opt/company/config.json",
+    "**/opt/company/config.json**",
+    "**//opt/company/config.json**",
+    "{/opt/company/config.json}",
+    "{//opt/company/config.json}",
+    "lookup failed@/opt/customer-a/config",
+    "lookup failed@//opt/customer-a/config",
     "source=/etc/company/config.json",
     "See `/opt/agent/private/report.json`",
     "See //opt/agent/private/report.json",
@@ -111,10 +117,11 @@ def test_registry_request_is_registered_and_rejects_duplicate_evidence() -> None
     assert list(Draft202012Validator(schema).iter_errors(payload))
 
 
-def test_safe_registry_name_and_relative_evidence_agree_in_all_lanes() -> None:
+@pytest.mark.parametrize("evidence", ["evidence/build-/report.json", "reports/review.json"])
+def test_safe_registry_name_and_relative_evidence_agree_in_all_lanes(evidence: str) -> None:
     payload = _request_payload()
     payload["package_name"] = "client-keyboard"
-    payload["evidence"] = ["evidence/build-/report.json"]
+    payload["evidence"] = [evidence]
     RegistryPreparationRequest.model_validate(payload)
     SchemaRegistry().validate("registry-preparation-request.v1", payload)
     schema = SchemaRegistry().load("registry-preparation-request.v1")

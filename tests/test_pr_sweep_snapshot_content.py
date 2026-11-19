@@ -10,9 +10,28 @@ import pytest
 
 from skills_sdk.validation import validate_pr_sweep_dirty_closeout
 
+_GIT_LOCATION_VARIABLES = frozenset(
+    {
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+        "GIT_IMPLICIT_WORK_TREE",
+        "GIT_PREFIX",
+    }
+)
+
+
+def _git_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if key not in _GIT_LOCATION_VARIABLES}
+
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", *args], cwd=repo, env=_git_environment(), check=True, capture_output=True, text=True)
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -36,6 +55,18 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
+@pytest.mark.parametrize("variable", sorted(_GIT_LOCATION_VARIABLES))
+def test_fixture_git_ignores_repository_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variable: str
+) -> None:
+    monkeypatch.setenv(variable, str(tmp_path / "unrelated"))
+    monkeypatch.setenv("SDK_FIXTURE_MARKER", "preserved")
+    assert _git_environment()["SDK_FIXTURE_MARKER"] == "preserved"
+    assert variable not in _git_environment()
+    repo = _repo(tmp_path)
+    assert (repo / ".git" / "index").is_file()
+
+
 def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path) -> None:
     source = _repo(tmp_path)
     parent = tmp_path / "parent"
@@ -44,6 +75,7 @@ def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path)
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_git_environment(),
         check=True,
         capture_output=True,
         text=True,
@@ -84,6 +116,7 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_git_environment(),
         check=True,
         capture_output=True,
         text=True,
@@ -107,6 +140,7 @@ def test_dirty_closeout_blocks_submodule_external_configuration(tmp_path: Path, 
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_git_environment(),
         check=True,
         capture_output=True,
         text=True,
