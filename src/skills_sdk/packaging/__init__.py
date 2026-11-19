@@ -92,9 +92,17 @@ def harden_plugin_package(
     return _harden(plugin_root, build_receipt, presentation_request=presentation_request, policy=policy)
 
 
+def emit_plugin_archive(plugin_root: Path, hardening_receipt: PluginHardeningReceipt) -> bytes:
+    """Emit an in-memory ZIP of a fresh, locally hardened plugin capture."""
+    from skills_sdk.packaging.plugin_archive import emit_plugin_archive as _emit
+
+    return _emit(plugin_root, hardening_receipt)
+
+
 __all__ = [
     "build_plugin_package",
     "build_skill_package",
+    "emit_plugin_archive",
     "harden_plugin_package",
     "harden_skill_package",
     "verify_package_archive",
