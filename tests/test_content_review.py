@@ -13,6 +13,7 @@ from types import MappingProxyType
 from typing import ClassVar
 
 import pytest
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from skills_sdk.cli import main as main_module
@@ -20,13 +21,61 @@ from skills_sdk.cli.main import main
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models.content_review import ContentReviewAssessment, ContentReviewExecutionResult, ContentReviewResult
+from skills_sdk.models.content_review import (
+    ContentReviewAssessment,
+    ContentReviewExecutionResult,
+    ContentReviewItem,
+    ContentReviewResult,
+)
 from skills_sdk.models.safety import PackageSafetyReviewer
 from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.validation.content_review import assess_content_review
 from skills_sdk.validation.skill_package import validate_skill_package
 
 REVISION = "1" * 40
+
+
+@pytest.mark.parametrize(
+    "schema_key",
+    [
+        "content-review.v1",
+        "content-review-assessment.v1",
+        "content-review-execution.v1",
+        "plugin-quality.v1",
+        "plugin-quality.v2",
+        "plugin-quality.v3",
+        "local-check.v2",
+        "local-check.v3",
+        "local-check.v4",
+    ],
+)
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("rationale", "dbPassword=opaque-value"),
+        ("rationale", "client_secret2 opaque-value"),
+        ("owner", "source]/etc/company/config.json"),
+        ("path", "references/source]/etc/company/config.json"),
+        ("evidence_ids", ["ghp_private"]),
+    ],
+)
+def test_content_review_public_fields_agree_in_nested_schemas(schema_key: str, field: str, value: object) -> None:
+    schema = SchemaRegistry().load(schema_key)
+    validator = Draft202012Validator({"$ref": "#/$defs/ContentReviewItem", "$defs": schema["$defs"]})
+    valid = {
+        "dimension": "reference",
+        "path": "references/guide.md",
+        "status": "clear",
+        "rationale": "client-keyboard package reviewed",
+        "evidence_ids": ["entry"],
+        "owner": None,
+    }
+    ContentReviewItem.model_validate(valid)
+    assert validator.is_valid(valid)
+    invalid = {**valid, field: value}
+    with pytest.raises(ValidationError):
+        ContentReviewItem.model_validate(invalid)
+    assert not validator.is_valid(invalid)
 
 
 class NestedSerializerFailure(PackageSafetyReviewer):

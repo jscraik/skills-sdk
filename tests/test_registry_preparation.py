@@ -16,6 +16,9 @@ from skills_sdk.packaging import harden_skill_package
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "package-receipts"
 _REDACTED_BLOCKER_MESSAGE = "Source blocker metadata was redacted; use its digest for identity."
 _UNSAFE_PUBLIC_TEXTS = (
+    "source]/etc/company/config.json",
+    "client_secret2 opaque-value",
+    "accessToken2 opaque-value",
     "password=opaque-value",
     "dbPassword=opaque-value",
     "client_key_prod=opaque-value",

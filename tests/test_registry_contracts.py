@@ -18,6 +18,13 @@ from skills_sdk.models.registry import (
 )
 
 _UNSAFE_PUBLIC_TEXTS = (
+    "source]/etc/company/config.json",
+    "source)/opt/company/config.json",
+    "source}/etc/company/config.json",
+    "source>/opt/company/config.json",
+    "read(/opt/company/config.json)",
+    "client_secret2 opaque-value",
+    "accessToken2 opaque-value",
     "Failed to read **/opt/company/config.json**",
     "Cannot read {/opt/acme/internal/config.json}",
     "lookup failed@/opt/customer-a/config",

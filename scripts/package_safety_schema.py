@@ -19,7 +19,7 @@ PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN = (
     r"-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|"
     r"[eE][yY][jJ][A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|"
     r"(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|"
-    r"[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)(?:[_-][A-Za-z0-9]+)*(?![A-Za-z0-9_-])|"
+    r"[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)[0-9]*(?:[_-][A-Za-z0-9]+)*(?![A-Za-z0-9_-])|"
     r"(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|"
     r"[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)"
     r"[A-Za-z0-9_-]*[\"']?[\s\u001c-\u001f\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=]|"
@@ -34,8 +34,8 @@ PUBLIC_TEXT_CREDENTIAL_SCHEMA_PATTERN = (
 MACHINE_PATH_SCHEMA_PATTERN = (
     r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\$[A-Za-z_][A-Za-z0-9_]*/|"
     r"(?:^|[^A-Za-z0-9._-])(?:[A-Za-z0-9._-]+\\)+[A-Za-z0-9._-]+|"
-    r"(?:^|[^A-Za-z0-9])\\|(?:^|[\s\u001c-\u001f\u0085\[(=:;'\"`<*{@])/(?!/)|"
-    r"(?:^|[\s\u001c-\u001f\u0085\[(=;'\"`<*{@])//|"
+    r"(?:^|[^A-Za-z0-9])\\|(?:^|[\s\u001c-\u001f\u0085\[\](){}=:;'\"`<>*@])/(?!/)|"
+    r"(?:^|[\s\u001c-\u001f\u0085\[\](){}=;'\"`<>*@])//|"
     r"(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|"
     r"[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|"
     r"[Rr][Oo][Oo][Tt])/|"
@@ -92,6 +92,13 @@ def append_package_safety_identity_constraints(
         elif title == "PackageSafetyEvidenceReceipt":
             for field in ("receipt_id", "input_receipt_id"):
                 properties[field]["not"] = {"pattern": credential_pattern}
+        elif title == "ContentReviewItem":
+            public_fields = [properties["path"], properties["rationale"], properties["evidence_ids"]["items"]]
+            public_fields.extend(choice for choice in properties["owner"]["anyOf"] if choice.get("type") == "string")
+            for field_schema in public_fields:
+                field_schema.setdefault("allOf", []).extend(
+                    ({"not": {"pattern": credential_pattern}}, {"not": {"pattern": machine_path_pattern}})
+                )
         for value in schema.values():
             append_package_safety_identity_constraints(value, credential_pattern, machine_path_pattern)
     elif isinstance(schema, list):
