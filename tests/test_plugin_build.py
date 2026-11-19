@@ -6,7 +6,9 @@ import copy
 import json
 from collections import UserList
 from collections.abc import MutableSequence
+from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 from pydantic import ValidationError
@@ -16,10 +18,12 @@ from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
+from skills_sdk.models.plugin import PluginCapturedFile
 from skills_sdk.models.plugin_build import PluginBuildReceipt, PluginHardeningPolicy, PluginHardeningReceipt
 from skills_sdk.models.plugin_presentation import PluginPresentationRequest
-from skills_sdk.packaging import build_plugin_package, build_skill_package, harden_plugin_package
+from skills_sdk.packaging import build_plugin_package, build_skill_package, emit_plugin_archive, harden_plugin_package
 from skills_sdk.packaging import plugin as service
+from skills_sdk.packaging import plugin_archive as archive_service
 
 REVISION = "1" * 40
 
@@ -75,6 +79,115 @@ def test_whole_plugin_read_only_build_hardening_and_schema_roundtrip(tmp_path: P
         assert type(receipt).model_validate_json(receipt.model_dump_json()) == receipt
     assert build_skill_package(root, source_revision=REVISION).status == "blocked"
     assert build_skill_package(root / "skills/fixture-skill", source_revision=REVISION).status == "built"
+
+
+def test_synthetic_whole_plugin_archive_round_trip(tmp_path: Path) -> None:
+    root = _plugin(tmp_path)
+    script = root / "skills/fixture-skill/scripts/example.sh"
+    script.parent.mkdir(exist_ok=True)
+    script.write_text("#!/bin/sh\nexit 0\n")
+    script.chmod(0o755)
+    original = _snapshot(root)
+
+    private = root / ".env"
+    private.write_text("SYNTHETIC_ONLY=yes\n")
+    assert build_plugin_package(root, source_revision=REVISION).status == "blocked"
+    private.unlink()
+    build = build_plugin_package(root, source_revision=REVISION)
+    assert build.status == "built"
+    hardened = _harden(root, build)
+    assert hardened.status == "pass"
+    archive_bytes = emit_plugin_archive(root, hardened)
+    assert emit_plugin_archive(root, hardened) == archive_bytes
+
+    restored = tmp_path / "restored" / root.name
+    with ZipFile(BytesIO(archive_bytes)) as archive:
+        assert sorted(archive.namelist()) == sorted(original)
+        assert "assets/icon.png" in archive.namelist()
+        for name in original:
+            info = archive.getinfo(name)
+            destination = restored / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(archive.read(info))
+            destination.chmod((info.external_attr >> 16) & 0o777)
+
+    assert _snapshot(restored) == original == _snapshot(root)
+    rebuilt = build_plugin_package(restored, source_revision=REVISION)
+    assert rebuilt == build
+    assert _harden(restored, rebuilt).status == "pass"
+
+
+@pytest.mark.parametrize(
+    ("change", "code"),
+    [
+        ("bytes", "plugin_archive_source_changed"),
+        ("mode", "plugin_archive_source_changed"),
+        ("private", "plugin_archive_source_invalid"),
+        ("link", "plugin_archive_source_invalid"),
+        ("empty", "plugin_archive_directory_unsupported"),
+    ],
+)
+def test_plugin_archive_rejects_drift_and_recovers(tmp_path: Path, change: str, code: str) -> None:
+    root = _plugin(tmp_path)
+    hardened = _harden(root, build_plugin_package(root, source_revision=REVISION))
+    expected = emit_plugin_archive(root, hardened)
+    path = root / "README.md"
+    if change == "bytes":
+        path.write_text("changed")
+    elif change == "mode":
+        path.chmod(0o755)
+    elif change == "private":
+        (root / ".env").touch()
+    elif change == "link":
+        (root / "link").symlink_to(path)
+    else:
+        (root / "empty").mkdir()
+    with pytest.raises(ContractError, match=code):
+        emit_plugin_archive(root, hardened)
+    if change == "bytes":
+        path.write_text("# Synthetic plugin\n")
+    elif change == "mode":
+        path.chmod(0o644)
+    elif change == "empty":
+        (root / "empty").rmdir()
+    else:
+        (root / (".env" if change == "private" else "link")).unlink()
+    assert emit_plugin_archive(root, hardened) == expected
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ("assets", "assets/icon.png", "assets/Icon.png"),
+        ("assets", "Assets", "assets/a.png", "Assets/b.png"),
+        ("assets", "Assets", "assets/icon.png"),
+        ("café.txt", "cafe\u0301.txt"),
+        ("Straße", "STRASSE"),
+    ],
+)
+def test_plugin_archive_rejects_portable_path_collisions(paths: tuple[str, ...]) -> None:
+    # Supply the captured names directly so the test also runs on case-insensitive hosts.
+    with pytest.raises(ContractError, match="plugin_archive_path_collision"):
+        archive_service._require_distinct_paths(paths)
+
+
+def test_plugin_archive_blocks_source_change_during_emission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _plugin(tmp_path)
+    hardened = _harden(root, build_plugin_package(root, source_revision=REVISION))
+    write_zip = archive_service._zip
+
+    def write_then_change(files: tuple[PluginCapturedFile, ...], payloads: dict[str, bytes]) -> bytes:
+        result = write_zip(files, payloads)
+        (root / "README.md").chmod(0o755)
+        return result
+
+    monkeypatch.setattr(archive_service, "_zip", write_then_change)
+    with pytest.raises(ContractError, match="plugin_archive_source_changed"):
+        emit_plugin_archive(root, hardened)
+    blocked = _harden(root, hardened.build)
+    assert blocked.status == "blocked"
+    with pytest.raises(ContractError, match="plugin_archive_hardening_required"):
+        emit_plugin_archive(root, blocked)
 
 
 @pytest.mark.parametrize("path", ["plugin.json", "skills/fixture-skill/SKILL.md", "assets/icon.png", "README.md"])
