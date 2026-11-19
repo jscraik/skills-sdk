@@ -98,6 +98,26 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     assert not sentinel.exists()
 
 
+def test_submodule_absolute_metadata_pointer_blocks_private_inspection(tmp_path: Path) -> None:
+    source = _repo(tmp_path)
+    parent = tmp_path / "parent-absolute"
+    parent.mkdir()
+    _git(parent, "init")
+    subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
+        cwd=parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    marker = parent / "module" / ".git"
+    metadata = (marker.parent / marker.read_text().strip().removeprefix("gitdir: ")).resolve()
+    marker.write_text(f"gitdir: {metadata}\n")
+    result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "submodule_worktree_escape"
+
+
 @pytest.mark.parametrize("symlink", [False, True])
 def test_dirty_closeout_checks_blobs_when_status_stat_cache_matches(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, symlink: bool

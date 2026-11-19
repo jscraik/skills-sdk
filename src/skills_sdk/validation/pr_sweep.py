@@ -503,6 +503,8 @@ def _git_status_preflight(
     """Reject index or attributes that can hide dirt or execute a clean filter."""
     if depth > 8:
         return "git_status_unavailable", "submodule nesting exceeds safe inspection depth"
+    if private_root is not None and not _git_metadata_is_private(repo_root, private_root):
+        return "submodule_worktree_escape", "Git metadata leaves the private inspection snapshot"
     if _git_config_has_includes(repo_root) is not False:
         return "git_config_include", "Git includes or local status files prevent isolated inspection"
     for key in ("core.fileMode", "core.symlinks"):
