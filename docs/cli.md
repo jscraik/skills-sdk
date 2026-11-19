@@ -1228,8 +1228,9 @@ skills-sdk verify pr-sweep-dirty-closeout --repo-root ./primary-checkout --requi
 The recurring-finding command checks the ledger schema, normalized-invariant
 fingerprints, duplicate identities and occurrences, and the three-occurrence
 guardrail rule. The dirty-closeout command requires the explicit worktree top
-level and reads `git status` there without optional Git locks. A complete
-ledger permits non-destructive accounting only;
+level, copies it to a private temporary snapshot, and reads `git status` there
+without optional Git locks after rejecting executable clean-filter attributes.
+A complete ledger permits non-destructive accounting only;
 `--require-clean` still fails if any staged, unstaged, or untracked path exists.
 Both commands return `pr-sweep-validation/v1`: exit `0` for `pass` and `2` for
 `fail` or `blocked`. Host paths are input arguments; the result contains only

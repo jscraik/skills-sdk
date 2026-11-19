@@ -6,9 +6,12 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -18,6 +21,15 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
+
+_GIT_INSPECTION_CONFIG = (
+    "core.checkStat=default",
+    "core.fileMode=true",
+    "core.fsmonitor=false",
+    "core.ignoreStat=false",
+    "core.trustCtime=true",
+    "core.untrackedCache=false",
+)
 
 
 def _failure(kind: str, status: str, code: str, message: str) -> PrSweepValidationResult:
@@ -201,16 +213,17 @@ def _recognized_paths(value: Any) -> set[str]:
     return set()
 
 
-def _git_environment() -> dict[str, str]:
+def _git_environment(*, isolated: bool = False) -> dict[str, str]:
     discovery_keys = {"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}
     return {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key in discovery_keys}
 
 
 def _run_git(repo_root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+    config_args = [argument for setting in _GIT_INSPECTION_CONFIG for argument in ("-c", setting)]
     return subprocess.run(
-        ["git", "-c", "core.fsmonitor=false", "--no-optional-locks", *args],
+        ["git", *config_args, "--no-optional-locks", *args],
         cwd=repo_root,
-        env=_git_environment(),
+        env=_git_environment(isolated=force_worktree),
         input=input_text,
         text=True,
         capture_output=True,
@@ -219,10 +232,266 @@ def _run_git(repo_root: Path, *args: str, input_text: str | None = None) -> subp
     )
 
 
-def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | None, str | None]:
+def _resolved_git_path(repo_root: Path, *args: str, force_worktree: bool = False) -> Path:
+    completed = _run_git(repo_root, *args, force_worktree=force_worktree)
+    if completed.returncode != 0 or not completed.stdout.strip():
+        raise OSError("could not resolve Git metadata")
+    return Path(completed.stdout.strip()).resolve()
+
+
+def _materialize_git_metadata(
+    repo_root: Path, snapshot_root: Path, private_root: Path, copy_entry: Callable[[str, str], str]
+) -> None:
+    marker = snapshot_root / ".git"
+    if marker.is_dir() and not marker.is_symlink():
+        return
+    git_directory = _resolved_git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-dir")
+    common_directory = _resolved_git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if marker.exists() or marker.is_symlink():
+        marker.unlink()
+    shutil.copytree(git_directory, marker, symlinks=True, copy_function=copy_entry)
+    if common_directory == git_directory:
+        return
+    common_snapshot = private_root / "common-git-dir"
+    shutil.copytree(common_directory, common_snapshot, symlinks=True, copy_function=copy_entry)
+    copied_commondir = marker / "commondir"
+    if copied_commondir.is_symlink():
+        copied_commondir.unlink()
+    copied_commondir.write_text(os.path.relpath(common_snapshot, marker) + "\n", encoding="utf-8")
+    source_modules = common_snapshot / "modules"
+    if source_modules.is_dir() and not (marker / "modules").exists():
+        shutil.copytree(source_modules, marker / "modules", symlinks=True, copy_function=copy_entry)
+
+
+def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
+    repo_root = repo_root.resolve()
+    if private_root.resolve().is_relative_to(repo_root.resolve()):
+        raise OSError("private inspection directory is inside the supplied worktree")
+    ignored_result = _run_git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z")
+    tracked_result = _run_git(repo_root, "ls-files", "--cached", "-z")
+    if (
+        ignored_result.returncode != 0
+        or tracked_result.returncode != 0
+        or len(ignored_result.stdout) > 4 * 1024 * 1024
+        or len(tracked_result.stdout) > 4 * 1024 * 1024
+    ):
+        raise OSError("could not enumerate ignored snapshot paths")
+    ignored = {path for path in ignored_result.stdout.split("\0") if path}
+    tracked = {path for path in tracked_result.stdout.split("\0") if path}
+    copied_bytes = 0
+
+    def skip_ignored(directory: str, names: list[str]) -> set[str]:
+        relative = Path(directory).relative_to(repo_root)
+        skipped: set[str] = set()
+        for name in names:
+            path = (relative / name).as_posix()
+            if name not in {".gitattributes", ".gitignore"} and path in ignored:
+                skipped.add(name)
+            elif path not in tracked and name != ".git":
+                mode = os.lstat(Path(directory) / name).st_mode
+                if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
+                    entry = relative / name
+                    if not any(
+                        (repo_root / parent / ".git").exists() for parent in entry.parents if parent != Path(".")
+                    ):
+                        skipped.add(name)
+        return skipped
+
+    def copy_entry(source: str, destination: str) -> str:
+        nonlocal copied_bytes
+        mode = os.lstat(source).st_mode
+        if stat.S_ISREG(mode):
+            descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+            try:
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise OSError("snapshot source changed type while copying")
+                with os.fdopen(descriptor, "rb", closefd=False) as input_file, open(destination, "xb") as output_file:
+                    while chunk := input_file.read(1024 * 1024):
+                        copied_bytes += len(chunk)
+                        if copied_bytes > _MAX_SNAPSHOT_BYTES:
+                            raise OSError("private snapshot exceeds its copy budget")
+                        output_file.write(chunk)
+                shutil.copystat(source, destination, follow_symlinks=False)
+                return destination
+            finally:
+                os.close(descriptor)
+        if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
+            source_path = Path(source)
+            if source_path.is_relative_to(repo_root):
+                relative = source_path.relative_to(repo_root)
+                if relative.as_posix() in tracked or any(
+                    (repo_root / parent / ".git").exists() for parent in relative.parents if parent != Path(".")
+                ):
+                    raise OSError("tracked or submodule special file cannot be represented in private snapshot")
+            Path(destination).touch()
+            return destination
+        raise OSError("unsupported snapshot entry type")
+
+    snapshot_root = private_root / "worktree"
+    shutil.copytree(repo_root, snapshot_root, symlinks=True, ignore=skip_ignored, copy_function=copy_entry)
+    _materialize_git_metadata(repo_root, snapshot_root, private_root, copy_entry)
+    snapshot_ignored = _run_git(
+        snapshot_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z", force_worktree=True
+    )
+    if (
+        snapshot_ignored.returncode != 0
+        or len(snapshot_ignored.stdout) > 4 * 1024 * 1024
+        or not set(filter(None, snapshot_ignored.stdout.split("\0"))).issubset(ignored)
+    ):
+        raise OSError("ignored paths differ in the private snapshot")
+    if ignored:
+        checked = _run_git(
+            snapshot_root,
+            "check-ignore",
+            "--stdin",
+            "-z",
+            input_text="\0".join(sorted(ignored)) + "\0",
+            force_worktree=True,
+        )
+        if checked.returncode != 0 or set(filter(None, checked.stdout.split("\0"))) != ignored:
+            raise OSError("ignored paths are not ignored by the private snapshot")
+    current_ignored = _run_git(repo_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z")
+    if (
+        current_ignored.returncode != 0
+        or len(current_ignored.stdout) > 4 * 1024 * 1024
+        or set(filter(None, current_ignored.stdout.split("\0"))) != ignored
+    ):
+        raise OSError("ignored paths changed during private snapshot creation")
+    return snapshot_root
+
+
+def _git_metadata_is_private(repo_root: Path, private_root: Path) -> bool:
+    private_root = private_root.resolve()
+    metadata_roots: list[Path] = []
+    for argument in ("--git-dir", "--git-common-dir"):
+        try:
+            metadata_root = _resolved_git_path(
+                repo_root,
+                "rev-parse",
+                "--path-format=absolute",
+                argument,
+                force_worktree=True,
+            )
+            metadata_root.relative_to(private_root)
+        except (OSError, ValueError):
+            return False
+        metadata_roots.append(metadata_root)
+    for name in ("index", "config", "config.worktree", "objects", "info/attributes", "info/exclude"):
+        try:
+            _resolved_git_path(
+                repo_root,
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-path",
+                name,
+                force_worktree=True,
+            ).relative_to(private_root)
+        except (OSError, ValueError):
+            return False
+    for path in metadata_roots[0].glob("sharedindex.*"):
+        try:
+            path.resolve().relative_to(private_root)
+        except (OSError, RuntimeError, ValueError):
+            return False
+    for metadata_root in metadata_roots:
+        alternates = metadata_root / "objects" / "info" / "alternates"
+        if alternates.exists() or alternates.is_symlink():
+            return False
+
+    def reject_walk_error(error: OSError) -> None:
+        raise error
+
+    try:
+        inspected_directories: set[Path] = set()
+        for metadata_root in metadata_roots:
+            for directory, names, files in os.walk(metadata_root, followlinks=True, onerror=reject_walk_error):
+                resolved_directory = Path(directory).resolve()
+                if not resolved_directory.is_relative_to(private_root):
+                    return False
+                if resolved_directory in inspected_directories:
+                    names.clear()
+                    continue
+                inspected_directories.add(resolved_directory)
+                for name in names + files:
+                    entry = Path(directory) / name
+                    if entry.is_symlink() and not entry.resolve().is_relative_to(private_root):
+                        return False
+    except (OSError, RuntimeError):
+        return False
+    return True
+
+
+def _git_config_has_includes(repo_root: Path) -> bool | None:
+    worktree_config = _resolved_git_path(
+        repo_root, "rev-parse", "--path-format=absolute", "--git-path", "config.worktree", force_worktree=True
+    )
+    sources = [("--local",)]
+    if worktree_config.exists():
+        sources.append(("--file", str(worktree_config)))
+    for source in sources:
+        completed = _run_git(repo_root, "config", *source, "--no-includes", "--null", "--list", force_worktree=True)
+        if completed.returncode != 0:
+            return None
+        keys = (entry.partition("\n")[0].casefold() for entry in completed.stdout.split("\0") if entry)
+        if any(key == "include.path" or (key.startswith("includeif.") and key.endswith(".path")) for key in keys):
+            return True
+    return False
+
+
+def _ambient_status_config_is_supported(repo_root: Path) -> bool:
+    relevant = {
+        "core.autocrlf",
+        "core.eol",
+        "core.safecrlf",
+        "core.excludesfile",
+        "core.attributesfile",
+        "core.symlinks",
+        "core.filemode",
+        "core.ignorecase",
+    }
+    xdg_root = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    if any((xdg_root / "git" / name).exists() for name in ("ignore", "attributes")):
+        return False
+    system_attributes = _run_git(repo_root, "var", "GIT_ATTR_SYSTEM")
+    if system_attributes.returncode != 0 or not system_attributes.stdout.strip():
+        return False
+    if Path(system_attributes.stdout.strip()).exists():
+        return False
+    config_sources = (
+        ("--file", str(Path.home() / ".gitconfig")),
+        ("--file", str(xdg_root / "git" / "config")),
+        ("--system",),
+    )
+    for scope in config_sources:
+        if scope[0] == "--file" and not Path(scope[1]).exists():
+            continue
+        configured = _run_git(repo_root, "config", *scope, "--name-only", "--list")
+        if configured.returncode != 0 and "No such file or directory" in configured.stderr:
+            continue
+        if configured.returncode not in {0, 1}:
+            return False
+        keys = {key.casefold() for key in configured.stdout.splitlines()}
+        if (
+            keys & relevant
+            or "include.path" in keys
+            or any(key.startswith("includeif.") and key.endswith(".path") for key in keys)
+        ):
+            return False
+    return True
+
+
+def _git_status_preflight(
+    repo_root: Path, *, private_root: Path | None = None, depth: int = 0
+) -> tuple[str | None, str | None]:
     """Reject index or attributes that can hide dirt or execute a clean filter."""
     if depth > 8:
         return "git_status_unavailable", "submodule nesting exceeds safe inspection depth"
+    for key in ("core.fileMode", "core.symlinks"):
+        configured = _run_git(repo_root, "config", "--local", "--bool", "--get", key)
+        if configured.returncode not in {0, 1}:
+            return "git_status_unavailable", "could not inspect local Git filesystem settings"
+        if configured.stdout.strip() == "false":
+            return "git_filesystem_mode_unsupported", "Git filesystem settings prevent trustworthy content inspection"
     tracked = _run_git(repo_root, "ls-files", "-v", "-z")
     if tracked.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git paths"
@@ -231,7 +500,7 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
         return "git_status_unavailable", "could not parse tracked Git paths"
     if any(record[0].islower() or record[0] == "S" for record in records):
         return "index_visibility_flags", "index visibility flags prevent a trustworthy clean result"
-    staged = _run_git(repo_root, "ls-files", "--stage", "-z")
+    staged = _run_git(repo_root, "ls-files", "--stage", "-z", force_worktree=private_root is not None)
     if staged.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git modes"
     for record in staged.stdout.split("\0"):
@@ -244,12 +513,31 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
         if submodule_root.is_symlink():
             return "git_status_unavailable", "submodule path is not safe to inspect"
         if (submodule_root / ".git").exists():
-            blocker_code, blocker_message = _git_status_preflight(submodule_root, depth=depth + 1)
+            worktree = _run_git(submodule_root, "config", "--get", "core.worktree", force_worktree=True)
+            if worktree.returncode not in {0, 1}:
+                return "git_status_unavailable", "could not inspect submodule worktree configuration"
+            if worktree.returncode == 0:
+                git_directory = _resolved_git_path(
+                    submodule_root, "rev-parse", "--path-format=absolute", "--git-dir", force_worktree=True
+                )
+                if (git_directory / worktree.stdout.strip()).resolve() != submodule_root.resolve():
+                    return "submodule_worktree_escape", "submodule status would inspect outside the private snapshot"
+            blocker_code, blocker_message = _git_status_preflight(
+                submodule_root, private_root=private_root, depth=depth + 1
+            )
             if blocker_code is not None:
                 return blocker_code, blocker_message
     paths = [record[2:] for record in records]
     if paths:
-        attributes = _run_git(repo_root, "check-attr", "-z", "--stdin", "filter", input_text="\0".join(paths) + "\0")
+        attributes = _run_git(
+            repo_root,
+            "check-attr",
+            "-z",
+            "--stdin",
+            "filter",
+            input_text="\0".join(paths) + "\0",
+            force_worktree=private_root is not None,
+        )
         if attributes.returncode != 0:
             return "git_status_unavailable", "could not inspect tracked Git attributes"
         fields = attributes.stdout.split("\0")
@@ -260,10 +548,73 @@ def _git_status_preflight(repo_root: Path, *, depth: int = 0) -> tuple[str | Non
     return None, None
 
 
+def _content_dirty_paths(repo_root: Path) -> set[str]:
+    """Compare index blobs independently of Git's cached filesystem metadata."""
+    staged = _run_git(repo_root, "ls-files", "--stage", "-z")
+    if staged.returncode != 0:
+        raise OSError("could not inspect index objects")
+    dirty: set[str] = set()
+    regular: list[tuple[str, str]] = []
+    for record in filter(None, staged.stdout.split("\0")):
+        metadata, path = record.split("\t", 1)
+        mode, object_id, stage = metadata.split()
+        if stage != "0":
+            continue  # Unmerged entries are already reported by status.
+        target = repo_root / path
+        if mode == "160000":
+            if (target / ".git").exists() and _content_dirty_paths(target):
+                dirty.add(path)
+            continue
+        try:
+            file_mode = target.lstat().st_mode
+        except (FileNotFoundError, NotADirectoryError):
+            dirty.add(path)  # The preflight has already rejected skip-worktree entries.
+            continue
+        if mode == "120000" and stat.S_ISLNK(file_mode):
+            hashed = _run_git(repo_root, "hash-object", "--stdin", input_text=os.readlink(target))
+        elif mode in {"100644", "100755"} and stat.S_ISREG(file_mode):
+            if "\n" in path or "\r" in path:
+                raise OSError("tracked path cannot be safely batched for content inspection")
+            regular.append((path, object_id))
+            continue
+        else:
+            dirty.add(path)
+            continue
+        if hashed.returncode != 0:
+            raise OSError("could not hash tracked content")
+        if hashed.stdout.strip() != object_id:
+            dirty.add(path)
+    if regular:
+        # --stdin-paths applies each path's staging conversions in one Git process.
+        # Preflight has rejected attributes that could execute a filter.
+        paths = "\n".join('"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"' for path, _ in regular) + "\n"
+        hashed = _run_git(repo_root, "hash-object", "--stdin-paths", input_text=paths)
+        object_ids = hashed.stdout.splitlines()
+        if hashed.returncode != 0 or len(object_ids) != len(regular):
+            raise OSError("could not hash tracked content")
+        mismatched = [
+            (path, expected) for (path, expected), actual in zip(regular, object_ids, strict=True) if actual != expected
+        ]
+        if mismatched:
+            # Git preserves an index blob's raw CRLF bytes when autocrlf changes
+            # after staging. A raw match is clean even if a new conversion differs.
+            raw_paths = (
+                "\n".join('"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"' for path, _ in mismatched) + "\n"
+            )
+            raw = _run_git(repo_root, "hash-object", "--stdin-paths", "--no-filters", input_text=raw_paths)
+            raw_ids = raw.stdout.splitlines()
+            if raw.returncode != 0 or len(raw_ids) != len(mismatched):
+                raise OSError("could not hash tracked content without conversions")
+            dirty.update(
+                path for (path, expected), actual in zip(mismatched, raw_ids, strict=True) if actual != expected
+            )
+    return dirty
+
+
 def validate_pr_sweep_dirty_closeout(
     repo_root: Path, *, ledger_path: Path | None = None, require_clean: bool = False
 ) -> PrSweepValidationResult:
-    """Account for primary-checkout dirt; never equate a ledger with cleanliness."""
+    """Account for primary-checkout dirt from a private snapshot; never waive cleanliness."""
     try:
         top_level = _run_git(repo_root, "rev-parse", "--show-toplevel")
         if top_level.returncode != 0 or Path(top_level.stdout.strip()).resolve() != repo_root.resolve():
@@ -276,13 +627,23 @@ def validate_pr_sweep_dirty_closeout(
         completed = _run_git(
             repo_root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"
         )
-    except (OSError, UnicodeError, RuntimeError, subprocess.TimeoutExpired):
+        content_dirty = _content_dirty_paths(repo_root)
+    except (OSError, UnicodeError, ValueError, RuntimeError, subprocess.TimeoutExpired):
         return _failure("dirty_closeout", "blocked", "git_status_unavailable", "could not inspect Git dirty state")
     if completed.returncode != 0:
         return _failure(
             "dirty_closeout", "blocked", "git_status_unavailable", "Git status failed in the supplied repository root"
         )
-    state = _parse_porcelain(completed.stdout)
+    try:
+        state = _parse_porcelain(completed.stdout)
+        state = PrSweepDirtyState(
+            staged_paths=state.staged_paths,
+            unstaged_paths=tuple(sorted(set(state.unstaged_paths) | content_dirty)),
+            untracked_paths=state.untracked_paths,
+            dirty_paths=tuple(sorted(set(state.dirty_paths) | content_dirty)),
+        )
+    except (ValueError, ContractError):
+        return _failure("dirty_closeout", "blocked", "git_status_unavailable", "could not verify Git dirty paths")
     ledgered: set[str] = set()
     findings: list[PrSweepFinding] = []
     if ledger_path is not None:
