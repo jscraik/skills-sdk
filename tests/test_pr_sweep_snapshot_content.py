@@ -1,4 +1,4 @@
-"""Content and submodule inspection regressions."""
+"""Private snapshot submodule and content-hashing regressions."""
 
 from __future__ import annotations
 
@@ -10,9 +10,28 @@ import pytest
 
 from skills_sdk.validation import validate_pr_sweep_dirty_closeout
 
+_GIT_LOCATION_VARIABLES = frozenset(
+    {
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_INDEX_FILE",
+        "GIT_COMMON_DIR",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_CEILING_DIRECTORIES",
+        "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+        "GIT_IMPLICIT_WORK_TREE",
+        "GIT_PREFIX",
+    }
+)
+
+
+def _git_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", *args], cwd=repo, env=_git_environment(), check=True, capture_output=True, text=True)
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -36,6 +55,34 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
+@pytest.mark.parametrize("variable", sorted(_GIT_LOCATION_VARIABLES))
+def test_fixture_git_ignores_repository_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variable: str
+) -> None:
+    monkeypatch.setenv(variable, str(tmp_path / "unrelated"))
+    monkeypatch.setenv("SDK_FIXTURE_MARKER", "preserved")
+    assert _git_environment()["SDK_FIXTURE_MARKER"] == "preserved"
+    assert variable not in _git_environment()
+    repo = _repo(tmp_path)
+    assert (repo / ".git" / "index").is_file()
+
+
+def test_fixture_git_calls_preserve_inherited_repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    caller = _repo(tmp_path)
+    index_before = (caller / ".git" / "index").read_bytes()
+    head_before = (caller / ".git" / "HEAD").read_bytes()
+    monkeypatch.setenv("GIT_DIR", str(caller / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(caller))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(caller / ".git" / "index"))
+    fixture_parent = tmp_path / "fixture"
+    fixture_parent.mkdir()
+    fixture = _repo(fixture_parent)
+
+    assert (fixture / ".git" / "index").is_file()
+    assert (caller / ".git" / "index").read_bytes() == index_before
+    assert (caller / ".git" / "HEAD").read_bytes() == head_before
+
+
 def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path) -> None:
     source = _repo(tmp_path)
     parent = tmp_path / "parent"
@@ -44,6 +91,7 @@ def test_dirty_closeout_sees_submodule_even_when_repo_ignores_it(tmp_path: Path)
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_git_environment(),
         check=True,
         capture_output=True,
         text=True,
@@ -84,6 +132,7 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_git_environment(),
         check=True,
         capture_output=True,
         text=True,
@@ -98,24 +147,33 @@ def test_dirty_closeout_blocks_submodule_clean_filter(tmp_path: Path) -> None:
     assert not sentinel.exists()
 
 
-def test_submodule_absolute_metadata_pointer_blocks_private_inspection(tmp_path: Path) -> None:
+@pytest.mark.parametrize("config_key", ["core.attributesFile", "include.path"])
+def test_dirty_closeout_blocks_submodule_external_configuration(tmp_path: Path, config_key: str) -> None:
     source = _repo(tmp_path)
-    parent = tmp_path / "parent-absolute"
+    parent = tmp_path / "parent-external-config"
     parent.mkdir()
     _git(parent, "init")
     subprocess.run(
         ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(source), "module"],
         cwd=parent,
+        env=_git_environment(),
         check=True,
         capture_output=True,
         text=True,
     )
-    marker = parent / "module" / ".git"
-    metadata = (marker.parent / marker.read_text().strip().removeprefix("gitdir: ")).resolve()
-    marker.write_text(f"gitdir: {metadata}\n")
+    sentinel = tmp_path / "external-filter-ran"
+    external = tmp_path / "external-config"
+    if config_key == "core.attributesFile":
+        external.write_text("tracked.txt filter=evil\n", encoding="utf-8")
+    else:
+        external.write_text(f'[filter "evil"]\n clean = touch {sentinel}\n', encoding="utf-8")
+    _git(parent / "module", "config", "filter.evil.clean", f"touch {sentinel}")
+    _git(parent / "module", "config", config_key, str(external))
+    (parent / "module" / "tracked.txt").write_text("changed\n", encoding="utf-8")
     result = validate_pr_sweep_dirty_closeout(parent, require_clean=True)
     assert result.status == "blocked"
-    assert result.findings[0].code == "submodule_worktree_escape"
+    assert result.findings[0].code == "git_config_include"
+    assert not sentinel.exists()
 
 
 @pytest.mark.parametrize("symlink", [False, True])

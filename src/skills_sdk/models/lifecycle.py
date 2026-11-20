@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
@@ -13,35 +12,15 @@ from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _Con
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import ReceiptId
 from skills_sdk.models.registry import RegistryIdentity, RegistryPreparationBlocker
+from skills_sdk.models.safety import _public_text_is_redaction_safe
 
 RuntimeIdentifier = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")]
-_CREDENTIAL_PREFIXES = ("aiza", "akia", "bearer", "ghp_", "github_pat_", "hf_", "sk-", "xoxb-", "xoxp-")
-_CREDENTIAL_PATTERN = re.compile(
-    rf"(?:^|[^A-Za-z0-9])(?:{'|'.join(re.escape(prefix) for prefix in _CREDENTIAL_PREFIXES)}|"
-    r"-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----|"
-    r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|"
-    r"(?:client|access)[_-]?(?:secret|token|key(?:[_-]?id)?)|"
-    r"(?:(?:ssh_)?private[_-]?key|api[_-]?key|credential|password|secret|token)"
-    r"(?:[_-][A-Za-z0-9]+)*"
-    r"[\"']?[\s\u001c-\u001f\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*[:=])",
-    re.IGNORECASE | re.ASCII,
-)
-_MACHINE_PATH_PATTERN = re.compile(
-    r"(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\$[A-Za-z_][A-Za-z0-9_]*/|"
-    r"(?:[A-Za-z0-9._-]+\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\|(?:^|[^A-Za-z0-9/])/(?!/)|"
-    r"(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|"
-    r"[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|"
-    r"(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|"
-    r"[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|"
-    r"[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|"
-    r"(?:^|[^A-Za-z0-9])[A-Za-z]:"
-)
 
 
 def lifecycle_text_is_public_safe(value: str) -> bool:
     """Return whether lifecycle public text avoids secret and host-path shapes."""
 
-    return _CREDENTIAL_PATTERN.search(value) is None and _MACHINE_PATH_PATTERN.search(value) is None
+    return _public_text_is_redaction_safe(value)
 
 
 def _require_public_text(value: str, field: str) -> str:

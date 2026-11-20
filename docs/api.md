@@ -529,10 +529,10 @@ maintenance. Complete-plugin capture has its own separate resource limits.
   same projection: the complete warning is digest-bound, safe portable evidence
   references remain readable, and raw warning IDs/messages are not copied.
   This service performs no registry I/O or publication.
-  Credential-shaped request evidence is rejected. Unsafe source blocker
-  code/message text is replaced by a generic typed blocker and bound through
-  `source_blocker_sha256`; safe source metadata and portable references remain
-  readable.
+  Credential- or machine-path-shaped request evidence is rejected. Unsafe
+  source blocker code/message text is replaced by a generic typed blocker and
+  bound through `source_blocker_sha256`; safe source metadata and portable
+  references remain readable.
 - **Package safety evidence:** `PackageSafetyEvidenceReceipt`,
   `PackageSafetyEvidenceReference`, `PackageSafetyFinding`, and
   `PackageSafetyBlocker`. The receipt binds one exact candidate and the

@@ -62,8 +62,12 @@ def _write_ledger(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def _fixture_git_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True, env=_fixture_git_environment())
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -230,7 +234,7 @@ def test_dirty_closeout_git_failure_is_typed_blocker(tmp_path: Path) -> None:
 
 def test_dirty_closeout_blocks_unsafe_combined_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path)
-    monkeypatch.setattr(pr_sweep_validation, "_content_dirty_paths", lambda _repo, **_kwargs: {"report:old.txt"})
+    monkeypatch.setattr(pr_sweep_validation, "_content_dirty_paths", lambda _repo: {"report:old.txt"})
     result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
