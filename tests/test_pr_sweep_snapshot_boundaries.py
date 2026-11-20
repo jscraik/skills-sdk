@@ -11,8 +11,12 @@ import pytest
 from skills_sdk.validation import pr_sweep as pr_sweep_validation
 
 
+def _fixture_git_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True, env=_fixture_git_environment())
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -83,6 +87,7 @@ def test_snapshot_matches_source_status_for_untracked_fifo(tmp_path: Path) -> No
     source_status = subprocess.run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
         cwd=repo,
+        env=_fixture_git_environment(),
         check=True,
         capture_output=True,
         text=True,

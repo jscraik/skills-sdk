@@ -632,6 +632,10 @@ evaluation v1/v2 semantics. Unknown receipt families continue to fail closed.
 Blocked preparation binds non-path or credential-shaped hardening evidence by
 SHA-256 separately from portable `evidence_refs`, so valid hardening inputs are
 neither silently discarded nor exposed or reinterpreted as filesystem paths.
+Registry public text shares lifecycle screening for generic secret assignments,
+private-key markers, JWTs, file URIs, machine paths, and control-whitespace
+assignment forms. Unsafe source blocker text is replaced by fixed metadata and
+retained only through `source_blocker_sha256`.
 This contract records local preparation only; a future publication adapter must
 produce separate registry evidence and bind the same candidate identity.
 

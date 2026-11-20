@@ -12,6 +12,7 @@ from local_check_schema import append_local_check_constraints
 from package_archive_schema import append_package_archive_constraints
 from pre_execution_safety_schema import append_pre_execution_safety_constraints
 from provider_execution_schema import append_provider_execution_constraints
+from registry_public_text_schema import append_registry_identity_constraints
 from runtime_lifecycle_schema import append_runtime_lifecycle_constraints
 from scenario_quality_schema import append_scenario_quality_constraints
 from schema_model_groups import (
@@ -59,17 +60,9 @@ _PORTABLE_PATH_PATTERN = (
 _NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"
 _NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
 _PROVIDER_IDENTITY_FIELDS = ("provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest")
-_REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN = (
-    r"(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
-    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
-)
 _V1_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"(^|[._:+-])(?:[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
     r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
-)
-_REGISTRY_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
-    r"(^|[._:+-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
-    r"[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
 )
 _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
     r"(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|"
@@ -107,39 +100,6 @@ def _append_provider_identity_constraints(schema: Any) -> None:
     elif isinstance(schema, list):
         for value in schema:
             _append_provider_identity_constraints(value)
-
-
-def _append_registry_identity_constraints(schema: Any) -> None:
-    """Project the secret-free contract into registry identity schemas."""
-    if isinstance(schema, dict):
-        title = schema.get("title")
-        if title == "RegistryIdentity":
-            properties = schema.get("properties", {})
-            for field in ("registry_id", "namespace"):
-                properties[field]["not"] = {"pattern": _REGISTRY_CREDENTIAL_COMPONENT_SCHEMA_PATTERN}
-        elif title in {"RegistryPreparationRequest", "RegistryPreparationReceipt"}:
-            properties = schema["properties"]
-            for field in ("package_name", "version"):
-                properties[field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
-            properties["version"]["pattern"] = _NORMALIZED_TEXT_PATTERN
-            if title == "RegistryPreparationRequest":
-                properties["evidence"]["uniqueItems"] = True
-            properties["evidence"]["items"]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
-        elif title == "RegistryPreparationBlocker":
-            for field in ("code", "message"):
-                schema["properties"][field]["not"] = {"pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN}
-            schema["properties"]["evidence_refs"]["items"]["not"] = {
-                "pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN
-            }
-        elif title == "RegistryPreparationWarning":
-            schema["properties"]["evidence_refs"]["items"]["not"] = {
-                "pattern": _REGISTRY_PUBLIC_CREDENTIAL_SCHEMA_PATTERN
-            }
-        for value in schema.values():
-            _append_registry_identity_constraints(value)
-    elif isinstance(schema, list):
-        for value in schema:
-            _append_registry_identity_constraints(value)
 
 
 def _append_registry_preparation_constraints(schema: dict[str, Any]) -> None:
@@ -625,7 +585,7 @@ def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str
     _append_portable_path_constraints(schema)
     _append_provider_identity_constraints(schema)
     append_selected_case_constraints(schema, filename)
-    _append_registry_identity_constraints(schema)
+    append_registry_identity_constraints(schema, filename)
     package_safety_schema.append_package_safety_schema_constraints(schema, filename)
     if filename in {"package-receipt.v1.schema.json", "package-receipt.v2.schema.json"}:
         schema["allOf"] = [

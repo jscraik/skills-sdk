@@ -30,6 +30,7 @@ _GIT_INSPECTION_CONFIG = (
     "core.trustCtime=true",
     "core.untrackedCache=false",
 )
+_MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024
 
 
 def _failure(kind: str, status: str, code: str, message: str) -> PrSweepValidationResult:
@@ -215,13 +216,21 @@ def _recognized_paths(value: Any) -> set[str]:
 
 def _git_environment(*, isolated: bool = False) -> dict[str, str]:
     discovery_keys = {"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}
-    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key in discovery_keys}
+    environment = {
+        key: value for key, value in os.environ.items() if not key.startswith("GIT_") or key in discovery_keys
+    }
+    environment["LC_ALL"] = "C"
+    if isolated:
+        environment.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_ATTR_NOSYSTEM="1")
+    return environment
 
 
-def _run_git(repo_root: Path, *args: str, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+def _run_git(
+    repo_root: Path, *args: str, input_text: str | None = None, force_worktree: bool = False
+) -> subprocess.CompletedProcess[str]:
     config_args = [argument for setting in _GIT_INSPECTION_CONFIG for argument in ("-c", setting)]
     return subprocess.run(
-        ["git", *config_args, "--no-optional-locks", *args],
+        ["git", *config_args, *([f"--work-tree={repo_root}"] if force_worktree else []), "--no-optional-locks", *args],
         cwd=repo_root,
         env=_git_environment(isolated=force_worktree),
         input=input_text,
@@ -433,7 +442,11 @@ def _git_config_has_includes(repo_root: Path) -> bool | None:
         if completed.returncode != 0:
             return None
         keys = (entry.partition("\n")[0].casefold() for entry in completed.stdout.split("\0") if entry)
-        if any(key == "include.path" or (key.startswith("includeif.") and key.endswith(".path")) for key in keys):
+        if any(
+            key in {"include.path", "core.attributesfile", "core.excludesfile"}
+            or (key.startswith("includeif.") and key.endswith(".path"))
+            for key in keys
+        ):
             return True
     return False
 
@@ -486,13 +499,20 @@ def _git_status_preflight(
     """Reject index or attributes that can hide dirt or execute a clean filter."""
     if depth > 8:
         return "git_status_unavailable", "submodule nesting exceeds safe inspection depth"
+    if private_root is not None:
+        if not _git_metadata_is_private(repo_root, private_root):
+            return "git_status_unavailable", "Git metadata escapes the private snapshot"
+        if _git_config_has_includes(repo_root) is not False:
+            return "git_config_include", "Git configuration references paths outside the private snapshot"
     for key in ("core.fileMode", "core.symlinks"):
-        configured = _run_git(repo_root, "config", "--local", "--bool", "--get", key)
+        configured = _run_git(
+            repo_root, "config", "--local", "--bool", "--get", key, force_worktree=private_root is not None
+        )
         if configured.returncode not in {0, 1}:
             return "git_status_unavailable", "could not inspect local Git filesystem settings"
         if configured.stdout.strip() == "false":
             return "git_filesystem_mode_unsupported", "Git filesystem settings prevent trustworthy content inspection"
-    tracked = _run_git(repo_root, "ls-files", "-v", "-z")
+    tracked = _run_git(repo_root, "ls-files", "-v", "-z", force_worktree=private_root is not None)
     if tracked.returncode != 0:
         return "git_status_unavailable", "could not inspect tracked Git paths"
     records = [record for record in tracked.stdout.split("\0") if record]
@@ -550,7 +570,7 @@ def _git_status_preflight(
 
 def _content_dirty_paths(repo_root: Path) -> set[str]:
     """Compare index blobs independently of Git's cached filesystem metadata."""
-    staged = _run_git(repo_root, "ls-files", "--stage", "-z")
+    staged = _run_git(repo_root, "ls-files", "--stage", "-z", force_worktree=True)
     if staged.returncode != 0:
         raise OSError("could not inspect index objects")
     dirty: set[str] = set()
@@ -571,7 +591,7 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
             dirty.add(path)  # The preflight has already rejected skip-worktree entries.
             continue
         if mode == "120000" and stat.S_ISLNK(file_mode):
-            hashed = _run_git(repo_root, "hash-object", "--stdin", input_text=os.readlink(target))
+            hashed = _run_git(repo_root, "hash-object", "--stdin", input_text=os.readlink(target), force_worktree=True)
         elif mode in {"100644", "100755"} and stat.S_ISREG(file_mode):
             if "\n" in path or "\r" in path:
                 raise OSError("tracked path cannot be safely batched for content inspection")
@@ -588,7 +608,7 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
         # --stdin-paths applies each path's staging conversions in one Git process.
         # Preflight has rejected attributes that could execute a filter.
         paths = "\n".join('"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"' for path, _ in regular) + "\n"
-        hashed = _run_git(repo_root, "hash-object", "--stdin-paths", input_text=paths)
+        hashed = _run_git(repo_root, "hash-object", "--stdin-paths", input_text=paths, force_worktree=True)
         object_ids = hashed.stdout.splitlines()
         if hashed.returncode != 0 or len(object_ids) != len(regular):
             raise OSError("could not hash tracked content")
@@ -601,7 +621,9 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
             raw_paths = (
                 "\n".join('"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"' for path, _ in mismatched) + "\n"
             )
-            raw = _run_git(repo_root, "hash-object", "--stdin-paths", "--no-filters", input_text=raw_paths)
+            raw = _run_git(
+                repo_root, "hash-object", "--stdin-paths", "--no-filters", input_text=raw_paths, force_worktree=True
+            )
             raw_ids = raw.stdout.splitlines()
             if raw.returncode != 0 or len(raw_ids) != len(mismatched):
                 raise OSError("could not hash tracked content without conversions")
@@ -614,20 +636,46 @@ def _content_dirty_paths(repo_root: Path) -> set[str]:
 def validate_pr_sweep_dirty_closeout(
     repo_root: Path, *, ledger_path: Path | None = None, require_clean: bool = False
 ) -> PrSweepValidationResult:
-    """Account for primary-checkout dirt from a private snapshot; never waive cleanliness."""
+    """Account for dirt observed in a private snapshot, never waive cleanliness.
+
+    The result describes the copied state, not a lock on the primary checkout.
+    Concurrent source edits during or after copying need a new validation run;
+    copying and inspection do not provide an atomic primary-checkout assertion.
+    """
     try:
         top_level = _run_git(repo_root, "rev-parse", "--show-toplevel")
         if top_level.returncode != 0 or Path(top_level.stdout.strip()).resolve() != repo_root.resolve():
             return _failure(
                 "dirty_closeout", "blocked", "invalid_repo_root", "supplied root is not a worktree top level"
             )
-        blocker_code, blocker_message = _git_status_preflight(repo_root)
-        if blocker_code is not None and blocker_message is not None:
-            return _failure("dirty_closeout", "blocked", blocker_code, blocker_message)
-        completed = _run_git(
-            repo_root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"
-        )
-        content_dirty = _content_dirty_paths(repo_root)
+        if not _ambient_status_config_is_supported(repo_root):
+            return _failure(
+                "dirty_closeout", "blocked", "ambient_git_config", "ambient Git status configuration is unsupported"
+            )
+        with TemporaryDirectory(prefix="sdk-pr-sweep-") as directory:
+            private_root = Path(directory).resolve()
+            if private_root.is_relative_to(repo_root.resolve()):
+                raise OSError("snapshot must be outside source checkout")
+            snapshot = _snapshot_worktree(repo_root, private_root)
+            if not _git_metadata_is_private(snapshot, private_root):
+                raise OSError("snapshot metadata leaves private directory")
+            if _git_config_has_includes(snapshot) is not False:
+                return _failure(
+                    "dirty_closeout", "blocked", "git_config_include", "Git config paths prevent private inspection"
+                )
+            blocker_code, blocker_message = _git_status_preflight(snapshot, private_root=private_root)
+            if blocker_code is not None and blocker_message is not None:
+                return _failure("dirty_closeout", "blocked", blocker_code, blocker_message)
+            completed = _run_git(
+                snapshot,
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+                "--ignore-submodules=none",
+                force_worktree=True,
+            )
+            content_dirty = _content_dirty_paths(snapshot)
     except (OSError, UnicodeError, ValueError, RuntimeError, subprocess.TimeoutExpired):
         return _failure("dirty_closeout", "blocked", "git_status_unavailable", "could not inspect Git dirty state")
     if completed.returncode != 0:
