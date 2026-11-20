@@ -13,11 +13,11 @@ from that SDK revision to HEAD may change only .tessl/stage78-test/ files.
 Stop and report any mismatch.
 
 Before running any checkout code, create a fresh private directory outside the
-checkout. Create a separate fresh bare clone from
+checkout. Create a separate fresh bare clone at BARE_CLONE from
 https://github.com/jscraik/skills-sdk.git, with system and global Git configuration
 disabled and no inherited GIT_* settings. Verify EXPECTED_HEAD is present there.
 Materialise the committed tree from that fresh bare clone with
-`git -c core.attributesFile=/dev/null archive --format=tar "$EXPECTED_HEAD" | tar -xf - -C "$RUN_ROOT"`,
+`git --git-dir="$BARE_CLONE" -c core.attributesFile=/dev/null archive --format=tar "$EXPECTED_HEAD" | tar -xf - -C "$RUN_ROOT"`,
 where RUN_ROOT is the newly created empty directory. Check both pipeline exit
 codes. Run dependency setup and pytest only inside RUN_ROOT. Never copy the
 original working tree, its ignored files or its untracked files into RUN_ROOT.
