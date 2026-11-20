@@ -10,10 +10,15 @@ jobs:
       - run:
           name: Validate trusted PR contract and prepare merge result
           command: bash scripts/circleci_pr_contract.sh
+      # CircleCI can match a prefix internally; supply no partial fallback key.
+      - restore_cache:
+          key: &mise-cache-key 'sdk-mise-main-v1-linux-x64-{{ checksum "scripts/circleci-mise-bootstrap.sh" }}-archive'
+      - run: &prepare-mise-archive
+          name: Prepare pinned mise archive
+          command: bash scripts/circleci-mise-bootstrap.sh
       - run: &install-tools
           name: Install pinned repository tools
           command: |
-            curl --fail --location --retry 3 --max-time 120 https://github.com/jdx/mise/releases/download/v2026.8.14/mise-v2026.8.14-linux-x64.tar.gz -o /tmp/mise.tar.gz
             echo "64d5f34aeb7a4e0e327dc1c9be66cd8162e14899a47b11901154a100285a3d61  /tmp/mise.tar.gz" | sha256sum -c -
             tar -xzf /tmp/mise.tar.gz -C /tmp
             sudo install /tmp/mise/bin/mise /usr/local/bin/mise
@@ -22,6 +27,13 @@ jobs:
             env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise install python uv ruff vale
             env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- uv sync --frozen
             printf 'export MISE_CEILING_PATHS=%q\nexport MISE_TRUSTED_CONFIG_PATHS=%q\n' "$MISE_CEILING_PATHS" "$MISE_TRUSTED_CONFIG_PATHS" >> "$BASH_ENV"
+      - when:
+          condition:
+            equal: [main, << pipeline.git.branch >>]
+          steps:
+            - save_cache:
+                key: *mise-cache-key
+                paths: [/tmp/mise.tar.gz]
       - run:
           name: Quality and schema checks
           command: env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_PERSONAL_ACCESS_TOKEN mise exec -- bash scripts/validate-repository.sh quality
@@ -87,6 +99,9 @@ jobs:
               (cd /tmp/sdk-ci && sha256sum -c wheel.sha256)
               cp -R /tmp/sdk-ci/dist .
             fi
+      - restore_cache:
+          key: *mise-cache-key
+      - run: *prepare-mise-archive
       - run: *install-tools
       - run:
           name: Full tests (two shards, four workers each)
@@ -111,6 +126,9 @@ jobs:
     steps:
       - attach_workspace: *attach-source
       - run: *restore-source
+      - restore_cache:
+          key: *mise-cache-key
+      - run: *prepare-mise-archive
       - run: *install-tools
       - run:
           name: Installed public API and CLI proof
@@ -127,6 +145,9 @@ jobs:
     steps:
       - attach_workspace: *attach-source
       - run: *restore-source
+      - restore_cache:
+          key: *mise-cache-key
+      - run: *prepare-mise-archive
       - run: *install-tools
       - run:
           name: Verify complete test coverage for the prepared revision
