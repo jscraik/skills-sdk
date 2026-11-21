@@ -2,7 +2,6 @@
 
 import hashlib
 import os
-from pathlib import Path
 import re
 import shlex
 import shutil
@@ -10,18 +9,23 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP = "scripts/circleci-mise-bootstrap.sh"
-ARCHIVE = "/tmp/mise.tar.gz"
+ARCHIVE = next(
+    line.removeprefix("readonly mise_archive=")
+    for line in (ROOT / BOOTSTRAP).read_text().splitlines()
+    if line.startswith("readonly mise_archive=")
+)
 PINNED_BYTES = b"synthetic pinned archive bytes"
 
 
 def _supply_checksum_tool(work: Path) -> None:
     """Use the real Linux utility when available, or model its stdin format."""
-    if shutil.which("sha256sum") is not None:
+    if sys.platform == "linux" and shutil.which("sha256sum") is not None:
         return
     checksum = work / "sha256sum"
     checksum.write_text(
@@ -68,7 +72,7 @@ class TestCircleCIMiseBootstrap(unittest.TestCase):
             flags=re.MULTILINE,
         )
         source = source.replace(f"={ARCHIVE}", f"={shlex.quote(str(self.archive))}")
-        source = source.replace("/tmp/sdk-mise.XXXXXXXX", shlex.quote(str(work / "stage.XXXXXXXX")))
+        source = re.sub(r"mktemp -d [^)]*", f"mktemp -d {shlex.quote(str(work / 'stage.XXXXXXXX'))}", source)
         self.script = work / "bootstrap.sh"
         self.script.write_text(source, encoding="utf-8")
 
