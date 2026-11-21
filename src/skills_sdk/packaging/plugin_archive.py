@@ -34,6 +34,14 @@ def _zip(files: tuple[PluginCapturedFile, ...], payloads: dict[str, bytes]) -> b
 def _require_distinct_paths(paths: tuple[str, ...]) -> None:
     seen: set[str] = set()
     for path in paths:
+        for component in PurePosixPath(path).parts:
+            if component.endswith((".", " ")) or any(char in '<>:"\\|?*' or ord(char) < 32 for char in component):
+                raise ContractError("plugin_archive_path_unsupported", "Archive path is not portable on restore")
+            stem = component.split(".", 1)[0].rstrip(" ").upper()
+            if stem in {"CON", "PRN", "AUX", "NUL"} or (
+                stem[:3] in {"COM", "LPT"} and len(stem) == 4 and stem[3] in "123456789¹²³"
+            ):
+                raise ContractError("plugin_archive_path_unsupported", "Archive path names a reserved device")
         key = normalize("NFC", normalize("NFC", path).casefold())
         if key in seen:
             raise ContractError("plugin_archive_path_collision", "Archive paths collide on portable restore")

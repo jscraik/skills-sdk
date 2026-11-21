@@ -1500,6 +1500,8 @@ whole-plugin hardening receipt and checks the source file inventory, SHA-256
 digests and ordinary file permissions before and after emission. It preserves
 regular file bytes and modes, including executability. Empty directories are
 rejected because the receipt does not represent them. Paths that collide after Unicode normalisation and case folding are rejected.
+Windows reserved device names, trailing dots or spaces, and characters rewritten
+or rejected during Windows extraction are rejected before emission.
 Directory permissions are outside the contract. A typed `ContractError` reports unsafe source,
 blocked hardening and drift. The bytes carry no release or publication authority.
 
