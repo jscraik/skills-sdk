@@ -38,7 +38,7 @@ def _require_distinct_paths(paths: tuple[str, ...]) -> None:
             if component.endswith((".", " ")) or any(char in '<>:"\\|?*' or ord(char) < 32 for char in component):
                 raise ContractError("plugin_archive_path_unsupported", "Archive path is not portable on restore")
             stem = component.split(".", 1)[0].rstrip(" ").upper()
-            if stem in {"CON", "PRN", "AUX", "NUL"} or (
+            if stem in {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"} or (
                 stem[:3] in {"COM", "LPT"} and len(stem) == 4 and stem[3] in "123456789¹²³"
             ):
                 raise ContractError("plugin_archive_path_unsupported", "Archive path names a reserved device")

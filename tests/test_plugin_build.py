@@ -181,7 +181,21 @@ def test_plugin_archive_rejects_windows_restore_rewrites(path: str) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    ["CON", "aux.json", "assets/NUL.txt", "COM1.log", "LPT¹.txt", "COM²/a.txt", "NUL .txt", "COM1 .log", "AUX .json"],
+    [
+        "CON",
+        "aux.json",
+        "assets/NUL.txt",
+        "COM1.log",
+        "LPT¹.txt",
+        "COM²/a.txt",
+        "NUL .txt",
+        "COM1 .log",
+        "AUX .json",
+        "CONIN$",
+        "assets/CONOUT$.txt",
+        "conin$.json",
+        "CONOUT$/a.txt",
+    ],
 )
 def test_plugin_archive_rejects_windows_device_names(path: str) -> None:
     with pytest.raises(ContractError, match="plugin_archive_path_unsupported"):
