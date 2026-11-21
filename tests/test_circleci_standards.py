@@ -166,7 +166,17 @@ def test_circleci_contract_rejects_missing_trust_proof_and_bad_order(
     else:
         parsed = yaml.safe_load(text)
         steps = parsed["jobs"]["prepare"]["steps"]
-        steps[1], steps[3] = steps[3], steps[1]
+        contract_index = next(
+            index
+            for index, step in enumerate(steps)
+            if isinstance(step, dict) and "circleci_pr_contract.sh" in str(step.get("run", ""))
+        )
+        quality_index = next(
+            index
+            for index, step in enumerate(steps)
+            if isinstance(step, dict) and "validate-repository.sh quality" in str(step.get("run", ""))
+        )
+        steps[contract_index], steps[quality_index] = steps[quality_index], steps[contract_index]
         text = yaml.safe_dump(parsed)
     config.write_text(text)
     script.write_text(contract)
