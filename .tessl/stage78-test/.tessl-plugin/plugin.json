@@ -1,0 +1,7 @@
+{
+  "name": "skills-sdk-lab/stage78-test",
+  "version": "0.1.0",
+  "description": "Read-only synthetic Skills SDK archive workflow test.",
+  "private": true,
+  "skills": "./skills/"
+}
