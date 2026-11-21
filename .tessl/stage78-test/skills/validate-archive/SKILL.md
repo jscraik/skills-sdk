@@ -14,6 +14,13 @@ files and the reviewed Windows archive repair paths: docs/api.md,
 src/skills_sdk/packaging/plugin_archive.py and tests/test_plugin_build.py.
 Stop and report any mismatch.
 
+When the diff includes the Python implementation or regression test, require the
+PR body to list the exact maintained-entrypoint validation commands for those
+changes and an explicit `pass`, `fail`, or `blocked` outcome for each command.
+For blocked commands, include the concrete reason and nearest meaningful fallback.
+Do not infer outcomes from missing evidence; require it to be supplied before
+treating validation as complete.
+
 Before running any checkout code, create a fresh private directory outside the
 checkout. Create a separate fresh bare clone at BARE_CLONE from
 https://github.com/jscraik/skills-sdk.git, with system and global Git configuration
