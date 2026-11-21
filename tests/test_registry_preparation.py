@@ -14,6 +14,53 @@ from skills_sdk.models.registry import RegistryIdentity, RegistryPreparationRece
 from skills_sdk.packaging import harden_skill_package
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "package-receipts"
+_REDACTED_BLOCKER_MESSAGE = "Source blocker metadata was redacted; use its digest for identity."
+_UNSAFE_PUBLIC_TEXTS = (
+    "source]/etc/company/config.json",
+    "client_secret2 opaque-value",
+    "accessToken2 opaque-value",
+    "password=opaque-value",
+    "dbPassword=opaque-value",
+    "client_key_prod=opaque-value",
+    "AWS_ACCESS_KEY_ID_PROD=opaque-value",
+    'source="/opt/company/config.json"',
+    "source=/etc/company/config.json",
+    "-----BEGIN " + "PRIVATE KEY----- synthetic",
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.signaturevalue",
+    "source at file:///opt/tool/config",
+    "source at /" + "home/alice/private.json",
+    "source at C:\\Users\\alice\\private.json",
+    "declared token\x1c=opaque-value",
+)
+
+
+def test_safe_identifier_and_relative_evidence_survive_screening() -> None:
+    from skills_sdk.models.registry import registry_evidence_is_redaction_safe
+
+    assert registry_evidence_is_redaction_safe("client-keyboard")
+    assert (
+        RegistryPreparationRequest(
+            registry=RegistryIdentity(registry_id="private-registry", namespace="example-team"),
+            package_name="client-keyboard",
+            version="0.1.0",
+            evidence=("evidence/build-/report.json",),
+        ).package_name
+        == "client-keyboard"
+    )
+    assert registry_evidence_is_redaction_safe("evidence/build-/report.json")
+    assert registry_evidence_is_redaction_safe("evidence/safe.json")
+    assert not registry_evidence_is_redaction_safe("/" + "home/alice/private.json")
+    assert registry_evidence_is_redaction_safe("a" * 65536)
+
+
+def _nested_strings(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, dict):
+        return tuple(text for item in value.values() for text in _nested_strings(item))
+    if isinstance(value, list):
+        return tuple(text for item in value for text in _nested_strings(item))
+    return ()
 
 
 def _package_receipt() -> PackageReceiptV2:
@@ -139,15 +186,19 @@ def test_blocked_package_receipt_stays_blocked_without_digest_claims() -> None:
     assert result.package_digest is None
     assert result.manifest_digest is None
     assert result.hardening_receipt_sha256 is None
+    assert package_receipt.blocker is not None
+    assert result.blocker.code == package_receipt.blocker.code
+    assert result.blocker.message == package_receipt.blocker.message
 
 
-def test_credential_shaped_package_blocker_metadata_is_redacted() -> None:
+@pytest.mark.parametrize("unsafe_text", _UNSAFE_PUBLIC_TEXTS)
+def test_unsafe_package_blocker_metadata_is_redacted(unsafe_text: str) -> None:
     payload = json.loads((FIXTURE_ROOT / "blocked-v2.json").read_text(encoding="utf-8"))
     package_receipt = PackageReceiptV2.model_validate(payload).model_copy(
         update={
             "blocker": PackageReceiptBlocker(
-                code="ghp_secret_marker",
-                message="blocked@sk-live-secret",
+                code="source_blocked",
+                message=unsafe_text,
                 evidence_refs=("evidence/safe.json",),
             )
         }
@@ -161,8 +212,31 @@ def test_credential_shaped_package_blocker_metadata_is_redacted() -> None:
     assert result.blocker.source_blocker_sha256 == canonical_json_sha256(
         package_receipt.blocker.model_dump(mode="json")
     )
-    assert "ghp_secret_marker" not in result.model_dump_json()
-    assert "blocked@sk-live-secret" not in result.model_dump_json()
+    assert result.blocker.message == _REDACTED_BLOCKER_MESSAGE
+    assert all(unsafe_text not in text for text in _nested_strings(result.model_dump(mode="json")))
+
+
+def test_credential_shaped_package_blocker_code_is_redacted() -> None:
+    payload = json.loads((FIXTURE_ROOT / "blocked-v2.json").read_text(encoding="utf-8"))
+    package_receipt = PackageReceiptV2.model_validate(payload).model_copy(
+        update={
+            "blocker": PackageReceiptBlocker(
+                code="ghp_secret_marker",
+                message="source blocked",
+                evidence_refs=("evidence/safe.json",),
+            )
+        }
+    )
+    result = _prepare(package_receipt)
+
+    assert package_receipt.blocker is not None
+    assert result.blocker is not None
+    assert result.blocker.code == "source_blocker_redacted"
+    assert result.blocker.message == _REDACTED_BLOCKER_MESSAGE
+    assert result.blocker.source_blocker_sha256 == canonical_json_sha256(
+        package_receipt.blocker.model_dump(mode="json")
+    )
+    assert all("ghp_secret_marker" not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
 def test_hardening_identity_mismatch_is_typed_and_identity_bound() -> None:
@@ -367,6 +441,7 @@ def test_all_hardening_blockers_and_evidence_are_preserved_deterministically() -
         ("hardening_blocked", ("evidence/hardening-first.json",)),
         ("provenance_blocked", ()),
     ]
+    assert tuple(item.message for item in first.blockers) == ("hardening blocked", "provenance blocked")
     assert [item.source_evidence_sha256 for item in first.blockers] == [
         (),
         (canonical_json_sha256("sensor:policy"),),
@@ -379,14 +454,15 @@ def test_all_hardening_blockers_and_evidence_are_preserved_deterministically() -
     assert first.publication_performed is False
 
 
-def test_credential_shaped_hardening_evidence_is_digest_bound_not_exposed() -> None:
+@pytest.mark.parametrize("unsafe_evidence", _UNSAFE_PUBLIC_TEXTS)
+def test_unsafe_hardening_evidence_is_digest_bound_not_exposed(unsafe_evidence: str) -> None:
     package_receipt = _package_receipt()
     baseline = harden_skill_package(package_receipt)
     blocker = PackageHardeningCheck(
         id="policy_blocked",
         status="blocker",
         message="policy blocked",
-        evidence=("token=sk-live-secret",),
+        evidence=(unsafe_evidence,),
     )
     hardening = baseline.model_copy(
         update={
@@ -409,17 +485,18 @@ def test_credential_shaped_hardening_evidence_is_digest_bound_not_exposed() -> N
     assert result.status == "blocked"
     assert result.blocker is not None
     assert result.blocker.evidence_refs == ()
-    assert result.blocker.source_evidence_sha256 == (canonical_json_sha256("token=sk-live-secret"),)
-    assert "token=sk-live-secret" not in result.model_dump_json()
+    assert result.blocker.source_evidence_sha256 == (canonical_json_sha256(unsafe_evidence),)
+    assert all(unsafe_evidence not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
-def test_credential_shaped_blocker_metadata_is_redacted_and_digest_bound() -> None:
+@pytest.mark.parametrize("unsafe_text", _UNSAFE_PUBLIC_TEXTS)
+def test_unsafe_hardening_blocker_metadata_is_redacted_and_digest_bound(unsafe_text: str) -> None:
     package_receipt = _package_receipt()
     baseline = harden_skill_package(package_receipt)
     blocker = PackageHardeningCheck(
-        id="ghp_secret_marker",
+        id="policy_blocked",
         status="blocker",
-        message="blocked#sk-live-secret",
+        message=unsafe_text,
         evidence=("evidence/safe.json",),
     )
     hardening = baseline.model_copy(
@@ -442,10 +519,44 @@ def test_credential_shaped_blocker_metadata_is_redacted_and_digest_bound() -> No
 
     assert result.blocker is not None
     assert result.blocker.code == "source_blocker_redacted"
+    assert result.blocker.message == _REDACTED_BLOCKER_MESSAGE
     assert result.blocker.source_blocker_sha256 == canonical_json_sha256(blocker.model_dump(mode="json"))
     assert result.blocker.evidence_refs == ("evidence/safe.json",)
-    assert "ghp_secret_marker" not in result.model_dump_json()
-    assert "blocked#sk-live-secret" not in result.model_dump_json()
+    assert all(unsafe_text not in text for text in _nested_strings(result.model_dump(mode="json")))
+
+
+def test_credential_shaped_hardening_blocker_code_is_redacted() -> None:
+    package_receipt = _package_receipt()
+    baseline = harden_skill_package(package_receipt)
+    blocker = PackageHardeningCheck(
+        id="ghp_secret_marker",
+        status="blocker",
+        message="source blocked",
+        evidence=("evidence/safe.json",),
+    )
+    hardening = baseline.model_copy(
+        update={
+            "status": "blocked",
+            "hardening_checks": (*baseline.hardening_checks, blocker),
+            "blockers": (blocker,),
+        }
+    )
+    result = prepare_private_registry_candidate(
+        package_receipt,
+        hardening,
+        RegistryPreparationRequest(
+            registry=RegistryIdentity(registry_id="private-registry", namespace="example-team"),
+            package_name="synthetic-skill",
+            version="0.1.0",
+            evidence=("evidence/private-registry-preparation.json",),
+        ),
+    )
+
+    assert result.blocker is not None
+    assert result.blocker.code == "source_blocker_redacted"
+    assert result.blocker.message == _REDACTED_BLOCKER_MESSAGE
+    assert result.blocker.source_blocker_sha256 == canonical_json_sha256(blocker.model_dump(mode="json"))
+    assert all("ghp_secret_marker" not in text for text in _nested_strings(result.model_dump(mode="json")))
 
 
 def test_prepared_warning_is_digest_bound_and_secret_free() -> None:

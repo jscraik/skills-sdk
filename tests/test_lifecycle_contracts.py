@@ -319,7 +319,7 @@ def test_blocked_plan_cannot_claim_transition_and_keeps_portable_blocker() -> No
 )
 def test_blocked_plan_rejects_unsafe_blocker_codes_across_boundaries(unsafe_code: str) -> None:
     payload = _planned_payload()
-    blocker = RegistryPreparationBlocker(code=unsafe_code, message="Blocked by policy")
+    blocker = {"code": unsafe_code, "message": "Blocked by policy"}
     payload.update(
         status="blocked",
         candidate=None,
@@ -327,10 +327,10 @@ def test_blocked_plan_rejects_unsafe_blocker_codes_across_boundaries(unsafe_code
         operation=None,
         proposed_lock_sha256=None,
         proposed_entry=None,
-        blocker=blocker.model_dump(mode="json"),
+        blocker=blocker,
     )
     _bind_plan_id(payload)
-    with pytest.raises(ValidationError, match="blocker must not contain"):
+    with pytest.raises(ValidationError, match="blocker text must not contain"):
         InstallPlan.model_validate(payload)
     with pytest.raises(ContractError, match="contract_validation_failed"):
         SchemaRegistry().validate("install-plan.v1", payload)
