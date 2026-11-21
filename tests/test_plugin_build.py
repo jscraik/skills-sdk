@@ -171,6 +171,47 @@ def test_plugin_archive_rejects_portable_path_collisions(paths: tuple[str, ...])
         archive_service._require_distinct_paths(paths)
 
 
+@pytest.mark.parametrize(
+    "path", ["plugin.json.", "plugin.json ", "assets/a?.txt", "assets/a*.txt", "assets/a:b", "dir./a.txt"]
+)
+def test_plugin_archive_rejects_windows_restore_rewrites(path: str) -> None:
+    with pytest.raises(ContractError, match="plugin_archive_path_unsupported"):
+        archive_service._require_distinct_paths(("plugin.json", path))
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "CON",
+        "aux.json",
+        "assets/NUL.txt",
+        "COM1.log",
+        "LPT¹.txt",
+        "COM²/a.txt",
+        "NUL .txt",
+        "COM1 .log",
+        "AUX .json",
+        "CONIN$",
+        "assets/CONOUT$.txt",
+        "conin$.json",
+        "CONOUT$/a.txt",
+    ],
+)
+def test_plugin_archive_rejects_windows_device_names(path: str) -> None:
+    with pytest.raises(ContractError, match="plugin_archive_path_unsupported"):
+        archive_service._require_distinct_paths((path,))
+
+
+def test_plugin_archive_emitter_rejects_restore_alias(tmp_path: Path) -> None:
+    root = _plugin(tmp_path)
+    (root / "plugin.json.").write_text("synthetic alias")
+    build = build_plugin_package(root, source_revision=REVISION)
+    hardened = _harden(root, build)
+    assert hardened.status == "pass"
+    with pytest.raises(ContractError, match="plugin_archive_path_unsupported"):
+        emit_plugin_archive(root, hardened)
+
+
 def test_plugin_archive_blocks_source_change_during_emission(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = _plugin(tmp_path)
     hardened = _harden(root, build_plugin_package(root, source_revision=REVISION))
