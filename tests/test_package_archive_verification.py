@@ -162,6 +162,21 @@ def test_accepts_canonical_archive_and_receipt(tmp_path: Path) -> None:
     SchemaRegistry().validate("package-archive-verification.v1", result.model_dump(mode="json"))
 
 
+def test_rejects_reordered_manifest_with_matching_candidate_digest(tmp_path: Path) -> None:
+    path = tmp_path / "reordered.zip"
+    payloads = {"README.md": b"read me", "SKILL.md": b"# Example\n"}
+    manifest_payload = _manifest(payloads).model_dump(mode="json")
+    manifest_payload["files"].reverse()
+    reordered_files = tuple(PackageManifestFile.model_validate(item) for item in manifest_payload["files"])
+    manifest_payload["candidate"]["content_sha256"] = candidate_content_sha256(reordered_files)
+    with ZipFile(path, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("package-manifest.json", json.dumps(manifest_payload))
+        for name, data in payloads.items():
+            archive.writestr(name, data)
+
+    assert _blocker_code(path) == "archive_manifest_invalid"
+
+
 @pytest.mark.parametrize(
     ("name", "writer", "code"),
     [
