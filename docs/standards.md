@@ -118,6 +118,13 @@ successful test receipts against the prepared revision. The full local wrapper
 retains sequential phases. Runtime source recapture, calibration,
 drift, failure and recovery checks are not cached or removed for speed.
 
+The CircleCI tool bootstrap cache stores only the pinned Linux x64 mise release
+archive. Prepare on `main` is the sole configured writer. Each job verifies the
+archive checksum before installation, including after a cache hit. If a cache
+entry is missing or invalid, the job downloads and verifies the pinned release.
+CircleCI cannot replace an existing cache with the same key. Bump the key prefix
+if a corrupt shared entry keeps causing downloads.
+
 Matched-lane execution may reuse closed YAML parsing within its own operation.
 The cache holds at most 32 entries and 2 MiB of accounted retained data; inputs
 over 64 KiB bypass it. Exact current text identifies entries, callers receive
