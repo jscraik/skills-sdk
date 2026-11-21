@@ -8,8 +8,10 @@ description: Run the approved synthetic Skills SDK archive validation on an exac
 Run only from the root of jscraik/skills-sdk. Before installing dependencies,
 require the launch instructions to supply EXPECTED_HEAD as a full commit SHA and
 verify the current HEAD equals EXPECTED_HEAD. Require
-b19c899a553023c2670c518f771d5826d319c067 to be an ancestor. The complete diff
-from that SDK revision to HEAD may change only .tessl/stage78-test/ files.
+21721ebfcd838379d9c50e36d78abfb62cb52ec1 to be an ancestor. The complete diff
+from that accepted SDK revision to HEAD may change only .tessl/stage78-test/
+files and the reviewed Windows archive repair paths: docs/api.md,
+src/skills_sdk/packaging/plugin_archive.py and tests/test_plugin_build.py.
 Stop and report any mismatch.
 
 Before running any checkout code, create a fresh private directory outside the
