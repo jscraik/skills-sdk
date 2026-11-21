@@ -42,7 +42,9 @@ def _receipt_with_extra_file(package_receipt: PackageReceiptV2, extra_file: Pack
     payload = package_receipt.model_dump(mode="json")
     assert payload["manifest"] is not None
     payload["manifest"]["files"].append(extra_file.model_dump(mode="json"))
+    payload["manifest"]["files"].sort(key=lambda item: item["path"])
     payload["included_files"].append(extra_file.path)
+    payload["included_files"].sort()
     files = tuple(PackageManifestFile.model_validate(item) for item in payload["manifest"]["files"])
     content_digest = candidate_content_sha256(files)
     payload["candidate"]["content_sha256"] = content_digest

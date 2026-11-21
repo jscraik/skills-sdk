@@ -12,7 +12,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import CandidateIdentity, Receipt, parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.package import PackageCandidateIdentity
-from skills_sdk.models.packaging import PackageReceipt, PackageReceiptV2
+from skills_sdk.models.packaging import PackageManifest, PackageReceipt, PackageReceiptV2
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "package-receipts"
 
@@ -314,6 +314,18 @@ def test_schema_registry_rejects_duplicate_manifest_paths() -> None:
     with pytest.raises(ContractError) as error:
         SchemaRegistry().validate("package-manifest.v1", payload)
     assert any("paths must be unique" in detail for detail in error.value.details)
+
+
+def test_package_manifest_requires_canonical_file_order() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))["manifest"]
+    assert [item.path for item in PackageManifest.model_validate(payload).files] == ["README.md", "SKILL.md"]
+
+    payload["files"].reverse()
+    with pytest.raises(ValidationError, match="paths must be sorted"):
+        PackageManifest.model_validate(payload)
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-manifest.v1", payload)
+    assert any("paths must be sorted" in detail for detail in error.value.details)
 
 
 def test_schema_registry_rejects_blocked_receipt_without_blocker() -> None:
