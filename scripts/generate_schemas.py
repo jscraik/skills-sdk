@@ -58,6 +58,13 @@ _PORTABLE_PATH_PATTERN = (
     rf"^(?=.*\S)(?![\s\S]*(?:{PORTABLE_PATH_CONTROL_PATTERN}))(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
     r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
 )
+_FROZEN_EVALUATION_V1_SCHEMAS = frozenset(
+    {"scenario-observation.v1.schema.json", "scenario-case-result.v1.schema.json", "evaluation-receipt.v1.schema.json"}
+)
+_LEGACY_PORTABLE_PATH_PATTERN = (
+    r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
+    r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
+)
 _NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"
 _NORMALIZED_TEXT_PATTERN = r"^\S(?:[\s\S]*\S)?$"
 _PROVIDER_IDENTITY_FIELDS = ("provider_id", "model_id", "version_or_digest", "adapter_id", "adapter_version_or_digest")
@@ -71,16 +78,16 @@ _V2_CREDENTIAL_COMPONENT_SCHEMA_PATTERN = (
 )
 
 
-def _append_portable_path_constraints(schema: Any) -> None:
+def _append_portable_path_constraints(schema: Any, pattern: str = _PORTABLE_PATH_PATTERN) -> None:
     """Project the shared PortablePath contract into every generated schema node."""
     if isinstance(schema, dict):
         if schema.pop("x-skills-sdk-portable-path", False):
-            schema["pattern"] = _PORTABLE_PATH_PATTERN
+            schema["pattern"] = pattern
         for value in schema.values():
-            _append_portable_path_constraints(value)
+            _append_portable_path_constraints(value, pattern)
     elif isinstance(schema, list):
         for value in schema:
-            _append_portable_path_constraints(value)
+            _append_portable_path_constraints(value, pattern)
 
 
 def _append_provider_identity_constraints(schema: Any) -> None:
@@ -583,7 +590,10 @@ def _append_inventory_v2_constraints(schema: dict[str, Any], filename: str) -> N
 def _render_schema(model: type[package_safety_schema.SchemaModel], filename: str) -> str:
     """Render one model as a normalized, policy-augmented JSON Schema."""
     schema = model.model_json_schema()
-    _append_portable_path_constraints(schema)
+    path_pattern = (
+        _LEGACY_PORTABLE_PATH_PATTERN if filename in _FROZEN_EVALUATION_V1_SCHEMAS else _PORTABLE_PATH_PATTERN
+    )
+    _append_portable_path_constraints(schema, path_pattern)
     _append_provider_identity_constraints(schema)
     append_selected_case_constraints(schema, filename)
     append_registry_identity_constraints(schema, filename)

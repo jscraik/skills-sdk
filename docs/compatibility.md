@@ -694,9 +694,13 @@ observation families; rollback journals remain typed supporting evidence.
 Draft 2020-12 enforces structural, state, public-text, and portable-path rules.
 Portable paths reject Unicode control and format characters (Cc and Cf),
 including terminal escapes and bidirectional formatting controls. Packaged
-schemas and Python validation enforce the same restriction; printable Unicode
-paths remain supported. This security restriction also applies to existing
-receipt families without changing their fields or candidate binding.
+schemas and Python validation enforce the same restriction except for the
+byte-frozen `scenario-observation/v1`, `scenario-case-result/v1` and
+`evaluation-receipt/v1` standalone schemas. Those three retain historical
+structural acceptance; current Python models and `SchemaRegistry` still reject
+control-bearing paths. A legacy schema pass alone does not establish runtime
+acceptance. Their v2 schemas enforce the stricter rule. Printable Unicode paths,
+receipt fields and candidate binding remain supported.
 Cross-object equality and digest binding require the named Pydantic
 `validate_against_*` method and are declared in schema semantic-validator
 metadata rather than being silently approximated.
