@@ -26,6 +26,7 @@ from schema_model_groups import (
 from scorer_receipt_schema import append_scorer_receipt_constraints
 from selected_case_schema import append_selected_case_constraints
 
+from skills_sdk.core.paths import PORTABLE_PATH_CONTROL_PATTERN
 from skills_sdk.models.inventory import (
     PackageInventory,
     PackageInventoryRecord,
@@ -54,7 +55,7 @@ from skills_sdk.models.safety import PackageSafetyEvidenceReceipt
 from skills_sdk.models.validation import SkillPackageValidation
 
 _PORTABLE_PATH_PATTERN = (
-    r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
+    rf"^(?=.*\S)(?![\s\S]*(?:{PORTABLE_PATH_CONTROL_PATTERN}))(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)"
     r"(?!.*//)(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
 )
 _NON_WHITESPACE_TEXT_PATTERN = r"^[\s\S]*\S[\s\S]*$"

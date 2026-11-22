@@ -692,6 +692,11 @@ adapter observations without changing runtime-lock or install-plan semantics.
 Generic receipt parsing recognizes only the five receipt-shaped result and
 observation families; rollback journals remain typed supporting evidence.
 Draft 2020-12 enforces structural, state, public-text, and portable-path rules.
+Portable paths reject Unicode control and format characters (Cc and Cf),
+including terminal escapes and bidirectional formatting controls. Packaged
+schemas and Python validation enforce the same restriction; printable Unicode
+paths remain supported. This security restriction also applies to existing
+receipt families without changing their fields or candidate binding.
 Cross-object equality and digest binding require the named Pydantic
 `validate_against_*` method and are declared in schema semantic-validator
 metadata rather than being silently approximated.

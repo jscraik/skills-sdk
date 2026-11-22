@@ -11,12 +11,12 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from skills_sdk.core.errors import ContractError
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import PORTABLE_PATH_CONTROL_PATTERN, require_portable_relative_path
 from skills_sdk.core.receipts import CandidateIdentity, parse_receipt
 from skills_sdk.core.schema_registry import SCHEMA_NAMES, SchemaRegistry, _packaged_validation_resources
 
 EXPECTED_PORTABLE_PATH_PATTERN = (
-    r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)"
+    rf"^(?=.*\S)(?![\s\S]*(?:{PORTABLE_PATH_CONTROL_PATTERN}))(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)"
     r"(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
 )
 
