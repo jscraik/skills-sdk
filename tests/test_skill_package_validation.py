@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -87,6 +88,43 @@ def test_frontmatter_failures_are_typed(tmp_path: Path, frontmatter: str, expect
 
     assert result.status == "blocked"
     assert expected_code in {item.code for item in result.findings}
+
+
+def test_unknown_frontmatter_identifiers_are_escaped_and_redacted(tmp_path: Path) -> None:
+    identifiers = (
+        "plain-key",
+        "line\nkey",
+        "\x1b]52;c;payload\x07",
+        "left\u202eright",
+        "api_key=private-value",
+    )
+    extra = "\n".join(f"{json.dumps(identifier)}: ignored" for identifier in identifiers)
+    root = _write_skill(tmp_path / "fixture-skill", extra_frontmatter=extra)
+
+    result = validate_skill_package(root, source_revision=REVISION)
+    receipt = build_skill_package(root, source_revision=REVISION, clock=_clock)
+
+    finding = next(item for item in result.findings if item.code == "unknown_frontmatter")
+    assert "\n" not in finding.message and "\x1b" not in finding.message and "\x07" not in finding.message
+    assert "\u202e" not in finding.message and "private-value" not in finding.message
+    assert json.dumps(r"line\x0akey") in finding.message
+    assert json.dumps(r"\x1b]52;c;payload\x07") in finding.message
+    assert json.dumps(r"left\u202eright") in finding.message
+    assert json.dumps("<redacted identifier>") in finding.message
+    assert json.dumps("plain-key") in finding.message
+    assert receipt.blocker is not None and receipt.blocker.message == finding.message
+
+
+def test_unknown_frontmatter_diagnostic_is_bounded(tmp_path: Path) -> None:
+    extra = "\n".join(f"unknown-{index:04d}: ignored" for index in range(1000))
+
+    result = validate_skill_package(
+        _write_skill(tmp_path / "fixture-skill", extra_frontmatter=extra), source_revision=REVISION
+    )
+
+    finding = next(item for item in result.findings if item.code == "unknown_frontmatter")
+    assert len(finding.message) <= len("unsupported frontmatter keys: ") + 4096
+    assert "identifiers omitted>" in finding.message
 
 
 def test_unclosed_frontmatter_is_blocked(tmp_path: Path) -> None:
