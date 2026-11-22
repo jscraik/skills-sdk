@@ -84,6 +84,8 @@ class PackageManifest(_ContractModel):
         paths = [item.path for item in self.files]
         if len(paths) != len(set(paths)):
             raise ValueError("package manifest paths must be unique")
+        if paths != sorted(paths):
+            raise ValueError("package manifest paths must be sorted")
         return self
 
 

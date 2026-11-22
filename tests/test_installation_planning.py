@@ -97,9 +97,9 @@ def test_unrelated_registry_input_receipt_is_a_typed_blocker() -> None:
     assert plan.proposed_lock_sha256 is None
 
 
-def test_registry_blocker_with_unsafe_code_is_replaced_by_portable_blocker() -> None:
+def test_registry_blocker_with_unsafe_code_is_rejected_before_planning() -> None:
     package_receipt = _package_receipt()
-    unsafe_blocker = RegistryPreparationBlocker(
+    unsafe_blocker = RegistryPreparationBlocker.model_construct(
         code="to" + "ken=plainvalue",
         message="Blocked by policy",
     )
@@ -114,10 +114,8 @@ def test_registry_blocker_with_unsafe_code_is_replaced_by_portable_blocker() -> 
             "blockers": (unsafe_blocker,),
         }
     )
-    plan = _plan(package_receipt, registry_receipt, RuntimeLock())
-    assert plan.status == "blocked"
-    assert plan.blocker is not None
-    assert plan.blocker.code == "installation_registry_blocker_not_portable"
+    with pytest.raises(ValidationError, match="registry blocker text must not contain"):
+        _plan(package_receipt, registry_receipt, RuntimeLock())
 
 
 def test_blocked_plan_projects_resolved_package_identity_not_registry_fields() -> None:

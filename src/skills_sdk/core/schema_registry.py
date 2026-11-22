@@ -6,6 +6,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import cache
 from importlib.resources import files
 from typing import Any
 
@@ -101,6 +102,8 @@ SCHEMA_NAMES = frozenset(
         "scorer-profile.v1",
         "skill-package-validation.v1",
         "plugin-package-validation.v1",
+        "plugin-build.v1",
+        "plugin-hardening.v1",
         "plugin-image-approval.v1",
         "plugin-presentation-copy-approval.v1",
         "plugin-presentation-request.v1",
@@ -188,10 +191,10 @@ class SchemaRegistry:
         """Validate a payload against structural and semantic schema rules."""
         if name not in SCHEMA_NAMES:
             raise ContractError("unknown_schema", f"unsupported schema: {name}")
-        schemas = {schema_name: self.load(schema_name) for schema_name in SCHEMA_NAMES}
-        registry = Registry().with_resources(
-            (schema["$id"], Resource.from_contents(schema)) for schema in schemas.values()
-        )
+        if type(self) is SchemaRegistry:
+            schemas, registry = _packaged_validation_resources()
+        else:
+            schemas, registry = _build_validation_resources(self)
         validator = Draft202012Validator(
             schemas[name],
             format_checker=FormatChecker(),
@@ -655,6 +658,10 @@ class SchemaRegistry:
             from skills_sdk.models.evaluation_v2 import EvaluationReceiptV2
 
             model = EvaluationReceiptV2
+        elif name in {"plugin-build.v1", "plugin-hardening.v1"}:
+            from skills_sdk.models.plugin_build import PluginBuildReceipt, PluginHardeningReceipt
+
+            model = PluginBuildReceipt if name == "plugin-build.v1" else PluginHardeningReceipt
         elif name == "plugin-package-validation.v1":
             from skills_sdk.models.plugin import PluginPackageValidation
 
@@ -701,3 +708,16 @@ class SchemaRegistry:
         except ValidationError as error:
             details = tuple(item["msg"] for item in error.errors())
             raise ContractError("contract_validation_failed", f"{name} rejected the payload", details) from error
+
+
+def _build_validation_resources(loader: SchemaRegistry) -> tuple[dict[str, dict[str, Any]], Registry]:
+    """Build private, prechecked schemas and their reference resolver."""
+    schemas = {name: loader.load(name) for name in SCHEMA_NAMES}
+    registry = Registry().with_resources((schema["$id"], Resource.from_contents(schema)) for schema in schemas.values())
+    return schemas, registry
+
+
+@cache
+def _packaged_validation_resources() -> tuple[dict[str, dict[str, Any]], Registry]:
+    """Reuse checked package-owned schemas, never public load results or payloads."""
+    return _build_validation_resources(SchemaRegistry())

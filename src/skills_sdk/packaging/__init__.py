@@ -15,6 +15,8 @@ from skills_sdk.models.packaging import (
     PackageReceipt,
     PackageReceiptV2,
 )
+from skills_sdk.models.plugin_build import PluginBuildReceipt, PluginHardeningPolicy, PluginHardeningReceipt
+from skills_sdk.models.plugin_presentation import PluginPresentationRequest
 
 if TYPE_CHECKING:
     from skills_sdk.validation import SkillValidationPolicy
@@ -70,4 +72,38 @@ def verify_package_archive(
     )
 
 
-__all__ = ["build_skill_package", "harden_skill_package", "verify_package_archive"]
+def build_plugin_package(plugin_root: Path, *, source_revision: str) -> PluginBuildReceipt:
+    """Build a local whole-plugin receipt without emitting files."""
+    from skills_sdk.packaging.plugin import build_plugin_package as _build
+
+    return _build(plugin_root, source_revision=source_revision)
+
+
+def harden_plugin_package(
+    plugin_root: Path,
+    build_receipt: PluginBuildReceipt,
+    *,
+    presentation_request: PluginPresentationRequest | None = None,
+    policy: PluginHardeningPolicy | None = None,
+) -> PluginHardeningReceipt:
+    """Check fresh whole-plugin source and supplied presentation approvals locally."""
+    from skills_sdk.packaging.plugin import harden_plugin_package as _harden
+
+    return _harden(plugin_root, build_receipt, presentation_request=presentation_request, policy=policy)
+
+
+def emit_plugin_archive(plugin_root: Path, hardening_receipt: PluginHardeningReceipt) -> bytes:
+    """Emit an in-memory ZIP of a fresh, locally hardened plugin capture."""
+    from skills_sdk.packaging.plugin_archive import emit_plugin_archive as _emit
+
+    return _emit(plugin_root, hardening_receipt)
+
+
+__all__ = [
+    "build_plugin_package",
+    "build_skill_package",
+    "emit_plugin_archive",
+    "harden_plugin_package",
+    "harden_skill_package",
+    "verify_package_archive",
+]

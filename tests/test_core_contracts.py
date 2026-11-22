@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from collections import UserList
 from collections.abc import MutableMapping
 from importlib.resources import files
 from typing import Any, cast
@@ -12,7 +13,7 @@ from jsonschema import Draft202012Validator
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.receipts import CandidateIdentity, parse_receipt
-from skills_sdk.core.schema_registry import SCHEMA_NAMES, SchemaRegistry
+from skills_sdk.core.schema_registry import SCHEMA_NAMES, SchemaRegistry, _packaged_validation_resources
 
 EXPECTED_PORTABLE_PATH_PATTERN = (
     r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)"
@@ -65,11 +66,69 @@ def test_valid_receipt_is_immutable_and_candidate_bound() -> None:
         cast(MutableMapping[str, Any], receipt.payload)["status"] = "fail"
 
 
+def test_receipt_owns_user_sequence_evidence() -> None:
+    payload = _receipt()
+    evidence = UserList(["tests/fixtures/synthetic-skill/SKILL.md"])
+    payload["evidence"] = evidence
+    receipt = parse_receipt(payload)
+    evidence.append("tests/fixtures/later.md")
+    assert receipt.payload["evidence"] == receipt.evidence == ("tests/fixtures/synthetic-skill/SKILL.md",)
+    assert receipt.payload["status"] == "pass"
+    assert receipt.receipt_id == "synthetic-validation-1"
+
+
 def test_candidate_mismatch_is_typed() -> None:
     receipt = parse_receipt(_receipt())
     other = CandidateIdentity("synthetic-skill", "2" * 40, "a" * 64)
     with pytest.raises(ContractError, match="candidate_mismatch"):
         receipt.require_candidate(other)
+
+
+def test_schema_validation_reuses_packaged_resources_across_instances(monkeypatch: pytest.MonkeyPatch) -> None:
+    load = SchemaRegistry.load
+    names: list[str] = []
+
+    def counted_load(registry: SchemaRegistry, name: str) -> dict[str, Any]:
+        names.append(name)
+        return load(registry, name)
+
+    _packaged_validation_resources.cache_clear()
+    monkeypatch.setattr(SchemaRegistry, "load", counted_load)
+    try:
+        SchemaRegistry().validate("receipt-base.v1", _receipt())
+        invalid = {**_receipt(), "candidate": {"package_id": "incomplete"}}
+        with pytest.raises(ContractError, match="contract_validation_failed"):
+            SchemaRegistry().validate("receipt-base.v1", invalid)
+        SchemaRegistry().validate("receipt-base.v1", _receipt())
+        assert sorted(names) == sorted(SCHEMA_NAMES)
+    finally:
+        _packaged_validation_resources.cache_clear()
+
+
+def test_public_schema_mutation_cannot_change_cached_validation() -> None:
+    name = "receipt-base.v1"
+    registry = SchemaRegistry()
+    registry.validate(name, _receipt())
+    public_schema = registry.load(name)
+    public_schema["properties"]["receipt_id"]["minLength"] = 10_000
+
+    assert registry.load(name) != public_schema
+    registry.validate(name, _receipt())
+
+
+def test_schema_registry_subclass_keeps_its_own_loader() -> None:
+    class StrictRegistry(SchemaRegistry):
+        def load(self, name: str) -> dict[str, Any]:
+            schema = super().load(name)
+            if name == "receipt-base.v1":
+                schema["properties"]["receipt_id"]["minLength"] = 10_000
+            return schema
+
+    name = "receipt-base.v1"
+    SchemaRegistry().validate(name, _receipt())
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        StrictRegistry().validate(name, _receipt())
+    SchemaRegistry().validate(name, _receipt())
 
 
 def test_unknown_schema_validation_is_typed() -> None:
