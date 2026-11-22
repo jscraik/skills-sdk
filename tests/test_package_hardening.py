@@ -147,7 +147,7 @@ def test_hardening_uses_canonical_validator_path_safety_policy(tmp_path: Path, u
         path=unsafe_path,
         sha256="0" * 64,
         size_bytes=0,
-        role=PackageFileRole.REFERENCE,
+        role=(PackageFileRole.REFERENCE if unsafe_path.startswith("references/") else PackageFileRole.ASSET),
     )
     unsafe_receipt = _receipt_with_extra_file(package_receipt, unsafe_file)
 
@@ -155,6 +155,28 @@ def test_hardening_uses_canonical_validator_path_safety_policy(tmp_path: Path, u
 
     assert receipt.status == "blocked"
     assert {item.id for item in receipt.blockers} == {"forbidden_package_paths"}
+
+
+def test_hardening_checks_literal_included_entrypoint_path(tmp_path: Path) -> None:
+    package_receipt = build_skill_package(_skill(tmp_path / "fixture"), source_revision=REVISION, clock=_clock)
+    payload = package_receipt.model_dump(mode="json")
+    payload.update(
+        status="blocked",
+        package_digest=None,
+        blocker={
+            "code": "synthetic_blocker",
+            "message": "Synthetic blocked build.",
+            "evidence_refs": (),
+        },
+        included_files=("README.md",),
+    )
+    blocked = PackageReceiptV2.model_validate(payload)
+
+    receipt = harden_skill_package(blocked)
+
+    required = next(item for item in receipt.hardening_checks if item.id == "required_package_roles")
+    assert required.status == "blocker"
+    assert required.evidence == ("README.md",)
 
 
 def test_hardening_check_has_one_status_axis() -> None:

@@ -34,9 +34,17 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _role(path: str) -> PackageFileRole:
+    if path == "SKILL.md":
+        return PackageFileRole.SKILL_MD
+    if path == "README.md":
+        return PackageFileRole.README
+    return PackageFileRole.ASSET
+
+
 def _manifest(payloads: dict[str, bytes]) -> PackageManifest:
     files = tuple(
-        PackageManifestFile(path=path, sha256=_sha(data), size_bytes=len(data), role=PackageFileRole.ASSET)
+        PackageManifestFile(path=path, sha256=_sha(data), size_bytes=len(data), role=_role(path))
         for path, data in sorted(payloads.items())
     )
     candidate = PackageCandidateIdentity(
@@ -47,7 +55,9 @@ def _manifest(payloads: dict[str, bytes]) -> PackageManifest:
         candidate=candidate,
         version="1.0.0",
         files=files,
-        provenance=PackageManifestProvenance(source=("SKILL.md",), builder="test-builder"),
+        provenance=PackageManifestProvenance(
+            source=(("SKILL.md" if "SKILL.md" in payloads else min(payloads)),), builder="test-builder"
+        ),
     )
 
 
@@ -177,6 +187,23 @@ def test_rejects_reordered_manifest_with_matching_candidate_digest(tmp_path: Pat
     assert _blocker_code(path) == "archive_manifest_invalid"
 
 
+def test_rejects_archive_with_forged_skill_role_and_matching_candidate_digest(tmp_path: Path) -> None:
+    path = tmp_path / "forged-role.zip"
+    manifest_payload = _manifest({"SKILL.md": b"# Example\n"}).model_dump(mode="json")
+    manifest_payload["files"][0]["path"] = "payload.txt"
+    files = tuple(PackageManifestFile.model_construct(**item) for item in manifest_payload["files"])
+    manifest_payload["candidate"]["content_sha256"] = candidate_content_sha256(files)
+    _write_entries(
+        path,
+        [
+            ("package-manifest.json", json.dumps(manifest_payload).encode()),
+            ("payload.txt", b"# Example\n"),
+        ],
+    )
+
+    assert _blocker_code(path) == "archive_manifest_invalid"
+
+
 @pytest.mark.parametrize(
     ("name", "writer", "code"),
     [
@@ -260,7 +287,7 @@ def test_rejects_archive_digest_and_receipt_mismatch(tmp_path: Path) -> None:
     assert _blocker_code(path, expected_archive_sha256="f" * 64) == "archive_digest_mismatch"
     receipt = _receipt(manifest).model_copy(update={"receipt_id": "other"})
     assert verify_package_archive(path, expected_package_receipt=receipt).status == "pass"
-    other = _manifest({"README.md": b"other"})
+    other = _manifest({"README.md": b"other", "SKILL.md": b"# Other\n"})
     assert _blocker_code(path, expected_package_receipt=_receipt(other)) == "archive_receipt_mismatch"
     mismatched_candidate = receipt.model_copy(update={"candidate": other.candidate})
     assert _blocker_code(path, expected_package_receipt=mismatched_candidate) == "archive_receipt_invalid"

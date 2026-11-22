@@ -545,6 +545,11 @@ pending-review state must emit the matching `v2` record or set envelope.
 must not infer that the digest covers the embedded manifest. Builders now emit
 `package-receipt/v2`, which preserves the v1 fields and additionally requires
 `package_digest` to equal the SHA-256 digest of the canonical JSON manifest.
+Manifest file roles are validated against canonical paths for both receipt
+versions. Built v2 receipts also require literal `SKILL.md` and require each
+provenance source to identify a manifested file. These model-level checks reject
+contradictory evidence while preserving v1's historical provenance and digest
+semantics. Hardening independently checks literal included paths.
 The generic receipt parser accepts both versions. Producers that require
 manifest binding must emit v2; consumers may continue reading v1 while they
 migrate without changing v1 semantics.

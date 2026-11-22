@@ -88,15 +88,15 @@ def _provenance_check(receipt: PackageReceipt) -> PackageHardeningCheck:
 def _required_role_check(
     files: tuple[PackageManifestFile, ...], policy: PackageHardeningPolicy
 ) -> PackageHardeningCheck:
-    roles = tuple(sorted({item.role.value for item in files}))
-    has_skill = "skill_md" in roles
-    has_readme = any(item.role.value == "readme" and item.path == "README.md" for item in files)
+    paths = tuple(sorted(item.path for item in files))
+    has_skill = "SKILL.md" in paths
+    has_readme = "README.md" in paths
     valid = has_skill and (has_readme or not policy.require_readme)
     return _check(
         "required_package_roles",
         status="pass" if valid else "blocker",
-        message="Package manifest must include SKILL.md and, when required, root README.md roles.",
-        evidence=roles,
+        message="Package manifest must include literal SKILL.md and, when required, root README.md paths.",
+        evidence=paths,
     )
 
 

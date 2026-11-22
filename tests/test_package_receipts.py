@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.receipts import CandidateIdentity, Receipt, parse_receipt
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.package import PackageCandidateIdentity
-from skills_sdk.models.packaging import PackageManifest, PackageReceipt, PackageReceiptV2
+from skills_sdk.models.packaging import PackageManifest, PackageManifestFile, PackageReceipt, PackageReceiptV2
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "package-receipts"
 
@@ -183,6 +183,54 @@ def test_v2_built_receipt_rejects_recomputed_digest_for_wrong_candidate_content(
     with pytest.raises(ContractError) as error:
         SchemaRegistry().validate("package-receipt.v2", payload)
     assert any("candidate digest must match manifest files" in detail for detail in error.value.details)
+
+
+def test_v2_built_receipt_rejects_forged_skill_role_with_recomputed_digests() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
+    forged_file = payload["manifest"]["files"][1]
+    forged_file["path"] = "payload.txt"
+    payload["included_files"][1] = "payload.txt"
+    files = tuple(PackageManifestFile.model_construct(**item) for item in payload["manifest"]["files"])
+    content_digest = candidate_content_sha256(files)
+    payload["candidate"]["content_sha256"] = content_digest
+    payload["manifest"]["candidate"]["content_sha256"] = content_digest
+    payload["package_digest"] = canonical_json_sha256(payload["manifest"])
+
+    with pytest.raises(ValidationError, match="file role must match its path"):
+        PackageReceiptV2.model_validate(payload)
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-receipt.v2", payload)
+    assert any("file role must match its path" in detail for detail in error.value.details)
+
+
+def test_v2_built_receipt_requires_literal_skill_entrypoint() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
+    payload["manifest"]["files"] = payload["manifest"]["files"][:1]
+    payload["manifest"]["provenance"]["source"] = ["README.md"]
+    payload["included_files"] = ["README.md"]
+    files = tuple(PackageManifestFile.model_validate(item) for item in payload["manifest"]["files"])
+    content_digest = candidate_content_sha256(files)
+    payload["candidate"]["content_sha256"] = content_digest
+    payload["manifest"]["candidate"]["content_sha256"] = content_digest
+    payload["package_digest"] = canonical_json_sha256(payload["manifest"])
+
+    with pytest.raises(ValidationError, match="manifest must include SKILL.md"):
+        PackageReceiptV2.model_validate(payload)
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-receipt.v2", payload)
+    assert any("manifest must include SKILL.md" in detail for detail in error.value.details)
+
+
+def test_v2_built_receipt_requires_manifested_provenance_sources() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted-v2.json").read_text(encoding="utf-8"))
+    payload["manifest"]["provenance"]["source"] = ["missing.md"]
+    payload["package_digest"] = canonical_json_sha256(payload["manifest"])
+
+    with pytest.raises(ValidationError, match="provenance sources must be manifested"):
+        PackageReceiptV2.model_validate(payload)
+    with pytest.raises(ContractError) as error:
+        SchemaRegistry().validate("package-receipt.v2", payload)
+    assert any("provenance sources must be manifested" in detail for detail in error.value.details)
 
 
 def test_v1_built_receipt_keeps_historical_digest_semantics() -> None:
