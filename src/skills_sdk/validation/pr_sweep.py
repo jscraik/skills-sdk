@@ -6,12 +6,12 @@ import hashlib
 import json
 import os
 import re
-import shutil
+import selectors
 import stat
 import subprocess
-from collections.abc import Callable
+import time
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, TemporaryFile
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -21,6 +21,7 @@ from skills_sdk.core.errors import ContractError
 from skills_sdk.core.paths import require_portable_relative_path
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.pr_sweep import PrSweepDirtyState, PrSweepFinding, PrSweepValidationResult
+from skills_sdk.validation._pr_sweep_snapshot import SnapshotBudget, copy_snapshot_tree
 
 _GIT_INSPECTION_CONFIG = (
     "core.checkStat=default",
@@ -31,6 +32,12 @@ _GIT_INSPECTION_CONFIG = (
     "core.untrackedCache=false",
 )
 _MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024
+_MAX_SNAPSHOT_ENTRIES = 100_000
+_MAX_SNAPSHOT_DEPTH = 64
+_MAX_GIT_INPUT_BYTES = 8 * 1024 * 1024
+_MAX_GIT_OUTPUT_BYTES = 4 * 1024 * 1024
+_MAX_GIT_OUTPUT_RECORDS = 300_000
+_GIT_TIMEOUT_SECONDS = 30
 
 
 def _failure(kind: str, status: str, code: str, message: str) -> PrSweepValidationResult:
@@ -229,16 +236,72 @@ def _run_git(
     repo_root: Path, *args: str, input_text: str | None = None, force_worktree: bool = False
 ) -> subprocess.CompletedProcess[str]:
     config_args = [argument for setting in _GIT_INSPECTION_CONFIG for argument in ("-c", setting)]
-    return subprocess.run(
-        ["git", *config_args, *([f"--work-tree={repo_root}"] if force_worktree else []), "--no-optional-locks", *args],
-        cwd=repo_root,
-        env=_git_environment(isolated=force_worktree),
-        input=input_text,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=30,
-    )
+    command = [
+        "git",
+        *config_args,
+        *([f"--work-tree={repo_root}"] if force_worktree else []),
+        "--no-optional-locks",
+        *args,
+    ]
+    payload = input_text.encode("utf-8") if input_text is not None else b""
+    if len(payload) > _MAX_GIT_INPUT_BYTES:
+        raise OSError("Git input exceeds its inspection budget")
+    separator = b"\0" if "-z" in args or "--null" in args else b"\n"
+    with TemporaryFile() as input_file:
+        input_file.write(payload)
+        input_file.seek(0)
+        with subprocess.Popen(
+            command,
+            cwd=repo_root,
+            env=_git_environment(isolated=force_worktree),
+            stdin=input_file if input_text is not None else subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ) as process:
+            stdout, stderr = _read_git_output(process, separator)
+    return subprocess.CompletedProcess(command, process.returncode, stdout.decode("utf-8"), stderr.decode("utf-8"))
+
+
+def _read_git_output(process: subprocess.Popen[bytes], separator: bytes) -> tuple[bytes, bytes]:
+    if process.stdout is None or process.stderr is None:
+        raise OSError("Git output pipes are unavailable")
+    chunks = {"stdout": bytearray(), "stderr": bytearray()}
+    records = 0
+    deadline = time.monotonic() + _GIT_TIMEOUT_SECONDS
+    selector = selectors.DefaultSelector()
+    try:
+        selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+        selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(process.args, _GIT_TIMEOUT_SECONDS)
+            events = selector.select(remaining)
+            if not events:
+                raise subprocess.TimeoutExpired(process.args, _GIT_TIMEOUT_SECONDS)
+            for key, _ in events:
+                chunk = os.read(key.fd, 64 * 1024)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                if sum(map(len, chunks.values())) + len(chunk) > _MAX_GIT_OUTPUT_BYTES:
+                    raise OSError("Git output exceeds its inspection budget")
+                chunks[key.data].extend(chunk)
+                if key.data == "stdout":
+                    records += chunk.count(separator)
+                    if records > _MAX_GIT_OUTPUT_RECORDS:
+                        raise OSError("Git output exceeds its record budget")
+        process.wait(timeout=max(0, deadline - time.monotonic()))
+        if chunks["stdout"] and not chunks["stdout"].endswith(separator):
+            records += 1
+        if records > _MAX_GIT_OUTPUT_RECORDS:
+            raise OSError("Git output exceeds its record budget")
+        return bytes(chunks["stdout"]), bytes(chunks["stderr"])
+    finally:
+        selector.close()
+        if process.poll() is None:
+            process.kill()
+            process.wait()
 
 
 def _resolved_git_path(repo_root: Path, *args: str, force_worktree: bool = False) -> Path:
@@ -249,7 +312,7 @@ def _resolved_git_path(repo_root: Path, *args: str, force_worktree: bool = False
 
 
 def _materialize_git_metadata(
-    repo_root: Path, snapshot_root: Path, private_root: Path, copy_entry: Callable[[str, str], str]
+    repo_root: Path, snapshot_root: Path, private_root: Path, budget: SnapshotBudget
 ) -> None:
     marker = snapshot_root / ".git"
     if marker.is_dir() and not marker.is_symlink():
@@ -258,18 +321,18 @@ def _materialize_git_metadata(
     common_directory = _resolved_git_path(repo_root, "rev-parse", "--path-format=absolute", "--git-common-dir")
     if marker.exists() or marker.is_symlink():
         marker.unlink()
-    shutil.copytree(git_directory, marker, symlinks=True, copy_function=copy_entry)
+    copy_snapshot_tree(git_directory, marker, budget)
     if common_directory == git_directory:
         return
     common_snapshot = private_root / "common-git-dir"
-    shutil.copytree(common_directory, common_snapshot, symlinks=True, copy_function=copy_entry)
+    copy_snapshot_tree(common_directory, common_snapshot, budget)
     copied_commondir = marker / "commondir"
     if copied_commondir.is_symlink():
         copied_commondir.unlink()
     copied_commondir.write_text(os.path.relpath(common_snapshot, marker) + "\n", encoding="utf-8")
     source_modules = common_snapshot / "modules"
     if source_modules.is_dir() and not (marker / "modules").exists():
-        shutil.copytree(source_modules, marker / "modules", symlinks=True, copy_function=copy_entry)
+        copy_snapshot_tree(source_modules, marker / "modules", budget)
 
 
 def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
@@ -287,58 +350,21 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
         raise OSError("could not enumerate ignored snapshot paths")
     ignored = {path for path in ignored_result.stdout.split("\0") if path}
     tracked = {path for path in tracked_result.stdout.split("\0") if path}
-    copied_bytes = 0
 
-    def skip_ignored(directory: str, names: list[str]) -> set[str]:
-        relative = Path(directory).relative_to(repo_root)
-        skipped: set[str] = set()
-        for name in names:
-            path = (relative / name).as_posix()
-            if name not in {".gitattributes", ".gitignore"} and path in ignored:
-                skipped.add(name)
-            elif path not in tracked and name != ".git":
-                mode = os.lstat(Path(directory) / name).st_mode
-                if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
-                    entry = relative / name
-                    if not any(
-                        (repo_root / parent / ".git").exists() for parent in entry.parents if parent != Path(".")
-                    ):
-                        skipped.add(name)
-        return skipped
-
-    def copy_entry(source: str, destination: str) -> str:
-        nonlocal copied_bytes
-        mode = os.lstat(source).st_mode
-        if stat.S_ISREG(mode):
-            descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
-            try:
-                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-                    raise OSError("snapshot source changed type while copying")
-                with os.fdopen(descriptor, "rb", closefd=False) as input_file, open(destination, "xb") as output_file:
-                    while chunk := input_file.read(1024 * 1024):
-                        copied_bytes += len(chunk)
-                        if copied_bytes > _MAX_SNAPSHOT_BYTES:
-                            raise OSError("private snapshot exceeds its copy budget")
-                        output_file.write(chunk)
-                shutil.copystat(source, destination, follow_symlinks=False)
-                return destination
-            finally:
-                os.close(descriptor)
-        if stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode):
-            source_path = Path(source)
-            if source_path.is_relative_to(repo_root):
-                relative = source_path.relative_to(repo_root)
-                if relative.as_posix() in tracked or any(
-                    (repo_root / parent / ".git").exists() for parent in relative.parents if parent != Path(".")
-                ):
-                    raise OSError("tracked or submodule special file cannot be represented in private snapshot")
-            Path(destination).touch()
-            return destination
-        raise OSError("unsupported snapshot entry type")
+    def skip_ignored(relative: Path, mode: int) -> bool:
+        path = relative.as_posix()
+        if not stat.S_ISDIR(mode) and relative.name not in {".gitattributes", ".gitignore"} and path in ignored:
+            return True
+        if path in tracked or relative.name == ".git" or not (stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode)):
+            return False
+        return not any(
+            (repo_root / parent / ".git").exists() for parent in relative.parents if parent != Path(".")
+        )
 
     snapshot_root = private_root / "worktree"
-    shutil.copytree(repo_root, snapshot_root, symlinks=True, ignore=skip_ignored, copy_function=copy_entry)
-    _materialize_git_metadata(repo_root, snapshot_root, private_root, copy_entry)
+    budget = SnapshotBudget(_MAX_SNAPSHOT_BYTES, _MAX_SNAPSHOT_ENTRIES, _MAX_SNAPSHOT_DEPTH)
+    copy_snapshot_tree(repo_root, snapshot_root, budget, should_skip=skip_ignored)
+    _materialize_git_metadata(repo_root, snapshot_root, private_root, budget)
     snapshot_ignored = _run_git(
         snapshot_root, "ls-files", "--others", "--ignored", "--exclude-standard", "-z", force_worktree=True
     )

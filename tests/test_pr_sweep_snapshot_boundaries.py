@@ -1,4 +1,4 @@
-"""Race and object-store boundaries for private Git status snapshots."""
+"""Race, resource, and object-store boundaries for private Git status snapshots."""
 
 from __future__ import annotations
 
@@ -44,17 +44,16 @@ def test_snapshot_blocks_changed_ignored_inventory(tmp_path: Path, monkeypatch: 
     repo = _repo(tmp_path)
     (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
     (repo / ".gitignore").write_text("dirty.txt\n", encoding="utf-8")
-    original_copytree = pr_sweep_validation.shutil.copytree
+    original_copy_tree = pr_sweep_validation.copy_snapshot_tree
 
-    def restore_ignore_before_copy(src: Path, dst: Path, *args: object, **kwargs: object) -> Path:
+    def restore_ignore_before_copy(src: Path, dst: Path, *args: object, **kwargs: object) -> None:
         if Path(src) == repo:
             (repo / ".gitignore").write_text("", encoding="utf-8")
-        copied = original_copytree(src, dst, *args, **kwargs)
+        original_copy_tree(src, dst, *args, **kwargs)
         if Path(src) == repo:
             (repo / ".gitignore").write_text("dirty.txt\n", encoding="utf-8")
-        return copied
 
-    monkeypatch.setattr(pr_sweep_validation.shutil, "copytree", restore_ignore_before_copy)
+    monkeypatch.setattr(pr_sweep_validation, "copy_snapshot_tree", restore_ignore_before_copy)
     result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
@@ -63,18 +62,83 @@ def test_snapshot_blocks_changed_ignored_inventory(tmp_path: Path, monkeypatch: 
 def test_snapshot_blocks_ignore_rule_added_only_during_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _repo(tmp_path)
     (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
-    original_copytree = pr_sweep_validation.shutil.copytree
+    original_copy_tree = pr_sweep_validation.copy_snapshot_tree
 
-    def add_ignore_during_copy(src: Path, dst: Path, *args: object, **kwargs: object) -> Path:
+    def add_ignore_during_copy(src: Path, dst: Path, *args: object, **kwargs: object) -> None:
         if Path(src) == repo:
             (repo / ".gitignore").write_text("dirty.txt\n", encoding="utf-8")
-        copied = original_copytree(src, dst, *args, **kwargs)
+        original_copy_tree(src, dst, *args, **kwargs)
         if Path(src) == repo:
             (repo / ".gitignore").write_text("", encoding="utf-8")
-        return copied
 
-    monkeypatch.setattr(pr_sweep_validation.shutil, "copytree", add_ignore_during_copy)
+    monkeypatch.setattr(pr_sweep_validation, "copy_snapshot_tree", add_ignore_during_copy)
     result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert result.status == "blocked"
+    assert result.findings[0].code == "git_status_unavailable"
+
+
+@pytest.mark.parametrize("entry_kind", ["file", "directory", "symlink"])
+def test_snapshot_object_budget_counts_empty_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, entry_kind: str
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    for index in range(3):
+        entry = source / f"entry-{index}"
+        if entry_kind == "file":
+            entry.touch()
+        elif entry_kind == "directory":
+            entry.mkdir()
+        else:
+            entry.symlink_to("missing")
+    destination = tmp_path / "destination"
+    monkeypatch.setattr(pr_sweep_validation, "_MAX_SNAPSHOT_ENTRIES", 2)
+    budget = pr_sweep_validation.SnapshotBudget(
+        pr_sweep_validation._MAX_SNAPSHOT_BYTES,
+        pr_sweep_validation._MAX_SNAPSHOT_ENTRIES,
+        pr_sweep_validation._MAX_SNAPSHOT_DEPTH,
+    )
+
+    with pytest.raises(OSError, match="object budget"):
+        pr_sweep_validation.copy_snapshot_tree(source, destination, budget)
+
+    assert len(list(destination.iterdir())) == 1
+
+
+def test_snapshot_object_budget_rejects_excessive_depth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    (source / "first" / "second").mkdir(parents=True)
+    destination = tmp_path / "destination"
+    monkeypatch.setattr(pr_sweep_validation, "_MAX_SNAPSHOT_DEPTH", 1)
+    budget = pr_sweep_validation.SnapshotBudget(
+        pr_sweep_validation._MAX_SNAPSHOT_BYTES,
+        pr_sweep_validation._MAX_SNAPSHOT_ENTRIES,
+        pr_sweep_validation._MAX_SNAPSHOT_DEPTH,
+    )
+
+    with pytest.raises(OSError, match="object budget"):
+        pr_sweep_validation.copy_snapshot_tree(source, destination, budget)
+
+    assert (destination / "first").is_dir()
+    assert not (destination / "first" / "second").exists()
+
+
+@pytest.mark.parametrize("limit", ["bytes", "records"])
+def test_git_output_budget_blocks_unbounded_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, limit: str
+) -> None:
+    repo = _repo(tmp_path)
+    if limit == "bytes":
+        monkeypatch.setattr(pr_sweep_validation, "_MAX_GIT_OUTPUT_BYTES", 1)
+    else:
+        (repo / "second.txt").touch()
+        _git(repo, "add", "second.txt")
+        monkeypatch.setattr(pr_sweep_validation, "_MAX_GIT_OUTPUT_RECORDS", 1)
+
+    result = pr_sweep_validation.validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
 
