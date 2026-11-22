@@ -358,6 +358,29 @@ def test_nonportable_filename_is_a_typed_blocker(tmp_path: Path) -> None:
     assert "invalid_package_path" in {item.code for item in result.findings}
 
 
+@pytest.mark.parametrize("filename", ["bad\x1b[31mname", "bad\x07name", "bad\u202ename"])
+def test_terminal_active_filename_is_blocked_without_echo(tmp_path: Path, filename: str) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    (root / filename).write_text("invalid\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    finding = next(item for item in result.findings if item.code == "invalid_package_path")
+    assert result.status == "blocked"
+    assert finding.evidence_refs == ()
+
+
+def test_printable_unicode_filename_remains_valid(tmp_path: Path) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    filename = "référence-指南.md"
+    (root / filename).write_text("valid\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    assert result.status == "pass"
+    assert filename in {item.path for item in result.files}
+
+
 def test_undecodable_filename_is_a_typed_blocker(tmp_path: Path) -> None:
     if os.name != "posix":
         pytest.skip("surrogateescape filename proof requires POSIX")

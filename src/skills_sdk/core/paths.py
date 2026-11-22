@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from pathlib import PurePosixPath
 
 from skills_sdk.core.errors import ContractError
@@ -12,7 +13,12 @@ _EXCLUDED_REFERENCE_TERMS = ("eval", "scorer", "rubric", "calibration", "heldout
 def require_portable_relative_path(value: str) -> PurePosixPath:
     """Return a normalized relative POSIX path or raise a typed error."""
 
-    if not value or not value.strip() or "\\" in value or any(char in value for char in "\r\n"):
+    if (
+        not value
+        or not value.strip()
+        or "\\" in value
+        or any(unicodedata.category(character) in {"Cc", "Cf"} for character in value)
+    ):
         raise ContractError("invalid_portable_path", "path must be a non-empty POSIX path")
     path = PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts or (path.parts and ":" in path.parts[0]):
