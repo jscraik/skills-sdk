@@ -12,11 +12,12 @@ from pydantic import ValidationError
 from test_saved_release_quality import saved_request
 
 from skills_sdk.core.digests import canonical_json_sha256
+from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.evaluation import check_plugin_quality
 from skills_sdk.intake import intake_skill_package
 from skills_sdk.models.intake import SkillPackageIntakeContextV2, SkillPackageIntakeContextV3
-from skills_sdk.models.package import ArchiveSourceSnapshot, SavedReleaseSnapshot
+from skills_sdk.models.package import ArchiveSourceProvenance, ArchiveSourceSnapshot, SavedReleaseSnapshot
 from skills_sdk.models.plugin_quality import PluginQualityRequestV2, PluginQualityRequestV3, PluginQualityResultV3
 
 
@@ -163,6 +164,23 @@ def test_archive_source_recapture_rejects_drift_and_restoration_recovers(tmp_pat
     assert restored.candidate == context.source.candidate
     assert restored.blocker is None and restored.validation.status == "pass"
     assert not any("provenance" in item.message.lower() for item in restored.validation.findings)
+
+
+def test_archive_provenance_rejects_sibling_path_at_every_semantic_boundary(tmp_path: Path) -> None:
+    """A sibling path cannot identify a different freshly captured recovery child."""
+    plugin, request, _, _ = archive_request(tmp_path)
+    child = request["children"][0]
+    context = SkillPackageIntakeContextV3.model_validate(child["request"]["intake"])
+    assert context.source.path == f"skills/{context.source.candidate.package_id}"
+    mismatched = {**context.source.model_dump(mode="json"), "path": "skills/other"}
+    with pytest.raises(ValidationError, match="path and revision"):
+        ArchiveSourceProvenance.model_validate(mismatched)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("archive-source-provenance.v1", mismatched)
+    forged_source = context.source.model_copy(update={"path": "skills/other"})
+    forged_context = context.model_copy(update={"source": forged_source})
+    with pytest.raises(ValidationError, match="path and revision"):
+        intake_skill_package(plugin / child["path"], forged_context)
 
 
 def test_old_source_contracts_reject_archive_shapes(tmp_path: Path) -> None:

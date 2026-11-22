@@ -22,7 +22,7 @@ from skills_sdk.models.intake import (
     SkillPackageIntakeContextV2,
     SkillPackageIntakeReceiptV2,
 )
-from skills_sdk.models.package import NormalizedPackageV2
+from skills_sdk.models.package import NormalizedPackageV2, SavedReleaseProvenance
 from skills_sdk.models.plugin_quality import PluginQualityRequest, PluginQualityRequestV2, PluginQualityResultV2
 
 
@@ -143,6 +143,23 @@ def test_saved_release_stale_source_blocks_at_actual_intake(tmp_path: Path) -> N
     restored = intake_skill_package(root / child["path"], context)
     assert restored.status == "normalized" and restored.blocker is None
     assert restored.candidate == context.source.candidate
+
+
+def test_saved_provenance_rejects_sibling_path_at_every_semantic_boundary(tmp_path: Path) -> None:
+    """A sibling path cannot identify a different freshly captured saved-release child."""
+    root, request, _, _ = saved_request(tmp_path)
+    child = request["children"][0]
+    context = SkillPackageIntakeContextV2.model_validate(child["request"]["intake"])
+    assert context.source.path == f"skills/{context.source.candidate.package_id}"
+    mismatched = {**context.source.model_dump(mode="json"), "path": "skills/other"}
+    with pytest.raises(ValidationError, match="path and revision"):
+        SavedReleaseProvenance.model_validate(mismatched)
+    with pytest.raises(ContractError):
+        SchemaRegistry().validate("saved-release-provenance.v1", mismatched)
+    forged_source = context.source.model_copy(update={"path": "skills/other"})
+    forged_context = context.model_copy(update={"source": forged_source})
+    with pytest.raises(ValidationError, match="path and revision"):
+        intake_skill_package(root / child["path"], forged_context)
 
 
 def test_old_intake_keeps_url_rejection(tmp_path: Path) -> None:
