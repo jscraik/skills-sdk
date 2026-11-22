@@ -211,6 +211,43 @@ def test_missing_and_not_regular_file(tmp_path: Path) -> None:
     assert _blocker_code(tmp_path) == "archive_not_regular_file"
 
 
+def test_rejects_symlinked_archive_source(tmp_path: Path) -> None:
+    target = tmp_path / "private.zip"
+    _archive(target)
+    selected = tmp_path / "selected.zip"
+    selected.symlink_to(target)
+
+    assert _blocker_code(selected) == "archive_unreadable"
+
+
+def test_rejects_archive_beneath_symlinked_parent(tmp_path: Path) -> None:
+    private = tmp_path / "private"
+    private.mkdir()
+    _archive(private / "package.zip")
+    selected = tmp_path / "selected"
+    selected.symlink_to(private, target_is_directory=True)
+
+    assert _blocker_code(selected / "package.zip") == "archive_unreadable"
+
+
+def test_safe_archive_read_unavailable_returns_typed_blocker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "package.zip"
+    _archive(path)
+    monkeypatch.setattr(archive_verification.os, "supports_dir_fd", os.supports_dir_fd - {os.open})
+
+    assert _blocker_code(path) == "archive_safe_read_unavailable"
+
+
+def test_relative_archive_path_remains_supported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "package.zip"
+    _archive(path)
+    monkeypatch.chdir(tmp_path)
+
+    assert verify_package_archive(Path("package.zip")).status == "pass"
+
+
 @pytest.mark.parametrize(
     ("mutation", "code"),
     [
@@ -339,6 +376,7 @@ def test_snapshot_io_failure_is_typed_and_closes_descriptor(
 
     with monkeypatch.context() as patch:
         patch.setattr(archive_verification.os, "open", tracked_open)
+        patch.setattr(archive_verification.os, "supports_dir_fd", {*os.supports_dir_fd, tracked_open})
         failure = MagicMock(side_effect=OSError("injected snapshot failure"))
         if stage == "read":
             stream = MagicMock()
@@ -348,9 +386,10 @@ def test_snapshot_io_failure_is_typed_and_closes_descriptor(
         else:
             patch.setattr(archive_verification.os, stage, failure)
         assert _blocker_code(path) == "archive_unreadable"
-    assert len(descriptors) == 1
-    with pytest.raises(OSError):
-        os.fstat(descriptors[0])
+    assert descriptors
+    for descriptor in descriptors:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
 
 
 def test_unserializable_forged_receipt_returns_typed_blocker(tmp_path: Path) -> None:
