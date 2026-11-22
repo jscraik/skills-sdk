@@ -11,7 +11,12 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from skills_sdk.core.errors import ContractError
-from skills_sdk.core.paths import PORTABLE_PATH_CONTROL_PATTERN, require_portable_relative_path
+from skills_sdk.core.paths import (
+    PORTABLE_PATH_CONTROL_PATTERN,
+    require_distinct_portable_restore_paths,
+    require_portable_relative_path,
+    require_portable_restore_path,
+)
 from skills_sdk.core.receipts import CandidateIdentity, parse_receipt
 from skills_sdk.core.schema_registry import SCHEMA_NAMES, SchemaRegistry, _packaged_validation_resources
 
@@ -294,6 +299,44 @@ def test_printable_unicode_paths_remain_portable() -> None:
     value = "références/指南-🙂.md"
 
     assert require_portable_relative_path(value).as_posix() == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "NUL",
+        "assets/COM1.log",
+        "references/guide.md.",
+        "references/guide.md ",
+        "assets/a?.txt",
+        "assets/a:b",
+    ],
+)
+def test_restore_paths_reject_host_rewritten_components(value: str) -> None:
+    with pytest.raises(ContractError, match="invalid_portable_restore_path"):
+        require_portable_restore_path(value)
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ("SKILL.md", "skill.md"),
+        ("café.txt", "cafe\u0301.txt"),
+        ("Straße", "STRASSE"),
+        ("assets/a.txt", "Assets/b.txt"),
+        ("assets", "assets/file.txt"),
+    ],
+)
+def test_restore_paths_reject_file_and_parent_aliases(paths: tuple[str, ...]) -> None:
+    with pytest.raises(ContractError, match="portable_restore_path_collision"):
+        require_distinct_portable_restore_paths(paths, include_parents=True)
+
+
+def test_restore_paths_preserve_distinct_unicode_and_shared_parents() -> None:
+    paths = ("references/résumé.md", "references/指南-🙂.md")
+
+    require_distinct_portable_restore_paths(paths, include_parents=True)
+    assert tuple(require_portable_restore_path(value).as_posix() for value in paths) == paths
 
 
 def test_receipt_schema_rejects_candidate_shape_drift() -> None:

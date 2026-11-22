@@ -328,6 +328,35 @@ def test_package_manifest_requires_canonical_file_order() -> None:
     assert any("paths must be sorted" in detail for detail in error.value.details)
 
 
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ("SKILL.md", "skill.md"),
+        ("assets/café.txt", "assets/cafe\u0301.txt"),
+        ("assets/a.txt", "Assets/b.txt"),
+    ],
+)
+def test_package_manifest_rejects_portable_restore_collisions(paths: tuple[str, ...]) -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))["manifest"]
+    template = payload["files"][0]
+    payload["files"] = [{**template, "path": path} for path in sorted(paths)]
+
+    with pytest.raises(ValidationError, match="paths collide on portable restore"):
+        PackageManifest.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-manifest.v1", payload)
+
+
+def test_package_manifest_rejects_reserved_restore_component() -> None:
+    payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))["manifest"]
+    payload["files"][0]["path"] = "assets/NUL.txt"
+
+    with pytest.raises(ValidationError, match="reserved device component"):
+        PackageManifest.model_validate(payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("package-manifest.v1", payload)
+
+
 def test_schema_registry_rejects_blocked_receipt_without_blocker() -> None:
     payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))
     payload["status"] = "blocked"

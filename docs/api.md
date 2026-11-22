@@ -407,6 +407,12 @@ For an incomplete blocked capture, the existing candidate digest can describe
 only the captured subset; it does not establish a complete package identity.
 The frontmatter rules are shared with plugin-child validation and entrypoint
 maintenance. Complete-plugin capture has its own separate resource limits.
+Standalone captures and manifests also reject names that cannot retain one
+identity on supported restore hosts: Unicode-normalisation or case-folding
+aliases, colliding parent directories, Windows reserved devices, trailing dots
+or spaces, and rewritten path characters. Standalone source validation reports
+these names through `invalid_package_path`; manifest validation rejects the same
+unsafe state at its model and `SchemaRegistry` boundaries.
 
 - **Archive verification:** import `verify_package_archive` from
   `skills_sdk.packaging`, and `PackageArchiveVerificationPolicy` and
@@ -416,6 +422,9 @@ maintenance. Complete-plugin capture has its own separate resource limits.
   `package-archive-verification/v1` with `pass` or a typed `blocked` result.
   A pass binds observed payload sizes and digests to the manifest and candidate;
   optional expectations compare the archive digest and a built package receipt v2.
+  Entry names must satisfy the same portable-restore identity rules as manifests;
+  aliases return `archive_path_collision`, while reserved or rewritten components
+  return `archive_path_invalid` before manifest or payload proof is emitted.
   Only stored and DEFLATE entries are supported. Unsupported compression and
   malformed ZIP streams return `archive_invalid_zip` before unsafe expansion.
   Use `SchemaRegistry().validate("package-archive-verification.v1", payload)`
@@ -777,7 +786,10 @@ maintenance. Complete-plugin capture has its own separate resource limits.
   candidate-bound intended state for a logical user or project target. Each
   entry binds package and candidate identity, version, package digest, registry
   identity, package and preparation receipt IDs, and an ordered digest inventory
-  of portable relative files. `InstallPlan` (`install-plan/v1`) describes a
+  of portable relative files. Runtime file inventories reject Unicode-normalisation
+  and case-folding aliases, colliding parent directories, reserved devices, and
+  host-rewritten components before a lock or plan is accepted. `InstallPlan`
+  (`install-plan/v1`) describes a
   deterministic `install`, `update`, or `no_change` transition, or a typed
   blocked result. The planner rejects a registry receipt whose
   `input_receipt_id` does not identify the exact package receipt, carries the

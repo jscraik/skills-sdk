@@ -358,6 +358,31 @@ def test_nonportable_filename_is_a_typed_blocker(tmp_path: Path) -> None:
     assert "invalid_package_path" in {item.code for item in result.findings}
 
 
+def test_restore_sensitive_filename_is_a_typed_build_blocker(tmp_path: Path) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    (root / "NUL.txt").write_text("invalid on supported restore hosts\n", encoding="utf-8")
+
+    validation = validate_skill_package(root, source_revision=REVISION)
+    receipt = build_skill_package(root, source_revision=REVISION, clock=_clock)
+
+    assert validation.status == "blocked"
+    assert "invalid_package_path" in {item.code for item in validation.findings}
+    assert receipt.status == "blocked"
+    assert receipt.blocker is not None and receipt.blocker.code == "invalid_package_path"
+
+
+def test_restore_aliases_are_typed_validation_blockers(tmp_path: Path) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    (root / "guide.md").write_text("first\n", encoding="utf-8")
+    (root / "GUIDE.md").write_text("second\n", encoding="utf-8")
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    finding = next(item for item in result.findings if item.code == "invalid_package_path")
+    assert result.status == "blocked"
+    assert set(finding.evidence_refs) == {"GUIDE.md", "guide.md"}
+
+
 @pytest.mark.parametrize("filename", ["bad\x1b[31mname", "bad\x07name", "bad\u202ename"])
 def test_terminal_active_filename_is_blocked_without_echo(tmp_path: Path, filename: str) -> None:
     root = _write_skill(tmp_path / "fixture-skill")

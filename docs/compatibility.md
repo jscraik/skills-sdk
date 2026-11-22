@@ -47,6 +47,7 @@ layer and are not registered in portable core's `SchemaRegistry`.
 
 Contents:
 
+- [Portable restore path hardening](#portable-restore-path-hardening)
 - [Plugin-first and registry-independent migration target](#plugin-first-and-registry-independent-migration-target)
 - [Accepted presentation assessment increment](#accepted-presentation-assessment-increment)
 - [Selected-case safety admission](#selected-case-safety-admission)
@@ -59,6 +60,17 @@ Contents:
 - [Workflow migration proof](#workflow-migration-proof)
 - [Separate evidence lanes](#separate-evidence-lanes)
 - [Tessl to Codex native-plugin compatibility question](#tessl-to-codex-native-plugin-compatibility-question)
+
+## Portable restore path hardening
+
+The existing package-manifest, runtime-lock, and install-plan v1 families now
+reject file inventories whose names collide after Unicode normalisation or case
+folding, whose parent directories collide, or whose components are rewritten or
+reserved on supported restore hosts. Their structural schema versions and
+ordinary portable-path shapes are unchanged; these set-level comparisons remain
+model and `SchemaRegistry` semantics. Archive verification applies the same rule
+before emitting proof. Existing canonical names, distinct printable Unicode
+names, digest binding, ordering, and typed blocked-state behavior remain intact.
 
 ## Plugin-first and registry-independent migration target
 
