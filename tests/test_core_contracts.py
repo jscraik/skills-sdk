@@ -11,12 +11,12 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from skills_sdk.core.errors import ContractError
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import PORTABLE_PATH_CONTROL_PATTERN, require_portable_relative_path
 from skills_sdk.core.receipts import CandidateIdentity, parse_receipt
 from skills_sdk.core.schema_registry import SCHEMA_NAMES, SchemaRegistry, _packaged_validation_resources
 
 EXPECTED_PORTABLE_PATH_PATTERN = (
-    r"^(?=.*\S)(?!.*[\r\n])(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)"
+    rf"^(?=.*\S)(?![\s\S]*(?:{PORTABLE_PATH_CONTROL_PATTERN}))(?!/)(?!.*\\)(?!.*(?:^|/)\.\.?(?:/|$))(?![^/]*:)(?!.*//)"
     r"(?!.*(?:^|/)\./)(?!.*\/$)[\s\S]+$"
 )
 
@@ -276,12 +276,24 @@ def test_non_blocked_receipt_rejects_blocker() -> None:
         "a\\b.json",
         "receipt.json\n",
         "receipt.json\r",
+        "receipt\tname.json",
+        "receipt\x07name.json",
+        "receipt\x1b[31mname.json",
+        "receipt\x9b31mname.json",
+        "receipt\u202ename.json",
+        "receipt\u2066name.json",
         "   ",
     ],
 )
 def test_non_portable_paths_are_rejected(value: str) -> None:
     with pytest.raises(ContractError, match="invalid_portable_path"):
         require_portable_relative_path(value)
+
+
+def test_printable_unicode_paths_remain_portable() -> None:
+    value = "références/指南-🙂.md"
+
+    assert require_portable_relative_path(value).as_posix() == value
 
 
 def test_receipt_schema_rejects_candidate_shape_drift() -> None:

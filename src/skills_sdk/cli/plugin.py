@@ -9,6 +9,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from skills_sdk.cli.display import print_human
+
 if TYPE_CHECKING:
     from skills_sdk.models.plugin import PluginPackageValidation
 
@@ -136,7 +138,7 @@ def _run_plugin_normalization(
             description=arguments.plugin_description,
         )
     except (OSError, UnicodeDecodeError, ValueError, RecursionError, ValidationError):
-        print("normalize-plugin: blocked (invalid intake context or plugin metadata)", file=sys.stderr)
+        print_human("normalize-plugin: blocked (invalid intake context or plugin metadata)", file=sys.stderr)
         return 2
     receipt = normalize_standalone_skill_package(
         arguments.skill_root,
@@ -147,11 +149,11 @@ def _run_plugin_normalization(
     if arguments.json_output:
         print(json.dumps(receipt.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"normalize-plugin: {receipt.status} (candidate preparation only; not release clearance)")
+        print_human(f"normalize-plugin: {receipt.status} (candidate preparation only; not release clearance)")
         if receipt.normalized_package is not None:
-            print(f"  plugin: {receipt.normalized_package.identity.package_id}")
+            print_human(f"  plugin: {receipt.normalized_package.identity.package_id}")
         if receipt.blocker is not None:
-            print(f"  {receipt.blocker.code}: {receipt.blocker.message}")
+            print_human(f"  {receipt.blocker.code}: {receipt.blocker.message}")
     return 0 if receipt.status == "prepared" else 2
 
 
@@ -165,11 +167,11 @@ def run_plugin_validation(
     if arguments.json_output:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"validate-plugin: {result.status} (structural capture only; not release clearance)")
+        print_human(f"validate-plugin: {result.status} (structural capture only; not release clearance)")
         for item in result.findings:
-            print(f"  {item.code}: {item.message}")
+            print_human(f"  {item.code}: {item.message}")
         for child in result.skills:
-            print(f"  {child.path}: {child.validation.status}")
+            print_human(f"  {child.path}: {child.validation.status}")
             for finding in child.validation.findings:
-                print(f"    {finding.code}: {finding.message}")
+                print_human(f"    {finding.code}: {finding.message}")
     return 0 if result.status == "pass" else 2

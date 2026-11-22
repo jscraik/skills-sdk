@@ -12,6 +12,7 @@ from typing import Any, cast
 from skills_sdk import __version__
 from skills_sdk.cli import COMMAND_HELP
 from skills_sdk.cli._quality_parsers import _add_content_review_parser, _add_coverage_parser, _add_quality_parser
+from skills_sdk.cli.display import print_human
 from skills_sdk.cli.fm_advisory import add_parser as add_fm_advisory_parser
 from skills_sdk.cli.plugin import PLUGIN_COMMANDS, add_plugin_parsers, run_plugin_command
 from skills_sdk.cli.routes import DISCOVERY_ONLY_EXIT, reject_discovery_only
@@ -250,24 +251,24 @@ def _print_result(command: str, result: Any, *, json_output: bool) -> None:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
         return
     package_id = result.candidate.package_id if result.candidate is not None else "unresolved-candidate"
-    print(f"{command}: {result.status} ({package_id})")
+    print_human(f"{command}: {result.status} ({package_id})")
     if command == "intake" and result.decision is not None:
-        print(f"  decision: {result.decision.decision.value}")
+        print_human(f"  decision: {result.decision.decision.value}")
         for code in result.decision.blocker_codes:
-            print(f"  decision_blocker: {code}")
+            print_human(f"  decision_blocker: {code}")
     for finding in _human_findings(command, result):
         references = ", ".join(finding.evidence_refs)
         suffix = f" [{references}]" if references else ""
-        print(f"  {finding.code}: {finding.message}{suffix}")
+        print_human(f"  {finding.code}: {finding.message}{suffix}")
     if command == "selected-case":
         for case in result.case_results:
-            print(f"  case {case.case_id}: {case.status}")
+            print_human(f"  case {case.case_id}: {case.status}")
             if case.missing_signals:
-                print(f"    missing_signals: {', '.join(case.missing_signals)}")
+                print_human(f"    missing_signals: {', '.join(case.missing_signals)}")
             if case.forbidden_commands_observed:
-                print(f"    forbidden_commands_observed: {', '.join(case.forbidden_commands_observed)}")
+                print_human(f"    forbidden_commands_observed: {', '.join(case.forbidden_commands_observed)}")
             if case.blocker is not None:
-                print(f"    {case.blocker.code}: {case.blocker.message}")
+                print_human(f"    {case.blocker.code}: {case.blocker.message}")
 
 
 def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
@@ -294,13 +295,13 @@ def _maintain_entrypoint(arguments: argparse.Namespace) -> int:
     if arguments.json_output:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"maintain-entrypoint: {result.status}")
+        print_human(f"maintain-entrypoint: {result.status}")
         if result.blocker is not None:
-            print(f"  {result.blocker.code}: {result.blocker.message}")
+            print_human(f"  {result.blocker.code}: {result.blocker.message}")
         if result.backup_name is not None:
-            print(f"  backup: {result.backup_name}")
+            print_human(f"  backup: {result.backup_name}")
         if result.recovery_name is not None:
-            print(f"  recovery: {result.recovery_name}")
+            print_human(f"  recovery: {result.recovery_name}")
     return 0 if result.status in {"matching", "repaired"} else 2
 
 
@@ -312,7 +313,8 @@ def _selected_case_blocker(code: str, message: str, *, json_output: bool) -> int
     if json_output:
         print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"selected-case: blocked\n  {blocker.code}: {blocker.message}")
+        print_human("selected-case: blocked")
+        print_human(f"  {blocker.code}: {blocker.message}")
     return 2
 
 
@@ -340,7 +342,8 @@ def _content_review(arguments: argparse.Namespace) -> int:
         if arguments.json_output:
             print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
         else:
-            print(f"review-content: blocked\n  {blocker.code}: {blocker.message}")
+            print_human("review-content: blocked")
+            print_human(f"  {blocker.code}: {blocker.message}")
         return 2
     except (OSError, ValueError, RecursionError):
         assessment = None
@@ -471,9 +474,9 @@ def _verify(arguments: argparse.Namespace) -> int:
     if arguments.json_output:
         print(json.dumps(verification.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"verify {arguments.verify_command}: {verification.status}")
+        print_human(f"verify {arguments.verify_command}: {verification.status}")
         for finding in verification.findings:
-            print(f"  {finding.code}: {finding.message}")
+            print_human(f"  {finding.code}: {finding.message}")
     return 0 if verification.status == "pass" else 2
 
 
@@ -493,25 +496,25 @@ def _emit_local_check(
     if json_output:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"local-check: {result.status}")
+        print_human(f"local-check: {result.status}")
         for name, receipt in stages:
-            print(f"  {name}: {receipt.status}")
+            print_human(f"  {name}: {receipt.status}")
         if blocked_stage:
-            print(f"  blocked_stage: {blocked_stage}")
+            print_human(f"  blocked_stage: {blocked_stage}")
         if stages and blocked_stage and blocked_stage != "candidate_changed":
             final_receipt = stages[-1][1]
             decision = getattr(final_receipt, "decision", None)
             if decision is not None:
-                print(f"  decision: {decision.decision.value}")
+                print_human(f"  decision: {decision.decision.value}")
                 for code in decision.blocker_codes:
-                    print(f"  decision_blocker: {code}")
+                    print_human(f"  decision_blocker: {code}")
             for finding in getattr(final_receipt, "findings", ()):
-                print(f"  {finding.code}: {finding.message}")
+                print_human(f"  {finding.code}: {finding.message}")
             final_blocker = getattr(final_receipt, "blocker", None)
             if final_blocker is not None:
-                print(f"  {final_blocker.code}: {final_blocker.message}")
+                print_human(f"  {final_blocker.code}: {final_blocker.message}")
         if blocker is not None:
-            print(f"  {blocker.code}: {blocker.message}")
+            print_human(f"  {blocker.code}: {blocker.message}")
     return 2 if blocked_stage else 0
 
 
@@ -611,9 +614,9 @@ def _quality_check(arguments: argparse.Namespace) -> int:
     if arguments.json_output:
         print(json.dumps(result.model_dump(mode="json"), sort_keys=True))
     else:
-        print(f"check-quality: {result.status}")
+        print_human(f"check-quality: {result.status}")
         if result.blocker is not None:
-            print(f"  {result.blocked_stage}: {result.blocker.code}: {result.blocker.message}")
+            print_human(f"  {result.blocked_stage}: {result.blocker.code}: {result.blocker.message}")
         if (
             result.stages
             and result.blocked_stage not in {None, "candidate_changed", "final-capture"}
@@ -622,16 +625,16 @@ def _quality_check(arguments: argparse.Namespace) -> int:
             receipt = result.stages[-1].receipt
             decision = getattr(receipt, "decision", None)
             if decision is not None:
-                print(f"  decision: {decision.decision.value}")
+                print_human(f"  decision: {decision.decision.value}")
                 for code in decision.blocker_codes:
-                    print(f"  decision_blocker: {code}")
+                    print_human(f"  decision_blocker: {code}")
             validation = getattr(receipt, "validation", None)
             findings = getattr(receipt, "findings", None) or getattr(validation, "findings", ())
             for finding in findings:
-                print(f"  {finding.code}: {finding.message}")
+                print_human(f"  {finding.code}: {finding.message}")
             receipt_blocker = getattr(receipt, "blocker", None)
             if receipt_blocker is not None:
-                print(f"  {receipt_blocker.code}: {receipt_blocker.message}")
+                print_human(f"  {receipt_blocker.code}: {receipt_blocker.message}")
     return 0 if result.status == "local_checks_passed" else 2
 
 
@@ -694,12 +697,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.json_output:
             print(json.dumps(comparison.model_dump(mode="json"), sort_keys=True))
             return 0 if comparison.status == "pass" else 2
-        print(f"compare-copy: {comparison.status}")
+        print_human(f"compare-copy: {comparison.status}")
         for label, validation in (("source", comparison.source), ("runtime", comparison.runtime)):
             for finding in validation.findings:
-                print(f"  {label}: {finding.code}: {finding.message}")
+                print_human(f"  {label}: {finding.code}: {finding.message}")
         for path in comparison.different_paths:
-            print(f"  different: {path}")
+            print_human(f"  different: {path}")
         return 0 if comparison.status == "pass" else 2
     if arguments.command == "eval":
         return _evaluation_command(arguments)
@@ -739,7 +742,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             if arguments.json_output:
                 print(json.dumps(blocker.model_dump(mode="json"), sort_keys=True))
             else:
-                print(f"intake: blocked\n  {blocker.code}: {blocker.message}")
+                print_human("intake: blocked")
+                print_human(f"  {blocker.code}: {blocker.message}")
             return 2
         except (ContractError, OSError, RecursionError, UnicodeDecodeError, ValueError, ValidationError):
             parser.error("invalid intake context")
