@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import traceback
-from collections.abc import AsyncIterator, Awaitable
+from collections.abc import AsyncIterator, Awaitable, Iterator
 from typing import Literal, cast
 
 import pytest
@@ -12,7 +12,10 @@ from skills_sdk.models.provider_call import ProviderCostObservation
 from skills_sdk.models.provider_execution import ProviderExecutionRequest, ProviderUsageMetadata
 from skills_sdk.providers import (
     ProviderAdapterBatch,
+    ProviderAdapterChunk,
     ProviderAdapterComplete,
+    ProviderAdapterFailure,
+    ProviderAdapterStreamEvent,
     ProviderAdapterStreamItem,
     ProviderAdapterTerminal,
     ProviderCallLimits,
@@ -128,6 +131,116 @@ def test_malformed_batch_container_is_a_contract_error() -> None:
     adapter.stream_values = [ProviderAdapterBatch(cast(tuple, object()))]
 
     with pytest.raises(ContractError, match="invalid_provider_event"):
+        _run(request, None, adapter)
+    assert adapter.cleanup_calls == 1
+
+
+def test_batch_tuple_subclass_is_rejected_before_iteration() -> None:
+    request = _provider_request(None)
+    adapter = FakeAdapter(request, mode="stream")
+
+    class IterationTrap(tuple[object, ...]):
+        def __iter__(self) -> Iterator[object]:
+            raise AssertionError("batch tuple subclass must not be iterated")
+
+    events = IterationTrap((ProviderAdapterChunk("answer"),))
+    adapter.stream_values = [ProviderAdapterBatch(cast(tuple[ProviderAdapterStreamEvent, ...], events))]
+
+    with pytest.raises(ContractError, match="invalid_provider_event"):
+        _run(request, None, adapter)
+    assert adapter.cleanup_calls == 1
+
+
+@pytest.mark.parametrize(
+    "evidence_refs",
+    [
+        tuple(f"evidence/{index}.json" for index in range(256)),
+        (f"evidence/{'x' * 4087}",),
+    ],
+)
+def test_adapter_evidence_metadata_accepts_count_and_string_boundaries(
+    evidence_refs: tuple[str, ...],
+) -> None:
+    request = _provider_request(None)
+    adapter = FakeAdapter(request)
+    adapter.complete_value = ProviderAdapterComplete("answer", evidence_refs)
+
+    outcome = _run(request, None, adapter)
+
+    assert outcome.public_result.execution.evidence_refs == evidence_refs
+
+
+@pytest.mark.parametrize("mode", ["complete", "stream", "failure"])
+@pytest.mark.parametrize(
+    "evidence_refs",
+    [
+        tuple(f"evidence/{index}.json" for index in range(257)),
+        (f"evidence/{'x' * 4088}",),
+        tuple(f"evidence/{index}-{'x' * 4000}" for index in range(17)),
+    ],
+)
+def test_adapter_evidence_metadata_limits_precede_receipt_validation(
+    mode: Literal["complete", "stream", "failure"],
+    evidence_refs: tuple[str, ...],
+) -> None:
+    request = _provider_request(None)
+    adapter = FakeAdapter(request, mode="stream" if mode == "stream" else "complete")
+    if mode == "complete":
+        adapter.complete_value = ProviderAdapterComplete("answer", evidence_refs)
+    elif mode == "stream":
+        adapter.stream_values = [ProviderAdapterTerminal(evidence_refs)]
+    else:
+        adapter.complete_value = ProviderAdapterFailure(
+            code="provider_failed",
+            category="provider",
+            retryable=False,
+            evidence_refs=evidence_refs,
+        )
+
+    with pytest.raises(ContractError, match="provider_metadata_too_large"):
+        _run(request, None, adapter)
+    assert adapter.cleanup_calls == 1
+
+
+@pytest.mark.parametrize("mode", ["complete", "stream"])
+@pytest.mark.parametrize("field_name", ["usage", "cost"])
+def test_oversized_nested_adapter_metadata_is_rejected_before_serialization(
+    mode: Literal["complete", "stream"],
+    field_name: Literal["usage", "cost"],
+) -> None:
+    request = _provider_request(None)
+    usage = ProviderUsageMetadata(unit_kind="tokens", input_units=1, output_units=1, total_units=2)
+    cost = ProviderCostObservation(amount="0.25", currency="USD", observed_at="2026-09-08T10:00:00Z")
+    if field_name == "usage":
+        usage = usage.model_copy(update={"unit_kind": "x" * 4097})
+    else:
+        cost = cost.model_copy(update={"amount": "1" * 4097})
+    adapter = FakeAdapter(request, mode=mode)
+    if mode == "complete":
+        adapter.complete_value = ProviderAdapterComplete(
+            "answer", ("evidence/output.json",), usage=usage, cost=cost
+        )
+    else:
+        adapter.stream_values = [
+            ProviderAdapterTerminal(("evidence/output.json",), usage=usage, cost=cost)
+        ]
+
+    with pytest.raises(ContractError, match="provider_metadata_too_large"):
+        _run(request, None, adapter)
+    assert adapter.cleanup_calls == 1
+
+
+def test_oversized_failure_code_is_rejected_before_receipt_validation() -> None:
+    request = _provider_request(None)
+    adapter = FakeAdapter(request)
+    adapter.complete_value = ProviderAdapterFailure(
+        code="x" * 4097,
+        category="provider",
+        retryable=False,
+        evidence_refs=("evidence/failure.json",),
+    )
+
+    with pytest.raises(ContractError, match="provider_metadata_too_large"):
         _run(request, None, adapter)
     assert adapter.cleanup_calls == 1
 
