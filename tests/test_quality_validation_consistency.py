@@ -88,7 +88,11 @@ def test_blocked_capture_identity_binds_candidate_and_recovers(
         capture["files"][0]["role"] = "asset"
     else:
         capture["files"][0]["size_bytes"] += 1
-    _reject_and_recover(forged, blocked, "capture identity" if field == "package" else "repeated validation")
+    message = {
+        "package": "capture identity",
+        "role": "package manifest file role must match its path",
+    }.get(field, "repeated validation")
+    _reject_and_recover(forged, blocked, message)
     unsafe.unlink()
     recovered = asyncio.run(
         workflow.check_local_quality(package, request, baseline_root=baseline, assessment=_assessment(package))
@@ -118,4 +122,5 @@ def test_unchanged_repeated_validations_agree_and_recover(tmp_path: Path, locati
         capture["findings"].append(
             {"code": "invented_warning", "severity": "warning", "message": "Invented warning.", "evidence_refs": []}
         )
-    _reject_and_recover(forged, passed, "repeated validation")
+    message = "package manifest file role must match its path" if field == "role" else "repeated validation"
+    _reject_and_recover(forged, passed, message)

@@ -32,7 +32,7 @@ def test_intake_rejects_unproved_serialized_metadata(attack: str) -> None:
     payload = intake_skill_package(root, _context()).model_dump(mode="json")
     if attack == "order":
         files = payload["validation"]["files"]
-        files.append({**files[0], "path": "z-extra.md"})
+        files.append({**files[0], "path": "z-extra.md", "role": "asset"})
         files.reverse()
         digest = candidate_content_sha256(PackageManifestFile.model_validate(item) for item in files)
         payload = json.loads(json.dumps(payload).replace(payload["candidate"]["content_sha256"], digest))
