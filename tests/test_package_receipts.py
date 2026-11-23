@@ -214,7 +214,7 @@ def test_v2_built_receipt_requires_literal_skill_entrypoint() -> None:
     payload["manifest"]["candidate"]["content_sha256"] = content_digest
     payload["package_digest"] = canonical_json_sha256(payload["manifest"])
 
-    with pytest.raises(ValidationError, match="manifest must include SKILL.md"):
+    with pytest.raises(ValidationError, match=r"manifest must include SKILL\.md"):
         PackageReceiptV2.model_validate(payload)
     with pytest.raises(ContractError) as error:
         SchemaRegistry().validate("package-receipt.v2", payload)
