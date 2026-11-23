@@ -573,7 +573,7 @@ def assess_scenario_quality(
                     _finding(
                         "release_case_not_eligible",
                         "release scenario set cases must include release in eval_modes",
-                        str(case.get("id") or "") or None,
+                        safe_diagnostic_identifier(str(case.get("id") or "")),
                     )
                 )
         if len(selected) < active_policy.minimum_release_cases:

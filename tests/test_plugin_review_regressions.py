@@ -118,9 +118,7 @@ def test_child_frontmatter_diagnostic_does_not_retain_active_or_private_text(tmp
 
     result = validate_plugin_package(root, source_revision=REVISION)
 
-    finding = next(
-        item for item in result.skills[0].validation.findings if item.code == "unknown_frontmatter"
-    )
+    finding = next(item for item in result.skills[0].validation.findings if item.code == "unknown_frontmatter")
     assert "\n" not in finding.message and "private-value" not in finding.message
     assert json.dumps(r"line\x0akey") in finding.message
     assert json.dumps("<redacted identifier>") in finding.message
