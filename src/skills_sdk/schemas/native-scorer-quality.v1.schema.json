@@ -1,0 +1,333 @@
+{
+  "$defs": {
+    "CodexNativeJudgeParameters": {
+      "additionalProperties": false,
+      "description": "Frozen requested CLI controls; temperature is explicitly unavailable.",
+      "properties": {
+        "apps": {
+          "const": false,
+          "default": false,
+          "title": "Apps",
+          "type": "boolean"
+        },
+        "cli_version": {
+          "minLength": 1,
+          "title": "Cli Version",
+          "type": "string"
+        },
+        "disabled_mcp_servers": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Disabled Mcp Servers",
+          "type": "array"
+        },
+        "ephemeral": {
+          "const": true,
+          "default": true,
+          "title": "Ephemeral",
+          "type": "boolean"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "plugins": {
+          "const": false,
+          "default": false,
+          "title": "Plugins",
+          "type": "boolean"
+        },
+        "reasoning_effort": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Reasoning Effort",
+          "type": "string"
+        },
+        "sandbox": {
+          "const": "read-only",
+          "default": "read-only",
+          "title": "Sandbox",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "codex-native-judge-parameters/v1",
+          "default": "codex-native-judge-parameters/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "shell_tool": {
+          "const": false,
+          "default": false,
+          "title": "Shell Tool",
+          "type": "boolean"
+        },
+        "temperature": {
+          "default": null,
+          "title": "Temperature",
+          "type": "null"
+        },
+        "temperature_control": {
+          "const": "not_exposed_by_codex_cli",
+          "default": "not_exposed_by_codex_cli",
+          "title": "Temperature Control",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "maximum": 300,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "trial_count": {
+          "const": 1,
+          "default": 1,
+          "title": "Trial Count",
+          "type": "integer"
+        },
+        "web_search": {
+          "const": "disabled",
+          "default": "disabled",
+          "title": "Web Search",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "cli_version",
+        "reasoning_effort",
+        "timeout_seconds",
+        "disabled_mcp_servers"
+      ],
+      "title": "CodexNativeJudgeParameters",
+      "type": "object"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "ScenarioQualityFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?![\\s\\S]*(?:[\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u0600-\\u0605\\u061c\\u06dd\\u070f\\u0890-\\u0891\\u08e2\\u180e\\u200b-\\u200f\\u202a-\\u202e\\u2060-\\u2064\\u2066-\\u206f\\ufeff\\ufff9-\\ufffb]|\ud804\udcbd|\ud804\udccd|\ud80d\udc30|\ud80d\udc31|\ud80d\udc32|\ud80d\udc33|\ud80d\udc34|\ud80d\udc35|\ud80d\udc36|\ud80d\udc37|\ud80d\udc38|\ud80d\udc39|\ud80d\udc3a|\ud80d\udc3b|\ud80d\udc3c|\ud80d\udc3d|\ud80d\udc3e|\ud80d\udc3f|\ud82f\udca0|\ud82f\udca1|\ud82f\udca2|\ud82f\udca3|\ud834\udd73|\ud834\udd74|\ud834\udd75|\ud834\udd76|\ud834\udd77|\ud834\udd78|\ud834\udd79|\ud834\udd7a|\udb40\udc01|\udb40\udc20|\udb40\udc21|\udb40\udc22|\udb40\udc23|\udb40\udc24|\udb40\udc25|\udb40\udc26|\udb40\udc27|\udb40\udc28|\udb40\udc29|\udb40\udc2a|\udb40\udc2b|\udb40\udc2c|\udb40\udc2d|\udb40\udc2e|\udb40\udc2f|\udb40\udc30|\udb40\udc31|\udb40\udc32|\udb40\udc33|\udb40\udc34|\udb40\udc35|\udb40\udc36|\udb40\udc37|\udb40\udc38|\udb40\udc39|\udb40\udc3a|\udb40\udc3b|\udb40\udc3c|\udb40\udc3d|\udb40\udc3e|\udb40\udc3f|\udb40\udc40|\udb40\udc41|\udb40\udc42|\udb40\udc43|\udb40\udc44|\udb40\udc45|\udb40\udc46|\udb40\udc47|\udb40\udc48|\udb40\udc49|\udb40\udc4a|\udb40\udc4b|\udb40\udc4c|\udb40\udc4d|\udb40\udc4e|\udb40\udc4f|\udb40\udc50|\udb40\udc51|\udb40\udc52|\udb40\udc53|\udb40\udc54|\udb40\udc55|\udb40\udc56|\udb40\udc57|\udb40\udc58|\udb40\udc59|\udb40\udc5a|\udb40\udc5b|\udb40\udc5c|\udb40\udc5d|\udb40\udc5e|\udb40\udc5f|\udb40\udc60|\udb40\udc61|\udb40\udc62|\udb40\udc63|\udb40\udc64|\udb40\udc65|\udb40\udc66|\udb40\udc67|\udb40\udc68|\udb40\udc69|\udb40\udc6a|\udb40\udc6b|\udb40\udc6c|\udb40\udc6d|\udb40\udc6e|\udb40\udc6f|\udb40\udc70|\udb40\udc71|\udb40\udc72|\udb40\udc73|\udb40\udc74|\udb40\udc75|\udb40\udc76|\udb40\udc77|\udb40\udc78|\udb40\udc79|\udb40\udc7a|\udb40\udc7b|\udb40\udc7c|\udb40\udc7d|\udb40\udc7e|\udb40\udc7f))(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ScenarioQualityFinding",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/native-scorer-quality.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Native declaration assessment; no numeric temperature is invented.",
+  "properties": {
+    "calibration_expected_labels": {
+      "default": [],
+      "items": {
+        "enum": [
+          "pass",
+          "fail"
+        ],
+        "type": "string"
+      },
+      "title": "Calibration Expected Labels",
+      "type": "array"
+    },
+    "calibration_probe_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Calibration Probe Count",
+      "type": "integer"
+    },
+    "calibration_probe_ids": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Calibration Probe Ids",
+      "type": "array"
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "execution_performed": {
+      "const": false,
+      "default": false,
+      "title": "Execution Performed",
+      "type": "boolean"
+    },
+    "findings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ScenarioQualityFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "network_used": {
+      "const": false,
+      "default": false,
+      "title": "Network Used",
+      "type": "boolean"
+    },
+    "parameters": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CodexNativeJudgeParameters"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "pass_threshold": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pass Threshold"
+    },
+    "schema_version": {
+      "const": "native-scorer-quality/v1",
+      "default": "native-scorer-quality/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scorer_id": {
+      "default": "",
+      "title": "Scorer Id",
+      "type": "string"
+    },
+    "scorer_type": {
+      "anyOf": [
+        {
+          "enum": [
+            "deterministic",
+            "llm_judge",
+            "hybrid",
+            "external"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scorer Type"
+    },
+    "scorer_version_or_digest": {
+      "default": "",
+      "title": "Scorer Version Or Digest",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "NativeScorerQualityReceipt",
+  "type": "object"
+}

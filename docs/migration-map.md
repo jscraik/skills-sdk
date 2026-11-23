@@ -1,5 +1,15 @@
 # Workflow migration map
 
+## Native-quality recovery candidate
+
+The local native-quality bridge ports only supplied calibration/declaration
+joins into the maintained local quality workflow. It retains current native
+receipt validation and source gates. The historical plugin coordinator is not
+restored: current budgets, safe metadata handling and bounded workers stay with
+the maintained plugin route. Native plugin composition, CLI integration and the
+host-authorised calibration runner remain outside this slice. Source and schema
+proof are in `tests/test_native_quality_bridge.py`; acceptance remains pending.
+
 Local whole-plugin build/hardening candidate (not accepted on main): additive
 `build_plugin_package` and `harden_plugin_package` bind complete capture and
 modes, fresh source and supplied presentation approvals without emission.

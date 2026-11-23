@@ -63,11 +63,12 @@ def _number(value: object) -> float | None:
     return None
 
 
-def _strict_metadata(metadata: Mapping[object, object]) -> list[ScenarioQualityFinding]:
+def _strict_metadata(metadata: Mapping[object, object], *, native: bool = False) -> list[ScenarioQualityFinding]:
     findings: list[ScenarioQualityFinding] = []
     if set(metadata) - _FIELDS:
         findings.append(_finding("unknown_scorer_field", "scorer_quality contains unsupported fields"))
-    if metadata.get("schema_version") != "skills-sdk.scorer-quality.v1":
+    schema = "skills-sdk.native-scorer-quality.v1" if native else "skills-sdk.scorer-quality.v1"
+    if metadata.get("schema_version") != schema:
         findings.append(_finding("invalid_scorer_schema", "scorer_quality schema_version is unsupported"))
     for field in ("scorer_id", "scorer_version_or_digest"):
         if not _text(metadata.get(field)):
@@ -83,7 +84,7 @@ def _strict_metadata(metadata: Mapping[object, object]) -> list[ScenarioQualityF
         findings.append(_finding("invalid_pass_threshold", "pass_threshold must be a number in (0, 1]"))
     if metadata.get("deterministic_checks_first") is not True:
         findings.append(_finding("deterministic_checks_first", "deterministic checks must run first"))
-    findings.extend(_judge_findings(metadata, scorer_type))
+    findings.extend(_judge_findings(metadata, scorer_type, native=native))
     findings.extend(_probe_findings(metadata))
     return findings
 
@@ -121,13 +122,17 @@ def _valid_rationale(value: object) -> bool:
     )
 
 
-def _judge_findings(metadata: Mapping[object, object], scorer_type: object) -> list[ScenarioQualityFinding]:
+def _judge_findings(
+    metadata: Mapping[object, object], scorer_type: object, *, native: bool = False
+) -> list[ScenarioQualityFinding]:
     judge = isinstance(scorer_type, str) and scorer_type in _JUDGE_TYPES
     findings: list[ScenarioQualityFinding] = []
     parameters = metadata.get("parameters")
-    if (parameters is not None or judge) and not _valid_parameters(parameters):
+    if (parameters is not None or judge or native) and not (
+        _native_parameters(parameters) is not None if native else _valid_parameters(parameters)
+    ):
         findings.append(
-            _finding("judge_parameters_versioned", "judge parameters need model, temperature, and trial_count")
+            _finding("judge_parameters_versioned", "judge parameters must match the declared parameter family")
         )
     rationale = metadata.get("rationale_audit")
     if (rationale is not None or judge) and not _valid_rationale(rationale):
@@ -225,6 +230,20 @@ def _expected_outcome(case: Mapping[object, object], probe_type: object, thresho
 
 
 def assess_scorer_quality(package_root: Path, *, source_revision: str) -> ScorerQualityReceipt:
+    """Assess legacy scorer declarations without native interpretation."""
+    return _assess_scorer_quality(package_root, source_revision=source_revision)
+
+
+def _native_parameters(value: object) -> object:
+    from skills_sdk.models.native_judge import CodexNativeJudgeParameters
+
+    try:
+        return CodexNativeJudgeParameters.model_validate(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _assess_scorer_quality(package_root: Path, *, source_revision: str, native: bool = False) -> ScorerQualityReceipt:
     """Assess declarations without claiming the held-out calibration ran here."""
     validation = validate_skill_package(package_root, source_revision=source_revision)
     findings = [
@@ -250,16 +269,45 @@ def assess_scorer_quality(package_root: Path, *, source_revision: str) -> Scorer
                 )
             else:
                 metadata = payload["scorer_quality"]
-                findings.extend(_strict_metadata(metadata))
+                findings.extend(_strict_metadata(metadata, native=native))
         except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
             findings.append(_finding("invalid_evals_yaml", f"cannot safely load scorer metadata: {type(exc).__name__}"))
     cases = metadata.get("calibration_cases")
-    return ScorerQualityReceipt(
+    from skills_sdk.models.native_quality import NativeScorerQualityReceipt
+
+    receipt_type = NativeScorerQualityReceipt if native else ScorerQualityReceipt
+    native_fields = (
+        {
+            "calibration_probe_ids": tuple(
+                case["id"] for case in cases if isinstance(case, Mapping) and _text(case.get("id"))
+            )
+            if isinstance(cases, list)
+            else (),
+            "calibration_expected_labels": tuple(
+                "pass" if case.get("probe_type") == "obvious_correct" else "fail"
+                for case in cases
+                if isinstance(case, Mapping)
+            )
+            if isinstance(cases, list)
+            else (),
+            "scorer_type": (
+                "external" if metadata.get("scorer_type") == "external_tessl" else metadata.get("scorer_type")
+            )
+            if isinstance(metadata.get("scorer_type"), str) and metadata.get("scorer_type") in _SCORER_TYPES
+            else None,
+        }
+        if native
+        else {}
+    )
+    return receipt_type(
+        **native_fields,
         candidate=validation.candidate,
         status="blocked" if findings else "pass",
         scorer_id=str(metadata.get("scorer_id") or ""),
         scorer_version_or_digest=str(metadata.get("scorer_version_or_digest") or ""),
-        parameters=_declared_parameters(metadata.get("parameters")),
+        parameters=_native_parameters(metadata.get("parameters"))
+        if native
+        else _declared_parameters(metadata.get("parameters")),
         pass_threshold=(
             threshold
             if (threshold := _number(metadata.get("pass_threshold"))) is not None and 0 < threshold <= 1

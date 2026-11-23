@@ -1,5 +1,27 @@
 # Python API
 
+## Native supplied-calibration quality bridge
+
+The local delivery candidate adds `NativeLocalCheckRequest` and
+`NativeLocalCheckResult` (`native-local-check-request/v1` and
+`native-local-check/v1`). Store an already supplied `NativeCalibrationReceipt` in the request
+`calibration` field, then pass the request to `check_local_quality`.
+The explicit native scorer declaration uses
+`skills-sdk.native-scorer-quality.v1` in `references/evals.yaml` and
+`CodexNativeJudgeParameters`, including the unavailable temperature control.
+The workflow joins the exact expected plan, candidate, scorer identity, native
+settings, threshold and ordered declared probe IDs. It retains the observation
+and checks its derived summary when receipts are read back.
+
+This profile reuses the existing intake, source, coverage, content-review and
+final recapture stages. Missing, failed or mismatched calibration stops before
+content review. Existing local-check v2/v3/v4 requests reject the native `calibration` field;
+their numeric-temperature and file-bundle semantics remain unchanged.
+This first profile uses the v1 intake context and has no CLI or whole-plugin
+native entrypoint. It performs no calibration or provider calls. Supplied
+callback evidence does not establish external authenticity, release readiness,
+publication or permission to execute. Hosted acceptance remains pending.
+
 The public API is the typed contract layer under `skills_sdk`. The top-level
 package exports the inventory, risk, evaluation, and provider execution
 contracts listed in its `__all__`. Import family-specific contracts such as

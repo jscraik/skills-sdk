@@ -74,6 +74,10 @@ SCHEMA_NAMES = frozenset(
         "scorer-calibration.v1",
         "observed-calibration-plan.v1",
         "observed-calibration.v1",
+        "native-scorer-quality.v1",
+        "native-scorer-calibration.v1",
+        "native-local-check-request.v1",
+        "native-local-check.v1",
         "native-calibration-plan.v1",
         "native-calibration.v1",
         "native-matched-calibration.v1",
@@ -586,6 +590,25 @@ class SchemaRegistry:
             from skills_sdk.models.observed_calibration import ObservedCalibrationPlan, ObservedCalibrationReceipt
 
             model = ObservedCalibrationPlan if name == "observed-calibration-plan.v1" else ObservedCalibrationReceipt
+        elif name in {
+            "native-scorer-quality.v1",
+            "native-scorer-calibration.v1",
+            "native-local-check-request.v1",
+            "native-local-check.v1",
+        }:
+            from skills_sdk.models.native_quality import (
+                NativeLocalCheckRequest,
+                NativeLocalCheckResult,
+                NativeScorerCalibrationReceipt,
+                NativeScorerQualityReceipt,
+            )
+
+            model = {
+                "native-scorer-quality.v1": NativeScorerQualityReceipt,
+                "native-scorer-calibration.v1": NativeScorerCalibrationReceipt,
+                "native-local-check-request.v1": NativeLocalCheckRequest,
+                "native-local-check.v1": NativeLocalCheckResult,
+            }[name]
         elif name in {"native-calibration-plan.v1", "native-calibration.v1"}:
             from skills_sdk.models.observed_calibration import NativeCalibrationPlan, NativeCalibrationReceipt
 

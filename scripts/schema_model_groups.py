@@ -44,6 +44,12 @@ from skills_sdk.models.native_matched import (
     NativeMatchedPairAssessment,
     NativeMatchedVariantCalibrationBundle,
 )
+from skills_sdk.models.native_quality import (
+    NativeLocalCheckRequest,
+    NativeLocalCheckResult,
+    NativeScorerCalibrationReceipt,
+    NativeScorerQualityReceipt,
+)
 from skills_sdk.models.observed_calibration import (
     NativeCalibrationPlan,
     NativeCalibrationReceipt,
@@ -129,6 +135,10 @@ def evaluation_schema_models() -> tuple[tuple[type[Any], str], ...]:
         (ScorerCalibrationReceipt, "scorer-calibration.v1.schema.json"),
         (ObservedCalibrationPlan, "observed-calibration-plan.v1.schema.json"),
         (ObservedCalibrationReceipt, "observed-calibration.v1.schema.json"),
+        (NativeScorerQualityReceipt, "native-scorer-quality.v1.schema.json"),
+        (NativeScorerCalibrationReceipt, "native-scorer-calibration.v1.schema.json"),
+        (NativeLocalCheckRequest, "native-local-check-request.v1.schema.json"),
+        (NativeLocalCheckResult, "native-local-check.v1.schema.json"),
         (NativeCalibrationPlan, "native-calibration-plan.v1.schema.json"),
         (NativeCalibrationReceipt, "native-calibration.v1.schema.json"),
         (NativeMatchedCalibrationReceipt, "native-matched-calibration.v1.schema.json"),

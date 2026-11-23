@@ -1,5 +1,14 @@
 # Skills SDK workflow
 
+## Local native-quality bridge candidate
+
+The unmerged native-quality bridge consumes supplied calibration through
+`check_local_quality`, preserving the existing gate order and source recapture.
+It adds exact plan and scorer-declaration joins without invoking a native judge.
+It does not restore the historical whole-plugin coordinator, runner or cloud
+handoff. Existing quality profiles and accepted release boundaries remain unchanged.
+See the [API description](api.md#native-supplied-calibration-quality-bridge).
+
 The local optional [Apple FM advisory](fm-advisory.md) is a separate diagnostic
 delivery candidate. `advise-fm` skips missing declared context and keeps its
 findings outside SDK acceptance. It is not a required workflow stage and does

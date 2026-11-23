@@ -1,5 +1,15 @@
 # Skills SDK workflow delivery
 
+## Native-quality bridge candidate, 23 November 2026
+
+Local work on `codex/native-calibration-quality-bridge` adds a supplied-native
+calibration profile to the existing local workflow. It binds the frozen expected
+plan to the source declaration and retains original observations and derived
+summaries. Existing numeric-temperature profiles stay unchanged. The slice
+excludes native plugin orchestration, CLI delivery, live provider execution and
+hosted acceptance. Focused tests and independent review are required before local
+closeout; no commit, publication or paid Factory run is authorised by this slice.
+
 ## Native calibration recovery candidate, 11 November 2026
 
 Recover the preserved native plan, receipt and guarded calibration service
