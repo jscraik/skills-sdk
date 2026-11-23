@@ -227,9 +227,7 @@ def test_backup_root_must_not_be_accessible_to_other_users(
         command.append("--apply")
     assert main(command) == 2
     payload = json.loads(capsys.readouterr().out)
-    assert payload["blocker"]["message"] == (
-        "backup root must be private and owned by the current effective user"
-    )
+    assert payload["blocker"]["message"] == ("backup root must be private and owned by the current effective user")
     assert target.read_bytes() == before
     assert _backup_files(backup) == []
 
@@ -256,9 +254,7 @@ def test_backup_root_must_be_owned_by_effective_user(
     monkeypatch.setattr(entrypoint.os, "fstat", foreign_owner_fstat)
     assert main([*args, "--apply", "--json"]) == 2
     payload = json.loads(capsys.readouterr().out)
-    assert payload["blocker"]["message"] == (
-        "backup root must be private and owned by the current effective user"
-    )
+    assert payload["blocker"]["message"] == ("backup root must be private and owned by the current effective user")
     assert target.read_bytes() == before
     assert _backup_files(backup) == []
 
@@ -280,9 +276,7 @@ def test_backup_root_privacy_is_rechecked_before_repair(
     monkeypatch.setattr(entrypoint, "_validate_backup_root", expose_after_validation)
     assert main([*args, "--apply", "--json"]) == 2
     payload = json.loads(capsys.readouterr().out)
-    assert payload["blocker"]["message"] == (
-        "backup root must be private and owned by the current effective user"
-    )
+    assert payload["blocker"]["message"] == ("backup root must be private and owned by the current effective user")
     assert target.read_bytes() == before
     assert _backup_files(backup) == []
 
