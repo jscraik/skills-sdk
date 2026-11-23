@@ -274,9 +274,7 @@ def _read_snapshot(
     try:
         descriptor = _open_archive_descriptor(archive_path)
     except _UnsupportedSafeArchiveRead:
-        return _blocked(
-            "archive_safe_read_unavailable", "host cannot enforce safe descriptor-relative archive reads"
-        )
+        return _blocked("archive_safe_read_unavailable", "host cannot enforce safe descriptor-relative archive reads")
     except FileNotFoundError:
         return _blocked("archive_missing", "package archive does not exist")
     except IsADirectoryError:

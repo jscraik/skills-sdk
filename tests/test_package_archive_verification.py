@@ -230,9 +230,7 @@ def test_rejects_archive_beneath_symlinked_parent(tmp_path: Path) -> None:
     assert _blocker_code(selected / "package.zip") == "archive_unreadable"
 
 
-def test_safe_archive_read_unavailable_returns_typed_blocker(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_safe_archive_read_unavailable_returns_typed_blocker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "package.zip"
     _archive(path)
     monkeypatch.setattr(archive_verification.os, "supports_dir_fd", os.supports_dir_fd - {os.open})
