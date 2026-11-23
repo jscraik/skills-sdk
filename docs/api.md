@@ -457,6 +457,9 @@ maintenance. Complete-plugin capture has its own separate resource limits.
   `build_skill_package` before `harden_skill_package`; hardening consumes the
   receipt and does not rescan the source filesystem. Builders emit
   `PackageReceiptV2`, which binds `package_digest` to the canonical manifest;
+  manifest roles must match their canonical paths, and built v2 receipts require
+  literal `SKILL.md` plus provenance sources present in the manifest. Registered
+  model validation enforces these cross-field relationships;
   `PackageReceipt` preserves the historical `package-receipt/v1` contract for
   compatible readers.
 - **Evaluation:** `ScenarioSet`, `ScenarioCase`, `ScorerProfile`,

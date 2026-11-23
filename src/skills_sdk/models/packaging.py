@@ -55,6 +55,12 @@ class PackageManifestFile(_ContractModel):
         require_portable_relative_path(value)
         return value
 
+    @model_validator(mode="after")
+    def role_matches_path(self) -> PackageManifestFile:
+        if self.role != _file_role(self.path):
+            raise ValueError("package manifest file role must match its path")
+        return self
+
 
 class PackageManifestProvenance(_ContractModel):
     """Portable provenance references used to build a package manifest."""
@@ -172,6 +178,11 @@ class PackageReceiptV2(PackageReceipt):
         if self.status == "built":
             assert self.manifest is not None
             assert self.candidate is not None
+            manifest_paths = {item.path for item in self.manifest.files}
+            if "SKILL.md" not in manifest_paths:
+                raise ValueError("built v2 package receipt manifest must include SKILL.md")
+            if not set(self.manifest.provenance.source) <= manifest_paths:
+                raise ValueError("built v2 package receipt provenance sources must be manifested")
             expected_content_digest = candidate_content_sha256(self.manifest.files)
             if self.candidate.content_sha256 != expected_content_digest:
                 raise ValueError("built package receipt candidate digest must match manifest files")
