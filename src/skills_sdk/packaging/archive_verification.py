@@ -37,6 +37,10 @@ _CENTRAL_HEADER_SIZE = 46
 _MAX_ZIP_COMMENT_BYTES = 65_535
 
 
+class _UnsupportedSafeArchiveRead(OSError):
+    """The host cannot enforce descriptor-relative no-follow archive reads."""
+
+
 def _blocked(code: str, message: str, evidence: tuple[str, ...] = ()) -> PackageArchiveVerificationReceipt:
     return PackageArchiveVerificationReceipt(
         status="blocked",
@@ -239,11 +243,43 @@ def _read_bounded_bytes(stream: BinaryIO, limit: int) -> bytes:
         return data.getvalue()
 
 
+def _open_archive_descriptor(archive_path: Path) -> int:
+    """Open an archive without following any symbolic-link path component."""
+
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    nonblock_flag = getattr(os, "O_NONBLOCK", None)
+    if (
+        any(not isinstance(flag, int) or flag == 0 for flag in (directory_flag, nofollow_flag, nonblock_flag))
+        or os.open not in os.supports_dir_fd
+    ):
+        raise _UnsupportedSafeArchiveRead("safe descriptor-relative archive reads are unavailable")
+    directory_flags = os.O_RDONLY | directory_flag | nofollow_flag
+    components = archive_path.parts
+    if archive_path.is_absolute():
+        descriptor = os.open(archive_path.anchor, directory_flags)
+        components = components[1:]
+    else:
+        descriptor = os.open(".", directory_flags)
+    if not components:
+        return descriptor
+    try:
+        for component in components[:-1]:
+            child = os.open(component, directory_flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        return os.open(components[-1], os.O_RDONLY | nonblock_flag | nofollow_flag, dir_fd=descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def _read_snapshot(
     archive_path: Path, policy: PackageArchiveVerificationPolicy
 ) -> bytes | PackageArchiveVerificationReceipt:
     try:
-        descriptor = os.open(archive_path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        descriptor = _open_archive_descriptor(archive_path)
+    except _UnsupportedSafeArchiveRead:
+        return _blocked("archive_safe_read_unavailable", "host cannot enforce safe descriptor-relative archive reads")
     except FileNotFoundError:
         return _blocked("archive_missing", "package archive does not exist")
     except IsADirectoryError:
