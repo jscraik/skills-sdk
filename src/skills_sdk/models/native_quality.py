@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import ClassVar, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -49,7 +50,7 @@ def _native_quality_input(value: object) -> object:
             _audit_copied_members(item)
         if isinstance(item, BaseModel):
             pending.append(item.__dict__)
-        elif isinstance(item, dict):
+        elif isinstance(item, Mapping):
             for name in (
                 "mutation_performed",
                 "network_used",
@@ -162,7 +163,7 @@ class NativeScorerCalibrationReceipt(ScorerCalibrationReceipt):
 class NativeLocalCheckRequest(LocalCheckRequestV2):
     """Freeze the complete expected calibration before accepting supplied evidence."""
 
-    schema_version: Literal["native-local-check-request/v1"] = "native-local-check-request/v1"
+    schema_version: Literal["native-local-check-request/v1"]
     calibration_plan: NativeCalibrationPlan
     calibration: NativeCalibrationReceipt | None = None
 
@@ -214,14 +215,13 @@ class NativeLocalCheckResult(LocalCheckResultV2):
     def calibration_matches_frozen_plan(self) -> Self:
         if self.request is not None:
             for stage in self.stages:
-                if isinstance(stage.receipt, NativeScorerCalibrationReceipt) and stage.passed():
+                if isinstance(stage.receipt, NativeScorerCalibrationReceipt):
                     observed = stage.receipt.observation
-                    if (
-                        observed is None
-                        or observed.plan != self.request.calibration_plan
-                        or observed != self.request.calibration
-                    ):
-                        raise ValueError("native quality requires its exact frozen calibration plan")
-                    declared = next(item.receipt for item in self.stages if item.name == "scorer-quality")
-                    require_native_declaration(self.request.calibration_plan, declared)
+                    if observed != self.request.calibration:
+                        raise ValueError("native quality requires its exact selected calibration observation")
+                    if stage.passed():
+                        if observed is None or observed.plan != self.request.calibration_plan:
+                            raise ValueError("native quality requires its exact frozen calibration plan")
+                        declared = next(item.receipt for item in self.stages if item.name == "scorer-quality")
+                        require_native_declaration(self.request.calibration_plan, declared)
         return self

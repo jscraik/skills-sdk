@@ -1106,7 +1106,6 @@
     },
     "schema_version": {
       "const": "native-local-check-request/v1",
-      "default": "native-local-check-request/v1",
       "title": "Schema Version",
       "type": "string"
     },
@@ -1123,6 +1122,7 @@
     }
   },
   "required": [
+    "schema_version",
     "intent",
     "candidate",
     "intake",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 import yaml
@@ -19,6 +20,7 @@ from skills_sdk.models.observed_calibration import (
     NativeCalibrationPlan,
     NativeCalibrationReceipt,
 )
+from skills_sdk.models.quality_workflow import LocalCheckRequestV2
 from skills_sdk.providers.codex_judge import CodexJudgeSettings
 from skills_sdk.validation import validate_skill_package
 
@@ -144,6 +146,7 @@ def test_native_bridge_stops_recovers_and_round_trips(tmp_path: Path) -> None:
         check_local_quality(package, {**request, "calibration": observation}, assessment=_assessment(package))
     )
     assert passed.status == "local_checks_passed", passed
+    assert type(passed.request) is NativeLocalCheckRequest
     assert passed.final_capture.candidate == passed.request.candidate
     assert not passed.evaluation_executed and not passed.promotion_authorized
     assert NativeLocalCheckResult.model_validate_json(passed.model_dump_json()) == passed
@@ -181,11 +184,31 @@ def test_native_bridge_rejects_substituted_evidence(tmp_path: Path, defect: str)
 def test_legacy_request_rejects_supplied_native_calibration(tmp_path: Path) -> None:
     request = _request(tmp_path)
     package = next(tmp_path.rglob("SKILL.md")).parent
+    request.pop("schema_version", None)
+    legacy = asyncio.run(check_local_quality(package, request, assessment=_assessment(package)))
+    assert legacy.status == "local_checks_passed"
+    assert type(legacy.request) is LocalCheckRequestV2
     result = asyncio.run(check_local_quality(package, {**request, "calibration": {}}))
     assert result.blocked_stage == "request"
 
 
-@pytest.mark.parametrize("defect", ["partial", "failed", "copied", "subclass", "candidate"])
+@pytest.mark.parametrize("mapping", [dict, MappingProxyType])
+def test_native_audit_rejects_receipt_subclass_in_mappings(tmp_path: Path, mapping: type) -> None:
+    class UntrustedReceipt(NativeCalibrationReceipt):
+        pass
+
+    package, request, observed = _fixture(tmp_path)
+    payload = {**request, "calibration": observed}
+    assert asyncio.run(check_local_quality(package, mapping(payload), assessment=_assessment(package))).status == (
+        "local_checks_passed"
+    )
+    payload["calibration"] = UntrustedReceipt.model_validate(observed.model_dump())
+    result = asyncio.run(check_local_quality(package, mapping(payload)))
+    assert result.blocked_stage == "request"
+    assert not result.stages
+
+
+@pytest.mark.parametrize("defect", ["partial", "failed", "copied", "candidate"])
 def test_invalid_observation_stops_before_content_review(tmp_path: Path, defect: str) -> None:
     package, request, observed = _fixture(tmp_path)
     if defect == "partial":
@@ -194,12 +217,6 @@ def test_invalid_observation_stops_before_content_review(tmp_path: Path, defect:
         observed = observed.model_copy(update={"status": "blocked"})
     elif defect == "copied":
         observed = observed.model_copy(update={"judge_invocation_count": True})
-    elif defect == "subclass":
-
-        class UntrustedReceipt(NativeCalibrationReceipt):
-            pass
-
-        observed = UntrustedReceipt.model_validate(observed.model_dump())
     else:
         observed = observed.model_copy(
             update={
@@ -260,6 +277,36 @@ def test_native_schemas_and_semantic_registry(tmp_path: Path) -> None:
         NativeLocalCheckRequest.model_validate({**request, "promotion_authorized": True})
 
 
+def test_native_request_schema_version_is_required(tmp_path: Path) -> None:
+    from jsonschema import Draft202012Validator
+    from jsonschema import ValidationError as SchemaValidationError
+
+    from skills_sdk.core.errors import ContractError
+    from skills_sdk.core.schema_registry import SchemaRegistry
+
+    package, request, observed = _fixture(tmp_path)
+    result = asyncio.run(
+        check_local_quality(package, {**request, "calibration": observed}, assessment=_assessment(package))
+    )
+    assert result.status == "local_checks_passed"
+    registry = SchemaRegistry()
+    raw = result.model_dump(mode="json")
+    del raw["request"]["schema_version"]
+    for name, payload in (("native-local-check-request.v1", raw["request"]), ("native-local-check.v1", raw)):
+        with pytest.raises(SchemaValidationError) as failure:
+            Draft202012Validator(registry.load(name)).validate(payload)
+        assert any(
+            error.validator == "required" and error.message == "'schema_version' is a required property"
+            for error in (failure.value, *failure.value.context)
+        )
+        with pytest.raises(ContractError):
+            registry.validate(name, payload)
+    with pytest.raises(ValidationError, match="schema_version"):
+        NativeLocalCheckRequest.model_validate(raw["request"])
+    invalid = asyncio.run(check_local_quality(package, raw["request"]))
+    assert invalid.blocked_stage == "request"
+
+
 def test_external_declaration_maps_to_canonical_plan_type(tmp_path: Path) -> None:
     package, request, observed = _fixture(tmp_path, external=True)
     passed = asyncio.run(
@@ -311,12 +358,21 @@ def test_native_final_recapture_rejects_changed_source(tmp_path: Path, monkeypat
     assert asyncio.run(check_local_quality(package, request, assessment=review)).status == "local_checks_passed"
 
 
-def test_native_result_retains_the_selected_observation(tmp_path: Path) -> None:
+@pytest.mark.parametrize("blocked", [False, True])
+def test_native_result_retains_the_selected_observation(tmp_path: Path, blocked: bool) -> None:
     package, request, observed = _fixture(tmp_path)
-    passed = asyncio.run(
+    if blocked:
+        request["calibration_plan"]["assertion_contract_sha256"] = "a" * 64
+    result = asyncio.run(
         check_local_quality(package, {**request, "calibration": observed}, assessment=_assessment(package))
     )
-    raw = passed.model_dump(mode="json")
+    if blocked:
+        assert result.blocked_stage == "scorer-calibration"
+        assert result.stages[-1].receipt.observation == observed
+        assert NativeLocalCheckResult.model_validate_json(result.model_dump_json()) == result
+    else:
+        assert result.status == "local_checks_passed"
+    raw = result.model_dump(mode="json")
     raw["request"]["calibration"]["results"][0]["judge_result_sha256"] = "a" * 64
-    with pytest.raises(ValidationError, match="frozen calibration plan"):
+    with pytest.raises(ValidationError, match="exact selected calibration observation"):
         NativeLocalCheckResult.model_validate(raw)

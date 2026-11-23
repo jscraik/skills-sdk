@@ -2,10 +2,18 @@
 
 ## Native supplied-calibration quality bridge
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:172556d167e5f2ce493c4198b3afbf408f334b8dd1da8beaddeca2a28dc5fd10 -->
+
 The local delivery candidate adds `NativeLocalCheckRequest` and
 `NativeLocalCheckResult` (`native-local-check-request/v1` and
-`native-local-check/v1`). Store an already supplied `NativeCalibrationReceipt` in the request
-`calibration` field, then pass the request to `check_local_quality`.
+`native-local-check/v1`). Set the request's required `schema_version` to
+`native-local-check-request/v1`. Store an already supplied
+`NativeCalibrationReceipt` in the request's `calibration` field, then pass the
+request to `check_local_quality`.
+
+<!-- /coderabbit-ai-generated:v1 -->
 The explicit native scorer declaration uses
 `skills-sdk.native-scorer-quality.v1` in `references/evals.yaml` and
 `CodexNativeJudgeParameters`, including the unavailable temperature control.
