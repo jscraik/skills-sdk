@@ -16,7 +16,11 @@ import yaml
 from skills_sdk.core.digests import candidate_content_sha256
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.package_safety import UNSAFE_PACKAGE_DIRECTORIES, unsafe_package_file_reason
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import (
+    require_distinct_portable_restore_paths,
+    require_portable_relative_path,
+    require_portable_restore_path,
+)
 from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity, _candidate_package_id
 from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile, _file_role
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
@@ -223,7 +227,7 @@ def _regular_file(
     relative_text = relative.as_posix()
     try:
         relative_text.encode("utf-8")
-        require_portable_relative_path(relative_text)
+        require_portable_restore_path(relative_text)
     except (ContractError, UnicodeError):
         return None, _finding("invalid_package_path", "package filenames must be portable POSIX paths"), None
     name = relative.name
@@ -316,7 +320,7 @@ def _scan_files(
             relative = relative_path.as_posix()
             try:
                 relative.encode("utf-8")
-                require_portable_relative_path(relative)
+                require_portable_restore_path(relative)
             except (ContractError, UnicodeError):
                 findings.append(_finding("invalid_package_path", "package filenames must be portable POSIX paths"))
                 continue
@@ -396,6 +400,17 @@ def _scan_files(
         os.close(root_fd)
     files.sort(key=lambda item: item.path)
     return files, findings, captured
+
+
+def _restore_path_findings(files: list[PackageManifestFile]) -> list[SkillPackageFinding]:
+    """Reject a capture that cannot retain distinct names on supported hosts."""
+
+    try:
+        require_distinct_portable_restore_paths(tuple(item.path for item in files), include_parents=True)
+    except ContractError as error:
+        refs = tuple(item for item in error.details if isinstance(item, str))
+        return [_finding("invalid_package_path", "package paths must remain distinct on portable restore", *refs)]
+    return []
 
 
 def _validate_ir(
@@ -495,6 +510,7 @@ def validate_skill_package(
         else:
             files, file_findings, captured = _scan_files(root, active_policy)
             findings.extend(file_findings)
+            findings.extend(_restore_path_findings(files))
             capture_incomplete = any(
                 finding.code in {"package_resource_limit", "source_changed", "unreadable_package_file"}
                 for finding in file_findings

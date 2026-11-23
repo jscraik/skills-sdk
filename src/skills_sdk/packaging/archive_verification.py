@@ -18,7 +18,7 @@ from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
 from skills_sdk.core.errors import ContractError
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import require_distinct_portable_restore_paths, require_portable_restore_path
 from skills_sdk.core.schema_registry import SchemaRegistry
 from skills_sdk.models.inventory import Sha256
 from skills_sdk.models.packaging import (
@@ -49,7 +49,7 @@ def _entry_path(info: ZipInfo) -> str | None:
     if "\x00" in info.orig_filename or info.orig_filename != name or info.is_dir():
         return None
     try:
-        require_portable_relative_path(name)
+        require_portable_restore_path(name)
     except ValueError:
         return None
     return name
@@ -170,6 +170,11 @@ def _validate_entries(
         if _is_symlink(info):
             return None, _blocked("archive_symlink_forbidden", "archive symlink entries are forbidden", (path,))
         entries[path] = info
+    try:
+        require_distinct_portable_restore_paths(tuple(entries), include_parents=True)
+    except ContractError as error:
+        evidence = tuple(item for item in error.details if isinstance(item, str))
+        return None, _blocked("archive_path_collision", "archive entry paths collide on portable restore", evidence)
     return entries, None
 
 

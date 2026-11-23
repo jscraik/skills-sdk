@@ -7,7 +7,11 @@ from typing import Annotated, Literal
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import (
+    require_distinct_portable_restore_paths,
+    require_portable_relative_path,
+    require_portable_restore_path,
+)
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 from skills_sdk.models.packaging import ReceiptId
@@ -59,7 +63,8 @@ class RuntimeFile(_ContractModel):
     @field_validator("path")
     @classmethod
     def path_must_be_portable(cls, value: str) -> str:
-        return _require_public_portable_text(value, "runtime file path")
+        require_portable_restore_path(value)
+        return _require_public_text(value, "runtime file path")
 
 
 class RuntimeLockEntry(_ContractModel):
@@ -92,6 +97,7 @@ class RuntimeLockEntry(_ContractModel):
         paths = tuple(item.path for item in self.files)
         if len(paths) != len(set(paths)):
             raise ValueError("runtime lock file paths must be unique")
+        require_distinct_portable_restore_paths(paths, include_parents=True)
         if candidate_content_sha256(self.files) != self.candidate.content_sha256:
             raise ValueError("runtime lock candidate digest must match runtime files")
         return self

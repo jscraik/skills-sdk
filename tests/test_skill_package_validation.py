@@ -9,7 +9,8 @@ import pytest
 
 from skills_sdk.core.errors import ContractError
 from skills_sdk.core.schema_registry import SchemaRegistry
-from skills_sdk.models.validation import ValidationSeverity
+from skills_sdk.models.packaging import PackageManifestFile
+from skills_sdk.models.validation import SkillPackageFinding, ValidationSeverity
 from skills_sdk.packaging import build_skill_package
 from skills_sdk.validation import SkillValidationPolicy, validate_skill_package
 from skills_sdk.validation import skill_package as skill_package_module
@@ -356,6 +357,43 @@ def test_nonportable_filename_is_a_typed_blocker(tmp_path: Path) -> None:
 
     assert result.status == "blocked"
     assert "invalid_package_path" in {item.code for item in result.findings}
+
+
+def test_restore_sensitive_filename_is_a_typed_build_blocker(tmp_path: Path) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    (root / "NUL.txt").write_text("invalid on supported restore hosts\n", encoding="utf-8")
+
+    validation = validate_skill_package(root, source_revision=REVISION)
+    receipt = build_skill_package(root, source_revision=REVISION, clock=_clock)
+
+    assert validation.status == "blocked"
+    assert "invalid_package_path" in {item.code for item in validation.findings}
+    assert receipt.status == "blocked"
+    assert receipt.blocker is not None and receipt.blocker.code == "invalid_package_path"
+
+
+def test_restore_aliases_are_typed_validation_blockers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _write_skill(tmp_path / "fixture-skill")
+    (root / "guide.md").write_text("first\n", encoding="utf-8")
+    original_scan = skill_package_module._scan_files
+
+    def scan_with_alias(
+        package_root: Path, policy: SkillValidationPolicy
+    ) -> tuple[list[PackageManifestFile], list[SkillPackageFinding], dict[str, bytes]]:
+        files, findings, captured = original_scan(package_root, policy)
+        guide = next(item for item in files if item.path == "guide.md")
+        files.append(guide.model_copy(update={"path": "GUIDE.md"}))
+        files.sort(key=lambda item: item.path)
+        captured["GUIDE.md"] = captured["guide.md"]
+        return files, findings, captured
+
+    monkeypatch.setattr(skill_package_module, "_scan_files", scan_with_alias)
+
+    result = validate_skill_package(root, source_revision=REVISION)
+
+    finding = next(item for item in result.findings if item.code == "invalid_package_path")
+    assert result.status == "blocked"
+    assert set(finding.evidence_refs) == {"GUIDE.md", "guide.md"}
 
 
 @pytest.mark.parametrize("filename", ["bad\x1b[31mname", "bad\x07name", "bad\u202ename"])

@@ -198,6 +198,39 @@ def test_runtime_lock_rejects_duplicate_entries_and_files_across_boundaries() ->
     assert list(Draft202012Validator(SchemaRegistry().load("install-plan.v1")).iter_errors(plan_payload))
 
 
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ("SKILL.md", "skill.md"),
+        ("assets/café.txt", "assets/cafe\u0301.txt"),
+        ("assets/a.txt", "Assets/b.txt"),
+    ],
+)
+def test_runtime_contracts_reject_portable_restore_collisions(paths: tuple[str, ...]) -> None:
+    entry_payload = _entry().model_dump(mode="json")
+    template = entry_payload["files"][0]
+    entry_payload["files"] = [{**template, "path": path} for path in paths]
+    lock_payload = {"schema_version": "runtime-lock/v1", "entries": [entry_payload]}
+
+    with pytest.raises(ValidationError, match="paths collide on portable restore"):
+        RuntimeLock.model_validate(lock_payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("runtime-lock.v1", lock_payload)
+
+    plan_payload = _planned_payload()
+    plan_payload["proposed_entry"] = entry_payload
+    _bind_plan_id(plan_payload)
+    with pytest.raises(ValidationError, match="paths collide on portable restore"):
+        InstallPlan.model_validate(plan_payload)
+    with pytest.raises(ContractError, match="contract_validation_failed"):
+        SchemaRegistry().validate("install-plan.v1", plan_payload)
+
+
+def test_runtime_file_rejects_reserved_restore_component() -> None:
+    with pytest.raises(ValidationError, match="reserved device component"):
+        RuntimeFile(path="assets/CON.txt", sha256="c" * 64)
+
+
 def test_runtime_lock_rejects_forged_file_inventory_across_model_and_registry() -> None:
     payload = RuntimeLock(entries=(_entry(),)).model_dump(mode="json")
     payload["entries"][0]["files"][0]["sha256"] = "f" * 64

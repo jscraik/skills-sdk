@@ -217,7 +217,13 @@ def test_rejects_archive_with_forged_skill_role_and_matching_candidate_digest(tm
         ("absolute", lambda path: _write_entries(path, [("/bad", b"x")]), "archive_path_invalid"),
         ("drive", lambda path: _write_entries(path, [("C:/bad", b"x")]), "archive_path_invalid"),
         ("traversal", lambda path: _write_entries(path, [("../bad", b"x")]), "archive_path_invalid"),
-        ("duplicate", lambda path: _write_entries(path, [("same", b"x"), ("same", b"x")]), "archive_entry_duplicate"),
+        ("reserved", lambda path: _write_entries(path, [("assets/NUL.txt", b"x")]), "archive_path_invalid"),
+        ("trailing_dot", lambda path: _write_entries(path, [("assets/file.", b"x")]), "archive_path_invalid"),
+        (
+            "duplicate",
+            lambda path: _write_entries(path, [("same", b"x"), ("same", b"x")]),
+            "archive_entry_duplicate",
+        ),
         ("duplicate_manifest", _write_duplicate_manifest, "archive_manifest_duplicate"),
         ("symlink", _write_symlink, "archive_symlink_forbidden"),
     ],
@@ -231,6 +237,22 @@ def test_rejects_unsafe_archive_shapes(tmp_path: Path, name: str, writer: Callab
     else:
         writer(path)
     assert _blocker_code(path) == code
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        ("SKILL.md", "skill.md"),
+        ("assets/café.txt", "assets/cafe\u0301.txt"),
+        ("assets/a.txt", "Assets/b.txt"),
+        ("package-manifest.json", "PACKAGE-MANIFEST.JSON"),
+    ],
+)
+def test_rejects_portable_restore_collisions_before_manifest_proof(tmp_path: Path, names: tuple[str, str]) -> None:
+    path = tmp_path / "collision.zip"
+    _write_entries(path, [(name, b"payload") for name in names])
+
+    assert _blocker_code(path) == "archive_path_collision"
 
 
 def test_missing_and_not_regular_file(tmp_path: Path) -> None:

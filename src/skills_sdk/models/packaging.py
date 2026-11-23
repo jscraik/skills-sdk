@@ -8,7 +8,11 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
 
 from skills_sdk.core.digests import candidate_content_sha256, canonical_json_sha256
-from skills_sdk.core.paths import require_portable_relative_path
+from skills_sdk.core.paths import (
+    require_distinct_portable_restore_paths,
+    require_portable_relative_path,
+    require_portable_restore_path,
+)
 from skills_sdk.models.inventory import NonEmptyText, PortablePath, Sha256, _ContractModel
 from skills_sdk.models.package import PackageCandidateIdentity
 
@@ -52,7 +56,7 @@ class PackageManifestFile(_ContractModel):
     @field_validator("path")
     @classmethod
     def path_must_be_portable(cls, value: str) -> str:
-        require_portable_relative_path(value)
+        require_portable_restore_path(value)
         return value
 
     @model_validator(mode="after")
@@ -92,6 +96,7 @@ class PackageManifest(_ContractModel):
             raise ValueError("package manifest paths must be unique")
         if paths != sorted(paths):
             raise ValueError("package manifest paths must be sorted")
+        require_distinct_portable_restore_paths(tuple(paths), include_parents=True)
         return self
 
 

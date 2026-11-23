@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from unicodedata import normalize
 from zipfile import ZIP_STORED, ZipFile, ZipInfo
 
 from skills_sdk.core.errors import ContractError
+from skills_sdk.core.paths import require_distinct_portable_restore_paths
 from skills_sdk.models.plugin import PluginCapturedFile
 from skills_sdk.models.plugin_build import PluginHardeningReceipt
 from skills_sdk.validation.plugin_capture import capture_plugin_source
@@ -32,20 +32,12 @@ def _zip(files: tuple[PluginCapturedFile, ...], payloads: dict[str, bytes]) -> b
 
 
 def _require_distinct_paths(paths: tuple[str, ...]) -> None:
-    seen: set[str] = set()
-    for path in paths:
-        for component in PurePosixPath(path).parts:
-            if component.endswith((".", " ")) or any(char in '<>:"\\|?*' or ord(char) < 32 for char in component):
-                raise ContractError("plugin_archive_path_unsupported", "Archive path is not portable on restore")
-            stem = component.split(".", 1)[0].rstrip(" ").upper()
-            if stem in {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"} or (
-                stem[:3] in {"COM", "LPT"} and len(stem) == 4 and stem[3] in "123456789¹²³"
-            ):
-                raise ContractError("plugin_archive_path_unsupported", "Archive path names a reserved device")
-        key = normalize("NFC", normalize("NFC", path).casefold())
-        if key in seen:
-            raise ContractError("plugin_archive_path_collision", "Archive paths collide on portable restore")
-        seen.add(key)
+    try:
+        require_distinct_portable_restore_paths(paths)
+    except ContractError as error:
+        if error.code == "portable_restore_path_collision":
+            raise ContractError("plugin_archive_path_collision", "Archive paths collide on portable restore") from error
+        raise ContractError("plugin_archive_path_unsupported", "Archive path is not portable on restore") from error
 
 
 def emit_plugin_archive(plugin_root: Path, hardening_receipt: PluginHardeningReceipt) -> bytes:

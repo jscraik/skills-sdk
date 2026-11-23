@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unicodedata
 from pathlib import PurePosixPath
+from unicodedata import normalize
 
 from skills_sdk.core.errors import ContractError
 
@@ -30,6 +31,8 @@ PORTABLE_PATH_CONTROL_PATTERN = (
 )
 
 _EXCLUDED_REFERENCE_TERMS = ("eval", "scorer", "rubric", "calibration", "heldout", "held-out", "hidden")
+_WINDOWS_RESERVED_NAMES = frozenset({"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"})
+_WINDOWS_REWRITTEN_CHARACTERS = frozenset('<>:"\\|?*')
 
 
 def require_portable_relative_path(value: str) -> PurePosixPath:
@@ -49,6 +52,48 @@ def require_portable_relative_path(value: str) -> PurePosixPath:
     if normalized != value or normalized in {".", ""}:
         raise ContractError("invalid_portable_path", "path must already be normalized")
     return path
+
+
+def require_portable_restore_path(value: str) -> PurePosixPath:
+    """Return a path whose components retain one identity on supported hosts."""
+
+    path = require_portable_relative_path(value)
+    for component in path.parts:
+        if component.endswith((".", " ")) or any(char in _WINDOWS_REWRITTEN_CHARACTERS for char in component):
+            raise ContractError(
+                "invalid_portable_restore_path",
+                "path contains a component that is rewritten or rejected on restore",
+            )
+        stem = component.split(".", 1)[0].rstrip(" ").upper()
+        numbered_device = stem[:3] in {"COM", "LPT"} and len(stem) == 4 and stem[3] in "123456789¹²³"
+        if stem in _WINDOWS_RESERVED_NAMES or numbered_device:
+            raise ContractError("invalid_portable_restore_path", "path contains a reserved device component")
+    return path
+
+
+def require_distinct_portable_restore_paths(paths: tuple[str, ...], *, include_parents: bool = False) -> None:
+    """Reject paths that identify the same file or directory on supported hosts."""
+
+    candidates = paths
+    if include_parents:
+        parents = {
+            parent.as_posix()
+            for value in paths
+            for parent in require_portable_restore_path(value).parents
+            if parent.parts
+        }
+        candidates = (*sorted(parents), *paths)
+    seen: dict[str, str] = {}
+    for value in candidates:
+        require_portable_restore_path(value)
+        key = normalize("NFC", normalize("NFC", value).casefold())
+        if key in seen:
+            raise ContractError(
+                "portable_restore_path_collision",
+                "paths collide on portable restore",
+                (seen[key], value),
+            )
+        seen[key] = value
 
 
 def require_matched_reference_path(value: str, selected_skill_paths: tuple[str, ...]) -> PurePosixPath:
