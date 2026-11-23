@@ -55,7 +55,15 @@ def intake_skill_package(
         else (SkillPackageIntakeReceiptV2 if saved else SkillPackageIntakeReceipt)
     )
     validation = validate_skill_package(package_root, source_revision=context.source_revision, policy=policy)
-    if saved and validation.status == "pass" and validation.candidate != context.source.candidate:
+    if (
+        saved
+        and validation.status == "pass"
+        and validation.candidate is not None
+        and (
+            validation.candidate != context.source.candidate
+            or context.source.path != f"skills/{validation.candidate.package_id}"
+        )
+    ):
         validation = SkillPackageValidation.model_validate(
             {
                 **validation.model_dump(mode="json"),

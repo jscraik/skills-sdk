@@ -272,10 +272,12 @@ class SavedReleaseProvenance(_ContractModel):
     candidate: PackageCandidateIdentity
 
     @model_validator(mode="after")
-    def source_revision_matches(self) -> SavedReleaseProvenance:
-        """Keep child identity in the containing snapshot's source revision."""
-        require_path = re.fullmatch(r"skills/[a-z0-9]+(?:[._-][a-z0-9]+)*", self.path)
-        if not require_path or self.candidate.source_revision != self.snapshot.root_candidate.source_revision:
+    def child_matches_snapshot(self) -> SavedReleaseProvenance:
+        """Bind the canonical child path and revision to the containing snapshot."""
+        if (
+            self.path != f"skills/{self.candidate.package_id}"
+            or self.candidate.source_revision != self.snapshot.root_candidate.source_revision
+        ):
             raise ValueError("saved child path and revision must bind the whole-plugin snapshot")
         return self
 

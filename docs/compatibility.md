@@ -535,7 +535,10 @@ contracts use `local-check-request/v3`, `local-check/v3`,
 `plugin-quality-request/v2` and `plugin-quality/v2`; older families reject the
 new shapes. No candidate identity or original repository-backed context is
 reinterpreted. Source locators remain locators, never fabricated repository
-slugs. A saved-source snapshot revision is not automatically a Git commit.
+slugs. A saved-source snapshot revision is not automatically a Git commit. A
+selected saved-release or recovery child path must equal
+`skills/<candidate.package_id>`; sibling-path claims never identify the selected
+candidate and fail semantic validation before normalized provenance is emitted.
 
 The maintained quality caller dispatches only explicit versions and preserves
 first-stop ordering, raw boolean checks, owner-text screening and read-only
