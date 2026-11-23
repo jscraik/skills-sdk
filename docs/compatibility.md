@@ -698,6 +698,15 @@ cancellation is not converted into a provider result. Passing offline
 conformance does not prove a real provider outcome, supported provider, billing
 accuracy, release, registry state, runtime state, or consumer compatibility.
 
+Provider-call resource hardening leaves both public `/v1` wire schemas
+unchanged. Stream batches now require an exact tuple whose configured length is
+checked without copying. Complete, stream-terminal, and typed-failure metadata
+is rejected before receipt construction when it exceeds 256 evidence
+references, 4,096 UTF-8 bytes for one metadata string, or 65,536 canonical JSON
+bytes in aggregate. Previously accepted oversized adapter metadata is an
+intentional contract violation; ordinary bounded evidence, usage, cost, and
+failure observations retain their existing result shapes and error semantics.
+
 `runtime-lock/v1` and `install-plan/v1` are additive schema families. They are
 registered for structural and Pydantic semantic validation but are not generic
 receipts: generic receipt parsing must not reinterpret intended runtime state

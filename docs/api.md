@@ -629,10 +629,15 @@ unsafe state at its model and `SchemaRegistry` boundaries.
   reads only the method selected by the descriptor. Each stream pull returns
   either one `ProviderAdapterChunk` or `ProviderAdapterTerminal`, or a
   `ProviderAdapterBatch` tuple. Batches must contain one to eight events by
-  default (never exceeding the configured buffer limit); a zero buffer limit
-  permits direct events only. A terminal event must be last in its batch. The
-  SDK applies the documented input, metadata, nesting, output, chunk, event,
-  deadline, and cleanup limits with zero retries. A successful
+  default (never exceeding the configured buffer limit); the SDK checks an
+  exact tuple and its length before iterating it, and does not copy the batch.
+  A zero buffer limit permits direct events only. A terminal event must be last
+  in its batch. Complete, stream-terminal, and typed-failure metadata permits at
+  most 256 evidence references, limits each metadata string to 4,096 UTF-8
+  bytes, and limits the complete canonical JSON metadata payload to 65,536
+  bytes before receipt validation. Oversized metadata is rejected, never
+  truncated. The SDK applies the documented input, metadata, nesting, output,
+  chunk, event, deadline, and cleanup limits with zero retries. A successful
   `ProviderCallOutcome` keeps complete text private and exposes only a
   `provider-call-result/v1` public result containing digests, counts, redacted
   terminal evidence, adapter-reported usage and cost observations, and its

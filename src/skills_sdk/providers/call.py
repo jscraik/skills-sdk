@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
-import json
 import math
 from asyncio import CancelledError, gather
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -14,7 +13,6 @@ from datetime import datetime
 from typing import Literal, cast
 
 from pydantic import ValidationError
-from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
@@ -30,6 +28,14 @@ from skills_sdk.models.provider_execution import (
     ProviderExecutionRequest,
     ProviderExecutionResult,
     ProviderUsageMetadata,
+)
+from skills_sdk.providers._metadata import (
+    _canonical_bytes,
+    _metadata_text,
+    _require_metadata_budget,
+    _validate_cost,
+    _validate_evidence_refs,
+    _validate_usage,
 )
 from skills_sdk.providers.types import (
     DEFAULT_PROVIDER_CALL_CLOCK,
@@ -48,6 +54,9 @@ from skills_sdk.providers.types import (
     TextProviderAdapter,
     _retain_provider_task,
 )
+
+type _FailureCategory = Literal["provider", "adapter", "transport", "timeout", "policy", "unknown"]
+type _FailureStatus = Literal["failed", "blocked", "indeterminate"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,10 +141,6 @@ def _normalize_json(value: object, *, depth: int, maximum_depth: int, active: se
         finally:
             active.remove(identity)
     raise _contract_error("invalid_provider_input", "provider input must contain only JSON-compatible values")
-
-
-def _canonical_bytes(value: JsonValue) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def _validate_request_and_input(
@@ -333,40 +338,30 @@ def _validate_complete(value: object, limits: ProviderCallLimits) -> ProviderAda
     text = str.__str__(value.text)
     if len(text) > limits.output_bytes or len(_utf8_bytes(text)) > limits.output_bytes:
         raise _contract_error("provider_output_too_large", "provider output exceeds the byte limit")
+    evidence_refs, usage, cost = _validate_terminal_metadata(value.evidence_refs, value.usage, value.cost)
     return ProviderAdapterComplete(
         text=text,
-        evidence_refs=value.evidence_refs,
-        usage=_validate_usage(value.usage),
-        cost=_validate_cost(value.cost),
+        evidence_refs=evidence_refs,
+        usage=usage,
+        cost=cost,
     )
 
 
-def _validate_usage(value: object) -> ProviderUsageMetadata | None:
-    if value is None:
-        return None
-    if isinstance(value, ProviderUsageMetadata):
-        try:
-            value = value.model_dump(mode="json", warnings="none")
-        except (PydanticSerializationError, TypeError, ValueError):
-            raise _contract_error("invalid_provider_event", "provider usage evidence failed validation") from None
-    try:
-        return ProviderUsageMetadata.model_validate(value)
-    except ValidationError:
-        raise _contract_error("invalid_provider_event", "provider usage evidence failed validation") from None
-
-
-def _validate_cost(value: object) -> ProviderCostObservation | None:
-    if value is None:
-        return None
-    if isinstance(value, ProviderCostObservation):
-        try:
-            value = value.model_dump(mode="json", warnings="none")
-        except (PydanticSerializationError, TypeError, ValueError):
-            raise _contract_error("invalid_provider_event", "provider cost evidence failed validation") from None
-    try:
-        return ProviderCostObservation.model_validate(value)
-    except ValidationError:
-        raise _contract_error("invalid_provider_event", "provider cost evidence failed validation") from None
+def _validate_terminal_metadata(
+    evidence_refs: object,
+    usage: object,
+    cost: object,
+) -> tuple[tuple[str, ...], ProviderUsageMetadata | None, ProviderCostObservation | None]:
+    refs = _validate_evidence_refs(evidence_refs, "invalid_provider_event")
+    validated_usage = _validate_usage(usage)
+    validated_cost = _validate_cost(cost)
+    payload: JsonValue = {
+        "cost": validated_cost.model_dump(mode="json") if validated_cost else None,
+        "evidence_refs": list(refs),
+        "usage": validated_usage.model_dump(mode="json") if validated_usage else None,
+    }
+    _require_metadata_budget(payload, "invalid_provider_event")
+    return refs, validated_usage, validated_cost
 
 
 async def _run_complete(
@@ -429,14 +424,19 @@ async def _run_stream(
                 "provider_stream_missing_terminal",
                 "provider stream ended without a terminal event",
             ) from error
-        if isinstance(item, ProviderAdapterBatch) and not isinstance(item.events, tuple):
-            raise _contract_error("invalid_provider_event", "provider stream batch has an invalid event container")
-        buffered = list(item.events) if isinstance(item, ProviderAdapterBatch) else [item]
-        if isinstance(item, ProviderAdapterBatch) and (
-            not buffered or limits.buffered_events == 0 or len(buffered) > limits.buffered_events
-        ):
-            raise _contract_error("provider_buffer_limit_exceeded", "provider stream batch exceeds the buffer limit")
-        observed_buffer = len(buffered) if isinstance(item, ProviderAdapterBatch) else 0
+        if isinstance(item, ProviderAdapterBatch):
+            events = item.events
+            if type(events) is not tuple:
+                raise _contract_error("invalid_provider_event", "provider stream batch has an invalid event container")
+            observed_buffer = len(events)
+            if not events or limits.buffered_events == 0 or observed_buffer > limits.buffered_events:
+                raise _contract_error(
+                    "provider_buffer_limit_exceeded", "provider stream batch exceeds the buffer limit"
+                )
+            buffered: tuple[object, ...] = events
+        else:
+            observed_buffer = 0
+            buffered = (item,)
         state.max_buffered_events = max(state.max_buffered_events, observed_buffer)
         terminal = _consume_events(buffered, state, limits)
         if terminal is not None:
@@ -445,7 +445,7 @@ async def _run_stream(
 
 
 def _consume_events(
-    buffered: list[object],
+    buffered: tuple[object, ...],
     state: _StreamState,
     limits: ProviderCallLimits,
 ) -> _Terminal | None:
@@ -460,6 +460,7 @@ def _consume_events(
                 raise _contract_error(
                     "provider_event_after_terminal", "provider stream batch contains an event after terminal"
                 )
+            evidence_refs, usage, cost = _validate_terminal_metadata(event.evidence_refs, event.usage, event.cost)
             text = "".join(state.chunks)
             state.events.append({"kind": "terminal", "sequence": len(state.events), "status": "completed"})
             return _Terminal(
@@ -469,9 +470,9 @@ def _consume_events(
                 event_sha256=_event_digest(state.events),
                 event_count=len(state.events),
                 max_buffered_events=state.max_buffered_events,
-                usage=_validate_usage(event.usage),
-                cost=_validate_cost(event.cost),
-                evidence_refs=event.evidence_refs,
+                usage=usage,
+                cost=cost,
+                evidence_refs=evidence_refs,
             )
         raise _contract_error("invalid_provider_event", "provider stream returned an unsupported event")
     return None
@@ -505,24 +506,38 @@ def _consume_chunk(
 
 
 def _failure_terminal(failure: ProviderAdapterFailure) -> _Terminal:
-    event_sha256 = _event_digest([{"kind": "terminal", "sequence": 0, "status": failure.status}])
+    code = _metadata_text(failure.code, "invalid_provider_failure")
+    category = cast(_FailureCategory, _metadata_text(failure.category, "invalid_provider_failure"))
+    status = cast(_FailureStatus, _metadata_text(failure.status, "invalid_provider_failure"))
+    if type(failure.retryable) is not bool:
+        raise _contract_error("invalid_provider_failure", "provider failure evidence failed validation")
+    evidence_refs = _validate_evidence_refs(failure.evidence_refs, "invalid_provider_failure")
+    _require_metadata_budget(
+        {
+            "category": category,
+            "code": code,
+            "evidence_refs": list(evidence_refs),
+            "retryable": failure.retryable,
+            "status": status,
+        },
+        "invalid_provider_failure",
+    )
+    event_sha256 = _event_digest([{"kind": "terminal", "sequence": 0, "status": status}])
     try:
-        if failure.status == "blocked":
+        if status == "blocked":
             blocker = ProviderExecutionBlocker(
-                code=failure.code,
-                category="transport" if failure.category == "timeout" else failure.category,
-                evidence_refs=failure.evidence_refs,
+                code=code,
+                category="transport" if category == "timeout" else category,
+                evidence_refs=evidence_refs,
             )
-            return _Terminal(
-                "blocked", None, None, event_sha256, 1, 0, None, None, failure.evidence_refs, blocker=blocker
-            )
+            return _Terminal("blocked", None, None, event_sha256, 1, 0, None, None, evidence_refs, blocker=blocker)
         error = ProviderExecutionError(
-            code=failure.code,
-            category=failure.category,
+            code=code,
+            category=category,
             retryable=failure.retryable,
-            evidence_refs=failure.evidence_refs,
+            evidence_refs=evidence_refs,
         )
-        return _Terminal(failure.status, None, None, event_sha256, 1, 0, None, None, failure.evidence_refs, error=error)
+        return _Terminal(status, None, None, event_sha256, 1, 0, None, None, evidence_refs, error=error)
     except ValidationError:
         raise _contract_error("invalid_provider_failure", "provider failure evidence failed validation") from None
 
