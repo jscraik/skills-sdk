@@ -32,6 +32,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, list[str]]:
     backup = tmp_path / "backups"
     for parent in (source.parent, target.parent, backup):
         parent.mkdir(parents=True)
+    backup.chmod(0o700)
     source.write_text("---\nname: example\ndescription: Fixed description.\n---\n\n# Example\n")
     target.write_text("---\nname: example\ndescription: Broken: metadata\n---\n\n# Example\n")
     args = [
@@ -166,7 +167,7 @@ def test_lock_namespace_is_independent_of_alias_and_backup_root(
     _LOCK_ROOT.mkdir(mode=0o700)
     _source, target, _backup, args = _fixture(tmp_path)
     alternate_backup = tmp_path / "alternate-backups"
-    alternate_backup.mkdir()
+    alternate_backup.mkdir(mode=0o700)
     monkeypatch.chdir(tmp_path)
     args[2] = str(target.relative_to(tmp_path))
     args[args.index("--backup-root") + 1] = str(alternate_backup)
@@ -209,6 +210,74 @@ def test_existing_lock_root_must_be_private_and_user_owned(tmp_path: Path, monke
     monkeypatch.setattr(entrypoint, "_LOCK_ROOT", unsafe_lock_root)
     assert main([*args, "--apply", "--json"]) == 2
     assert target.read_text().startswith("---\nname: example\ndescription: Broken")
+    assert _backup_files(backup) == []
+
+
+@pytest.mark.parametrize("mode", [0o770, 0o707, 0o1777])
+@pytest.mark.parametrize("apply", [False, True])
+def test_backup_root_must_not_be_accessible_to_other_users(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], mode: int, apply: bool
+) -> None:
+    """Verify shared backup namespaces are rejected before runtime bytes are copied."""
+    _source, target, backup, args = _fixture(tmp_path)
+    before = target.read_bytes()
+    backup.chmod(mode)
+    command = [*args, "--json"]
+    if apply:
+        command.append("--apply")
+    assert main(command) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["blocker"]["message"] == ("backup root must be private and owned by the current effective user")
+    assert target.read_bytes() == before
+    assert _backup_files(backup) == []
+
+
+def test_backup_root_must_be_owned_by_effective_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify a private directory owned by another user cannot receive recovery state."""
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    before = target.read_bytes()
+    backup_identity = (backup.stat().st_dev, backup.stat().st_ino)
+    real_fstat = os.fstat
+
+    def foreign_owner_fstat(descriptor: int) -> os.stat_result:
+        observed = real_fstat(descriptor)
+        if (observed.st_dev, observed.st_ino) != backup_identity:
+            return observed
+        values = list(observed)
+        values[4] = observed.st_uid + 1
+        return os.stat_result(values)
+
+    monkeypatch.setattr(entrypoint.os, "fstat", foreign_owner_fstat)
+    assert main([*args, "--apply", "--json"]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["blocker"]["message"] == ("backup root must be private and owned by the current effective user")
+    assert target.read_bytes() == before
+    assert _backup_files(backup) == []
+
+
+def test_backup_root_privacy_is_rechecked_before_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Verify repair rejects a backup root made shared after preflight validation."""
+    from skills_sdk.host import entrypoint
+
+    _source, target, backup, args = _fixture(tmp_path)
+    before = target.read_bytes()
+    validate_backup_root = entrypoint._validate_backup_root
+
+    def expose_after_validation(request: entrypoint.EntrypointRequest) -> None:
+        validate_backup_root(request)
+        request.backup_root.chmod(0o777)
+
+    monkeypatch.setattr(entrypoint, "_validate_backup_root", expose_after_validation)
+    assert main([*args, "--apply", "--json"]) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["blocker"]["message"] == ("backup root must be private and owned by the current effective user")
+    assert target.read_bytes() == before
     assert _backup_files(backup) == []
 
 
@@ -611,7 +680,7 @@ def test_supporting_document_requires_runtime_entrypoint(tmp_path: Path) -> None
 def test_backup_root_inside_package_tree_is_blocked(tmp_path: Path, tree: str) -> None:
     source, target, _backup, args = _fixture(tmp_path)
     nested = (source.parent if tree == "source" else target.parent) / "backups"
-    nested.mkdir()
+    nested.mkdir(mode=0o700)
     args[args.index("--backup-root") + 1] = str(nested)
     assert main([*args, "--json"]) == 2
     assert main([*args, "--apply", "--json"]) == 2

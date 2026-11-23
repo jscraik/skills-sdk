@@ -78,7 +78,9 @@ target-parent device and inode plus the target filename, so path aliases and
 alternate backup roots serialize the same repair. It stages replacement bytes
 and preserves the prior bytes through an exclusive, independent snapshot before
 atomic publication. The backup root must be outside both package trees. The
-adapter preserves target mode bits and syncs the backup directory before
+backup root must also be owned by the effective user and have no group or other
+permission bits; an existing mode `0700` directory satisfies this requirement.
+The adapter preserves target mode bits and syncs the backup directory before
 publication. It does not preserve
 ownership, ACLs, or extended attributes on the replacement, or establish
 crash-durable preexisting content. The backup directory must already

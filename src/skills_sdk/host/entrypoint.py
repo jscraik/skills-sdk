@@ -234,10 +234,20 @@ def _exchange(parent: int, left: str, right: str) -> None:
         raise OSError(error, os.strerror(error))
 
 
+def _validate_private_backup_root(descriptor: int) -> None:
+    """Require sensitive recovery state to remain in a caller-private directory."""
+    observed = os.fstat(descriptor)
+    if observed.st_uid != os.geteuid() or stat.S_IMODE(observed.st_mode) & 0o077:
+        raise ValueError("backup root must be private and owned by the current effective user")
+
+
 def _validate_backup_root(request: EntrypointRequest) -> None:
     backup = request.backup_root.resolve(strict=True)
     backup_parent = _open_directory_tree(backup)
-    os.close(backup_parent)
+    try:
+        _validate_private_backup_root(backup_parent)
+    finally:
+        os.close(backup_parent)
     for package_root in (request.source.parent.resolve(strict=True), request.target.parent.resolve(strict=True)):
         if backup == package_root or backup.is_relative_to(package_root):
             raise ValueError("backup root must be outside source and runtime package trees")
@@ -411,6 +421,7 @@ def repair_entrypoint(request: EntrypointRequest) -> EntrypointMaintenanceResult
         for path in (request.source.parent, request.target.parent, request.backup_root):
             parents.append(_open_directory_tree(path))
         source_parent, target_parent, backup_parent = parents
+        _validate_private_backup_root(backup_parent)
         source = _source(request, source_parent, target_parent)
         lock_parent = _validated_lock_root()
         try:
