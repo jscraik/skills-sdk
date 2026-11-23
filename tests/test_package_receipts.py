@@ -339,7 +339,9 @@ def test_package_manifest_requires_canonical_file_order() -> None:
 def test_package_manifest_rejects_portable_restore_collisions(paths: tuple[str, ...]) -> None:
     payload = json.loads((FIXTURE_ROOT / "accepted.json").read_text(encoding="utf-8"))["manifest"]
     template = payload["files"][0]
-    payload["files"] = [{**template, "path": path} for path in sorted(paths)]
+    payload["files"] = [
+        {**template, "path": path, "role": "skill_md" if path == "SKILL.md" else "asset"} for path in sorted(paths)
+    ]
 
     with pytest.raises(ValidationError, match="paths collide on portable restore"):
         PackageManifest.model_validate(payload)

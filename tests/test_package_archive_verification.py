@@ -221,9 +221,7 @@ def test_rejects_unsafe_archive_shapes(tmp_path: Path, name: str, writer: Callab
         ("package-manifest.json", "PACKAGE-MANIFEST.JSON"),
     ],
 )
-def test_rejects_portable_restore_collisions_before_manifest_proof(
-    tmp_path: Path, names: tuple[str, str]
-) -> None:
+def test_rejects_portable_restore_collisions_before_manifest_proof(tmp_path: Path, names: tuple[str, str]) -> None:
     path = tmp_path / "collision.zip"
     _write_entries(path, [(name, b"payload") for name in names])
 

@@ -36,9 +36,7 @@ def _require_distinct_paths(paths: tuple[str, ...]) -> None:
         require_distinct_portable_restore_paths(paths)
     except ContractError as error:
         if error.code == "portable_restore_path_collision":
-            raise ContractError(
-                "plugin_archive_path_collision", "Archive paths collide on portable restore"
-            ) from error
+            raise ContractError("plugin_archive_path_collision", "Archive paths collide on portable restore") from error
         raise ContractError("plugin_archive_path_unsupported", "Archive path is not portable on restore") from error
 
 

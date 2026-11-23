@@ -71,9 +71,7 @@ def require_portable_restore_path(value: str) -> PurePosixPath:
     return path
 
 
-def require_distinct_portable_restore_paths(
-    paths: tuple[str, ...], *, include_parents: bool = False
-) -> None:
+def require_distinct_portable_restore_paths(paths: tuple[str, ...], *, include_parents: bool = False) -> None:
     """Reject paths that identify the same file or directory on supported hosts."""
 
     candidates = paths
