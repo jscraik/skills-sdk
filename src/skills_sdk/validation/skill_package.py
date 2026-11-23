@@ -24,6 +24,7 @@ from skills_sdk.core.paths import (
 from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity, _candidate_package_id
 from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile, _file_role
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
+from skills_sdk.validation.diagnostics import render_untrusted_identifiers
 from skills_sdk.validation.skill_ir import SkillIR, build_skill_ir, read_frontmatter
 
 _ALLOWED_FRONTMATTER: Final[frozenset[str]] = frozenset(
@@ -429,7 +430,11 @@ def _validate_ir(
     unknown = sorted(set(ir.frontmatter) - policy.allowed_frontmatter)
     if unknown:
         findings.append(
-            _finding("unknown_frontmatter", f"unsupported frontmatter keys: {', '.join(unknown)}", "SKILL.md")
+            _finding(
+                "unknown_frontmatter",
+                f"unsupported frontmatter keys: {render_untrusted_identifiers(unknown)}",
+                "SKILL.md",
+            )
         )
     if policy.max_entrypoint_lines is not None:
         line_count = len(skill_text.splitlines())

@@ -107,6 +107,23 @@ def test_all_canonical_child_roles_preserve_standalone_compatibility(tmp_path: P
     SchemaRegistry().validate("plugin-package-validation.v1", good.model_dump(mode="json"))
 
 
+def test_child_frontmatter_diagnostic_does_not_retain_active_or_private_text(tmp_path: Path) -> None:
+    root, _ = _fixture(tmp_path)
+    entrypoint = root / "skills" / "fixture-skill" / "SKILL.md"
+    entrypoint.write_text(
+        "---\nname: fixture-skill\ndescription: Inspect synthetic examples.\n"
+        '"line\\nkey": ignored\n"api_key=private-value": ignored\n---\n# Example\n',
+        encoding="utf-8",
+    )
+
+    result = validate_plugin_package(root, source_revision=REVISION)
+
+    finding = next(item for item in result.skills[0].validation.findings if item.code == "unknown_frontmatter")
+    assert "\n" not in finding.message and "private-value" not in finding.message
+    assert json.dumps(r"line\x0akey") in finding.message
+    assert json.dumps("<redacted identifier>") in finding.message
+
+
 def _warning_messages(result: PluginPackageValidation) -> tuple[str, ...]:
     """Return ignored-field messages after checking their severity and manifest evidence reference."""
     warnings = tuple(item for item in result.findings if item.code == "plugin_unknown_fields_ignored")

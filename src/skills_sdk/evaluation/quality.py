@@ -22,6 +22,7 @@ from skills_sdk.models.scenario_quality import (
 )
 from skills_sdk.models.validation import SkillPackageValidation
 from skills_sdk.validation import validate_skill_package
+from skills_sdk.validation.diagnostics import render_untrusted_identifiers, safe_diagnostic_identifier
 from skills_sdk.validation.yaml_cache import load_closed_yaml
 
 _EVALS_PATH = "references/evals.yaml"
@@ -204,12 +205,16 @@ def _case_findings(case: object) -> list[ScenarioQualityFinding]:
     if not isinstance(case, Mapping):
         return [_finding("invalid_scenario_case", "scenario cases must be mappings")]
     raw_case_id = case.get("id")
-    case_id = cast(str, raw_case_id) if _text(raw_case_id) else None
+    case_id = safe_diagnostic_identifier(cast(str, raw_case_id)) if _text(raw_case_id) else None
     findings: list[ScenarioQualityFinding] = []
     unsupported = sorted(set(case) - _CASE_FIELDS)
     if unsupported:
         findings.append(
-            _finding("unsupported_scenario_field", f"unsupported scenario fields: {', '.join(unsupported)}", case_id)
+            _finding(
+                "unsupported_scenario_field",
+                f"unsupported scenario fields: {render_untrusted_identifiers(unsupported)}",
+                case_id,
+            )
         )
     for field in ("id", "category", "unit", "given", "should", "why_realistic", "prompt", "reproduce"):
         if not _text(case.get(field)):
@@ -310,7 +315,12 @@ def _document_cases(
         return []
     unsupported = sorted(set(payload) - _TOP_FIELDS)
     if unsupported:
-        findings.append(_finding("unsupported_evals_field", f"unsupported eval fields: {', '.join(unsupported)}"))
+        findings.append(
+            _finding(
+                "unsupported_evals_field",
+                f"unsupported eval fields: {render_untrusted_identifiers(unsupported)}",
+            )
+        )
     if payload.get("schema_version") != "2.0":
         findings.append(_finding("unsupported_evals_schema", "evals.yaml schema_version must be 2.0"))
     if payload.get("skill_name") != package_id:
@@ -418,6 +428,14 @@ def _release_sets(
                 )
             )
             continue
+        if safe_diagnostic_identifier(identifier) is None:
+            findings.append(
+                _finding(
+                    "invalid_scenario_set",
+                    "release scenario set identifiers must be bounded public text without display controls",
+                )
+            )
+            continue
         identifiers.append(identifier)
         valid_sets.append(item)
     if len(identifiers) != len(set(identifiers)):
@@ -470,7 +488,10 @@ def _select_release_cases(
     unknown = [item for item in selected_ids if item not in by_id]
     if unknown:
         findings.append(
-            _finding("unknown_scenario_id", f"release scenario set contains unknown ids: {', '.join(unknown)}")
+            _finding(
+                "unknown_scenario_id",
+                f"release scenario set contains unknown ids: {render_untrusted_identifiers(unknown)}",
+            )
         )
     return [by_id[item] for item in selected_ids if item in by_id]
 
@@ -490,7 +511,9 @@ def assess_scenario_quality(
     active_policy = policy or ScenarioQualityPolicy()
     effective_policy = ScenarioQualityAppliedPolicy.model_validate(asdict(active_policy))
     selector_invalid = scenario_set_id is not None and (
-        not _text(scenario_set_id) or scenario_set_id != scenario_set_id.strip()
+        not _text(scenario_set_id)
+        or scenario_set_id != scenario_set_id.strip()
+        or safe_diagnostic_identifier(scenario_set_id) is None
     )
     valid_scenario_set_id = scenario_set_id if not selector_invalid else None
     validation = validate_skill_package(package_root, source_revision=source_revision)
@@ -550,7 +573,7 @@ def assess_scenario_quality(
                     _finding(
                         "release_case_not_eligible",
                         "release scenario set cases must include release in eval_modes",
-                        str(case.get("id") or "") or None,
+                        safe_diagnostic_identifier(str(case.get("id") or "")),
                     )
                 )
         if len(selected) < active_policy.minimum_release_cases:
