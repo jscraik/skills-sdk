@@ -105,9 +105,7 @@ def test_snapshot_object_budget_counts_empty_entries(
     assert len(list(destination.iterdir())) == 1
 
 
-def test_snapshot_object_budget_rejects_excessive_depth(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_snapshot_object_budget_rejects_excessive_depth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source = tmp_path / "source"
     (source / "first" / "second").mkdir(parents=True)
     destination = tmp_path / "destination"

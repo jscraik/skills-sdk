@@ -311,9 +311,7 @@ def _resolved_git_path(repo_root: Path, *args: str, force_worktree: bool = False
     return Path(completed.stdout.strip()).resolve()
 
 
-def _materialize_git_metadata(
-    repo_root: Path, snapshot_root: Path, private_root: Path, budget: SnapshotBudget
-) -> None:
+def _materialize_git_metadata(repo_root: Path, snapshot_root: Path, private_root: Path, budget: SnapshotBudget) -> None:
     marker = snapshot_root / ".git"
     if marker.is_dir() and not marker.is_symlink():
         return
@@ -357,9 +355,7 @@ def _snapshot_worktree(repo_root: Path, private_root: Path) -> Path:
             return True
         if path in tracked or relative.name == ".git" or not (stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode)):
             return False
-        return not any(
-            (repo_root / parent / ".git").exists() for parent in relative.parents if parent != Path(".")
-        )
+        return not any((repo_root / parent / ".git").exists() for parent in relative.parents if parent != Path("."))
 
     snapshot_root = private_root / "worktree"
     budget = SnapshotBudget(_MAX_SNAPSHOT_BYTES, _MAX_SNAPSHOT_ENTRIES, _MAX_SNAPSHOT_DEPTH)

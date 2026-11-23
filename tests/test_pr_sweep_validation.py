@@ -658,16 +658,28 @@ def test_snapshot_rejects_file_replaced_by_fifo_before_open(tmp_path: Path, monk
     repo = _repo(tmp_path)
     original_open = os.open
     tracked = repo / "tracked.txt"
+    injected = False
 
     def replace_before_open(path: str | os.PathLike[str], flags: int, *args: object, **kwargs: object) -> int:
-        if Path(path) == tracked:
+        nonlocal injected
+        parent = kwargs.get("dir_fd")
+        relative_source = (
+            Path(path) == Path(tracked.name)
+            and isinstance(parent, int)
+            and os.path.samestat(os.fstat(parent), repo.stat())
+        )
+        if Path(path) == tracked or relative_source:
             assert flags & os.O_NONBLOCK
+            assert not injected
             tracked.unlink()
             os.mkfifo(tracked)
+            injected = True
         return original_open(path, flags, *args, **kwargs)
 
     monkeypatch.setattr(os, "open", replace_before_open)
+    monkeypatch.setattr(os, "supports_dir_fd", os.supports_dir_fd | {replace_before_open})
     result = validate_pr_sweep_dirty_closeout(repo, require_clean=True)
+    assert injected
     assert result.status == "blocked"
     assert result.findings[0].code == "git_status_unavailable"
 
