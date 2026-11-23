@@ -217,16 +217,46 @@ def test_oversized_nested_adapter_metadata_is_rejected_before_serialization(
         cost = cost.model_copy(update={"amount": "1" * 4097})
     adapter = FakeAdapter(request, mode=mode)
     if mode == "complete":
-        adapter.complete_value = ProviderAdapterComplete(
-            "answer", ("evidence/output.json",), usage=usage, cost=cost
-        )
+        adapter.complete_value = ProviderAdapterComplete("answer", ("evidence/output.json",), usage=usage, cost=cost)
     else:
-        adapter.stream_values = [
-            ProviderAdapterTerminal(("evidence/output.json",), usage=usage, cost=cost)
-        ]
+        adapter.stream_values = [ProviderAdapterTerminal(("evidence/output.json",), usage=usage, cost=cost)]
 
     with pytest.raises(ContractError, match="provider_metadata_too_large"):
         _run(request, None, adapter)
+    assert adapter.cleanup_calls == 1
+
+
+@pytest.mark.parametrize("mode", ["complete", "stream"])
+@pytest.mark.parametrize(
+    ("field_name", "missing"),
+    [
+        ("usage", "unit_kind"),
+        ("usage", "input_units"),
+        ("usage", "output_units"),
+        ("usage", "total_units"),
+        ("cost", "amount"),
+        ("cost", "currency"),
+        ("cost", "observed_at"),
+        ("cost", "claimed_by"),
+    ],
+)
+def test_missing_forged_metadata_fields_are_contract_errors(
+    mode: Literal["complete", "stream"], field_name: Literal["usage", "cost"], missing: str
+) -> None:
+    request = _provider_request(None)
+    usage = ProviderUsageMetadata(unit_kind="tokens", input_units=1, output_units=1, total_units=2)
+    cost = ProviderCostObservation(amount="0.25", currency="USD", observed_at="2026-09-08T10:00:00Z")
+    object.__delattr__(usage if field_name == "usage" else cost, missing)
+    adapter = FakeAdapter(request, mode=mode)
+    if mode == "complete":
+        adapter.complete_value = ProviderAdapterComplete("answer", ("evidence/output.json",), usage=usage, cost=cost)
+    else:
+        adapter.stream_values = [ProviderAdapterTerminal(("evidence/output.json",), usage=usage, cost=cost)]
+
+    with pytest.raises(ContractError, match="invalid_provider_event") as error:
+        _run(request, None, adapter)
+    assert error.value.__cause__ is None
+    assert "AttributeError" not in "".join(traceback.format_exception(error.value))
     assert adapter.cleanup_calls == 1
 
 

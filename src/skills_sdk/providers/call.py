@@ -5,17 +5,14 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
-import json
 import math
 from asyncio import CancelledError, gather
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from typing import Literal, cast
 
 from pydantic import ValidationError
-from pydantic_core import PydanticSerializationError
 
 from skills_sdk.core.digests import canonical_json_sha256
 from skills_sdk.core.errors import ContractError
@@ -31,6 +28,14 @@ from skills_sdk.models.provider_execution import (
     ProviderExecutionRequest,
     ProviderExecutionResult,
     ProviderUsageMetadata,
+)
+from skills_sdk.providers._metadata import (
+    _canonical_bytes,
+    _metadata_text,
+    _require_metadata_budget,
+    _validate_cost,
+    _validate_evidence_refs,
+    _validate_usage,
 )
 from skills_sdk.providers.types import (
     DEFAULT_PROVIDER_CALL_CLOCK,
@@ -50,9 +55,6 @@ from skills_sdk.providers.types import (
     _retain_provider_task,
 )
 
-_MAX_PROVIDER_METADATA_BYTES = 65_536
-_MAX_PROVIDER_METADATA_ITEMS = 256
-_MAX_PROVIDER_METADATA_ITEM_BYTES = 4_096
 type _FailureCategory = Literal["provider", "adapter", "transport", "timeout", "policy", "unknown"]
 type _FailureStatus = Literal["failed", "blocked", "indeterminate"]
 
@@ -139,10 +141,6 @@ def _normalize_json(value: object, *, depth: int, maximum_depth: int, active: se
         finally:
             active.remove(identity)
     raise _contract_error("invalid_provider_input", "provider input must contain only JSON-compatible values")
-
-
-def _canonical_bytes(value: JsonValue) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def _validate_request_and_input(
@@ -241,44 +239,6 @@ def _utf8_bytes(text: str) -> bytes:
 
 def _text_digest(text: str) -> str:
     return hashlib.sha256(_utf8_bytes(text)).hexdigest()
-
-
-def _metadata_text(value: object, invalid_code: str) -> str:
-    if type(value) is not str:
-        raise _contract_error(invalid_code, "provider metadata contains an invalid string")
-    text = str.__str__(value)
-    if len(text) > _MAX_PROVIDER_METADATA_ITEM_BYTES:
-        raise _contract_error("provider_metadata_too_large", "provider metadata exceeds the byte limit")
-    try:
-        encoded = text.encode("utf-8")
-    except UnicodeEncodeError:
-        raise _contract_error(invalid_code, "provider metadata strings must be valid UTF-8") from None
-    if len(encoded) > _MAX_PROVIDER_METADATA_ITEM_BYTES:
-        raise _contract_error("provider_metadata_too_large", "provider metadata exceeds the byte limit")
-    return text
-
-
-def _validate_evidence_refs(value: object, invalid_code: str) -> tuple[str, ...]:
-    if type(value) is not tuple:
-        raise _contract_error(invalid_code, "provider evidence refs have an invalid container")
-    if len(value) > _MAX_PROVIDER_METADATA_ITEMS:
-        raise _contract_error("provider_metadata_too_large", "provider metadata exceeds the item limit")
-    canonical_size = 2
-    for index, item in enumerate(value):
-        text = _metadata_text(item, invalid_code)
-        canonical_size += len(_canonical_bytes(text)) + (1 if index else 0)
-        if canonical_size > _MAX_PROVIDER_METADATA_BYTES:
-            raise _contract_error("provider_metadata_too_large", "provider metadata exceeds the byte limit")
-    return cast(tuple[str, ...], value)
-
-
-def _require_metadata_budget(value: JsonValue, invalid_code: str) -> None:
-    try:
-        size = len(_canonical_bytes(value))
-    except (TypeError, ValueError):
-        raise _contract_error(invalid_code, "provider metadata failed serialization") from None
-    if size > _MAX_PROVIDER_METADATA_BYTES:
-        raise _contract_error("provider_metadata_too_large", "provider metadata exceeds the byte limit")
 
 
 async def _captured(awaitable: Awaitable[object]) -> object:
@@ -385,51 +345,6 @@ def _validate_complete(value: object, limits: ProviderCallLimits) -> ProviderAda
         usage=usage,
         cost=cost,
     )
-
-
-def _validate_usage(value: object) -> ProviderUsageMetadata | None:
-    if value is None:
-        return None
-    if type(value) is not ProviderUsageMetadata:
-        raise _contract_error("invalid_provider_event", "provider usage evidence failed validation")
-    _metadata_text(value.unit_kind, "invalid_provider_event")
-    counts = (value.input_units, value.output_units, value.total_units)
-    if any(type(count) is not int for count in counts):
-        raise _contract_error("invalid_provider_event", "provider usage evidence failed validation")
-    if any(int.bit_length(count) > _MAX_PROVIDER_METADATA_BYTES * 4 for count in counts):
-        raise _contract_error("provider_metadata_too_large", "provider metadata exceeds the byte limit")
-    try:
-        payload = value.model_dump(mode="json", warnings="none")
-        return ProviderUsageMetadata.model_validate(payload)
-    except (PydanticSerializationError, TypeError, ValueError):
-        raise _contract_error("invalid_provider_event", "provider usage evidence failed validation") from None
-
-
-def _validate_cost(value: object) -> ProviderCostObservation | None:
-    if value is None:
-        return None
-    if type(value) is not ProviderCostObservation:
-        raise _contract_error("invalid_provider_event", "provider cost evidence failed validation")
-    amount = value.amount
-    if type(amount) is str:
-        _metadata_text(amount, "invalid_provider_event")
-    elif type(amount) is not Decimal:
-        raise _contract_error("invalid_provider_event", "provider cost evidence failed validation")
-    elif amount.__sizeof__() > _MAX_PROVIDER_METADATA_BYTES:
-        raise _contract_error("provider_metadata_too_large", "provider metadata exceeds the byte limit")
-    else:
-        _metadata_text(str(amount), "invalid_provider_event")
-    _metadata_text(value.currency, "invalid_provider_event")
-    _metadata_text(value.claimed_by, "invalid_provider_event")
-    if type(value.observed_at) not in {datetime, str}:
-        raise _contract_error("invalid_provider_event", "provider cost evidence failed validation")
-    if type(value.observed_at) is str:
-        _metadata_text(value.observed_at, "invalid_provider_event")
-    try:
-        payload = value.model_dump(mode="json", warnings="none")
-        return ProviderCostObservation.model_validate(payload)
-    except (PydanticSerializationError, TypeError, ValueError):
-        raise _contract_error("invalid_provider_event", "provider cost evidence failed validation") from None
 
 
 def _validate_terminal_metadata(
@@ -615,9 +530,7 @@ def _failure_terminal(failure: ProviderAdapterFailure) -> _Terminal:
                 category="transport" if category == "timeout" else category,
                 evidence_refs=evidence_refs,
             )
-            return _Terminal(
-                "blocked", None, None, event_sha256, 1, 0, None, None, evidence_refs, blocker=blocker
-            )
+            return _Terminal("blocked", None, None, event_sha256, 1, 0, None, None, evidence_refs, blocker=blocker)
         error = ProviderExecutionError(
             code=code,
             category=category,
