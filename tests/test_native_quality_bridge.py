@@ -376,3 +376,58 @@ def test_native_result_retains_the_selected_observation(tmp_path: Path, blocked:
     raw["request"]["calibration"]["results"][0]["judge_result_sha256"] = "a" * 64
     with pytest.raises(ValidationError, match="exact selected calibration observation"):
         NativeLocalCheckResult.model_validate(raw)
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize("slot", ["calibration_plan", "calibration"])
+@pytest.mark.parametrize("defect", ["subclass", "unknown", "mapping"])
+def test_mixed_calibration_members_reject_before_normalisation(
+    tmp_path: Path, wrapped: bool, slot: str, defect: str
+) -> None:
+    from collections import UserDict
+
+    from skills_sdk.models.observed_calibration import HeldOutCalibrationProbe
+
+    package, request, observed = _fixture(tmp_path)
+    request["calibration"] = observed.model_dump(mode="python")
+    plan = request[slot] if slot == "calibration_plan" else request[slot]["plan"]
+    plan["probes"] = list(plan["probes"])
+    valid_probe = plan["probes"][0]
+    if defect == "subclass":
+
+        class ForeignProbe(HeldOutCalibrationProbe):
+            pass
+
+        invalid_probe = ForeignProbe.model_validate(valid_probe)
+    elif defect == "unknown":
+        invalid_probe = HeldOutCalibrationProbe.model_validate(valid_probe).model_copy(update={"hidden": True})
+    else:
+        invalid_probe = UserDict(valid_probe)
+    plan["probes"][0] = invalid_probe
+    with pytest.raises(ValidationError):
+        NativeCalibrationPlan.model_validate(plan)
+    payload = UserDict(request) if wrapped else request
+    with pytest.raises(ValidationError):
+        NativeLocalCheckRequest.model_validate(payload)
+    rejected = asyncio.run(check_local_quality(package, payload))
+    assert rejected.blocked_stage == "request" and not rejected.stages
+    plan["probes"][0] = HeldOutCalibrationProbe.model_validate(valid_probe)
+    recovered = asyncio.run(check_local_quality(package, payload, assessment=_assessment(package)))
+    assert recovered.status == "local_checks_passed"
+
+
+def test_calibration_audit_deduplicates_shared_subtrees(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from skills_sdk.models import native_quality
+
+    _, request, _ = _fixture(tmp_path)
+    shared = request["calibration_plan"]
+    original = native_quality._audit_copied_members
+    calls = []
+
+    def count_audit(value: object) -> None:
+        calls.append(id(value))
+        original(value)
+
+    monkeypatch.setattr(native_quality, "_audit_copied_members", count_audit)
+    native_quality._native_quality_input([{"calibration": shared} for _ in range(100)])
+    assert calls == [id(shared)]

@@ -37,6 +37,13 @@ def _native_quality_input(value: object) -> object:
         NativeLocalCheckResult,
     )
     pending, seen = [value], set()
+    audited: set[int] = set()
+
+    def audit_once(item: object) -> None:
+        if id(item) not in audited:
+            _audit_copied_members(item)
+            audited.add(id(item))
+
     while pending:
         if len(seen) > 131072:
             raise ValueError("native quality input exceeds its work boundary")
@@ -47,7 +54,7 @@ def _native_quality_input(value: object) -> object:
         if isinstance(item, canonical) and type(item) not in canonical:
             raise ValueError("native quality requires canonical SDK native models")
         if isinstance(item, (NativeCalibrationPlan, NativeCalibrationReceipt)):
-            _audit_copied_members(item)
+            audit_once(item)
         if isinstance(item, BaseModel):
             pending.append(item.__dict__)
         elif isinstance(item, Mapping):
@@ -63,6 +70,9 @@ def _native_quality_input(value: object) -> object:
             ):
                 if name in item and item[name] is not False:
                     raise ValueError("native quality proof flags require literal false")
+            for name in ("calibration_plan", "calibration", "observation"):
+                if name in item:
+                    audit_once(item[name])
             pending.extend(item.values())
         elif isinstance(item, (list, tuple)):
             pending.extend(item)
