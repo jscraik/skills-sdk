@@ -25,7 +25,7 @@ from skills_sdk.models.package import PackageCandidateIdentity, SkillIdentity, _
 from skills_sdk.models.packaging import PackageFileRole, PackageManifestFile, _file_role
 from skills_sdk.models.validation import SkillPackageFinding, SkillPackageValidation, ValidationSeverity
 from skills_sdk.validation.diagnostics import render_untrusted_identifiers
-from skills_sdk.validation.skill_ir import SkillIR, build_skill_ir, read_frontmatter
+from skills_sdk.validation.skill_ir import SkillIR, UnclosedFrontmatterError, build_skill_ir
 
 _ALLOWED_FRONTMATTER: Final[frozenset[str]] = frozenset(
     {"name", "description", "version", "license", "compatibility", "allowed-tools", "metadata", "triggers"}
@@ -36,6 +36,9 @@ _MAX_PACKAGE_DIRECTORY_DEPTH: Final[int] = 64
 _MAX_PACKAGE_FILE_BYTES: Final[int] = 16 * 1024 * 1024
 _MAX_PACKAGE_TOTAL_BYTES: Final[int] = 64 * 1024 * 1024
 _MAX_PACKAGE_RESOURCES: Final[int] = 2048
+_INCOMPLETE_CAPTURE_CODES: Final[frozenset[str]] = frozenset(
+    {"package_resource_limit", "source_changed", "unreadable_package_file"}
+)
 _MAX_REFERENCE_TEXT_BYTES: Final[int] = 8_388_608
 _MAX_YAML_COLLECTION_DEPTH: Final[int] = 128
 _MAX_YAML_EVENTS: Final[int] = 100_000
@@ -388,7 +391,7 @@ def _scan_files(
                 captured[relative] = payload
             if finding is not None:
                 findings.append(finding)
-                if finding.code in {"package_resource_limit", "source_changed", "unreadable_package_file"}:
+                if finding.code in _INCOMPLETE_CAPTURE_CODES:
                     capture_stopped = True
                     return
         after = os.fstat(directory_fd)
@@ -465,10 +468,9 @@ def _captured_skill_identity(
         if payload is None:
             raise OSError("SKILL.md was not captured as a regular file")
         text = payload.decode("utf-8")
-        _frontmatter, _body, closed = read_frontmatter(text)
-        if not closed:
-            return None, [_finding("invalid_frontmatter", "SKILL.md requires closed frontmatter", "SKILL.md")]
         return _validate_ir(root, text, build_skill_ir(root / "SKILL.md", text=text), policy)
+    except UnclosedFrontmatterError:
+        return None, [_finding("invalid_frontmatter", "SKILL.md requires closed frontmatter", "SKILL.md")]
     except UnicodeDecodeError:
         return None, [_finding("invalid_utf8", "SKILL.md must be UTF-8", "SKILL.md")]
     except OSError:
@@ -516,10 +518,7 @@ def validate_skill_package(
             files, file_findings, captured = _scan_files(root, active_policy)
             findings.extend(file_findings)
             findings.extend(_restore_path_findings(files))
-            capture_incomplete = any(
-                finding.code in {"package_resource_limit", "source_changed", "unreadable_package_file"}
-                for finding in file_findings
-            )
+            capture_incomplete = any(finding.code in _INCOMPLETE_CAPTURE_CODES for finding in file_findings)
             findings.extend(_package_policy_findings(captured, active_policy, capture_complete=not capture_incomplete))
             if "SKILL.md" in captured or not capture_incomplete:
                 identity, ir_findings = _captured_skill_identity(root, captured.get("SKILL.md"), active_policy)

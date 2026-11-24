@@ -9,6 +9,10 @@ from typing import Any
 from skills_sdk.validation.yaml_cache import load_closed_yaml
 
 
+class UnclosedFrontmatterError(ValueError):
+    """The entrypoint lacks a closed leading frontmatter block."""
+
+
 @dataclass(frozen=True, slots=True)
 class SkillIR:
     """Fields derived from one parsed ``SKILL.md`` source."""
@@ -42,7 +46,7 @@ def build_skill_ir(skill_md: Path, *, text: str) -> SkillIR:
 
     frontmatter, body, closed = read_frontmatter(text)
     if not closed:
-        raise ValueError("SKILL.md requires a closed leading frontmatter block")
+        raise UnclosedFrontmatterError("SKILL.md requires a closed leading frontmatter block")
     metadata = frontmatter.get("metadata")
     metadata_version = metadata.get("version") if isinstance(metadata, dict) else None
     raw_name = frontmatter.get("name")
