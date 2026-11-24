@@ -46,6 +46,9 @@ set -eu
 [[ -z "${GH_TOKEN+x}" && -z "${GITHUB_TOKEN+x}" && -z "${GITHUB_PERSONAL_ACCESS_TOKEN+x}" ]]
 [[ "$MISE_TRUSTED_CONFIG_PATHS" == "$PWD/.mise.toml" ]]
 [[ "$MISE_CEILING_PATHS" == "$PWD/.." ]]
+state_dir="${MISE_STATE_DIR:-$HOME/.local/state/mise}"
+mkdir -p "$state_dir/trusted-configs"
+: > "$state_dir/trusted-configs/checkout"
 printf '%s\n' "$*" >> "$PROOF_LOG"
 [[ "${FAIL_SYNC:-0}" != 1 || "$*" != 'exec -- uv sync --frozen --extra images' ]]
 MISE
@@ -86,6 +89,7 @@ def test_repeated_setup_preserves_inputs_and_scopes_environment(worker: tuple[Pa
     assert (checkout / "uv.lock").read_bytes() == lock_before
     assert (home / ".local/bin/mise").is_file()
     assert not (home / ".config").exists()
+    assert not (home / ".local/state/mise").exists()
     commands = Path(environment["PROOF_LOG"]).read_text(encoding="utf-8").splitlines()
     assert (
         commands
@@ -131,4 +135,5 @@ def test_failed_sync_stops_and_cleans_scratch(worker: tuple[Path, Path, dict[str
     assert "completed" not in result.stdout
     commands = Path(worker[2]["PROOF_LOG"]).read_text(encoding="utf-8")
     assert "exec -- python --version" not in commands
+    assert not (worker[1] / ".local/state/mise").exists()
     assert not list(Path(worker[2]["FIXTURE_TMP"]).glob("scratch.*"))
