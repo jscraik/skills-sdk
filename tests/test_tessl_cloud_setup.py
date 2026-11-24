@@ -46,9 +46,8 @@ set -eu
 [[ -z "${GH_TOKEN+x}" && -z "${GITHUB_TOKEN+x}" && -z "${GITHUB_PERSONAL_ACCESS_TOKEN+x}" ]]
 [[ "$MISE_TRUSTED_CONFIG_PATHS" == "$PWD/.mise.toml" ]]
 [[ "$MISE_CEILING_PATHS" == "$PWD/.." ]]
-state_dir="${MISE_STATE_DIR:-$HOME/.local/state/mise}"
-mkdir -p "$state_dir/trusted-configs"
-: > "$state_dir/trusted-configs/checkout"
+mkdir -p "${MISE_STATE_DIR:-$HOME/.local/state/mise}/trusted-configs"
+printf 'trust\n' > "${MISE_STATE_DIR:-$HOME/.local/state/mise}/trusted-configs/preparation"
 printf '%s\n' "$*" >> "$PROOF_LOG"
 [[ "${FAIL_SYNC:-0}" != 1 || "$*" != 'exec -- uv sync --frozen --extra images' ]]
 MISE
@@ -79,6 +78,9 @@ def test_repeated_setup_preserves_inputs_and_scopes_environment(worker: tuple[Pa
     original_environment = environment.copy()
     sentinel = home / "existing-setting"
     sentinel.write_bytes(b"preserve existing settings")
+    caller_state = home / ".local/state/mise"
+    caller_state.mkdir(parents=True)
+    (caller_state / "existing-trust").write_bytes(b"caller-owned trust")
     lock_before = (checkout / "uv.lock").read_bytes()
     for _ in range(2):
         result = _run(worker)
@@ -89,7 +91,8 @@ def test_repeated_setup_preserves_inputs_and_scopes_environment(worker: tuple[Pa
     assert (checkout / "uv.lock").read_bytes() == lock_before
     assert (home / ".local/bin/mise").is_file()
     assert not (home / ".config").exists()
-    assert not (home / ".local/state/mise").exists()
+    assert list(caller_state.iterdir()) == [caller_state / "existing-trust"]
+    assert (caller_state / "existing-trust").read_bytes() == b"caller-owned trust"
     commands = Path(environment["PROOF_LOG"]).read_text(encoding="utf-8").splitlines()
     assert (
         commands

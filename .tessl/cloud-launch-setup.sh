@@ -28,6 +28,7 @@ install -m 0755 "$scratch/mise/bin/mise" "$HOME/.local/bin/mise"
 export PATH="$HOME/.local/bin:$PATH"
 export MISE_CEILING_PATHS="$repo_root/.."
 export MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"
+# mise install may persist trust; discard preparation state on every exit.
 export MISE_STATE_DIR="$scratch/mise-state"
 mise install python uv ruff vale
 mise exec -- uv sync --frozen --extra images

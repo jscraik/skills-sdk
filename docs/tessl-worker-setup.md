@@ -12,8 +12,10 @@ the full validation route. Tool preparation does not require GitHub credentials;
 the hook removes those variables from its child environment. The later agent's
 permissions remain controlled by its selected Tessl environment.
 
-Trust is scoped to the checkout through environment variables. The hook does
-not change persistent mise trust settings. Repeated execution refreshes the
+Trust is scoped to the checkout through environment variables. Preparation
+state, including mise trust records, lives in the temporary directory and is
+removed on success or failure. Installed tools remain available to the agent;
+existing worker trust records are unchanged. Repeated execution refreshes the
 same tools and dependency environment. A failed bootstrap or dependency sync
 stops preparation; it does not establish validation success. Installed tools
 can remain after a later failure in the disposable worker.
