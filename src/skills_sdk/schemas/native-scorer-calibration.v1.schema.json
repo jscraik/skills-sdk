@@ -1,0 +1,917 @@
+{
+  "$defs": {
+    "CodexNativeJudgeParameters": {
+      "additionalProperties": false,
+      "description": "Frozen requested CLI controls; temperature is explicitly unavailable.",
+      "properties": {
+        "apps": {
+          "const": false,
+          "default": false,
+          "title": "Apps",
+          "type": "boolean"
+        },
+        "cli_version": {
+          "minLength": 1,
+          "title": "Cli Version",
+          "type": "string"
+        },
+        "disabled_mcp_servers": {
+          "items": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Disabled Mcp Servers",
+          "type": "array"
+        },
+        "ephemeral": {
+          "const": true,
+          "default": true,
+          "title": "Ephemeral",
+          "type": "boolean"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "plugins": {
+          "const": false,
+          "default": false,
+          "title": "Plugins",
+          "type": "boolean"
+        },
+        "reasoning_effort": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Reasoning Effort",
+          "type": "string"
+        },
+        "sandbox": {
+          "const": "read-only",
+          "default": "read-only",
+          "title": "Sandbox",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "codex-native-judge-parameters/v1",
+          "default": "codex-native-judge-parameters/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "shell_tool": {
+          "const": false,
+          "default": false,
+          "title": "Shell Tool",
+          "type": "boolean"
+        },
+        "temperature": {
+          "default": null,
+          "title": "Temperature",
+          "type": "null"
+        },
+        "temperature_control": {
+          "const": "not_exposed_by_codex_cli",
+          "default": "not_exposed_by_codex_cli",
+          "title": "Temperature Control",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "maximum": 300,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "trial_count": {
+          "const": 1,
+          "default": 1,
+          "title": "Trial Count",
+          "type": "integer"
+        },
+        "web_search": {
+          "const": "disabled",
+          "default": "disabled",
+          "title": "Web Search",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "cli_version",
+        "reasoning_effort",
+        "timeout_seconds",
+        "disabled_mcp_servers"
+      ],
+      "title": "CodexNativeJudgeParameters",
+      "type": "object"
+    },
+    "HeldOutCalibrationProbe": {
+      "additionalProperties": false,
+      "description": "A host-retained label bound to the exact held-out provider output.",
+      "properties": {
+        "expected_label": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Expected Label",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "probe_id": {
+          "minLength": 1,
+          "title": "Probe Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "probe_id",
+        "output_sha256",
+        "expected_label"
+      ],
+      "title": "HeldOutCalibrationProbe",
+      "type": "object"
+    },
+    "NativeCalibrationPlan": {
+      "additionalProperties": false,
+      "description": "Separate native family; preserve all existing candidate and safety gates.",
+      "properties": {
+        "assertion_contract_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Assertion Contract Sha256",
+          "type": "string"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "judge": {
+          "$ref": "#/$defs/ProviderIdentityV2"
+        },
+        "parameters": {
+          "$ref": "#/$defs/CodexNativeJudgeParameters"
+        },
+        "policy": {
+          "$ref": "#/$defs/ScorerCalibrationAppliedPolicy"
+        },
+        "probes": {
+          "items": {
+            "$ref": "#/$defs/HeldOutCalibrationProbe"
+          },
+          "maxItems": 64,
+          "minItems": 2,
+          "title": "Probes",
+          "type": "array"
+        },
+        "rubric_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Rubric Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "native-calibration-plan/v1",
+          "default": "native-calibration-plan/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scorer": {
+          "$ref": "#/$defs/ScorerProfile"
+        }
+      },
+      "required": [
+        "candidate",
+        "scorer",
+        "judge",
+        "parameters",
+        "policy",
+        "assertion_contract_sha256",
+        "probes",
+        "rubric_sha256"
+      ],
+      "title": "NativeCalibrationPlan",
+      "type": "object"
+    },
+    "NativeCalibrationReceipt": {
+      "additionalProperties": false,
+      "description": "Native callback proof; never external authenticity or release clearance.",
+      "properties": {
+        "blocker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageSafetyBlocker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence_scope": {
+          "const": "observed_adapter_callbacks",
+          "default": "observed_adapter_callbacks",
+          "title": "Evidence Scope",
+          "type": "string"
+        },
+        "external_authenticity_verified": {
+          "const": false,
+          "default": false,
+          "title": "External Authenticity Verified",
+          "type": "boolean"
+        },
+        "judge_execution_performed": {
+          "title": "Judge Execution Performed",
+          "type": "boolean"
+        },
+        "judge_invocation_count": {
+          "maximum": 128,
+          "minimum": 0,
+          "title": "Judge Invocation Count",
+          "type": "integer"
+        },
+        "mutation_performed": {
+          "const": false,
+          "default": false,
+          "title": "Mutation Performed",
+          "type": "boolean"
+        },
+        "plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NativeCalibrationPlan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "promotion_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Promotion Authorized",
+          "type": "boolean"
+        },
+        "results": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ObservedCalibrationProbeResult"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "native-calibration/v1",
+          "default": "native-calibration/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "judge_invocation_count",
+        "judge_execution_performed"
+      ],
+      "title": "NativeCalibrationReceipt",
+      "type": "object"
+    },
+    "ObservedCalibrationProbeResult": {
+      "additionalProperties": false,
+      "description": "Redacted per-output execution result; raw outputs never enter the receipt.",
+      "properties": {
+        "expected_label": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Expected Label",
+          "type": "string"
+        },
+        "judge_result_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Judge Result Sha256",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "predicted_label": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Predicted Label",
+          "type": "string"
+        },
+        "probe_id": {
+          "minLength": 1,
+          "title": "Probe Id",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        },
+        "trial_index": {
+          "minimum": 0,
+          "title": "Trial Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "probe_id",
+        "trial_index",
+        "output_sha256",
+        "expected_label",
+        "predicted_label",
+        "score",
+        "judge_result_sha256"
+      ],
+      "title": "ObservedCalibrationProbeResult",
+      "type": "object"
+    },
+    "PackageCandidateIdentity": {
+      "additionalProperties": false,
+      "description": "Immutable identity shared by intake and downstream proof receipts.",
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "package_id": {
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Package Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "package-candidate/v1",
+          "default": "package-candidate/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_revision": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "source_revision",
+        "content_sha256"
+      ],
+      "title": "PackageCandidateIdentity",
+      "type": "object"
+    },
+    "PackageSafetyBlocker": {
+      "additionalProperties": false,
+      "description": "Typed reason that a safety-review state cannot establish no issue.",
+      "properties": {
+        "code": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)[0-9]*(?:[_-][A-Za-z0-9]+)*(?![A-Za-z0-9_-])|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)[A-Za-z0-9_-]*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=]|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])|[a-z][A-Z](?:piKey|ccessToken|uthToken|assword|rivateKey|ecret|oken)(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=]"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:^|[^A-Za-z0-9._-])(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[\\s\\u001c-\\u001f\\u0085\\[\\](){}=:;'\\\"`<>*@])/(?!/)|(?:^|[\\s\\u001c-\\u001f\\u0085\\[\\](){}=;'\\\"`<>*@])//|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)[0-9]*(?:[_-][A-Za-z0-9]+)*(?![A-Za-z0-9_-])|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)[A-Za-z0-9_-]*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=]|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])|[a-z][A-Z](?:piKey|ccessToken|uthToken|assword|rivateKey|ecret|oken)(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=]"
+                }
+              },
+              {
+                "not": {
+                  "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:^|[^A-Za-z0-9._-])(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[\\s\\u001c-\\u001f\\u0085\\[\\](){}=:;'\\\"`<>*@])/(?!/)|(?:^|[\\s\\u001c-\\u001f\\u0085\\[\\](){}=;'\\\"`<>*@])//|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+                }
+              }
+            ],
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?![\\s\\S]*(?:[\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u0600-\\u0605\\u061c\\u06dd\\u070f\\u0890-\\u0891\\u08e2\\u180e\\u200b-\\u200f\\u202a-\\u202e\\u2060-\\u2064\\u2066-\\u206f\\ufeff\\ufff9-\\ufffb]|\ud804\udcbd|\ud804\udccd|\ud80d\udc30|\ud80d\udc31|\ud80d\udc32|\ud80d\udc33|\ud80d\udc34|\ud80d\udc35|\ud80d\udc36|\ud80d\udc37|\ud80d\udc38|\ud80d\udc39|\ud80d\udc3a|\ud80d\udc3b|\ud80d\udc3c|\ud80d\udc3d|\ud80d\udc3e|\ud80d\udc3f|\ud82f\udca0|\ud82f\udca1|\ud82f\udca2|\ud82f\udca3|\ud834\udd73|\ud834\udd74|\ud834\udd75|\ud834\udd76|\ud834\udd77|\ud834\udd78|\ud834\udd79|\ud834\udd7a|\udb40\udc01|\udb40\udc20|\udb40\udc21|\udb40\udc22|\udb40\udc23|\udb40\udc24|\udb40\udc25|\udb40\udc26|\udb40\udc27|\udb40\udc28|\udb40\udc29|\udb40\udc2a|\udb40\udc2b|\udb40\udc2c|\udb40\udc2d|\udb40\udc2e|\udb40\udc2f|\udb40\udc30|\udb40\udc31|\udb40\udc32|\udb40\udc33|\udb40\udc34|\udb40\udc35|\udb40\udc36|\udb40\udc37|\udb40\udc38|\udb40\udc39|\udb40\udc3a|\udb40\udc3b|\udb40\udc3c|\udb40\udc3d|\udb40\udc3e|\udb40\udc3f|\udb40\udc40|\udb40\udc41|\udb40\udc42|\udb40\udc43|\udb40\udc44|\udb40\udc45|\udb40\udc46|\udb40\udc47|\udb40\udc48|\udb40\udc49|\udb40\udc4a|\udb40\udc4b|\udb40\udc4c|\udb40\udc4d|\udb40\udc4e|\udb40\udc4f|\udb40\udc50|\udb40\udc51|\udb40\udc52|\udb40\udc53|\udb40\udc54|\udb40\udc55|\udb40\udc56|\udb40\udc57|\udb40\udc58|\udb40\udc59|\udb40\udc5a|\udb40\udc5b|\udb40\udc5c|\udb40\udc5d|\udb40\udc5e|\udb40\udc5f|\udb40\udc60|\udb40\udc61|\udb40\udc62|\udb40\udc63|\udb40\udc64|\udb40\udc65|\udb40\udc66|\udb40\udc67|\udb40\udc68|\udb40\udc69|\udb40\udc6a|\udb40\udc6b|\udb40\udc6c|\udb40\udc6d|\udb40\udc6e|\udb40\udc6f|\udb40\udc70|\udb40\udc71|\udb40\udc72|\udb40\udc73|\udb40\udc74|\udb40\udc75|\udb40\udc76|\udb40\udc77|\udb40\udc78|\udb40\udc79|\udb40\udc7a|\udb40\udc7b|\udb40\udc7c|\udb40\udc7d|\udb40\udc7e|\udb40\udc7f))(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "(^|[^A-Za-z0-9])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-|-----[Bb][Ee][Gg][Ii][Nn](?: [A-Za-z0-9]+)? [Pp][Rr][Ii][Vv][Aa][Tt][Ee] [Kk][Ee][Yy]-----|[eE][yY][jJ][A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)[0-9]*(?:[_-][A-Za-z0-9]+)*(?![A-Za-z0-9_-])|(?:[cC][lL][iI][eE][nN][tT]|[aA][cC][cC][eE][sS][sS])[_-]?(?:[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN]|[kK][eE][yY](?:[_-]?[iI][dD])?)[A-Za-z0-9_-]*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=]|(?:(?:[sS][sS][hH]_)?[pP][rR][iI][vV][aA][tT][eE][_-]?[kK][eE][yY]|[aA][pP][iI][_-]?[kK][eE][yY]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=])|[a-z][A-Z](?:piKey|ccessToken|uthToken|assword|rivateKey|ecret|oken)(?:[_-][A-Za-z0-9]+)*[\\\"']?[\\s\\u001c-\\u001f\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*[:=]"
+              }
+            },
+            {
+              "not": {
+                "pattern": "(?:[fF][iI][lL][eE]:)/+|(?:^|[^A-Za-z0-9])\\$[A-Za-z_][A-Za-z0-9_]*/|(?:^|[^A-Za-z0-9._-])(?:[A-Za-z0-9._-]+\\\\)+[A-Za-z0-9._-]+|(?:^|[^A-Za-z0-9])\\\\|(?:^|[\\s\\u001c-\\u001f\\u0085\\[\\](){}=:;'\\\"`<>*@])/(?!/)|(?:^|[\\s\\u001c-\\u001f\\u0085\\[\\](){}=;'\\\"`<>*@])//|(?:^|[^A-Za-z0-9/])/(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9.:/])(?:[A-Za-z0-9._-]+/)+(?:[Uu][sS][eE][rR][sS]|[Hh][oO][mM][eE]|[Pp][rR][iI][vV][aA][tT][eE]|[Tt][mM][pP]|[Ww][oO][rR][kK][sS][pP][aA][cC][eE]|[Vv][aA][rR]/[Ff][oO][lL][dD][eE][rR][sS]|[Rr][Oo][Oo][Tt])/|(?:^|[^A-Za-z0-9])[A-Za-z]:"
+              }
+            },
+            {
+              "pattern": "\\S"
+            }
+          ],
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PackageSafetyBlocker",
+      "type": "object"
+    },
+    "ProviderIdentityV2": {
+      "additionalProperties": false,
+      "description": "Hardened provider identity for provider-bearing v2 contracts.",
+      "properties": {
+        "adapter_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "adapter_version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Adapter Version Or Digest",
+          "type": "string"
+        },
+        "model_id": {
+          "allOf": [
+            {
+              "not": {
+                "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+              }
+            }
+          ],
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*(?:/[A-Za-z0-9][A-Za-z0-9._:+-]*)*$",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "provider_id": {
+          "maxLength": 64,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+          "title": "Provider Id",
+          "type": "string"
+        },
+        "provider_kind": {
+          "enum": [
+            "llm",
+            "agent",
+            "external"
+          ],
+          "title": "Provider Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "provider-identity/v2",
+          "default": "provider-identity/v2",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "version_or_digest": {
+          "maxLength": 128,
+          "not": {
+            "pattern": "(^|[._:+/-])(?:[aA][iI][zZ][aA]|[aA][kK][iI][aA]|[bB][eE][aA][rR][eE][rR]|[gG][hH][pP]_|[gG][iI][tT][hH][uU][bB]_[pP][aA][tT]_|[hH][fF]_|[sS][kK]-|[xX][oO][xX][bB]-|[xX][oO][xX][pP]-)"
+          },
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]*$",
+          "title": "Version Or Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_id",
+        "provider_kind",
+        "model_id",
+        "version_or_digest",
+        "adapter_id",
+        "adapter_version_or_digest"
+      ],
+      "title": "ProviderIdentityV2",
+      "type": "object"
+    },
+    "ScenarioQualityFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case Id"
+        },
+        "code": {
+          "pattern": "^[a-z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "pattern": "^(?=.*\\S)(?![\\s\\S]*(?:[\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u0600-\\u0605\\u061c\\u06dd\\u070f\\u0890-\\u0891\\u08e2\\u180e\\u200b-\\u200f\\u202a-\\u202e\\u2060-\\u2064\\u2066-\\u206f\\ufeff\\ufff9-\\ufffb]|\ud804\udcbd|\ud804\udccd|\ud80d\udc30|\ud80d\udc31|\ud80d\udc32|\ud80d\udc33|\ud80d\udc34|\ud80d\udc35|\ud80d\udc36|\ud80d\udc37|\ud80d\udc38|\ud80d\udc39|\ud80d\udc3a|\ud80d\udc3b|\ud80d\udc3c|\ud80d\udc3d|\ud80d\udc3e|\ud80d\udc3f|\ud82f\udca0|\ud82f\udca1|\ud82f\udca2|\ud82f\udca3|\ud834\udd73|\ud834\udd74|\ud834\udd75|\ud834\udd76|\ud834\udd77|\ud834\udd78|\ud834\udd79|\ud834\udd7a|\udb40\udc01|\udb40\udc20|\udb40\udc21|\udb40\udc22|\udb40\udc23|\udb40\udc24|\udb40\udc25|\udb40\udc26|\udb40\udc27|\udb40\udc28|\udb40\udc29|\udb40\udc2a|\udb40\udc2b|\udb40\udc2c|\udb40\udc2d|\udb40\udc2e|\udb40\udc2f|\udb40\udc30|\udb40\udc31|\udb40\udc32|\udb40\udc33|\udb40\udc34|\udb40\udc35|\udb40\udc36|\udb40\udc37|\udb40\udc38|\udb40\udc39|\udb40\udc3a|\udb40\udc3b|\udb40\udc3c|\udb40\udc3d|\udb40\udc3e|\udb40\udc3f|\udb40\udc40|\udb40\udc41|\udb40\udc42|\udb40\udc43|\udb40\udc44|\udb40\udc45|\udb40\udc46|\udb40\udc47|\udb40\udc48|\udb40\udc49|\udb40\udc4a|\udb40\udc4b|\udb40\udc4c|\udb40\udc4d|\udb40\udc4e|\udb40\udc4f|\udb40\udc50|\udb40\udc51|\udb40\udc52|\udb40\udc53|\udb40\udc54|\udb40\udc55|\udb40\udc56|\udb40\udc57|\udb40\udc58|\udb40\udc59|\udb40\udc5a|\udb40\udc5b|\udb40\udc5c|\udb40\udc5d|\udb40\udc5e|\udb40\udc5f|\udb40\udc60|\udb40\udc61|\udb40\udc62|\udb40\udc63|\udb40\udc64|\udb40\udc65|\udb40\udc66|\udb40\udc67|\udb40\udc68|\udb40\udc69|\udb40\udc6a|\udb40\udc6b|\udb40\udc6c|\udb40\udc6d|\udb40\udc6e|\udb40\udc6f|\udb40\udc70|\udb40\udc71|\udb40\udc72|\udb40\udc73|\udb40\udc74|\udb40\udc75|\udb40\udc76|\udb40\udc77|\udb40\udc78|\udb40\udc79|\udb40\udc7a|\udb40\udc7b|\udb40\udc7c|\udb40\udc7d|\udb40\udc7e|\udb40\udc7f))(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?(?:/|$))(?![^/]*:)(?!.*//)(?!.*(?:^|/)\\./)(?!.*\\/$)[\\s\\S]+$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ScenarioQualityFinding",
+      "type": "object"
+    },
+    "ScorerCalibrationAppliedPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "max_false_negatives": {
+          "minimum": 0,
+          "title": "Max False Negatives",
+          "type": "integer"
+        },
+        "max_false_positives": {
+          "minimum": 0,
+          "title": "Max False Positives",
+          "type": "integer"
+        },
+        "minimum_examples": {
+          "minimum": 1,
+          "title": "Minimum Examples",
+          "type": "integer"
+        },
+        "minimum_true_negatives": {
+          "minimum": 1,
+          "title": "Minimum True Negatives",
+          "type": "integer"
+        },
+        "minimum_true_positives": {
+          "minimum": 1,
+          "title": "Minimum True Positives",
+          "type": "integer"
+        },
+        "threshold": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold",
+        "minimum_examples",
+        "minimum_true_positives",
+        "minimum_true_negatives",
+        "max_false_positives",
+        "max_false_negatives"
+      ],
+      "title": "ScorerCalibrationAppliedPolicy",
+      "type": "object"
+    },
+    "ScorerCalibrationMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "fn": {
+          "minimum": 0,
+          "title": "Fn",
+          "type": "integer"
+        },
+        "fp": {
+          "minimum": 0,
+          "title": "Fp",
+          "type": "integer"
+        },
+        "tn": {
+          "minimum": 0,
+          "title": "Tn",
+          "type": "integer"
+        },
+        "tp": {
+          "minimum": 0,
+          "title": "Tp",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tp",
+        "tn",
+        "fp",
+        "fn"
+      ],
+      "title": "ScorerCalibrationMetrics",
+      "type": "object"
+    },
+    "ScorerCalibrationRates": {
+      "additionalProperties": false,
+      "properties": {
+        "accuracy": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accuracy"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Precision"
+        },
+        "tnr": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tnr"
+        },
+        "tpr": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tpr"
+        }
+      },
+      "title": "ScorerCalibrationRates",
+      "type": "object"
+    },
+    "ScorerProfile": {
+      "additionalProperties": false,
+      "description": "Versioned scorer identity and calibration requirements.",
+      "properties": {
+        "calibration_probe_ids": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Calibration Probe Ids",
+          "type": "array"
+        },
+        "calibration_required": {
+          "title": "Calibration Required",
+          "type": "boolean"
+        },
+        "candidate": {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        "deterministic_checks_first": {
+          "title": "Deterministic Checks First",
+          "type": "boolean"
+        },
+        "pass_threshold": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Pass Threshold",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "scorer-profile/v1",
+          "default": "scorer-profile/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scorer_id": {
+          "minLength": 1,
+          "title": "Scorer Id",
+          "type": "string"
+        },
+        "scorer_type": {
+          "enum": [
+            "deterministic",
+            "llm_judge",
+            "hybrid",
+            "external"
+          ],
+          "title": "Scorer Type",
+          "type": "string"
+        },
+        "version_or_digest": {
+          "minLength": 1,
+          "title": "Version Or Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate",
+        "scorer_id",
+        "scorer_type",
+        "version_or_digest",
+        "pass_threshold",
+        "deterministic_checks_first",
+        "calibration_required"
+      ],
+      "title": "ScorerProfile",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.skills-sdk.dev/native-scorer-calibration.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Retain a supplied native observation alongside its recomputed summary.",
+  "properties": {
+    "candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageCandidateIdentity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "confusion_matrix": {
+      "$ref": "#/$defs/ScorerCalibrationMetrics"
+    },
+    "effective_policy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScorerCalibrationAppliedPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "example_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Example Count",
+      "type": "integer"
+    },
+    "execution_performed": {
+      "const": false,
+      "default": false,
+      "title": "Execution Performed",
+      "type": "boolean"
+    },
+    "findings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ScenarioQualityFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "metrics": {
+      "$ref": "#/$defs/ScorerCalibrationRates"
+    },
+    "mutation_performed": {
+      "const": false,
+      "default": false,
+      "title": "Mutation Performed",
+      "type": "boolean"
+    },
+    "network_used": {
+      "const": false,
+      "default": false,
+      "title": "Network Used",
+      "type": "boolean"
+    },
+    "observation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NativeCalibrationReceipt"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "parameters": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CodexNativeJudgeParameters"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "prompt_version": {
+      "default": "",
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "native-scorer-calibration/v1",
+      "default": "native-scorer-calibration/v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scorer_id": {
+      "default": "",
+      "title": "Scorer Id",
+      "type": "string"
+    },
+    "scorer_version_or_digest": {
+      "default": "",
+      "title": "Scorer Version Or Digest",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "NativeScorerCalibrationReceipt",
+  "type": "object"
+}

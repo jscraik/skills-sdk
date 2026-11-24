@@ -98,6 +98,12 @@ from skills_sdk.models.native_matched import (
     NativeMatchedPairAssessment,
     NativeMatchedVariantCalibrationBundle,
 )
+from skills_sdk.models.native_quality import (
+    NativeLocalCheckRequest,
+    NativeLocalCheckResult,
+    NativeScorerCalibrationReceipt,
+    NativeScorerQualityReceipt,
+)
 from skills_sdk.models.observed_calibration import (
     CalibrationJudgeVerdict,
     HeldOutCalibrationProbe,
@@ -306,12 +312,16 @@ __all__ = [
     "MutationRaceEvidence",
     "NativeCalibrationPlan",
     "NativeCalibrationReceipt",
+    "NativeLocalCheckRequest",
+    "NativeLocalCheckResult",
     "NativeMatchedCalibrationReceipt",
     "NativeMatchedCalibrationTarget",
     "NativeMatchedComparisonPlan",
     "NativeMatchedLaneSpec",
     "NativeMatchedPairAssessment",
     "NativeMatchedVariantCalibrationBundle",
+    "NativeScorerCalibrationReceipt",
+    "NativeScorerQualityReceipt",
     "NormalizedPackage",
     "NormalizedPackageV2",
     "NormalizedPackageV3",

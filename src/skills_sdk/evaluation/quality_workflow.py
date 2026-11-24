@@ -9,9 +9,11 @@ from pydantic import ValidationError
 
 from skills_sdk.evaluation.content_review import OfflineContentReviewAdapter, execute_content_review
 from skills_sdk.evaluation.coverage import assess_scenario_coverage
+from skills_sdk.evaluation.native_quality import assess_native_calibration
 from skills_sdk.evaluation.scorer_calibration import assess_scorer_calibration
 from skills_sdk.evaluation.scorer_quality import assess_scorer_quality
 from skills_sdk.intake import intake_skill_package
+from skills_sdk.models.native_quality import NativeLocalCheckRequest, NativeLocalCheckResult, NativeLocalQualityStage
 from skills_sdk.models.packaging import PackageReceiptBlocker
 from skills_sdk.models.quality_workflow import (
     LocalCheckRequestV2,
@@ -35,9 +37,13 @@ def _blocked(
 ) -> LocalCheckResultV2:
     """Return portable orchestration failure without host paths or exception text."""
     result_model = (
-        LocalCheckResultV4
-        if isinstance(request, LocalCheckRequestV4)
-        else (LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2)
+        NativeLocalCheckResult
+        if isinstance(request, NativeLocalCheckRequest)
+        else (
+            LocalCheckResultV4
+            if isinstance(request, LocalCheckRequestV4)
+            else (LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2)
+        )
     )
     return result_model(
         status="blocked",
@@ -56,9 +62,13 @@ def _record(
 ) -> LocalCheckResultV2 | None:
     """Stop at the first changed candidate or incomplete stage; retain its receipt."""
     stage_model = (
-        LocalQualityStageV3
-        if isinstance(request, LocalCheckRequestV4)
-        else (LocalQualityStageV2 if isinstance(request, LocalCheckRequestV3) else LocalQualityStage)
+        NativeLocalQualityStage
+        if isinstance(request, NativeLocalCheckRequest)
+        else (
+            LocalQualityStageV3
+            if isinstance(request, LocalCheckRequestV4)
+            else (LocalQualityStageV2 if isinstance(request, LocalCheckRequestV3) else LocalQualityStage)
+        )
     )
     stage = stage_model(name=name, receipt=receipt)
     stages.append(stage)
@@ -86,8 +96,15 @@ def _deterministic_stages(
             coverage_plan=request.coverage_plan,
         ),
     )
-    yield "scorer-quality", assess_scorer_quality(root, source_revision=revision)
-    yield "scorer-calibration", assess_scorer_calibration(root, source_revision=revision)
+    if isinstance(request, NativeLocalCheckRequest):
+        from skills_sdk.evaluation.scorer_quality import _assess_scorer_quality
+
+        declaration = _assess_scorer_quality(root, source_revision=revision, native=True)
+        yield "scorer-quality", declaration
+        yield "scorer-calibration", assess_native_calibration(request, declaration, request.calibration)
+    else:
+        yield "scorer-quality", assess_scorer_quality(root, source_revision=revision)
+        yield "scorer-calibration", assess_scorer_calibration(root, source_revision=revision)
 
 
 def _final_result(
@@ -108,9 +125,13 @@ def _final_result(
             and baseline.candidate == request.update_baseline
         )
     result_model = (
-        LocalCheckResultV4
-        if isinstance(request, LocalCheckRequestV4)
-        else (LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2)
+        NativeLocalCheckResult
+        if isinstance(request, NativeLocalCheckRequest)
+        else (
+            LocalCheckResultV4
+            if isinstance(request, LocalCheckRequestV4)
+            else (LocalCheckResultV3 if isinstance(request, LocalCheckRequestV3) else LocalCheckResultV2)
+        )
     )
     return result_model(
         status="local_checks_passed" if unchanged else "blocked",
@@ -142,9 +163,12 @@ async def check_local_quality(
     explicitly provided trusted callback; its receipt is a separate evidence lane.
     """
     try:
-        payload = LocalCheckRequestV2.inputs_are_revalidated(request)
+        from skills_sdk.models.native_quality import _native_quality_input
+
+        payload = _native_quality_input(request)
         model = (
             {
+                "native-local-check-request/v1": NativeLocalCheckRequest,
                 "local-check-request/v3": LocalCheckRequestV3,
                 "local-check-request/v4": LocalCheckRequestV4,
             }.get(payload.get("schema_version"), LocalCheckRequestV2)

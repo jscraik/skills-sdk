@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
 
@@ -241,6 +241,7 @@ class LocalQualityStage(_ContractModel):
     """Retain each actual upstream service receipt without altering its meaning."""
 
     model_config = ConfigDict(revalidate_instances="always")
+    _stage_types: ClassVar[dict] = _QUALITY_TYPES
     name: QualityStageName
     receipt: QualityStageReceipt
 
@@ -253,7 +254,7 @@ class LocalQualityStage(_ContractModel):
     @model_validator(mode="after")
     def receipt_matches_name(self) -> LocalQualityStage:
         """Require the stage's canonical receipt type and consistent validation manifests."""
-        if type(self.receipt) not in _QUALITY_TYPES[self.name]:
+        if type(self.receipt) not in self._stage_types[self.name]:
             raise ValueError("quality stage must use its canonical receipt type")
         if isinstance(self.receipt, SkillPackageValidation):
             _validation_manifest_matches(self.receipt)
@@ -278,6 +279,7 @@ class LocalCheckResultV2(_ContractModel):
     """Ordered local quality evidence; never admission or promotion permission."""
 
     model_config = ConfigDict(revalidate_instances="always")
+    _stage_types: ClassVar[dict] = _QUALITY_TYPES
     schema_version: Literal["local-check/v2"] = "local-check/v2"
     status: Literal["local_checks_passed", "blocked"]
     request: LocalCheckRequestV2 | None
@@ -322,7 +324,7 @@ class LocalCheckResultV2(_ContractModel):
             }:
                 raise ValueError("request blocker code must identify a request failure")
             return self
-        expected = tuple(_QUALITY_TYPES)
+        expected = tuple(self._stage_types)
         if self.request.intent != "update":
             expected = expected[1:]
         if tuple(stage.name for stage in self.stages) != expected[: len(self.stages)]:
