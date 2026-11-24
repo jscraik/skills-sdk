@@ -12,7 +12,9 @@ the full validation route. Tool preparation does not require GitHub credentials;
 the hook removes those variables from its child environment. The later agent's
 permissions remain controlled by its selected Tessl environment.
 
-Trust is scoped to the checkout through environment variables. Preparation
+Trust is scoped to the checkout through environment variables. Global and system
+configuration are excluded from preparation without changing worker-owned files.
+Preparation
 state, including mise trust records, lives in the temporary directory and is
 removed on success or failure. Installed tools remain available to the agent;
 existing worker trust records are unchanged. Repeated execution refreshes the
@@ -34,7 +36,9 @@ the `skills-sdk-lab/skills-sdk` project explicitly, with `codex` and
 `gpt-6.1-sol`; read-only GitHub access is sufficient for this check. The checker
 must report both hook runs passing, `AGENT=codex`, an empty `WORKDIR` for the
 repository root, and the expected Python and uv versions. Then verify the
-agent can execute a maintained SDK validation command through `mise exec`.
+agent can execute `mise exec -- bash scripts/validate-repository.sh`, the SDK
+validation command. Record the exact revision, command and pass/fail/blocked
+outcome; preparation success alone does not prove validation.
 The hook's child-process PATH does not configure the later agent, so that
 command must find mise through Tessl's documented `~/.local/bin` path.
 

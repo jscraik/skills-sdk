@@ -45,7 +45,13 @@ cat > "$1/mise/bin/mise" <<'MISE'
 set -eu
 [[ -z "${GH_TOKEN+x}" && -z "${GITHUB_TOKEN+x}" && -z "${GITHUB_PERSONAL_ACCESS_TOKEN+x}" ]]
 [[ "$MISE_TRUSTED_CONFIG_PATHS" == "$PWD/.mise.toml" ]]
-[[ "$MISE_CEILING_PATHS" == "$PWD/.." ]]
+[[ "$MISE_CEILING_PATHS" == "$(cd "$PWD/.." && pwd -P)" ]]
+[[ "$MISE_CONFIG_DIR" == "$FIXTURE_TMP"/scratch.*/config ]]
+[[ "$MISE_SYSTEM_CONFIG_DIR" == "$FIXTURE_TMP"/scratch.*/system-config ]]
+[[ "$MISE_GLOBAL_CONFIG_FILE" == "$FIXTURE_TMP"/scratch.*/global.toml ]]
+[[ "$MISE_SYSTEM_CONFIG_FILE" == "$FIXTURE_TMP"/scratch.*/system.toml ]]
+[[ -f "$MISE_GLOBAL_CONFIG_FILE" && ! -s "$MISE_GLOBAL_CONFIG_FILE" ]]
+[[ -f "$MISE_SYSTEM_CONFIG_FILE" && ! -s "$MISE_SYSTEM_CONFIG_FILE" ]]
 mkdir -p "${MISE_STATE_DIR:-$HOME/.local/state/mise}/trusted-configs"
 printf 'trust\n' > "${MISE_STATE_DIR:-$HOME/.local/state/mise}/trusted-configs/preparation"
 printf '%s\n' "$*" >> "$PROOF_LOG"
@@ -140,3 +146,19 @@ def test_failed_sync_stops_and_cleans_scratch(worker: tuple[Path, Path, dict[str
     assert "exec -- python --version" not in commands
     assert not (worker[1] / ".local/state/mise").exists()
     assert not list(Path(worker[2]["FIXTURE_TMP"]).glob("scratch.*"))
+
+
+def test_setup_excludes_parent_and_worker_configs(worker: tuple[Path, Path, dict[str, str]]) -> None:
+    checkout, home, environment = worker
+    parent_config = checkout.parent / ".mise.toml"
+    global_config = home / ".config/mise/config.toml"
+    system_config = checkout.parent / "system/config.toml"
+    for path in (parent_config, global_config, system_config):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("invalid unrelated configuration", encoding="utf-8")
+    environment["MISE_GLOBAL_CONFIG_FILE"] = str(global_config)
+    environment["MISE_SYSTEM_CONFIG_FILE"] = str(system_config)
+    result = _run(worker)
+    assert result.returncode == 0, result.stderr
+    for path in (parent_config, global_config, system_config):
+        assert path.read_text(encoding="utf-8") == "invalid unrelated configuration"

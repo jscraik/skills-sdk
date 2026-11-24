@@ -26,8 +26,15 @@ install -m 0755 "$scratch/mise/bin/mise" "$HOME/.local/bin/mise"
 # Child-process PATH changes do not reach the agent. Tessl already exposes
 # ~/.local/bin; put mise there and resolve SDK commands through mise exec.
 export PATH="$HOME/.local/bin:$PATH"
-export MISE_CEILING_PATHS="$repo_root/.."
+export MISE_CEILING_PATHS="$(cd "$repo_root/.." && pwd -P)"
 export MISE_TRUSTED_CONFIG_PATHS="$repo_root/.mise.toml"
+# Trusted paths grant trust, not config isolation. Exclude worker-owned configs.
+export MISE_CONFIG_DIR="$scratch/config"
+export MISE_SYSTEM_CONFIG_DIR="$scratch/system-config"
+export MISE_GLOBAL_CONFIG_FILE="$scratch/global.toml"
+export MISE_SYSTEM_CONFIG_FILE="$scratch/system.toml"
+: > "$MISE_GLOBAL_CONFIG_FILE"
+: > "$MISE_SYSTEM_CONFIG_FILE"
 # mise install may persist trust; discard preparation state on every exit.
 export MISE_STATE_DIR="$scratch/mise-state"
 mise install python uv ruff vale
