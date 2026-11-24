@@ -135,6 +135,7 @@ def test_unclosed_frontmatter_is_blocked(tmp_path: Path) -> None:
     result = validate_skill_package(root, source_revision=REVISION)
     assert result.status == "blocked"
     assert {item.code for item in result.findings} == {"invalid_frontmatter"}
+    assert result.findings[0].message == "SKILL.md requires closed frontmatter"
 
 
 @pytest.mark.parametrize("declared_name", [None, ""])
@@ -286,7 +287,8 @@ def test_malformed_yaml_is_a_typed_blocker(tmp_path: Path, frontmatter: str) -> 
     result = validate_skill_package(root, source_revision=REVISION)
 
     assert result.status == "blocked"
-    assert "invalid_frontmatter" in {item.code for item in result.findings}
+    finding = next(item for item in result.findings if item.code == "invalid_frontmatter")
+    assert finding.message == "SKILL.md frontmatter must be valid YAML"
 
 
 def test_candidate_digest_binds_all_safe_package_files(tmp_path: Path) -> None:
