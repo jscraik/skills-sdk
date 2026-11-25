@@ -2,14 +2,6 @@
 
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/jscraik/skills-sdk?utm_source=oss&utm_medium=github&utm_campaign=jscraik%2Fskills-sdk&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
-Accepted PR #60 provides read-only
-[`check-plugin-presentation`](docs/cli.md#plugin-presentation-assessment) for
-fresh complete-plugin assets and supplied candidate-bound approvals. Optional
-`skills-sdk[images]` enables raster decoding. This assessment does not establish
-release, archive, independent visual/rights review or host-display clearance.
-Unmerged whole-plugin quality and native judge work remains outside this
-accepted capability set; see the [delivery record](docs/projects/sdk-workflow/tasks.md).
-
 Skills SDK is a portable Python contract layer and local tooling surface for
 Agent Skills packages. It defines explicit, versioned contracts for inventory,
 intake, evaluation, risk, security, manifests, and receipts. Its local
@@ -20,28 +12,63 @@ review assessment and static security screening have separate evidence limits;
 they do not establish live provider or reviewer truth. The core remains independent of a host
 repository, provider account, runtime installation, or registry.
 
-Within the [brAInwav product family](ARCHITECTURE.md#brainwav-product-family),
-`skills-sdk` owns reusable tooling. The future `skills-registry` is a separate
-repository for the service; its workers consume a pinned SDK package version.
-Its creation remains subject to the [registry start gate](docs/workflow.md#registry-transition).
+**Status:** this is the `0.x` contract-building series. Start with the read-only
+validation example below; most of the end-to-end creation, installation and
+registry workflow remains planned. See [Current status](#current-status) for
+implemented routes and migration limits.
 
-The Python API can deterministically prepare an intended runtime-lock
-transition with `plan_runtime_install`. The plan is portable and
-mutation-free: it does not resolve host paths, write a lock, install files,
-execute rollback, or prove discovery, activation, or runtime behavior. Package
-installation, runtime-lock application, rollback, discovery, and activation
-require future SDK-owned host integration and separate evidence contracts. The narrower
-existing-copy comparison and maintenance routes are documented in
-[`docs/runtime-copy-integration.md`](docs/runtime-copy-integration.md).
+## Get the source
 
-> Thin Surfaces. Strong Guardrails. Progressive Disclosure. Durable Memory.
-> Professional Output.
+You need Git and `mise` on your path. The supported Python range is
+`>=3.12,<3.13`; [`.mise.toml`](.mise.toml) pins the repository tools. Clone the
+source, install those tools, then synchronise the locked Python environment:
+
+```bash
+git clone https://github.com/jscraik/skills-sdk.git
+cd skills-sdk
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise install python uv ruff vale
+```
+
+## Quick start
+
+From the checkout root:
+
+```bash
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
+```
+
+Validate the committed synthetic skill without executing it or changing its
+files. The source revision below identifies your checkout:
+
+```bash
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill --source-revision "$(git rev-parse HEAD)" --json --robot
+```
+
+Expected result: exit `0`, a `skill-package-validation/v1` result with
+`status: "pass"`, `mutation_performed: false`, and candidate
+`package_id: "synthetic-skill"`. This establishes structural validation of the
+fixture. It does not execute a skill, evaluate a provider, install a package or
+establish release clearance. Keep the fixture unchanged when using its checkout
+revision; [the agent entrypoint](docs/agent-entrypoint.md) includes explicit
+before-and-after fixture checks.
+
+For route discovery:
+
+```bash
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --version
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help
+MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk inventory --help
+```
+
+The default help stays short. Add `--help` to a route such as `validate`,
+`build` or `inventory` for its inputs and boundaries. Route help does not mean
+that an operation is implemented.
 
 ## Contents
 
+- [Quick start](#quick-start)
 - [Current status](#current-status)
 - [What the SDK guarantees](#what-the-sdk-guarantees)
-- [Quick start](#quick-start)
 - [Validate a standalone skill](#validate-a-standalone-skill)
 - [Build a candidate-bound receipt](#build-a-candidate-bound-receipt)
 - [Python API](#python-api)
@@ -51,6 +78,14 @@ existing-copy comparison and maintenance routes are documented in
 - [Project language and further reading](#project-language-and-further-reading)
 
 ## Current status
+
+Accepted PR #60 provides read-only
+[`check-plugin-presentation`](docs/cli.md#plugin-presentation-assessment) for
+fresh complete-plugin assets and supplied candidate-bound approvals. Optional
+`skills-sdk[images]` enables raster decoding. This assessment does not establish
+release, archive, independent visual/rights review or host-display clearance.
+Unmerged whole-plugin quality and native judge work remains outside this
+accepted capability set; see the [delivery record](docs/projects/sdk-workflow/tasks.md).
 
 The repository is version `0.1.0` and is in the contract-building `0.x`
 series. Accepted local routes cover standalone intake/quality/validation/build,
@@ -108,6 +143,23 @@ security, evaluation, registry, installation, and correction gates. The
 [migration map](docs/migration-map.md) distinguishes legacy capabilities from
 current SDK behaviour; the [task record](docs/projects/sdk-workflow/tasks.md)
 tracks their implementation and proof.
+
+Within the [brAInwav product family](ARCHITECTURE.md#brainwav-product-family),
+`skills-sdk` owns reusable tooling. The future `skills-registry` is a separate
+repository for the service; its workers consume a pinned SDK package version.
+Its creation remains subject to the [registry start gate](docs/workflow.md#registry-transition).
+
+The Python API can deterministically prepare an intended runtime-lock
+transition with `plan_runtime_install`. The plan is portable and
+mutation-free: it does not resolve host paths, write a lock, install files,
+execute rollback, or prove discovery, activation, or runtime behavior. Package
+installation, runtime-lock application, rollback, discovery, and activation
+require future SDK-owned host integration and separate evidence contracts. The narrower
+existing-copy comparison and maintenance routes are documented in
+[`docs/runtime-copy-integration.md`](docs/runtime-copy-integration.md).
+
+> Thin Surfaces. Strong Guardrails. Progressive Disclosure. Durable Memory.
+> Professional Output.
 
 ## What the SDK guarantees
 
@@ -168,28 +220,6 @@ their own evidence for the same candidate identity. See
 [`docs/compatibility.md`](docs/compatibility.md) for the compatibility policy
 and evidence boundary.
 
-## Quick start
-
-The supported development floor is Python `>=3.12,<3.13`. From the checkout root:
-
-```bash
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv sync --frozen
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --version
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk --help
-```
-
-The default help route stays short. Load more detail only for the route you
-need:
-
-```bash
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk inventory --help
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate --help
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk build --help
-```
-
-The first-run route and its boundaries are also documented in
-[`docs/agent-entrypoint.md`](docs/agent-entrypoint.md).
-
 ## Validate a standalone skill
 
 `validate` reads a package and returns a `skill-package-validation/v1` result;
@@ -236,17 +266,9 @@ usage error occurs before a versioned validation result is produced. The full
 command contract is in
 [`docs/cli.md`](docs/cli.md).
 
-The committed `tests/fixtures/synthetic-skill` fixture makes the validation
-contract runnable from the repository root. A passing validation is:
-
-```bash
-MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill \
-  --source-revision 0000000000000000000000000000000000000000 \
-  --json --robot
-```
-
-Expected evidence is exit `0`, `status: "pass"`, and a candidate with
-`package_id: "synthetic-skill"`. A blocked validation is:
+The [quick start](#quick-start) validates the committed
+`tests/fixtures/synthetic-skill` fixture using your checkout revision. To see a
+blocked validation, supply an invalid revision:
 
 ```bash
 MISE_CEILING_PATHS="$PWD/.." MISE_TRUSTED_CONFIG_PATHS="$PWD/.mise.toml" mise exec -- uv run --frozen skills-sdk validate tests/fixtures/synthetic-skill \
