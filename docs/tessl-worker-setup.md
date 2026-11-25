@@ -14,13 +14,28 @@ permissions remain controlled by its selected Tessl environment.
 
 Trust is scoped to the checkout through environment variables. Global and system
 configuration are excluded from preparation without changing worker-owned files.
-Preparation
-state, including mise trust records, lives in the temporary directory and is
-removed on success or failure. Installed tools remain available to the agent;
+Preparation state, including mise trust records, is kept in a temporary
+directory and removed whether setup succeeds or fails. Installed tools
+remain available to the agent;
 existing worker trust records are unchanged. Repeated execution refreshes the
 same tools and dependency environment. A failed bootstrap or dependency sync
 stops preparation; it does not establish validation success. Installed tools
 can remain after a later failure in the disposable worker.
+
+## GitHub issue intake preflight
+
+Before applying the `tessl` label, identify the active issue loop ID in Tessl
+and fetch the source branch the loop uses. Compare the loop's live project
+with the manifest at the exact source revision:
+
+```bash
+python3 scripts/check_tessl_loop_project.py --revision "$source_revision" --loop "$loop_id"
+```
+
+The command uses the signed-in Tessl CLI and starts no cloud run. If the
+command fails, resolve the project mismatch or lookup failure before labeling
+the issue. The command reads the committed manifest, so local edits to
+`tessl.json` do not affect the result.
 
 ## Validation and cloud verification
 
