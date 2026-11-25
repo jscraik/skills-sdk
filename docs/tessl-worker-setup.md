@@ -15,8 +15,8 @@ permissions remain controlled by its selected Tessl environment.
 Trust is scoped to the checkout through environment variables. Global and system
 configuration are excluded from preparation without changing worker-owned files.
 Preparation
-state, including mise trust records, lives in the temporary directory and is
-removed on success or failure. Installed tools remain available to the agent;
+state, including mise trust records, is kept in a temporary directory and
+removed whether setup succeeds or fails. Installed tools remain available to the agent;
 existing worker trust records are unchanged. Repeated execution refreshes the
 same tools and dependency environment. A failed bootstrap or dependency sync
 stops preparation; it does not establish validation success. Installed tools
