@@ -313,15 +313,15 @@ def verify_package_archive(
     snapshot = _read_snapshot(archive_path, active_policy)
     if isinstance(snapshot, PackageArchiveVerificationReceipt):
         return snapshot
+    if len(snapshot) > active_policy.max_archive_bytes:
+        return _blocked("archive_invalid_zip", "archive exceeds configured verification bounds")
+    eocd_offset = _preflight_central_directory(snapshot, active_policy)
+    if eocd_offset is None:
+        return _blocked("archive_invalid_zip", "archive central directory violates verification bounds")
+    archive_digest = hashlib.sha256(snapshot).hexdigest()
+    if expected_archive_sha256 is not None and archive_digest != expected_archive_sha256:
+        return _blocked("archive_digest_mismatch", "archive digest does not match the expected digest")
     with BytesIO(snapshot) as archive_stream:
-        if len(snapshot) > active_policy.max_archive_bytes:
-            return _blocked("archive_invalid_zip", "archive exceeds configured verification bounds")
-        eocd_offset = _preflight_central_directory(snapshot, active_policy)
-        if eocd_offset is None:
-            return _blocked("archive_invalid_zip", "archive central directory violates verification bounds")
-        archive_digest = hashlib.sha256(snapshot).hexdigest()
-        if expected_archive_sha256 is not None and archive_digest != expected_archive_sha256:
-            return _blocked("archive_digest_mismatch", "archive digest does not match the expected digest")
         # Keep the original digest; exclude only the validated comment from the
         # stdlib parser's EOCD search, which otherwise trusts its last signature.
         archive_stream.seek(eocd_offset + _EOCD_SIZE - 2)

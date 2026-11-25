@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
+import stat
 from dataclasses import replace
 from pathlib import Path
 
@@ -150,14 +150,15 @@ def test_source_drift_is_rejected_and_corrected_input_recovers(tmp_path: Path, m
     root = _plugin(tmp_path)
     definition, context = _prepared(root, ("skills/alpha",))
     target = root / ("references/shared.md" if mutation == "shared" else "skills/alpha/SKILL.md")
+    original_mode = stat.S_IMODE(target.stat().st_mode)
     if mutation == "mode":
-        os.chmod(target, 0o744)
+        target.chmod(original_mode ^ stat.S_IXUSR)
     else:
         target.write_text(target.read_text() + "changed\n", encoding="utf-8")
     with pytest.raises(ContractError):
         prepare_matched_plugin_context(definition, context)
     if mutation == "mode":
-        os.chmod(target, 0o644)
+        target.chmod(original_mode)
     else:
         target.write_text(target.read_text().removesuffix("changed\n"), encoding="utf-8")
     assert prepare_matched_plugin_context(definition, context)["prompt"] == "Review the plugin."

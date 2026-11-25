@@ -517,7 +517,7 @@ def test_normalization_rechecks_destination_after_validation_and_recovers(
         elif mutation == "directory":
             (root / "unvalidated").mkdir()
         elif mutation == "permissions":
-            child.chmod(0o600)
+            child.chmod(stat.S_IMODE(child.stat().st_mode) ^ stat.S_IRGRP)
         else:
             child.unlink()
             child.symlink_to(source / "SKILL.md")
