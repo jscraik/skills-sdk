@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
+import stat
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 
@@ -152,14 +152,15 @@ def test_complete_source_or_mode_drift_blocks_and_corrected_source_recovers(tmp_
     evidence = _evidence(root)
     target = root / ("shared.md" if mutation == "shared" else "skills/beta/SKILL.md")
     original = target.read_bytes()
+    original_mode = stat.S_IMODE(target.stat().st_mode)
     if mutation == "mode":
-        os.chmod(target, 0o744)
+        target.chmod(original_mode ^ stat.S_IXUSR)
     else:
         target.write_bytes(original + b"changed\n")
     blocker = assess_plugin_pre_execution_safety(root, evidence, checked_at=NOW)
     assert blocker is not None and blocker.code == "plugin_security_source_changed"
     if mutation == "mode":
-        os.chmod(target, 0o644)
+        target.chmod(original_mode)
     else:
         target.write_bytes(original)
     assert assess_plugin_pre_execution_safety(root, evidence, checked_at=NOW) is None
